@@ -14,6 +14,7 @@ import { Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { UserBadges } from "@/components/user-badges";
 
 const ProfilPage = () => {
   const { user, loading } = useAuth();
@@ -325,6 +326,12 @@ const ProfilPage = () => {
                   )}
                 </div>
               </div>
+              
+              {/* Badge-uri câștigate */}
+              <div className="mt-6">
+                <UserBadges />
+              </div>
+              
               {/* Progres la cursuri (neschimbat) */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-blue-100/80 via-pink-100/60 to-white/80 dark:from-zinc-800/80 dark:via-blue-900/60 dark:to-zinc-900/80 rounded-xl p-4 shadow space-card">
                 <span className="font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">

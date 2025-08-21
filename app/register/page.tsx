@@ -62,6 +62,14 @@ export default function RegisterPage() {
     const { data, error } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
+      options: {
+        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+        data: {
+          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          nickname: formData.nickname,
+          grade: formData.grade,
+        },
+      },
     })
     if (error) {
       setLoading(false)
@@ -72,34 +80,12 @@ export default function RegisterPage() {
       })
       return
     }
-    // Adaugă date suplimentare în profiles
-    const user = data.user
-    if (user) {
-      const { error: profileError } = await supabase.from("profiles").insert([
-        {
-          user_id: user.id,
-          name: formData.firstName + " " + formData.lastName,
-          nickname: formData.nickname,
-          grade: formData.grade,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      if (profileError) {
-        toast({
-          title: "Cont creat, dar eroare la profil",
-          description: profileError.message,
-          variant: "destructive",
-        })
-        setLoading(false)
-        return
-      }
-    }
     setLoading(false)
     toast({
       title: "Cont creat cu succes!",
       description: "Verifică emailul pentru confirmare.",
     })
-    router.push("/login")
+    router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
   }
 
   const updateFormData = (field: string, value: string | boolean) => {
@@ -374,6 +360,12 @@ export default function RegisterPage() {
                   <Button
                     variant="outline"
                     className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300 h-12 bg-transparent"
+                    onClick={async () => {
+                      await supabase.auth.signInWithOAuth({
+                        provider: "google",
+                        options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined },
+                      })
+                    }}
                   >
                     <Chrome className="w-5 h-5 mr-2" />
                     Google
@@ -381,6 +373,12 @@ export default function RegisterPage() {
                   <Button
                     variant="outline"
                     className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300 h-12 bg-transparent"
+                    onClick={async () => {
+                      await supabase.auth.signInWithOAuth({
+                        provider: "github",
+                        options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined },
+                      })
+                    }}
                   >
                     <Github className="w-5 h-5 mr-2" />
                     GitHub

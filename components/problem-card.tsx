@@ -5,6 +5,7 @@ import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 import React from 'react';
+import { PlayCircle } from "lucide-react";
 
 interface ProblemCardProps {
   problem: Problem
@@ -62,6 +63,9 @@ export function ProblemCard({ problem, solved }: ProblemCardProps) {
           <span className="text-3xl drop-shadow-lg">{problemIcon}</span>
           <Badge className={`border ${difficultyColors[problem.difficulty as keyof typeof difficultyColors] || "bg-gray-100 text-gray-700 border-gray-300"} font-semibold px-3 py-1 text-xs`}>{problem.difficulty}</Badge>
           <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-semibold px-3 py-1 text-xs">{problem.category}</Badge>
+          {typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== '' && (
+            <PlayCircle className="w-5 h-5 text-red-500" title="Rezolvare video" />
+          )}
           {solved && <span className="ml-2 text-green-600 text-xl" title="Rezolvat">✔️</span>}
           <span className="text-xs text-gray-400 ml-auto font-mono">{problem.id}</span>
         </div>

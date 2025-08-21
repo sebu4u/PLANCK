@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { ProblemCard } from "@/components/problem-card"
@@ -23,6 +23,7 @@ const CLASS_MAP: Record<number, string> = {
 
 export default function ProblemsPage() {
   const { user } = useAuth();
+  const didMountRef = useRef(false)
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     category: "Toate",
@@ -72,6 +73,7 @@ export default function ProblemsPage() {
       const matchesSearch =
         problem.title.toLowerCase().includes(searchLower) ||
         problem.statement.toLowerCase().includes(searchLower) ||
+        problem.id.toLowerCase().includes(searchLower) ||
         (problem.tags && (
           Array.isArray(problem.tags)
             ? problem.tags.some((tag) => tag.toLowerCase().includes(searchLower))
@@ -106,14 +108,40 @@ export default function ProblemsPage() {
     return true
   })
 
-  const totalPages = Math.ceil(filteredProblems.length / PROBLEMS_PER_PAGE)
+  // Sortare explicită: întâi problemele cu youtube_url (dacă există), apoi Ușor -> Mediu -> Avansat, apoi cele mai noi
+  const difficultyOrder: Record<string, number> = { "Ușor": 1, "Mediu": 2, "Avansat": 3 }
+  const hasAnyYoutube = filteredProblems.some((p) => typeof p.youtube_url === 'string' && p.youtube_url.trim() !== '')
+  const sortedProblems = [...filteredProblems].sort((a, b) => {
+    if (hasAnyYoutube) {
+      const aHas = typeof a.youtube_url === 'string' && a.youtube_url.trim() !== ''
+      const bHas = typeof b.youtube_url === 'string' && b.youtube_url.trim() !== ''
+      if (aHas !== bHas) return aHas ? -1 : 1
+    }
+    const aRank = difficultyOrder[a.difficulty] ?? 99
+    const bRank = difficultyOrder[b.difficulty] ?? 99
+    if (aRank !== bRank) return aRank - bRank
+    const aTime = new Date(a.created_at).getTime()
+    const bTime = new Date(b.created_at).getTime()
+    return bTime - aTime
+  })
+
+  const totalPages = Math.ceil(sortedProblems.length / PROBLEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * PROBLEMS_PER_PAGE
-  const paginatedProblems = filteredProblems.slice(startIndex, startIndex + PROBLEMS_PER_PAGE)
+  const paginatedProblems = sortedProblems.slice(startIndex, startIndex + PROBLEMS_PER_PAGE)
 
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters)
     setCurrentPage(1)
   }
+
+  // On page change, jump to the top of the catalog (no animation)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [currentPage])
 
   return (
     <div className="min-h-screen bg-white text-gray-900">

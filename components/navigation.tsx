@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Menu, X, BookOpen, Calculator, Rocket, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const { user, logout, loading, profile } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
 
   if (loading) {
     // Poți returna un skeleton sau null pentru a nu afișa login/profil până nu știm starea userului
@@ -91,6 +93,7 @@ export function Navigation() {
                       onClick={async () => {
                         await logout()
                         toast({ title: "Te-ai delogat cu succes!" })
+                        router.push("/")
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
@@ -176,6 +179,7 @@ export function Navigation() {
                         onClick={async () => {
                           await logout()
                           toast({ title: "Te-ai delogat cu succes!" })
+                          router.push("/")
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                       >

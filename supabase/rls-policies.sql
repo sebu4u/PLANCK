@@ -1,0 +1,86 @@
+-- Enable Row Level Security
+alter table if exists public.profiles enable row level security;
+alter table if exists public.problems enable row level security;
+alter table if exists public.solved_problems enable row level security;
+
+drop policy if exists "problems_select_public" on public.problems;
+create policy "problems_select_public"
+  on public.problems for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+  on public.profiles for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own"
+  on public.profiles for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own"
+  on public.profiles for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Solved problems: per-user access
+drop policy if exists "solved_select_own" on public.solved_problems;
+create policy "solved_select_own"
+  on public.solved_problems for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- Optional: trigger to auto-create profiles from auth.users metadata
+-- Note: create this in your Supabase SQL editor if not already present
+-- Will safely upsert a profile when a new user is created
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  name text,
+  nickname text,
+  bio text,
+  grade text,
+  user_icon text,
+  created_at timestamp with time zone default now()
+);
+
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (user_id, name, nickname, grade)
+  values (new.id,
+          coalesce(new.raw_user_meta_data ->> 'name', ''),
+          coalesce(new.raw_user_meta_data ->> 'nickname', ''),
+          coalesce(new.raw_user_meta_data ->> 'grade', null))
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+drop policy if exists "solved_insert_own" on public.solved_problems;
+create policy "solved_insert_own"
+  on public.solved_problems for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "solved_update_own" on public.solved_problems;
+create policy "solved_update_own"
+  on public.solved_problems for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "solved_delete_own" on public.solved_problems;
+create policy "solved_delete_own"
+  on public.solved_problems for delete
+  to authenticated
+  using (auth.uid() = user_id);

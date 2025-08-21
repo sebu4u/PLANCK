@@ -113,6 +113,7 @@ const chapterIcons: Record<string, React.ReactNode> = {
 }
 
 export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }: ProblemFiltersProps) {
+  const STORAGE_KEY = "problemFilters"
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     category: "Toate",
@@ -127,12 +128,16 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
 
   const updateFilters = (newFilters: Partial<FilterState>) => {
     const updated = { ...filters, ...newFilters }
-    setFilters(updated)
-    onFilterChange({
+    const applied: FilterState = {
       ...updated,
       class: newFilters.class ?? selectedClass,
       chapter: newFilters.chapter ?? selectedChapter,
-    })
+    }
+    setFilters(applied)
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(applied))
+    } catch {}
+    onFilterChange(applied)
   }
 
   const clearFilters = () => {
@@ -145,6 +150,9 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
       chapter: "Toate",
     }
     setFilters(cleared)
+    try {
+      sessionStorage.removeItem(STORAGE_KEY)
+    } catch {}
     onFilterChange(cleared)
   }
 
@@ -160,6 +168,27 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
     observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
     return () => observer.disconnect();
   }, []);
+
+  // Restore saved filters on mount (from this session only)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Partial<FilterState>
+      const restored: FilterState = {
+        search: parsed.search ?? "",
+        category: parsed.category ?? "Toate",
+        difficulty: parsed.difficulty ?? "Toate",
+        isFree: typeof parsed.isFree === "boolean" ? parsed.isFree : null,
+        class: parsed.class ?? "Toate",
+        chapter: parsed.chapter ?? "Toate",
+      }
+      setFilters(restored)
+      setSelectedClass(restored.class)
+      setSelectedChapter(restored.chapter)
+      onFilterChange(restored)
+    } catch {}
+  }, [])
 
   return (
     <div className="bg-white border border-purple-200 rounded-lg p-6 space-y-6">

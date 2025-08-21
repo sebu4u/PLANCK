@@ -52,6 +52,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setProfile(data)
         }
+        return
+      }
+
+      // Dacă nu există profil, îl creăm pe loc folosind user_metadata din Supabase
+      if (!data) {
+        const userMeta: any = user?.user_metadata || {}
+        const { error: insertError } = await supabase.from("profiles").insert({
+          user_id: user.id,
+          name: (userMeta.name as string) || "",
+          nickname: (userMeta.nickname as string) || "",
+          grade: (userMeta.grade as string) || null,
+          created_at: new Date().toISOString(),
+        })
+        if (!insertError) {
+          const { data: created } = await supabase
+            .from("profiles")
+            .select("name, nickname, user_icon, grade")
+            .eq("user_id", user.id)
+            .single()
+          if (created) {
+            setProfile(created.user_icon ? { ...created, user_icon: `${created.user_icon}?t=${Date.now()}` } : created)
+          }
+        }
       }
     }
     fetchProfile()

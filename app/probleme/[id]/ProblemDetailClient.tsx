@@ -5,13 +5,14 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, X } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 import React from 'react';
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
+import confetti from 'canvas-confetti'
 
 // Array cu 10 iconițe variate pentru probleme (același sistem ca în problem-card)
 const problemIcons = [
@@ -39,6 +40,15 @@ const getProblemIcon = (problemId: string): string => {
   return problemIcons[index];
 }
 
+// Array cu textele de felicitare
+const congratulationMessages = [
+  "Felicitări! Ai rezolvat problema 🎉",
+  "Bravo! Pas cu pas devii mai bun 🚀",
+  "Super! Ai mai urcat un nivel 🔬",
+  "Excelent! 💡",
+  "Felicitări! Ai câștigat +1 XP"
+]
+
 export default function ProblemDetailClient({ problem, categoryIcons, difficultyColors }: {
   problem: Problem,
   categoryIcons: any,
@@ -47,6 +57,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [showVideo, setShowVideo] = useState(false)
   const [isSolved, setIsSolved] = useState(false)
   const [loadingSolved, setLoadingSolved] = useState(true)
+  const [congratulationMessage, setCongratulationMessage] = useState<string | null>(null)
+  const [newBadge, setNewBadge] = useState<any>(null)
   const { user } = useAuth();
   const problemIcon = getProblemIcon(problem.id);
 
@@ -68,17 +80,132 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const handleMarkSolved = async () => {
     if (!user) return;
     setLoadingSolved(true);
+    
+    // Marchează problema ca rezolvată
     await supabase.from('solved_problems').insert({
       user_id: user.id,
       problem_id: problem.id,
       solved_at: new Date().toISOString(),
     });
+    
+    // Verifică dacă utilizatorul a câștigat un badge nou
+    const { data: newBadges } = await supabase
+      .from('user_badges')
+      .select(`
+        id,
+        earned_at,
+        badge:badges (
+          id,
+          name,
+          description,
+          icon,
+          required_problems,
+          color
+        )
+      `)
+      .eq('user_id', user.id)
+      .gte('earned_at', new Date().toISOString())
+      .order('earned_at', { ascending: false })
+      .limit(1);
+    
     setIsSolved(true);
     setLoadingSolved(false);
+    
+    // Afișează notificarea de badge nou dacă există
+    if (newBadges && newBadges.length > 0) {
+      setNewBadge(newBadges[0]);
+    }
+    
+    // Afisarea textului de felicitare
+    const message = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
+    setCongratulationMessage(message);
+    
+    // Generarea de confetiți
+    const duration = 3 * 1000; // 3 secunde
+    const animationEnd = Date.now() + duration;
+
+    function randomInRange(min: number, max: number) {
+      return Math.random() * (max - min) + min;
+    }
+
+    const interval: NodeJS.Timeout = setInterval(function () {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+
+      // since particles fall down, start a bit higher than random
+      confetti({
+        particleCount: particleCount,
+        startVelocity: 30,
+        spread: 360,
+        origin: {
+          x: randomInRange(0.1, 0.3),
+          y: Math.random() - 0.2,
+        },
+      });
+      confetti({
+        particleCount: particleCount,
+        startVelocity: 30,
+        spread: 360,
+        origin: {
+          x: randomInRange(0.7, 0.9),
+          y: Math.random() - 0.2,
+        },
+      });
+    }, 250);
+    
+    // Ascunderea textului după 2 secunde
+    setTimeout(() => {
+      setCongratulationMessage(null);
+    }, 2000);
   };
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50 text-gray-900 relative overflow-hidden">
+      
+      {/* Overlay pentru textul de felicitare */}
+      {congratulationMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="text-4xl md:text-5xl font-bold text-pink-600 text-center animate-bounce-in drop-shadow-2xl">
+            {congratulationMessage}
+          </div>
+        </div>
+      )}
+      
+      {/* Toast pentru badge nou (dreapta jos) */}
+      {newBadge && (
+        <div className="fixed bottom-4 right-4 z-50 pointer-events-none">
+          <div className="pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-xl p-4 shadow-xl border border-purple-200 dark:border-purple-700 animate-fade-in max-w-xs w-full">
+            <div className="flex items-start gap-3">
+              <div className="text-3xl leading-none">
+                {newBadge.badge.icon}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-bold text-purple-700 dark:text-pink-400">
+                  Badge nou câștigat
+                </div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {newBadge.badge.name}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {newBadge.badge.description}
+                </div>
+              </div>
+              <button
+                aria-label="Închide notificarea"
+                onClick={() => setNewBadge(null)}
+                className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Navigation />
       <div className="pt-16 relative" style={{ zIndex: 2 }}>

@@ -55,6 +55,15 @@ export default function LoginPage() {
     }
   }
 
+  // Handle magic link / oAuth callback if Supabase redirects back with a code
+  React.useEffect(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    if (hash.includes('access_token') || hash.includes('code')) {
+      // Supabase JS handles this automatically via onAuthStateChange; just ensure we refresh user
+      router.replace('/')
+    }
+  }, [router])
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <Navigation />
