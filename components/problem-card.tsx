@@ -56,13 +56,23 @@ const difficultyColors = {
 export function ProblemCard({ problem, solved }: ProblemCardProps) {
   const problemIcon = getProblemIcon(problem.id);
   
+  // Funcție pentru a trunchia numele capitolului pe mobil
+  const truncateChapterName = (chapterName: string) => {
+    // Pe mobil, trunchiază la 25 de caractere și adaugă "..."
+    const mobileTruncated = chapterName.length > 25 ? chapterName.substring(0, 25) + "..." : chapterName;
+    return mobileTruncated;
+  };
+  
   return (
     <Card className="h-full flex flex-col border-0 shadow-xl bg-gradient-to-br from-white/80 via-purple-50 to-pink-50 backdrop-blur-md glassmorphism hover:scale-[1.025] hover:shadow-2xl transition-transform duration-300">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-3xl drop-shadow-lg">{problemIcon}</span>
           <Badge className={`border ${difficultyColors[problem.difficulty as keyof typeof difficultyColors] || "bg-gray-100 text-gray-700 border-gray-300"} font-semibold px-3 py-1 text-xs`}>{problem.difficulty}</Badge>
-          <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-semibold px-3 py-1 text-xs">{problem.category}</Badge>
+          <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-semibold px-3 py-1 text-xs">
+            <span className="block md:hidden">{truncateChapterName(problem.category)}</span>
+            <span className="hidden md:block">{problem.category}</span>
+          </Badge>
           {typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== '' && (
             <PlayCircle className="w-5 h-5 text-red-500" title="Rezolvare video" />
           )}

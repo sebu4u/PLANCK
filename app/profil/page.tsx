@@ -13,8 +13,9 @@ import { Navigation } from "@/components/navigation";
 import { Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { UserBadges } from "@/components/user-badges";
+import { ChangePasswordModal } from "@/components/change-password-modal";
 
 const ProfilPage = () => {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ const ProfilPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [solvedProblems, setSolvedProblems] = useState<any[]>([]);
   const [problemsOpen, setProblemsOpen] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -339,10 +341,31 @@ const ProfilPage = () => {
                 </span>
                 <span className="text-blue-600 dark:text-blue-400 font-bold text-lg drop-shadow cosmic-text-glow">(în curând)</span>
               </div>
+
+              {/* Schimbare parolă */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-green-100/80 via-pink-100/60 to-white/80 dark:from-zinc-800/80 dark:via-green-900/60 dark:to-zinc-900/80 rounded-xl p-4 shadow space-card">
+                <span className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-gradient-to-tr from-green-600 via-pink-400 to-fuchsia-500 text-white shadow cosmic-glow animate-pulse-scale">Securitate</Badge>
+                </span>
+                <Button
+                  onClick={() => setShowChangePasswordModal(true)}
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-900/20 transition-all duration-300"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  Schimbă parola
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
       </section>
+
+      {/* Modal pentru schimbarea parolei */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+      />
     </main>
   );
 };

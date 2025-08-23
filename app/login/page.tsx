@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Eye, EyeOff, Mail, Lock, Rocket, Star, Zap, ArrowRight, Github, Chrome } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Eye, EyeOff, Mail, Lock, Rocket, Star, Zap, ArrowRight, Github, Chrome, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -23,6 +24,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
+  const [isValidating, setIsValidating] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -35,17 +38,63 @@ export default function LoginPage() {
     }
   }, [user, authLoading, router])
 
+  // Validare în timp real pentru parola greșită
+  useEffect(() => {
+    if (password && email) {
+      const validatePassword = async () => {
+        setIsValidating(true)
+        setPasswordError("")
+        
+        try {
+          const { error } = await supabase.auth.signInWithPassword({ 
+            email, 
+            password 
+          })
+          
+          if (error) {
+            // Verifică dacă eroarea este legată de parolă
+            if (error.message.includes("Invalid login credentials") || 
+                error.message.includes("Invalid email or password") ||
+                error.message.includes("Wrong password")) {
+              setPasswordError("Parola introdusă este incorectă")
+            }
+          }
+        } catch (err) {
+          // Ignoră erorile de rețea sau alte erori
+        } finally {
+          setIsValidating(false)
+        }
+      }
+
+      // Debounce pentru a nu face prea multe cereri
+      const timeoutId = setTimeout(validatePassword, 1000)
+      return () => clearTimeout(timeoutId)
+    } else {
+      setPasswordError("")
+    }
+  }, [password, email])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setPasswordError("") // Resetează eroarea la submit
+    
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
+    
     if (error) {
-      toast({
-        title: "Eroare la autentificare",
-        description: error.message,
-        variant: "destructive",
-      })
+      // Verifică dacă eroarea este legată de parolă
+      if (error.message.includes("Invalid login credentials") || 
+          error.message.includes("Invalid email or password") ||
+          error.message.includes("Wrong password")) {
+        setPasswordError("Parola introdusă este incorectă")
+      } else {
+        toast({
+          title: "Eroare la autentificare",
+          description: error.message,
+          variant: "destructive",
+        })
+      }
     } else {
       toast({
         title: "Autentificare reușită!",
@@ -190,7 +239,11 @@ export default function LoginPage() {
                         placeholder="Introdu parola"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 border-purple-200 focus:border-purple-400 focus:ring-purple-400 h-12"
+                        className={`pl-10 pr-10 h-12 transition-colors ${
+                          passwordError 
+                            ? "border-red-500 focus:border-red-500 focus:ring-red-500" 
+                            : "border-purple-200 focus:border-purple-400 focus:ring-purple-400"
+                        }`}
                         required
                       />
                       <button
@@ -201,6 +254,24 @@ export default function LoginPage() {
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    
+                    {/* Eroare parolă */}
+                    {passwordError && (
+                      <Alert variant="destructive" className="mt-2 py-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-sm">
+                          {passwordError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {/* Indicator de validare */}
+                    {isValidating && password && email && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <div className="w-4 h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
+                        Se verifică parola...
+                      </div>
+                    )}
                   </div>
 
                   {/* Remember Me & Forgot Password */}
@@ -217,7 +288,7 @@ export default function LoginPage() {
                       </Label>
                     </div>
                     <Link
-                      href="/forgot-password"
+                      href="/reset-password"
                       className="text-sm text-purple-600 hover:text-purple-700 font-medium transition-colors"
                     >
                       Ai uitat parola?
@@ -228,7 +299,7 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-300 h-12 text-lg font-semibold cosmic-glow"
-                    disabled={loading}
+                    disabled={loading || isValidating}
                   >
                     <ArrowRight className="w-5 h-5 mr-2" />
                     {loading ? "Se conectează..." : "Conectează-te"}

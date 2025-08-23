@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <footer className="bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-4 gap-8">
+        <div className="grid md:grid-cols-3 gap-8">
           <div>
             <h3 className="text-2xl font-bold text-black dark:text-white mb-4 title-font">PLANCK</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -89,21 +89,6 @@ export function Footer() {
                 </Link>
               </li>
             </ul>
-          </div>
-
-          <div>
-            <h4 className="text-black dark:text-white font-semibold mb-4">Newsletter</h4>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Primește noutăți și resurse gratuite</p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Email-ul tău"
-                className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white placeholder-gray-500 focus:outline-none focus:border-[hsl(348,83%,47%)]"
-              />
-              <button className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black hover:bg-[hsl(348,83%,47%)] dark:hover:bg-[hsl(348,83%,47%)] dark:hover:text-white rounded transition-colors">
-                Abonează-te
-              </button>
-            </div>
           </div>
         </div>
 

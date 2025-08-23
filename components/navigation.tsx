@@ -87,6 +87,9 @@ export function Navigation() {
                   <DropdownMenuItem asChild>
                     <a href="/profil" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-100">Profil</a>
                   </DropdownMenuItem>
+                  <DropdownMenuItem className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed" disabled>
+                    Clasa mea
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <button
@@ -155,6 +158,12 @@ export function Navigation() {
             >
               Despre
             </Link>
+            <button
+              className="text-gray-400 cursor-not-allowed block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg w-full text-left"
+              disabled
+            >
+              Clasa mea
+            </button>
             <div className="border-t border-gray-200 pt-3 mt-3">
               {user ? (
                 <DropdownMenu>

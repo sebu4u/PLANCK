@@ -1,8 +1,10 @@
 import { BlackHoleAnimation } from "@/components/black-hole-animation"
 import { Navigation } from "@/components/navigation"
 import { AboutPlanckSection } from "@/components/about-planck-section"
+import { BenefitsSection } from "@/components/benefits-section"
+import { ContentExampleSection } from "@/components/content-example-section"
 import { CoursesSection } from "@/components/courses-section"
-import { ProblemsSection } from "@/components/problems-section"
+import { NewsletterSection } from "@/components/newsletter-section"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -12,18 +14,33 @@ export default function HomePage() {
     <div className="min-h-screen bg-white text-gray-900">
       <Navigation />
 
-      {/* Hero Section cu temă spațială - FĂRĂ MODIFICĂRI */}
+      {/* Hero Section cu temă spațială - MODIFICĂRI PENTRU MOBIL */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden cosmic-bg">
         <div className="cosmic-particles"></div>
         <BlackHoleAnimation />
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-          <h1 className="text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] xl:text-[15rem] font-black text-white title-font mb-4 sm:mb-8 animate-scale-in text-center cosmic-text-glow">
-            PLANCK
-          </h1>
-          <div className="w-16 sm:w-24 md:w-32 h-1 bg-gradient-to-r from-purple-400 to-pink-400 mb-4 sm:mb-8 animate-expand cosmic-glow"></div>
-          <p className="text-lg sm:text-xl md:text-2xl text-gray-200 text-center max-w-3xl px-4 animate-fade-in-up-delay leading-relaxed">
-            Explorează universul fizicii prin cursuri interactive și probleme captivante
-          </p>
+          {/* Container pentru text și buton - modificat pentru mobil */}
+          <div className="flex flex-col items-center justify-center md:justify-center">
+            <h1 className="text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] xl:text-[15rem] font-black text-white title-font mb-4 sm:mb-8 animate-scale-in text-center cosmic-text-glow">
+              PLANCK
+            </h1>
+            <div className="w-16 sm:w-24 md:w-32 h-1 bg-gradient-to-r from-purple-400 to-pink-400 mb-4 sm:mb-8 animate-expand cosmic-glow"></div>
+            <p className="text-lg sm:text-xl md:text-2xl text-gray-200 text-center max-w-3xl px-4 animate-fade-in-up-delay leading-relaxed">
+              Explorează universul fizicii prin cursuri interactive și probleme captivante
+            </p>
+            
+            {/* Buton CTA doar pentru mobil */}
+            <div className="block md:hidden mt-8 animate-fade-in-up-delay">
+              <Link href="/probleme">
+                <Button 
+                  size="lg" 
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 cosmic-glow shadow-lg hover:shadow-xl"
+                >
+                  Începe acum
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
         <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 z-10 animate-bounce-delayed">
           <div className="animate-bounce">
@@ -33,6 +50,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Benefits Section */}
+      <BenefitsSection />
+
+      {/* Content Example Section */}
+      <ContentExampleSection />
 
       {/* About PLANCK Section - CU ANIMAȚII LA SCROLL */}
       <div className="scroll-animate-fade-up relative overflow-hidden">
@@ -222,39 +245,7 @@ export default function HomePage() {
       </div>
 
       {/* Success Section - CU ANIMAȚII LA SCROLL */}
-      <section className="scroll-animate-slide-up relative min-h-[50vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-purple-600 via-pink-600 to-purple-800 py-20">
-        {/* Top Wave */}
-        <div className="absolute top-0 left-0 w-full overflow-hidden leading-none">
-          <svg
-            className="relative block w-full h-16"
-            data-name="Layer 1"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1200 120"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
-              className="fill-white"
-            ></path>
-          </svg>
-        </div>
-
-        {/* Bottom Wave */}
-        <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none rotate-180">
-          <svg
-            className="relative block w-full h-16"
-            data-name="Layer 1"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1200 120"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
-              className="fill-white"
-            ></path>
-          </svg>
-        </div>
-
+      <section className="scroll-animate-fade-up relative min-h-[50vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-purple-600 via-pink-600 to-purple-800 py-20">
         {/* Background Effects */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Animated particles */}
@@ -298,7 +289,7 @@ export default function HomePage() {
           <div className="text-center lg:text-left scroll-animate-fade-right">
             <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black text-white title-font leading-tight cosmic-text-glow">
               Succesul În Fizică
-              <span className="block bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent">
+              <span className="block text-yellow-300">
                 Începe Aici
               </span>
             </h2>
@@ -353,9 +344,9 @@ export default function HomePage() {
         <CoursesSection />
       </div>
 
-      {/* Problems Section - CU ANIMAȚII LA SCROLL */}
+      {/* Newsletter Section - CU ANIMAȚII LA SCROLL */}
       <div className="scroll-animate-slide-up">
-        <ProblemsSection />
+        <NewsletterSection />
       </div>
 
       {/* Footer - CU ANIMAȚII LA SCROLL */}

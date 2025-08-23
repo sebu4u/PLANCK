@@ -42,7 +42,6 @@ export default function RegisterPage() {
     confirmPassword: "",
     grade: "",
     agreeToTerms: false,
-    agreeToNewsletter: false,
   })
   const { toast } = useToast()
   const router = useRouter()
@@ -301,7 +300,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  {/* Terms and Newsletter */}
+                  {/* Terms */}
                   <div className="space-y-3">
                     <div className="flex items-start space-x-2">
                       <Checkbox
@@ -320,18 +319,6 @@ export default function RegisterPage() {
                         <Link href="/privacy" className="text-purple-600 hover:text-purple-700 font-medium">
                           Politica de Confidențialitate
                         </Link>
-                      </Label>
-                    </div>
-
-                    <div className="flex items-start space-x-2">
-                      <Checkbox
-                        id="newsletter"
-                        checked={formData.agreeToNewsletter}
-                        onCheckedChange={(checked) => updateFormData("agreeToNewsletter", checked as boolean)}
-                        className="border-purple-300 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 mt-1"
-                      />
-                      <Label htmlFor="newsletter" className="text-sm text-gray-600 cursor-pointer leading-relaxed">
-                        Vreau să primesc noutăți și oferte speciale prin email
                       </Label>
                     </div>
                   </div>
