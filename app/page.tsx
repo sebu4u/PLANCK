@@ -1,3 +1,4 @@
+import { Metadata } from "next"
 import { BlackHoleAnimation } from "@/components/black-hole-animation"
 import { Navigation } from "@/components/navigation"
 import { AboutPlanckSection } from "@/components/about-planck-section"
@@ -6,8 +7,11 @@ import { ContentExampleSection } from "@/components/content-example-section"
 import { CoursesSection } from "@/components/courses-section"
 import { NewsletterSection } from "@/components/newsletter-section"
 import { Footer } from "@/components/footer"
+import { generateMetadata } from "@/lib/metadata"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = generateMetadata('home')
 
 export default function HomePage() {
   return (

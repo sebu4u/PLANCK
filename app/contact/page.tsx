@@ -1,4 +1,8 @@
+import { Metadata } from "next"
 import { Mail, MessageCircle, Clock, MapPin } from "lucide-react"
+import { generateMetadata } from "@/lib/metadata"
+
+export const metadata: Metadata = generateMetadata('contact')
 
 export default function ContactPage() {
   return (

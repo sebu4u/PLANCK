@@ -4,16 +4,29 @@ import { Inter } from "next/font/google"
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { baseMetadata } from "@/lib/metadata"
+import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "PLANCK - Platforma Educațională de Fizică",
-  description:
-    "Învață fizica prin cursuri video interactive și probleme captivante. Cursuri pentru clasa a 9-a și a 10-a.",
-  keywords: "fizică, educație, liceu, cursuri video, probleme fizică, mecanică, optică, termodinamică, electricitate",
-    generator: 'v0.dev'
+  ...baseMetadata,
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      { url: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  },
+  manifest: '/site.webmanifest',
 }
 
 export const viewport: Viewport = {
@@ -29,6 +42,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ro">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationStructuredData),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(websiteStructuredData),
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <ScrollToTop />
         <AuthProvider>

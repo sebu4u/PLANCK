@@ -1,6 +1,10 @@
+import { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { NewsletterSection } from "@/components/newsletter-section"
+import { generateMetadata } from "@/lib/metadata"
+
+export const metadata: Metadata = generateMetadata('coming-soon')
 
 export default function ComingSoonCoursesPage() {
   return (

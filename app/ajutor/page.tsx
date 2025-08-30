@@ -1,4 +1,8 @@
+import { Metadata } from "next"
 import { Mail, MessageCircle, Clock, HelpCircle, BookOpen, Users } from "lucide-react"
+import { generateMetadata } from "@/lib/metadata"
+
+export const metadata: Metadata = generateMetadata('help')
 
 export default function AjutorPage() {
   return (

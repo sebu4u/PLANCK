@@ -1,9 +1,13 @@
+import { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Users, BookOpen, Award, Target, Rocket, Zap, Heart, Star, Trophy, Brain } from "lucide-react"
+import { generateMetadata } from "@/lib/metadata"
 import Link from "next/link"
+
+export const metadata: Metadata = generateMetadata('about')
 
 export default function AboutPage() {
   return (

@@ -1,3 +1,8 @@
+import { Metadata } from "next"
+import { generateMetadata } from "@/lib/metadata"
+
+export const metadata: Metadata = generateMetadata('terms')
+
 export default function TermeniPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">

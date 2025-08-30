@@ -1,3 +1,4 @@
+import { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,7 +19,12 @@ import {
   Download,
   MessageCircle,
 } from "lucide-react"
+import { generateMetadata } from "@/lib/metadata"
+import { courseStructuredData } from "@/lib/structured-data"
+import { StructuredData } from "@/components/structured-data"
 import Link from "next/link"
+
+export const metadata: Metadata = generateMetadata('class-9')
 
 const courseData = {
   title: "Fizica Clasa a 9-a",
@@ -134,6 +140,7 @@ export default function Clasa9Page() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
+      <StructuredData data={courseStructuredData(courseData)} />
       <Navigation />
 
       <div className="pt-16">

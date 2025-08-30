@@ -1,11 +1,13 @@
-"use client"
-
+import { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { CoursesSection } from "@/components/courses-section"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Star, Users, Clock, Award, PlayCircle, CheckCircle2, Zap } from "lucide-react"
+import { generateMetadata } from "@/lib/metadata"
+
+export const metadata: Metadata = generateMetadata('courses')
 
 const scrollToCourses = () => {
   const coursesSection = document.getElementById('courses')
