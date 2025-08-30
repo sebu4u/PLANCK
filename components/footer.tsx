@@ -19,13 +19,17 @@ export function Footer() {
                 <Facebook size={20} />
               </Link>
               <Link
-                href="#"
+                href="https://www.instagram.com/planck.academy/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
               >
                 <Instagram size={20} />
               </Link>
               <Link
-                href="#"
+                href="https://www.youtube.com/@PLANCK.academy"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
               >
                 <Youtube size={20} />
@@ -43,23 +47,8 @@ export function Footer() {
             <h4 className="text-black dark:text-white font-semibold mb-4">Cursuri</h4>
             <ul className="space-y-2 text-gray-600 dark:text-gray-400">
               <li>
-                <Link href="/cursuri/clasa-9" className="hover:text-[hsl(348,83%,47%)] transition-colors">
-                  Fizica Clasa a 9-a
-                </Link>
-              </li>
-              <li>
-                <Link href="/cursuri/clasa-10" className="hover:text-[hsl(348,83%,47%)] transition-colors">
-                  Fizica Clasa a 10-a
-                </Link>
-              </li>
-              <li>
                 <Link href="/probleme" className="hover:text-[hsl(348,83%,47%)] transition-colors">
                   Catalog Probleme
-                </Link>
-              </li>
-              <li>
-                <Link href="/abonament" className="hover:text-[hsl(348,83%,47%)] transition-colors">
-                  Abonament
                 </Link>
               </li>
             </ul>

@@ -28,7 +28,7 @@ export default function ProblemsPage() {
     search: "",
     category: "Toate",
     difficulty: "Toate",
-    isFree: null,
+    progress: "Toate",
     class: "Toate",
     chapter: "Toate",
   })
@@ -101,17 +101,23 @@ export default function ProblemsPage() {
     if (filters.difficulty !== "Toate" && problem.difficulty !== filters.difficulty) {
       return false
     }
-    // isFree filter (dacă există acest câmp)
-    if (filters.isFree !== null && typeof problem.isFree === 'boolean' && problem.isFree !== filters.isFree) {
-      return false
-    }
+    // Progress filter (Rezolvate / Nerezolvate)
+    if (filters.progress === "Rezolvate" && !solvedProblems.includes(problem.id)) return false
+    if (filters.progress === "Nerezolvate" && solvedProblems.includes(problem.id)) return false
     return true
   })
 
-  // Sortare explicită: întâi problemele cu youtube_url (dacă există), apoi Ușor -> Mediu -> Avansat, apoi cele mai noi
+  // Sortare explicită:
+  // 1) Probleme nerezolvate la început, rezolvate la final
+  // 2) Înăuntrul fiecărei grupe, întâi problemele cu youtube_url (dacă există)
+  // 3) Apoi Ușor -> Mediu -> Avansat
+  // 4) Apoi cele mai noi
   const difficultyOrder: Record<string, number> = { "Ușor": 1, "Mediu": 2, "Avansat": 3 }
   const hasAnyYoutube = filteredProblems.some((p) => typeof p.youtube_url === 'string' && p.youtube_url.trim() !== '')
   const sortedProblems = [...filteredProblems].sort((a, b) => {
+    const aSolved = solvedProblems.includes(a.id)
+    const bSolved = solvedProblems.includes(b.id)
+    if (aSolved !== bSolved) return aSolved ? 1 : -1
     if (hasAnyYoutube) {
       const aHas = typeof a.youtube_url === 'string' && a.youtube_url.trim() !== ''
       const bHas = typeof b.youtube_url === 'string' && b.youtube_url.trim() !== ''

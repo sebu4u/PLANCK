@@ -3,22 +3,22 @@ import { Star } from "lucide-react"
 
 const testimonials = [
   {
-    name: "Ana Popescu",
+    name: "Rares Stefan",
     grade: "Clasa a 10-a",
     content:
       "PLANCK m-a ajutat să înțeleg fizica mult mai bine. Explicațiile sunt clare și problemele sunt foarte bine organizate.",
     rating: 5,
-    avatar: "/placeholder.svg?height=40&width=40",
+    avatar: "https://i.ibb.co/whxDdCfF/Whats-App-Image-2025-08-30-at-17-01-30-5b2ca226.jpg",
   },
   {
-    name: "Mihai Ionescu",
+    name: "Mihai David",
     grade: "Clasa a 9-a",
     content: "Cursurile video sunt fantastice! Am reușit să îmi îmbunătățesc notele la fizică considerabil.",
-    rating: 5,
+    rating: 4.5,
     avatar: "/placeholder.svg?height=40&width=40",
   },
   {
-    name: "Elena Dumitrescu",
+    name: "Elena Pascu",
     grade: "Absolventă",
     content: "Platforma PLANCK mi-a fost de mare ajutor în pregătirea pentru BAC. Recomand cu încredere!",
     rating: 5,

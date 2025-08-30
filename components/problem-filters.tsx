@@ -22,7 +22,7 @@ export interface FilterState {
   search: string
   category: string
   difficulty: string
-  isFree: boolean | null
+  progress: "Toate" | "Nerezolvate" | "Rezolvate"
   class: string
   chapter: string
 }
@@ -118,7 +118,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
     search: "",
     category: "Toate",
     difficulty: "Toate",
-    isFree: null,
+    progress: "Toate",
     class: "Toate",
     chapter: "Toate",
   })
@@ -145,7 +145,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
       search: "",
       category: "Toate",
       difficulty: "Toate",
-      isFree: null,
+      progress: "Toate",
       class: "Toate",
       chapter: "Toate",
     }
@@ -157,7 +157,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
   }
 
   const hasActiveFilters =
-    filters.search || filters.difficulty !== "Toate" || filters.isFree !== null
+    filters.search || filters.difficulty !== "Toate" || filters.progress !== "Toate"
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -179,7 +179,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
         search: parsed.search ?? "",
         category: parsed.category ?? "Toate",
         difficulty: parsed.difficulty ?? "Toate",
-        isFree: typeof parsed.isFree === "boolean" ? parsed.isFree : null,
+        progress: (parsed as any).progress === "Nerezolvate" || (parsed as any).progress === "Rezolvate" ? (parsed as any).progress : "Toate",
         class: parsed.class ?? "Toate",
         chapter: parsed.chapter ?? "Toate",
       }
@@ -273,16 +273,16 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
         </div>
       </div>
 
-      {/* Free/Premium Filter */}
+      {/* Progress Filter */}
       <div>
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Acces</label>
-        <div className="flex gap-2">
+        <label className="text-sm font-medium text-gray-700 mb-2 block">Progres</label>
+        <div className="grid grid-cols-2 gap-2">
           <Button
-            variant={filters.isFree === null ? "default" : "outline"}
+            variant={filters.progress === "Toate" ? "default" : "outline"}
             size="sm"
-            onClick={() => updateFilters({ isFree: null })}
+            onClick={() => updateFilters({ progress: "Toate" })}
             className={
-              filters.isFree === null
+              filters.progress === "Toate"
                 ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
                 : "border-purple-200 hover:border-purple-400 hover:text-purple-600"
             }
@@ -290,28 +290,28 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
             Toate
           </Button>
           <Button
-            variant={filters.isFree === true ? "default" : "outline"}
+            variant={filters.progress === "Nerezolvate" ? "default" : "outline"}
             size="sm"
-            onClick={() => updateFilters({ isFree: true })}
+            onClick={() => updateFilters({ progress: "Nerezolvate" })}
             className={
-              filters.isFree === true
+              filters.progress === "Nerezolvate"
                 ? "bg-gradient-to-r from-green-600 to-green-700 text-white"
                 : "border-green-200 hover:border-green-400 hover:text-green-600"
             }
           >
-            Gratuite
+            Nerezolvate
           </Button>
           <Button
-            variant={filters.isFree === false ? "default" : "outline"}
+            variant={filters.progress === "Rezolvate" ? "default" : "outline"}
             size="sm"
-            onClick={() => updateFilters({ isFree: false })}
+            onClick={() => updateFilters({ progress: "Rezolvate" })}
             className={
-              filters.isFree === false
-                ? "bg-gradient-to-r from-orange-600 to-orange-700 text-white"
-                : "border-orange-200 hover:border-orange-400 hover:text-orange-600"
+              filters.progress === "Rezolvate"
+                ? "col-span-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white"
+                : "col-span-2 border-orange-200 hover:border-orange-400 hover:text-orange-600"
             }
           >
-            Premium
+            Rezolvate
           </Button>
         </div>
       </div>

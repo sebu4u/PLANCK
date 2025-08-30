@@ -94,12 +94,12 @@ export function AboutPlanckSection() {
 
             <div className="flex items-center gap-3">
               <img
-                src="/placeholder.svg?height=40&width=40"
+                src="https://i.ibb.co/whxDdCfF/Whats-App-Image-2025-08-30-at-17-01-30-5b2ca226.jpg"
                 alt="Ana Popescu"
                 className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
               />
               <div>
-                <div className="text-black dark:text-white font-medium">Ana Popescu</div>
+                <div className="text-black dark:text-white font-medium">Stefan Rares</div>
                 <div className="text-gray-600 dark:text-gray-400 text-sm">Clasa a 10-a</div>
               </div>
             </div>
@@ -185,12 +185,12 @@ export function AboutPlanckSection() {
 
             <div className="flex items-center gap-3">
               <img
-                src="/placeholder.svg?height=40&width=40"
-                alt="Mihai Ionescu"
+                src="https://i.ibb.co/h1LhbfRG/Whats-App-Image-2025-08-30-at-17-03-19-adac22c2.jpg"
+                alt="Mihai David"
                 className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
               />
               <div>
-                <div className="text-black dark:text-white font-medium">Mihai Ionescu</div>
+                <div className="text-black dark:text-white font-medium">Mihai David</div>
                 <div className="text-gray-600 dark:text-gray-400 text-sm">Clasa a 9-a</div>
               </div>
             </div>
@@ -276,12 +276,12 @@ export function AboutPlanckSection() {
 
             <div className="flex items-center gap-3">
               <img
-                src="/placeholder.svg?height=40&width=40"
+                src="https://i.ibb.co/Jwvr4DmK/Whats-App-Image-2025-08-30-at-17-02-41-153070e7.jpg"
                 alt="Elena Dumitrescu"
                 className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
               />
               <div>
-                <div className="text-black dark:text-white font-medium">Elena Dumitrescu</div>
+                <div className="text-black dark:text-white font-medium">Elena Pascu</div>
                 <div className="text-gray-600 dark:text-gray-400 text-sm">Absolventă</div>
               </div>
             </div>

@@ -1,3 +1,5 @@
+"use client"
+
 import { Navigation } from "@/components/navigation"
 import { CoursesSection } from "@/components/courses-section"
 import { Footer } from "@/components/footer"
@@ -5,11 +7,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Star, Users, Clock, Award, PlayCircle, CheckCircle2, Zap } from "lucide-react"
 
+const scrollToCourses = () => {
+  const coursesSection = document.getElementById('courses')
+  if (coursesSection) {
+    coursesSection.scrollIntoView({ 
+      behavior: 'smooth',
+      block: 'start'
+    })
+  }
+}
+
 const courseStats = [
   {
     icon: Users,
     label: "Studenți activi",
-    value: "2,500+",
+    value: "0",
     color: "text-blue-600",
   },
   {
@@ -21,13 +33,13 @@ const courseStats = [
   {
     icon: Award,
     label: "Rata de succes",
-    value: "96%",
+    value: "0%",
     color: "text-purple-600",
   },
   {
     icon: Star,
     label: "Rating mediu",
-    value: "4.9/5",
+    value: "-/5",
     color: "text-yellow-600",
   },
 ]
@@ -86,6 +98,7 @@ export default function CoursesPage() {
 
               <Button
                 size="lg"
+                onClick={scrollToCourses}
                 className="bg-white text-purple-600 hover:bg-purple-50 text-lg px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:scale-105 cosmic-glow"
               >
                 <PlayCircle className="w-5 h-5 mr-2" />

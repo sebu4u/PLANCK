@@ -357,6 +357,25 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         className="rounded-lg"
                       ></iframe>
                     </div>
+                    {/* Button "Marchează ca rezolvată" sub video */}
+                    <div className="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
+                      {user && !loadingSolved && (
+                        <button
+                          onClick={handleMarkSolved}
+                          disabled={isSolved}
+                          className={`flex items-center gap-2 px-6 py-4 rounded-xl font-bold text-lg shadow-xl border-2 transition-all duration-200
+                            ${isSolved ? 'bg-green-100 border-green-400 text-green-700 cursor-not-allowed' : 'bg-white border-purple-300 text-purple-700 hover:bg-purple-50 hover:border-purple-500'}
+                          `}
+                          style={{ minWidth: 0 }}
+                        >
+                          {isSolved ? <span className="text-xl">✔️</span> : <span className="text-xl">☆</span>}
+                          {isSolved ? 'Rezolvată' : 'Marchează ca rezolvată'}
+                        </button>
+                      )}
+                      {!user && (
+                        <span className="text-gray-400 text-xs">(autentifică-te pentru progres)</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

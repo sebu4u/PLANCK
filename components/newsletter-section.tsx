@@ -3,22 +3,69 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useState } from "react"
-import { Mail, Send, Sparkles, Zap, Star } from "lucide-react"
+import { Mail, Send, Sparkles, Zap, Star, CheckCircle, AlertCircle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { isValidEmail, subscribeToNewsletter } from "@/lib/newsletter"
 
 export function NewsletterSection() {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
 
+  /**
+   * Handles newsletter subscription form submission
+   * Validates email, calls API, and shows appropriate feedback
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email) return
     
+    // Validate email presence
+    if (!email.trim()) {
+      toast({
+        title: "Eroare",
+        description: "Te rugăm să introduci o adresă de email",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate email format using utility function
+    if (!isValidEmail(email)) {
+      toast({
+        title: "Email invalid",
+        description: "Te rugăm să introduci o adresă de email validă",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsSubmitting(false)
-    setEmail("")
-    // Here you would typically send the email to your newsletter service
+
+    try {
+      // Use utility function to subscribe to newsletter
+      const result = await subscribeToNewsletter(email)
+
+      // Show success message
+      toast({
+        title: "Abonare reușită! 🎉",
+        description: result.message,
+      })
+      
+      // Reset form
+      setEmail("")
+    } catch (error) {
+      console.error('Newsletter subscription error:', error)
+      
+      // Show error message
+      const errorMessage = error instanceof Error ? error.message : "A apărut o eroare. Te rugăm să încerci din nou."
+      toast({
+        title: "Eroare la abonare",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

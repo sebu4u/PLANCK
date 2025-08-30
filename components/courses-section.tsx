@@ -6,8 +6,8 @@ const courses = [
     id: "clasa-9",
     title: "Fizica Clasa a 9-a",
     subtitle: "Mecanica și Optica",
-    rating: 4.9,
-    students: 1247,
+    rating: 5,
+    students: 0,
     price: "199 RON",
     chapters: [
       { title: "Cinematica punctului material", locked: false },
@@ -22,8 +22,8 @@ const courses = [
     id: "clasa-10",
     title: "Fizica Clasa a 10-a",
     subtitle: "Termodinamica și Electricitate",
-    rating: 4.8,
-    students: 987,
+    rating: 5,
+    students: 0,
     price: "229 RON",
     chapters: [
       { title: "Teoria cinetică a gazelor", locked: false },
@@ -38,7 +38,7 @@ const courses = [
 
 export function CoursesSection() {
   return (
-    <section className="py-12 sm:py-16 lg:py-20 px-4 max-w-7xl mx-auto">
+    <section id="courses" className="py-12 sm:py-16 lg:py-20 px-4 max-w-7xl mx-auto">
       <div className="text-center mb-12 sm:mb-16 animate-fade-in-up">
         <h2 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
           Cursuri de Fizică
@@ -107,7 +107,7 @@ export function CoursesSection() {
               ))}
             </div>
 
-            <Link href={`/cursuri/${course.id}`}>
+            <Link href={`/cursuri/curand`}>
               <button className="w-full py-3 rounded-xl text-white font-medium bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-colors">
                 Începeți cursul
               </button>

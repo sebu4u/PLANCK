@@ -5,17 +5,14 @@ import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Navigation } from "@/components/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Lock, Facebook, Instagram, Youtube, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ProfilPage = () => {
   const { user, loading } = useAuth();
@@ -169,30 +166,14 @@ const ProfilPage = () => {
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden cosmic-bg">
-      <Navigation />
-      {/* Blurred avatar wallpaper background */}
-      {avatarUrl && (
-        <div
-          className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none select-none"
-          aria-hidden="true"
-        >
-          <AspectRatio ratio={16 / 9} className="w-full h-full">
-            <img
-              src={avatarUrl}
-              alt="Avatar wallpaper"
-              className="w-full h-full object-cover object-center blur-2xl scale-125 opacity-40 animate-fade-in"
-              draggable={false}
-            />
-          </AspectRatio>
-          <div className="absolute inset-0 bg-gradient-to-b from-purple-600/40 via-pink-400/20 to-white/80 dark:to-zinc-900/80" />
-        </div>
-      )}
-      <section className="relative z-10 w-full max-w-2xl px-4 py-12 flex flex-col items-center animate-fade-in-up">
-        <Card className="w-full bg-white/70 dark:bg-zinc-900/70 backdrop-blur-lg border-0 shadow-2xl cosmic-glow transition-transform duration-500 hover:scale-[1.01]">
-          <CardHeader className="flex flex-col items-center space-y-4">
-            <div className="relative group animate-fade-in-up">
-              <Avatar className="w-32 h-32 shadow-xl border-4 border-white/80 dark:border-zinc-800/80 transition-transform duration-500 group-hover:scale-105 group-hover:shadow-2xl">
+    <>
+      <main className="relative min-h-screen flex flex-col items-center overflow-visible cosmic-bg pt-24 md:pt-32">
+        <Navigation />
+        <section className="relative z-10 w-full max-w-3xl px-4 py-10 flex flex-col items-center animate-fade-in-up">
+          <Card className="w-full bg-white/80 dark:bg-zinc-900/70 backdrop-blur-lg border border-zinc-200/40 dark:border-zinc-800/60 shadow-xl flex flex-col min-h-[85vh] md:min-h-[70vh]">
+          <CardHeader className="flex flex-col items-center gap-4 pb-6 pt-8">
+            <div className="relative group">
+              <Avatar className="w-28 h-28 shadow-lg border-4 border-white/80 dark:border-zinc-800/80 transition-transform duration-300 group-hover:scale-105">
                 {avatarUrl ? (
                   <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
                 ) : (
@@ -209,7 +190,7 @@ const ProfilPage = () => {
                   </svg>
                 </div>
               )}
-              <label className="absolute bottom-2 right-2 bg-gradient-to-tr from-purple-600 via-pink-400 to-fuchsia-500 text-white rounded-full px-3 py-1 text-xs font-bold shadow-lg cursor-pointer opacity-90 hover:opacity-100 transition-opacity animate-fade-in-up-delay-2">
+              <label className="absolute bottom-2 right-2 bg-gradient-to-tr from-purple-600 via-pink-400 to-fuchsia-500 text-white rounded-full px-3 py-1 text-xs font-medium shadow cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
                 <input
                   type="file"
                   accept="image/*"
@@ -220,7 +201,8 @@ const ProfilPage = () => {
                 Schimbă
               </label>
             </div>
-            <div className="flex flex-col items-center gap-1 animate-fade-in-up-delay-2">
+            <div className="flex flex-col items-center gap-3 w-full">
+              <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Username</div>
               <div className="flex items-center gap-2">
                 {nicknameEdit ? (
                   <>
@@ -240,20 +222,21 @@ const ProfilPage = () => {
                   </>
                 ) : (
                   <>
-                    <span className="text-lg font-semibold text-purple-700 dark:text-pink-400 drop-shadow cosmic-text-glow">
+                    <span className="text-lg font-semibold text-zinc-900 dark:text-white">
                       {nickname || <span className="italic text-gray-400">Adaugă un nickname...</span>}
                     </span>
-                    <Button size="icon" variant="ghost" className="ml-1 p-1 text-purple-400 hover:text-purple-600 dark:text-pink-300 dark:hover:text-pink-500 opacity-70 hover:opacity-100 transition-all" onClick={() => setNicknameEdit(true)} aria-label="Editează nickname">
+                    <Button size="icon" variant="ghost" className="ml-1 p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setNicknameEdit(true)} aria-label="Editează nickname">
                       <Pencil size={16} />
                     </Button>
                   </>
                 )}
               </div>
-              <div className="text-xl font-bold text-zinc-900 dark:text-white cosmic-text-glow">
+              <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nume</div>
+              <div className="text-xl font-bold text-zinc-900 dark:text-white text-center">
                 {profile?.name || user.email}
               </div>
             </div>
-            <div className="w-full flex flex-col items-center animate-fade-in-up-delay-3">
+            <div className="w-full flex flex-col items-center">
               {bioEdit ? (
                 <div className="flex flex-col items-center gap-2 mt-2 w-full">
                   <textarea
@@ -272,101 +255,112 @@ const ProfilPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="mt-2 text-gray-700 dark:text-gray-300 text-center flex items-center justify-center">
-                  <span>{bio || <span className="italic text-gray-400">Adaugă un bio...</span>}</span>
-                  <Button size="icon" variant="ghost" className="ml-1 p-1 text-purple-400 hover:text-purple-600 dark:text-pink-300 dark:hover:text-pink-500 opacity-70 hover:opacity-100 transition-all" onClick={() => setBioEdit(true)} aria-label="Editează bio">
-                    <Pencil size={16} />
-                  </Button>
+                <div className="mt-2 w-full max-w-md text-gray-700 dark:text-gray-300 text-center flex items-start justify-center">
+                  <div className="w-full border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-2 bg-white/60 dark:bg-zinc-900/40">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-left w-full">{bio || <span className="italic text-gray-400">Adaugă un bio...</span>}</span>
+                      <Button size="icon" variant="ghost" className="p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setBioEdit(true)} aria-label="Editează bio">
+                        <Pencil size={16} />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="flex flex-col gap-6 mt-6 animate-fade-in-up-delay-3">
-              {/* Progres la probleme - dropdown */}
-              <div className="flex flex-col">
-                <button
-                  type="button"
-                  className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-purple-100/80 via-pink-100/60 to-white/80 dark:from-zinc-800/80 dark:via-purple-900/60 dark:to-zinc-900/80 rounded-xl p-4 shadow space-card cursor-pointer focus:outline-none"
-                  onClick={() => setProblemsOpen((v) => !v)}
-                  aria-expanded={problemsOpen}
-                  aria-controls="solved-problems-dropdown"
-                >
-                  <span className="font-medium text-purple-700 dark:text-pink-400 flex items-center gap-2">
-                    <Badge variant="default" className="bg-gradient-to-tr from-purple-600 via-pink-400 to-fuchsia-500 text-white shadow cosmic-glow animate-pulse-scale">Progres la probleme</Badge>
-                  </span>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-purple-600 dark:text-pink-400 font-bold text-lg drop-shadow cosmic-text-glow">{solvedCount} probleme rezolvate</span>
-                    <Progress value={Math.min(solvedCount, 100)} className="w-48 h-3 bg-white/60 dark:bg-zinc-800/60 cosmic-glow" />
-                  </div>
-                  <span className="ml-2 flex items-center">
-                    {problemsOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                  </span>
-                </button>
-                {/* Dropdown cu probleme rezolvate */}
-                <div
-                  id="solved-problems-dropdown"
-                  className={`transition-all duration-300 overflow-hidden ${problemsOpen ? 'max-h-40 py-3' : 'max-h-0 py-0'} px-2`}
-                  aria-hidden={!problemsOpen}
-                >
-                  {solvedProblems.length === 0 ? (
-                    <span className="text-gray-500 italic">Nu ai rezolvat încă nicio problemă.</span>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {solvedProblems.map((problem) => (
-                        <Link
-                          key={problem.id}
-                          href={`/probleme/${problem.id}`}
-                          className="inline-block"
-                        >
-                          <span className="px-3 py-1 rounded-lg bg-purple-200 dark:bg-purple-800 text-purple-900 dark:text-purple-100 font-semibold text-sm shadow hover:bg-purple-300 dark:hover:bg-purple-700 transition-colors cursor-pointer border border-purple-300 dark:border-purple-700">
-                            #{problem.id}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Badge-uri câștigate */}
-              <div className="mt-6">
-                <UserBadges />
-              </div>
-              
-              {/* Progres la cursuri (neschimbat) */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-blue-100/80 via-pink-100/60 to-white/80 dark:from-zinc-800/80 dark:via-blue-900/60 dark:to-zinc-900/80 rounded-xl p-4 shadow space-card">
-                <span className="font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-gradient-to-tr from-blue-600 via-pink-400 to-fuchsia-500 text-white shadow cosmic-glow animate-pulse-scale">Progres la cursuri</Badge>
-                </span>
-                <span className="text-blue-600 dark:text-blue-400 font-bold text-lg drop-shadow cosmic-text-glow">(în curând)</span>
-              </div>
+            <Tabs defaultValue="activity" className="w-full mt-4">
+              <TabsList className="grid grid-cols-3 w-full">
+                <TabsTrigger value="activity">Activitate</TabsTrigger>
+                <TabsTrigger value="badges">Badges</TabsTrigger>
+                <TabsTrigger value="settings">Setari</TabsTrigger>
+              </TabsList>
 
-              {/* Schimbare parolă */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-green-100/80 via-pink-100/60 to-white/80 dark:from-zinc-800/80 dark:via-green-900/60 dark:to-zinc-900/80 rounded-xl p-4 shadow space-card">
-                <span className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-gradient-to-tr from-green-600 via-pink-400 to-fuchsia-500 text-white shadow cosmic-glow animate-pulse-scale">Securitate</Badge>
-                </span>
-                <Button
-                  onClick={() => setShowChangePasswordModal(true)}
-                  variant="outline"
-                  className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-900/20 transition-all duration-300"
+              <TabsContent value="activity" className="mt-4">
+                {solvedProblems.length === 0 ? (
+                  <span className="text-gray-500 italic">Nu ai rezolvat încă nicio problemă.</span>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {solvedProblems.map((problem) => (
+                      <Link key={problem.id} href={`/probleme/${problem.id}`} className="inline-block">
+                        <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                          #{problem.id}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="badges" className="mt-4">
+                <UserBadges />
+              </TabsContent>
+
+              <TabsContent value="settings" className="mt-4">
+                <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white/60 dark:bg-zinc-900/40">
+                  <div className="text-sm text-zinc-600 dark:text-zinc-300">Resetare parolă</div>
+                  <Button onClick={() => setShowChangePasswordModal(true)} variant="outline">
+                    <Lock className="w-4 h-4 mr-2" />
+                    Schimbă parola
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+          </Card>
+        </section>
+
+        {/* Modal pentru schimbarea parolei */}
+        <ChangePasswordModal
+          isOpen={showChangePasswordModal}
+          onClose={() => setShowChangePasswordModal(false)}
+        />
+      </main>
+
+      {/* Mini Footer pentru pagina de profil (full-width) */}
+      <footer className="bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 py-12 px-4 w-full">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-black dark:text-white mb-4 title-font">PLANCK</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                Platforma educațională de fizică pentru liceeni. Învață, exersează și reușește!
+              </p>
+              <div className="flex gap-4">
+                <Link
+                  href="#"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
                 >
-                  <Lock className="w-4 h-4 mr-2" />
-                  Schimbă parola
-                </Button>
+                  <Facebook size={20} />
+                </Link>
+                <Link
+                  href="#"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
+                >
+                  <Instagram size={20} />
+                </Link>
+                <Link
+                  href="#"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
+                >
+                  <Youtube size={20} />
+                </Link>
+                <Link
+                  href="#"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
+                >
+                  <Mail size={20} />
+                </Link>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </section>
+          </div>
 
-      {/* Modal pentru schimbarea parolei */}
-      <ChangePasswordModal
-        isOpen={showChangePasswordModal}
-        onClose={() => setShowChangePasswordModal(false)}
-      />
-    </main>
+          <div className="border-t border-gray-200 dark:border-gray-800 mt-8 pt-8 text-center text-gray-600 dark:text-gray-400">
+            <p>&copy; 2024 PLANCK. Toate drepturile rezervate.</p>
+          </div>
+        </div>
+      </footer>
+    </>
   );
 };
 

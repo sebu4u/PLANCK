@@ -22,8 +22,8 @@ const courses = [
     ],
     price: "199 RON",
     originalPrice: "299 RON",
-    rating: 4.9,
-    students: 1247,
+    rating: 5,
+    students: 0,
     totalDuration: "16h 40m",
     level: "Începător",
     certificate: true,
@@ -45,8 +45,8 @@ const courses = [
     ],
     price: "229 RON",
     originalPrice: "329 RON",
-    rating: 4.8,
-    students: 987,
+    rating: 5,
+    students: 0,
     totalDuration: "18h 20m",
     level: "Intermediar",
     certificate: true,
@@ -162,7 +162,7 @@ export function EnhancedCoursesSection() {
                     </div>
 
                     <div className="flex gap-3">
-                      <Link href={`/cursuri/${course.id}`} className="flex-1">
+                      <Link href={`/cursuri/curand`} className="flex-1">
                         <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-300 cosmic-glow h-12">
                           <PlayCircle className="w-4 h-4 mr-2" />
                           Începe cursul
