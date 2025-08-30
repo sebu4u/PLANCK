@@ -6,18 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Star, Users, Clock, Award, PlayCircle, CheckCircle2, Zap } from "lucide-react"
 import { generateMetadata } from "@/lib/metadata"
+import { ScrollToCoursesButton } from "@/components/scroll-to-courses-button"
 
 export const metadata: Metadata = generateMetadata('courses')
-
-const scrollToCourses = () => {
-  const coursesSection = document.getElementById('courses')
-  if (coursesSection) {
-    coursesSection.scrollIntoView({ 
-      behavior: 'smooth',
-      block: 'start'
-    })
-  }
-}
 
 const courseStats = [
   {
@@ -98,14 +89,7 @@ export default function CoursesPage() {
                 ))}
               </div>
 
-              <Button
-                size="lg"
-                onClick={scrollToCourses}
-                className="bg-white text-purple-600 hover:bg-purple-50 text-lg px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:scale-105 cosmic-glow"
-              >
-                <PlayCircle className="w-5 h-5 mr-2" />
-                Începe să înveți acum
-              </Button>
+              <ScrollToCoursesButton />
             </div>
           </div>
         </section>
