@@ -90,11 +90,11 @@ drop policy if exists "user_badges_select_own" on public.user_badges;
 create policy "user_badges_select_own"
   on public.user_badges for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((SELECT auth.uid()) = user_id);
 
 -- Doar sistemul poate insera badge-uri pentru utilizatori
 drop policy if exists "user_badges_insert_system" on public.user_badges;
 create policy "user_badges_insert_system"
   on public.user_badges for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check ((SELECT auth.uid()) = user_id);

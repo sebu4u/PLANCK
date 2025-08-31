@@ -312,11 +312,11 @@ export default function RegisterPage() {
                       />
                       <Label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer leading-relaxed">
                         Sunt de acord cu{" "}
-                        <Link href="/terms" className="text-purple-600 hover:text-purple-700 font-medium">
+                        <Link href="/termeni" className="text-purple-600 hover:text-purple-700 font-medium">
                           Termenii și Condițiile
                         </Link>{" "}
                         și{" "}
-                        <Link href="/privacy" className="text-purple-600 hover:text-purple-700 font-medium">
+                        <Link href="/termeni" className="text-purple-600 hover:text-purple-700 font-medium">
                           Politica de Confidențialitate
                         </Link>
                       </Label>

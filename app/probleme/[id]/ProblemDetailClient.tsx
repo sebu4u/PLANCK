@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, lazy, Suspense } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +13,10 @@ import React from 'react';
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Lazy load video player component
+const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
 
 // Array cu 10 iconițe variate pentru probleme (același sistem ca în problem-card)
 const problemIcons = [
@@ -49,6 +53,29 @@ const congratulationMessages = [
   "Felicitări! Ai câștigat +1 XP"
 ]
 
+// Loading skeleton for video content
+function VideoSkeleton() {
+  return (
+    <div className="aspect-video w-full max-w-3xl mx-auto rounded-lg overflow-hidden shadow-2xl bg-gray-100">
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <Skeleton className="w-16 h-16 rounded-full mx-auto mb-4" />
+          <Skeleton className="w-32 h-4 rounded mx-auto" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Loading skeleton for problem image
+function ImageSkeleton() {
+  return (
+    <div className="mt-6 flex justify-center">
+      <Skeleton className="w-full max-w-2xl h-96 rounded-lg" />
+    </div>
+  )
+}
+
 export default function ProblemDetailClient({ problem, categoryIcons, difficultyColors }: {
   problem: Problem,
   categoryIcons: any,
@@ -59,6 +86,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [loadingSolved, setLoadingSolved] = useState(true)
   const [congratulationMessage, setCongratulationMessage] = useState<string | null>(null)
   const [newBadge, setNewBadge] = useState<any>(null)
+  const [imageLoaded, setImageLoaded] = useState(false)
   const { user } = useAuth();
   const problemIcon = getProblemIcon(problem.id);
 
@@ -99,128 +127,82 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           name,
           description,
           icon,
-          required_problems,
           color
         )
       `)
       .eq('user_id', user.id)
-      .gte('earned_at', new Date().toISOString())
-      .order('earned_at', { ascending: false })
+      .is('earned_at', null)
       .limit(1);
-    
+
+    if (newBadges && newBadges.length > 0) {
+      setNewBadge(newBadges[0]);
+      // Marchează badge-ul ca câștigat
+      await supabase
+        .from('user_badges')
+        .update({ earned_at: new Date().toISOString() })
+        .eq('id', newBadges[0].id);
+    }
+
     setIsSolved(true);
     setLoadingSolved(false);
     
-    // Afișează notificarea de badge nou dacă există
-    if (newBadges && newBadges.length > 0) {
-      setNewBadge(newBadges[0]);
-    }
+    // Afișează mesajul de felicitare
+    const randomMessage = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
+    setCongratulationMessage(randomMessage);
     
-    // Afisarea textului de felicitare
-    const message = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
-    setCongratulationMessage(message);
+    // Confetti effect
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
     
-    // Generarea de confetiți
-    const duration = 3 * 1000; // 3 secunde
-    const animationEnd = Date.now() + duration;
-
-    function randomInRange(min: number, max: number) {
-      return Math.random() * (max - min) + min;
-    }
-
-    const interval: NodeJS.Timeout = setInterval(function () {
-      const timeLeft = animationEnd - Date.now();
-
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-
-      const particleCount = 50 * (timeLeft / duration);
-
-      // since particles fall down, start a bit higher than random
-      confetti({
-        particleCount: particleCount,
-        startVelocity: 30,
-        spread: 360,
-        origin: {
-          x: randomInRange(0.1, 0.3),
-          y: Math.random() - 0.2,
-        },
-      });
-      confetti({
-        particleCount: particleCount,
-        startVelocity: 30,
-        spread: 360,
-        origin: {
-          x: randomInRange(0.7, 0.9),
-          y: Math.random() - 0.2,
-        },
-      });
-    }, 250);
-    
-    // Ascunderea textului după 2 secunde
+    // Ascunde mesajul după 3 secunde
     setTimeout(() => {
       setCongratulationMessage(null);
-    }, 2000);
+      setNewBadge(null);
+    }, 3000);
   };
-  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50 text-gray-900 relative overflow-hidden">
-      
-      {/* Overlay pentru textul de felicitare */}
-      {congratulationMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="text-4xl md:text-5xl font-bold text-pink-600 text-center animate-bounce-in drop-shadow-2xl">
-            {congratulationMessage}
-          </div>
-        </div>
-      )}
-      
-      {/* Toast pentru badge nou (dreapta jos) */}
-      {newBadge && (
-        <div className="fixed bottom-4 right-4 z-50 pointer-events-none">
-          <div className="pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-xl p-4 shadow-xl border border-purple-200 dark:border-purple-700 animate-fade-in max-w-xs w-full">
-            <div className="flex items-start gap-3">
-              <div className="text-3xl leading-none">
-                {newBadge.badge.icon}
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-bold text-purple-700 dark:text-pink-400">
-                  Badge nou câștigat
-                </div>
-                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {newBadge.badge.name}
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  {newBadge.badge.description}
-                </div>
-              </div>
-              <button
-                aria-label="Închide notificarea"
-                onClick={() => setNewBadge(null)}
-                className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
+    <div className="min-h-screen bg-white text-gray-900">
       <Navigation />
-      <div className="pt-16 relative" style={{ zIndex: 2 }}>
-        {/* Header */}
-        <section className="py-12 px-4 bg-gradient-to-br from-white/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border-b border-purple-100/50 shadow-lg">
-          <div className="max-w-4xl mx-auto flex flex-col gap-6">
-            <Link href="/probleme" className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 hover:underline transition-colors duration-200 font-medium">
-              <ArrowLeft className="w-4 h-4" /> Înapoi la catalog
-            </Link>
-            <div className="flex items-start gap-4">
-              <div className="text-6xl drop-shadow-lg bg-white/50 rounded-2xl p-4 backdrop-blur-sm">
-                {problemIcon}
-              </div>
-              <div className="flex-1">
-                <h1 className="text-4xl font-bold text-gray-900 mb-4 leading-tight">
+      <div className="pt-16">
+        {/* Hero Section */}
+        <section className="py-12 sm:py-16 lg:py-20 px-4 bg-gradient-to-br from-purple-50 to-pink-50">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center gap-4 mb-8">
+              <Link href="/probleme" className="flex items-center gap-2 text-purple-600 hover:text-purple-700 transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+                <span>Înapoi la probleme</span>
+              </Link>
+            </div>
+            
+            <div className="grid lg:grid-cols-3 gap-8 items-start">
+              <div className="lg:col-span-2">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-4xl drop-shadow-lg">{problemIcon}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className={`border ${difficultyColors[problem.difficulty] || "bg-gray-100 text-gray-700 border-gray-300"} font-semibold px-3 py-1`}>
+                      {problem.difficulty}
+                    </Badge>
+                    <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-semibold px-3 py-1">
+                      {problem.category}
+                    </Badge>
+                    {typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== '' && (
+                      <Badge className="bg-red-100 text-red-700 border-red-300 font-semibold px-3 py-1">
+                        🎥 Rezolvare video
+                      </Badge>
+                    )}
+                    {isSolved && (
+                      <Badge className="bg-green-100 text-green-700 border-green-300 font-semibold px-3 py-1">
+                        ✔️ Rezolvată
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 line-clamp-3">
                   {problem.title.includes('$')
                     ? problem.title.split(/(\$[^$]+\$)/g).map((part, idx) =>
                         part.startsWith('$') && part.endsWith('$') ? (
@@ -232,41 +214,9 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                     : <span>{problem.title}</span>
                   }
                 </h1>
-                <div className="flex gap-3 flex-wrap">
-                  <Badge className={`${difficultyColors[problem.difficulty as keyof typeof difficultyColors] || ""} text-sm px-4 py-2`}>
-                    {problem.difficulty}
-                  </Badge>
-                  <Badge variant="outline" className="text-sm px-4 py-2 bg-white/50 backdrop-blur-sm">
-                    {problem.category}
-                  </Badge>
-                  <span className="text-sm text-gray-500 font-mono bg-white/30 px-3 py-2 rounded-lg backdrop-blur-sm">
-                    #{problem.id}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        
-        {/* Problem Statement & Video */}
-        <section className="py-12 px-4 max-w-4xl mx-auto relative z-10">
-          <Card className="bg-white/80 backdrop-blur-md border-0 shadow-2xl">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100/50">
-              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                <span className="text-3xl">{problemIcon}</span>
-                Enunțul problemei
-              </CardTitle>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-sm text-gray-600">
-                <div className="bg-white/50 p-3 rounded-lg backdrop-blur-sm">
-                  <span className="font-semibold text-purple-700">Cod problemă:</span> {problem.id}
-                </div>
-                <div className="bg-white/50 p-3 rounded-lg backdrop-blur-sm">
-                  <span className="font-semibold text-purple-700">Data adăugării:</span> {problem.created_at ? new Date(problem.created_at).toLocaleDateString('ro-RO') : ''}
-                </div>
-              </div>
-              {problem.description && (
-                <div className="mt-4 p-4 bg-white/70 rounded-lg backdrop-blur-sm border-l-4 border-purple-400">
-                  <div className="text-gray-700 font-medium">
+                
+                {problem.description && (
+                  <p className="text-lg text-gray-600 mb-6 leading-relaxed">
                     {problem.description.includes('$')
                       ? problem.description.split(/(\$[^$]+\$)/g).map((part, idx) =>
                           part.startsWith('$') && part.endsWith('$') ? (
@@ -277,18 +227,65 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         )
                       : <span>{problem.description}</span>
                     }
+                  </p>
+                )}
+                
+                {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {problem.tags.map((tag: string, idx: number) => (
+                      <span key={idx} className="px-3 py-1 bg-gradient-to-r from-purple-200 to-pink-200 text-purple-800 rounded-full text-sm font-semibold shadow-sm border border-purple-100">
+                        {tag.trim()}
+                      </span>
+                    ))}
                   </div>
-                </div>
-              )}
-              {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {problem.tags.map((tag: string, idx: number) => (
-                    <span key={idx} className="px-3 py-1 bg-gradient-to-r from-purple-200 to-pink-200 text-purple-800 rounded-full text-sm font-semibold shadow-sm border border-purple-100 backdrop-blur-sm">
-                      {tag.trim()}
-                    </span>
-                  ))}
-                </div>
-              )}
+                )}
+              </div>
+              
+              <div className="lg:col-span-1">
+                <Card className="border-purple-200 sticky top-24">
+                  <CardHeader>
+                    <CardTitle>Informații problema</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">ID:</span>
+                      <span className="font-mono text-sm">{problem.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Clasa:</span>
+                      <span className="font-semibold">Clasa a {problem.class}-a</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Categoria:</span>
+                      <span className="font-semibold">{problem.category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Dificultatea:</span>
+                      <Badge className={`${difficultyColors[problem.difficulty] || "bg-gray-100 text-gray-700"}`}>
+                        {problem.difficulty}
+                      </Badge>
+                    </div>
+                    {problem.created_at && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Adăugată:</span>
+                        <span className="text-sm">{new Date(problem.created_at).toLocaleDateString('ro-RO')}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Problem Content */}
+        <section className="py-16 px-4 max-w-7xl mx-auto">
+          <Card className="border-purple-200 shadow-2xl">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200">
+              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <span className="text-3xl">{problemIcon}</span>
+                Enunțul problemei
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-8">
               <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border border-gray-100 shadow-inner">
@@ -305,10 +302,17 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                 </div>
                 {problem.image_url && (
                   <div className="mt-6 flex justify-center">
+                    {!imageLoaded && <ImageSkeleton />}
                     <img
-                      src={problem.image_url}
+                      src={problem.image_url.replace(/^@/, '')}
                       alt="Ilustrație problemă"
-                      className="rounded-lg max-w-full max-h-96 shadow-md border border-gray-200"
+                      className={`rounded-lg max-w-full max-h-96 shadow-md border border-gray-200 ${!imageLoaded ? 'hidden' : ''}`}
+                      onLoad={() => setImageLoaded(true)}
+                      onError={(e) => {
+                        console.error('Image failed to load:', problem.image_url, e);
+                        setImageLoaded(true); // Hide skeleton even on error
+                      }}
+                      style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '384px' }}
                     />
                   </div>
                 )}
@@ -316,12 +320,18 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
               
               {!showVideo && (
                 <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
-                  <button
-                    onClick={() => setShowVideo(true)}
-                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold shadow-xl hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-300 text-lg transform hover:shadow-2xl"
-                  >
-                    🎥 Vezi rezolvarea video
-                  </button>
+                  {typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== '' ? (
+                    <button
+                      onClick={() => setShowVideo(true)}
+                      className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold shadow-xl hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-300 text-lg transform hover:shadow-2xl"
+                    >
+                      🎥 Vezi rezolvarea video
+                    </button>
+                  ) : (
+                    <div className="px-8 py-4 bg-gray-100 text-gray-500 rounded-xl font-bold text-lg border-2 border-gray-200">
+                      📹 Rezolvare video indisponibilă
+                    </div>
+                  )}
                   {user && !loadingSolved && (
                     <button
                       onClick={handleMarkSolved}
@@ -341,22 +351,16 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                 </div>
               )}
               
-              {showVideo && (
+              {showVideo && typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== '' && (
                 <div className="mt-8 animate-fade-in-up">
                   <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
                     <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">📹 Rezolvarea video</h3>
-                    <div className="aspect-video w-full max-w-3xl mx-auto rounded-lg overflow-hidden shadow-2xl">
-                      <iframe
-                        width="100%"
-                        height="100%"
-                        src={problem.youtube_url.replace("watch?v=", "embed/")}
+                    <Suspense fallback={<VideoSkeleton />}>
+                      <VideoPlayer
+                        videoUrl={problem.youtube_url}
                         title="Rezolvare video"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="rounded-lg"
-                      ></iframe>
-                    </div>
+                      />
+                    </Suspense>
                     {/* Button "Marchează ca rezolvată" sub video */}
                     <div className="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
                       {user && !loadingSolved && (
@@ -384,6 +388,33 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         </section>
       </div>
       <Footer />
+      
+      {/* Congratulation Modal */}
+      {congratulationMessage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl animate-fade-in-up">
+            <div className="text-6xl mb-4">🎉</div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Felicitări!</h3>
+            <p className="text-gray-600 mb-6">{congratulationMessage}</p>
+            {newBadge && (
+              <div className="bg-gradient-to-r from-purple-100 to-pink-100 p-4 rounded-lg mb-6">
+                <div className="text-3xl mb-2">{newBadge.badge.icon}</div>
+                <h4 className="font-bold text-gray-900 mb-1">{newBadge.badge.name}</h4>
+                <p className="text-sm text-gray-600">{newBadge.badge.description}</p>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setCongratulationMessage(null);
+                setNewBadge(null);
+              }}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200"
+            >
+              Continuă
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

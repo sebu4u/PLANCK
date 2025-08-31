@@ -13,27 +13,27 @@ drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
   on public.profiles for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((SELECT auth.uid()) = user_id);
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
   on public.profiles for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check ((SELECT auth.uid()) = user_id);
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"
   on public.profiles for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((SELECT auth.uid()) = user_id)
+  with check ((SELECT auth.uid()) = user_id);
 
 -- Solved problems: per-user access
 drop policy if exists "solved_select_own" on public.solved_problems;
 create policy "solved_select_own"
   on public.solved_problems for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((SELECT auth.uid()) = user_id);
 
 -- Optional: trigger to auto-create profiles from auth.users metadata
 -- Note: create this in your Supabase SQL editor if not already present
@@ -70,17 +70,17 @@ drop policy if exists "solved_insert_own" on public.solved_problems;
 create policy "solved_insert_own"
   on public.solved_problems for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check ((SELECT auth.uid()) = user_id);
 
 drop policy if exists "solved_update_own" on public.solved_problems;
 create policy "solved_update_own"
   on public.solved_problems for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((SELECT auth.uid()) = user_id)
+  with check ((SELECT auth.uid()) = user_id);
 
 drop policy if exists "solved_delete_own" on public.solved_problems;
 create policy "solved_delete_own"
   on public.solved_problems for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using ((SELECT auth.uid()) = user_id);

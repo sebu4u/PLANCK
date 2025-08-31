@@ -23,6 +23,7 @@ import { generateMetadata } from "@/lib/metadata"
 import { courseStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
 import Link from "next/link"
+import Image from "next/image"
 
 export const metadata: Metadata = generateMetadata('class-10')
 
@@ -209,10 +210,14 @@ export default function Clasa10Page() {
               </div>
 
               <div className="relative">
-                <img
+                <Image
                   src={courseData.image || "/placeholder.svg"}
                   alt={courseData.title}
+                  width={0}
+                  height={0}
+                  sizes="100vw"
                   className="rounded-lg shadow-2xl w-full"
+                  style={{ width: '100%', height: 'auto' }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Button size="lg" className="bg-white/90 text-blue-600 hover:bg-white rounded-full w-20 h-20">
@@ -312,10 +317,14 @@ export default function Clasa10Page() {
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-start gap-4">
-                        <img
+                        <Image
                           src={courseData.instructor.avatar || "/placeholder.svg"}
                           alt={courseData.instructor.name}
+                          width={0}
+                          height={0}
+                          sizes="80px"
                           className="w-20 h-20 rounded-full border-4 border-blue-200"
+                          style={{ width: '80px', height: '80px' }}
                         />
                         <div>
                           <h4 className="text-xl font-bold text-gray-900">{courseData.instructor.name}</h4>
@@ -351,10 +360,14 @@ export default function Clasa10Page() {
                         <Card key={index} className="border-blue-200">
                           <CardContent className="p-6">
                             <div className="flex items-start gap-4">
-                              <img
+                              <Image
                                 src={testimonial.avatar || "/placeholder.svg"}
                                 alt={testimonial.name}
+                                width={0}
+                                height={0}
+                                sizes="48px"
                                 className="w-12 h-12 rounded-full border-2 border-blue-200"
+                                style={{ width: '48px', height: '48px' }}
                               />
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">

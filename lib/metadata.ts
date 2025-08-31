@@ -16,14 +16,14 @@ export const baseMetadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://planck.ro'),
+  metadataBase: new URL('https://www.planck.academy'),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'ro_RO',
-    url: 'https://planck.ro',
+    url: 'https://www.planck.academy',
     siteName: 'PLANCK',
     title: 'PLANCK - Platforma Educațională de Fizică',
     description: 'Învață fizica prin cursuri video interactive și probleme captivante. Cursuri pentru clasa a 9-a și a 10-a.',
@@ -53,9 +53,10 @@ export const baseMetadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  verification: {
-    google: 'your-google-verification-code',
-  },
+  // Google verification done via DNS on Namecheap
+  // verification: {
+  //   google: 'your-google-verification-code',
+  // },
 }
 
 // Page-specific metadata configurations

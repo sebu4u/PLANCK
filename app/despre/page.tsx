@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Users, BookOpen, Award, Target, Rocket, Zap, Heart, Star, Trophy, Brain } from "lucide-react"
 import { generateMetadata } from "@/lib/metadata"
 import Link from "next/link"
+import Image from "next/image"
 
 export const metadata: Metadata = generateMetadata('about')
 
@@ -192,10 +193,14 @@ export default function AboutPage() {
               <Card className="bg-white border-purple-200 hover:border-purple-400 transition-all duration-300 space-card animate-fade-in-up">
                 <CardContent className="p-8 text-center">
                   <div className="relative mb-6">
-                    <img
+                    <Image
                       src="https://i.ibb.co/0RKyZ5jj/DSC02304.jpg"
                       alt="Mițurcă Sebastian"
+                      width={0}
+                      height={0}
+                      sizes="128px"
                       className="w-32 h-32 rounded-full border-4 border-purple-200 shadow-lg object-cover mx-auto cosmic-glow"
+                      style={{ width: '128px', height: '128px' }}
                     />
                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
                       <Trophy className="w-5 h-5 text-white" />
@@ -215,10 +220,14 @@ export default function AboutPage() {
               <Card className="bg-white border-pink-200 hover:border-pink-400 transition-all duration-300 space-card animate-fade-in-up-delay">
                 <CardContent className="p-8 text-center">
                   <div className="relative mb-6">
-                    <img
+                    <Image
                       src="https://i.ibb.co/JRktCngW/Whats-App-Image-2025-06-15-at-22-05-38-efacef2e.jpg"
                       alt="Avram Marina"
+                      width={0}
+                      height={0}
+                      sizes="128px"
                       className="w-32 h-32 rounded-full border-4 border-pink-200 shadow-lg object-cover mx-auto cosmic-glow"
+                      style={{ width: '128px', height: '128px' }}
                     />
                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
                       <Brain className="w-5 h-5 text-white" />

@@ -13,6 +13,64 @@ import Link from "next/link";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Skeleton components for profile page
+const ProfileHeaderSkeleton = () => (
+  <div className="flex flex-col items-center gap-4 pb-6 pt-8">
+    <div className="relative">
+      <Skeleton className="w-28 h-28 rounded-full" />
+      <Skeleton className="absolute bottom-2 right-2 w-16 h-6 rounded-full" />
+    </div>
+    <div className="flex flex-col items-center gap-3 w-full">
+      <Skeleton className="w-20 h-3 rounded" />
+      <div className="flex items-center gap-2">
+        <Skeleton className="w-32 h-6 rounded" />
+        <Skeleton className="w-6 h-6 rounded" />
+      </div>
+      <Skeleton className="w-16 h-3 rounded" />
+      <Skeleton className="w-48 h-7 rounded" />
+    </div>
+    <div className="w-full flex flex-col items-center">
+      <Skeleton className="w-64 h-20 rounded-md" />
+    </div>
+  </div>
+);
+
+const ActivitySkeleton = () => (
+  <div className="mt-4">
+    <div className="flex flex-wrap gap-2">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <Skeleton key={index} className="w-16 h-8 rounded-md" />
+      ))}
+    </div>
+  </div>
+);
+
+const BadgesSkeleton = () => (
+  <div className="mt-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="flex items-center gap-3 p-4 border rounded-lg">
+          <Skeleton className="w-12 h-12 rounded-full" />
+          <div className="flex-1">
+            <Skeleton className="w-24 h-4 rounded mb-2" />
+            <Skeleton className="w-32 h-3 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const SettingsSkeleton = () => (
+  <div className="mt-4">
+    <div className="flex items-center justify-between rounded-lg border p-4">
+      <Skeleton className="w-32 h-4 rounded" />
+      <Skeleton className="w-32 h-10 rounded" />
+    </div>
+  </div>
+);
 
 const ProfilPage = () => {
   const { user, loading } = useAuth();
@@ -30,10 +88,13 @@ const ProfilPage = () => {
   const [solvedProblems, setSolvedProblems] = useState<any[]>([]);
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [solvedProblemsLoading, setSolvedProblemsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     const fetchProfile = async () => {
+      setProfileLoading(true);
       const { data, error } = await supabase
         .from("profiles")
         .select("name, bio, user_icon, nickname")
@@ -49,6 +110,7 @@ const ProfilPage = () => {
         }
         setNickname(data.nickname || "");
       }
+      setProfileLoading(false);
     };
     fetchProfile();
   }, [user]);
@@ -68,6 +130,7 @@ const ProfilPage = () => {
   useEffect(() => {
     if (!user) return;
     const fetchSolvedProblems = async () => {
+      setSolvedProblemsLoading(true);
       // 1. Ia toate problem_id rezolvate de user
       const { data: solved, error: solvedError } = await supabase
         .from("solved_problems")
@@ -76,6 +139,7 @@ const ProfilPage = () => {
         .order("solved_at", { ascending: false });
       if (!solved || solved.length === 0) {
         setSolvedProblems([]);
+        setSolvedProblemsLoading(false);
         return;
       }
       // 2. Ia titlurile problemelor
@@ -86,6 +150,7 @@ const ProfilPage = () => {
         .in("id", problemIds);
       if (!problems) {
         setSolvedProblems([]);
+        setSolvedProblemsLoading(false);
         return;
       }
       // 3. Asociază solved cu titlurile
@@ -96,6 +161,7 @@ const ProfilPage = () => {
         solved_at: s.solved_at,
       }));
       setSolvedProblems(solvedWithTitles);
+      setSolvedProblemsLoading(false);
     };
     fetchSolvedProblems();
   }, [user]);
@@ -162,7 +228,34 @@ const ProfilPage = () => {
   };
 
   if (loading || !user) {
-    return <div className="container mx-auto py-8">Se încarcă...</div>;
+    return (
+      <main className="relative min-h-screen flex flex-col items-center overflow-visible cosmic-bg pt-24 md:pt-32">
+        <Navigation />
+        <section className="relative z-10 w-full max-w-3xl px-4 py-10 flex flex-col items-center animate-fade-in-up">
+          <Card className="w-full bg-white/80 dark:bg-zinc-900/70 backdrop-blur-lg border border-zinc-200/40 dark:border-zinc-800/60 shadow-xl flex flex-col min-h-[85vh] md:min-h-[70vh]">
+            <ProfileHeaderSkeleton />
+            <CardContent className="pt-0">
+              <Tabs defaultValue="activity" className="w-full mt-4">
+                <TabsList className="grid grid-cols-3 w-full">
+                  <TabsTrigger value="activity">Activitate</TabsTrigger>
+                  <TabsTrigger value="badges">Badges</TabsTrigger>
+                  <TabsTrigger value="settings">Setari</TabsTrigger>
+                </TabsList>
+                <TabsContent value="activity" className="mt-4">
+                  <ActivitySkeleton />
+                </TabsContent>
+                <TabsContent value="badges" className="mt-4">
+                  <BadgesSkeleton />
+                </TabsContent>
+                <TabsContent value="settings" className="mt-4">
+                  <SettingsSkeleton />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -172,101 +265,107 @@ const ProfilPage = () => {
         <section className="relative z-10 w-full max-w-3xl px-4 py-10 flex flex-col items-center animate-fade-in-up">
           <Card className="w-full bg-white/80 dark:bg-zinc-900/70 backdrop-blur-lg border border-zinc-200/40 dark:border-zinc-800/60 shadow-xl flex flex-col min-h-[85vh] md:min-h-[70vh]">
           <CardHeader className="flex flex-col items-center gap-4 pb-6 pt-8">
-            <div className="relative group">
-              <Avatar className="w-28 h-28 shadow-lg border-4 border-white/80 dark:border-zinc-800/80 transition-transform duration-300 group-hover:scale-105">
-                {avatarUrl ? (
-                  <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
-                ) : (
-                  <AvatarFallback>
-                    {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              {uploadingAvatar && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60 rounded-full z-10">
-                  <svg className="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                </div>
-              )}
-              <label className="absolute bottom-2 right-2 bg-gradient-to-tr from-purple-600 via-pink-400 to-fuchsia-500 text-white rounded-full px-3 py-1 text-xs font-medium shadow cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarChange}
-                  disabled={uploadingAvatar}
-                />
-                Schimbă
-              </label>
-            </div>
-            <div className="flex flex-col items-center gap-3 w-full">
-              <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Username</div>
-              <div className="flex items-center gap-2">
-                {nicknameEdit ? (
-                  <>
-                    <input
-                      className="border rounded p-1 px-2 text-base mr-2 bg-white/80 dark:bg-zinc-800/80"
-                      value={nickname}
-                      onChange={e => setNickname(e.target.value)}
-                      maxLength={32}
-                      autoFocus
-                    />
-                    <Button size="sm" onClick={handleNicknameSave} disabled={saving}>
-                      Salvează
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setNicknameEdit(false)}>
-                      Anulează
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-lg font-semibold text-zinc-900 dark:text-white">
-                      {nickname || <span className="italic text-gray-400">Adaugă un nickname...</span>}
-                    </span>
-                    <Button size="icon" variant="ghost" className="ml-1 p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setNicknameEdit(true)} aria-label="Editează nickname">
-                      <Pencil size={16} />
-                    </Button>
-                  </>
-                )}
-              </div>
-              <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nume</div>
-              <div className="text-xl font-bold text-zinc-900 dark:text-white text-center">
-                {profile?.name || user.email}
-              </div>
-            </div>
-            <div className="w-full flex flex-col items-center">
-              {bioEdit ? (
-                <div className="flex flex-col items-center gap-2 mt-2 w-full">
-                  <textarea
-                    className="border rounded p-2 w-64 min-h-[60px] bg-white/80 dark:bg-zinc-800/80"
-                    value={bio}
-                    onChange={e => setBio(e.target.value)}
-                    maxLength={300}
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleBioSave} disabled={saving}>
-                      Salvează
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setBioEdit(false)}>
-                      Anulează
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-2 w-full max-w-md text-gray-700 dark:text-gray-300 text-center flex items-start justify-center">
-                  <div className="w-full border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-2 bg-white/60 dark:bg-zinc-900/40">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-left w-full">{bio || <span className="italic text-gray-400">Adaugă un bio...</span>}</span>
-                      <Button size="icon" variant="ghost" className="p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setBioEdit(true)} aria-label="Editează bio">
-                        <Pencil size={16} />
-                      </Button>
+            {profileLoading ? (
+              <ProfileHeaderSkeleton />
+            ) : (
+              <>
+                <div className="relative group">
+                  <Avatar className="w-28 h-28 shadow-lg border-4 border-white/80 dark:border-zinc-800/80 transition-transform duration-300 group-hover:scale-105">
+                    {avatarUrl ? (
+                      <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
+                    ) : (
+                      <AvatarFallback>
+                        {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60 rounded-full z-10">
+                      <svg className="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                      </svg>
                     </div>
+                  )}
+                  <label className="absolute bottom-2 right-2 bg-gradient-to-tr from-purple-600 via-pink-400 to-fuchsia-500 text-white rounded-full px-3 py-1 text-xs font-medium shadow cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                      disabled={uploadingAvatar}
+                    />
+                    Schimbă
+                  </label>
+                </div>
+                <div className="flex flex-col items-center gap-3 w-full">
+                  <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Username</div>
+                  <div className="flex items-center gap-2">
+                    {nicknameEdit ? (
+                      <>
+                        <input
+                          className="border rounded p-1 px-2 text-base mr-2 bg-white/80 dark:bg-zinc-800/80"
+                          value={nickname}
+                          onChange={e => setNickname(e.target.value)}
+                          maxLength={32}
+                          autoFocus
+                        />
+                        <Button size="sm" onClick={handleNicknameSave} disabled={saving}>
+                          Salvează
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setNicknameEdit(false)}>
+                          Anulează
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-lg font-semibold text-zinc-900 dark:text-white">
+                          {nickname || <span className="italic text-gray-400">Adaugă un nickname...</span>}
+                        </span>
+                        <Button size="icon" variant="ghost" className="ml-1 p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setNicknameEdit(true)} aria-label="Editează nickname">
+                          <Pencil size={16} />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nume</div>
+                  <div className="text-xl font-bold text-zinc-900 dark:text-white text-center">
+                    {profile?.name || user.email}
                   </div>
                 </div>
-              )}
-            </div>
+                <div className="w-full flex flex-col items-center">
+                  {bioEdit ? (
+                    <div className="flex flex-col items-center gap-2 mt-2 w-full">
+                      <textarea
+                        className="border rounded p-2 w-64 min-h-[60px] bg-white/80 dark:bg-zinc-800/80"
+                        value={bio}
+                        onChange={e => setBio(e.target.value)}
+                        maxLength={300}
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleBioSave} disabled={saving}>
+                          Salvează
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setBioEdit(false)}>
+                          Anulează
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 w-full max-w-md text-gray-700 dark:text-gray-300 text-center flex items-start justify-center">
+                      <div className="w-full border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-2 bg-white/60 dark:bg-zinc-900/40">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-left w-full">{bio || <span className="italic text-gray-400">Adaugă un bio...</span>}</span>
+                          <Button size="icon" variant="ghost" className="p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setBioEdit(true)} aria-label="Editează bio">
+                            <Pencil size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardHeader>
           <CardContent className="pt-0">
             <Tabs defaultValue="activity" className="w-full mt-4">
@@ -277,7 +376,9 @@ const ProfilPage = () => {
               </TabsList>
 
               <TabsContent value="activity" className="mt-4">
-                {solvedProblems.length === 0 ? (
+                {solvedProblemsLoading ? (
+                  <ActivitySkeleton />
+                ) : solvedProblems.length === 0 ? (
                   <span className="text-gray-500 italic">Nu ai rezolvat încă nicio problemă.</span>
                 ) : (
                   <div className="flex flex-wrap gap-2">

@@ -10,9 +10,9 @@ import Link from "next/link"
 import ProblemDetailClient from "./ProblemDetailClient"
 
 interface ProblemPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 const categoryIcons = {
@@ -35,7 +35,8 @@ async function getProblemFromSupabase(id: string): Promise<Problem | null> {
 }
 
 export default async function ProblemPage({ params }: ProblemPageProps) {
-  const problem = await getProblemFromSupabase(params.id)
+  const { id } = await params
+  const problem = await getProblemFromSupabase(id)
   if (!problem) {
     notFound()
   }

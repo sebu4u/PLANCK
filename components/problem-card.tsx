@@ -4,8 +4,12 @@ import Link from "next/link"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
-import React from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { PlayCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Lazy load KaTeX components
+const LazyInlineMath = lazy(() => import('react-katex').then(module => ({ default: module.InlineMath })))
 
 interface ProblemCardProps {
   problem: Problem
@@ -53,6 +57,47 @@ const difficultyColors = {
   Avansat: "bg-red-100 text-red-700 border-red-300",
 }
 
+// Component for rendering math content with lazy loading
+function MathContent({ content }: { content: string }) {
+  const [isMathLoaded, setIsMathLoaded] = useState(false)
+  const [hasMath, setHasMath] = useState(false)
+
+  useEffect(() => {
+    // Check if content contains math expressions
+    const containsMath = content.includes('$')
+    setHasMath(containsMath)
+    
+    if (containsMath) {
+      // Lazy load math rendering
+      const timer = setTimeout(() => {
+        setIsMathLoaded(true)
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [content])
+
+  if (!hasMath) {
+    return <span>{content}</span>
+  }
+
+  if (!isMathLoaded) {
+    return <Skeleton className="w-full h-4 rounded" />
+  }
+
+  return (
+    <Suspense fallback={<Skeleton className="w-full h-4 rounded" />}>
+      {content.split(/(\$[^$]+\$)/g).map((part, idx) =>
+        part.startsWith('$') && part.endsWith('$') ? (
+          <LazyInlineMath key={idx} math={part.slice(1, -1)} />
+        ) : (
+          <span key={idx}>{part}</span>
+        )
+      )}
+    </Suspense>
+  )
+}
+
 export function ProblemCard({ problem, solved }: ProblemCardProps) {
   const problemIcon = getProblemIcon(problem.id);
   
@@ -80,28 +125,10 @@ export function ProblemCard({ problem, solved }: ProblemCardProps) {
           <span className="text-xs text-gray-400 ml-auto font-mono">{problem.id}</span>
         </div>
         <CardTitle className="text-xl font-bold text-gray-900 mb-1 line-clamp-2 drop-shadow-sm">
-          {problem.title.includes('$')
-            ? problem.title.split(/(\$[^$]+\$)/g).map((part, idx) =>
-                part.startsWith('$') && part.endsWith('$') ? (
-                  <InlineMath key={idx} math={part.slice(1, -1)} />
-                ) : (
-                  <span key={idx}>{part}</span>
-                )
-              )
-            : <span>{problem.title}</span>
-          }
+          <MathContent content={problem.title} />
         </CardTitle>
         {problem.description && <div className="text-sm text-gray-700 mb-1 line-clamp-2 font-medium">
-          {problem.description.includes('$')
-            ? problem.description.split(/(\$[^$]+\$)/g).map((part, idx) =>
-                part.startsWith('$') && part.endsWith('$') ? (
-                  <InlineMath key={idx} math={part.slice(1, -1)} />
-                ) : (
-                  <span key={idx}>{part}</span>
-                )
-              )
-            : <span>{problem.description}</span>
-          }
+          <MathContent content={problem.description} />
         </div>}
         {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">

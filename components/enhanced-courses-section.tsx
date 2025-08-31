@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Star, Zap, Users, Clock, PlayCircle, CheckCircle2, BookOpen } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 const courses = [
   {
@@ -77,10 +78,14 @@ export function EnhancedCoursesSection() {
             <div className="lg:flex">
               {/* Course Image */}
               <div className="lg:w-2/5 relative">
-                <img
+                <Image
                   src={course.image || "/placeholder.svg"}
                   alt={course.title}
+                  width={0}
+                  height={0}
+                  sizes="(max-width: 1024px) 100vw, 40vw"
                   className="w-full h-64 lg:h-full object-cover"
+                  style={{ width: '100%', height: '100%' }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 right-4">

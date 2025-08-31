@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card"
+import Image from "next/image"
 
 export function AboutPlanckSection() {
   return (
@@ -93,10 +94,14 @@ export function AboutPlanckSection() {
             </p>
 
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src="https://i.ibb.co/whxDdCfF/Whats-App-Image-2025-08-30-at-17-01-30-5b2ca226.jpg"
                 alt="Ana Popescu"
+                width={0}
+                height={0}
+                sizes="40px"
                 className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                style={{ width: '40px', height: '40px' }}
               />
               <div>
                 <div className="text-black dark:text-white font-medium">Stefan Rares</div>
@@ -184,10 +189,14 @@ export function AboutPlanckSection() {
             </p>
 
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src="https://i.ibb.co/h1LhbfRG/Whats-App-Image-2025-08-30-at-17-03-19-adac22c2.jpg"
                 alt="Mihai David"
+                width={0}
+                height={0}
+                sizes="40px"
                 className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                style={{ width: '40px', height: '40px' }}
               />
               <div>
                 <div className="text-black dark:text-white font-medium">Mihai David</div>
@@ -275,10 +284,14 @@ export function AboutPlanckSection() {
             </p>
 
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src="https://i.ibb.co/Jwvr4DmK/Whats-App-Image-2025-08-30-at-17-02-41-153070e7.jpg"
                 alt="Elena Dumitrescu"
+                width={0}
+                height={0}
+                sizes="40px"
                 className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                style={{ width: '40px', height: '40px' }}
               />
               <div>
                 <div className="text-black dark:text-white font-medium">Elena Pascu</div>

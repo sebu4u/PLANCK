@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/admin/', '/private/'],
     },
-    sitemap: 'https://planck.ro/sitemap.xml',
+    sitemap: 'https://www.planck.academy/sitemap.xml',
   }
 }

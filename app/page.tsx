@@ -7,6 +7,7 @@ import { ContentExampleSection } from "@/components/content-example-section"
 import { CoursesSection } from "@/components/courses-section"
 import { NewsletterSection } from "@/components/newsletter-section"
 import { Footer } from "@/components/footer"
+import { ProgressNotification } from "@/components/progress-notification"
 import { generateMetadata } from "@/lib/metadata"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -357,6 +358,9 @@ export default function HomePage() {
       <div className="scroll-animate-fade-up">
         <Footer />
       </div>
+
+      {/* Progress Notification */}
+      <ProgressNotification />
     </div>
   )
 }
