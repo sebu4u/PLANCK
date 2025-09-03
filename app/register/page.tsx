@@ -346,26 +346,16 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant="outline"
-                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300 h-12 bg-transparent"
-                    onClick={async () => {
-                      await supabase.auth.signInWithOAuth({
-                        provider: "google",
-                        options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined },
-                      })
-                    }}
+                    className="border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed transition-all duration-300 h-12 opacity-50"
+                    disabled
                   >
                     <Chrome className="w-5 h-5 mr-2" />
                     Google
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300 h-12 bg-transparent"
-                    onClick={async () => {
-                      await supabase.auth.signInWithOAuth({
-                        provider: "github",
-                        options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined },
-                      })
-                    }}
+                    className="border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed transition-all duration-300 h-12 opacity-50"
+                    disabled
                   >
                     <Github className="w-5 h-5 mr-2" />
                     GitHub

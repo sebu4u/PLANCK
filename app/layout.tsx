@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Poppins } from "next/font/google"
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
@@ -9,6 +9,11 @@ import { organizationStructuredData, websiteStructuredData } from "@/lib/structu
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
+const poppins = Poppins({ 
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-poppins"
+})
 
 export const metadata: Metadata = {
   ...baseMetadata,
@@ -25,6 +30,8 @@ export const metadata: Metadata = {
       { url: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
       { url: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
+    // Adaugă aceste pentru Google favicon
+    shortcut: '/favicon.ico',
   },
   manifest: '/site.webmanifest',
 }
@@ -56,7 +63,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} ${poppins.variable}`}>
         <ScrollToTop />
         <AuthProvider>
           {children}

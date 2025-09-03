@@ -118,8 +118,8 @@ export default function AboutPage() {
               <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400 transition-all duration-300 space-card">
                 <CardContent className="p-6 text-center">
                   <Users className="w-10 h-10 text-purple-600 mx-auto mb-4" />
-                  <div className="text-3xl font-bold text-purple-700 mb-2">2500+</div>
-                  <div className="text-gray-600 font-medium">Studenți activi</div>
+                  <div className="text-3xl font-bold text-purple-700 mb-2">100+</div>
+                  <div className="text-gray-600 font-medium">Conturi create</div>
                 </CardContent>
               </Card>
 

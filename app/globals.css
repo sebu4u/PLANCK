@@ -174,11 +174,11 @@
   background: linear-gradient(45deg, #a855f7, #ef4444);
 }
 
-/* Title font using system fonts - reduced letter spacing */
+/* Title font using Poppins as primary font */
 .title-font {
-  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }

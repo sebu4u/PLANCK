@@ -3,9 +3,10 @@ import { useState, lazy, Suspense } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowLeft, X } from "lucide-react"
+import { ArrowLeft, X, List } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
@@ -14,6 +15,7 @@ import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
+import { ProblemsSidebar } from "@/components/problems-sidebar"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -87,6 +89,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [congratulationMessage, setCongratulationMessage] = useState<string | null>(null)
   const [newBadge, setNewBadge] = useState<any>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth();
   const problemIcon = getProblemIcon(problem.id);
 
@@ -171,11 +174,22 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         {/* Hero Section */}
         <section className="py-12 sm:py-16 lg:py-20 px-4 bg-gradient-to-br from-purple-50 to-pink-50">
           <div className="max-w-7xl mx-auto">
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center justify-between mb-8">
               <Link href="/probleme" className="flex items-center gap-2 text-purple-600 hover:text-purple-700 transition-colors">
                 <ArrowLeft className="w-5 h-5" />
                 <span>Înapoi la probleme</span>
               </Link>
+              
+              {/* Problems Sidebar Toggle Button */}
+              <Button
+                onClick={() => setSidebarOpen(true)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-purple-200 hover:bg-purple-50 hover:border-purple-300 transition-all duration-200 shadow-sm"
+              >
+                <List className="w-4 h-4" />
+                <span className="hidden sm:inline">Toate problemele</span>
+              </Button>
             </div>
             
             <div className="grid lg:grid-cols-3 gap-8 items-start">
@@ -388,6 +402,13 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         </section>
       </div>
       <Footer />
+      
+      {/* Problems Sidebar */}
+      <ProblemsSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        currentProblemId={problem.id}
+      />
       
       {/* Congratulation Modal */}
       {congratulationMessage && (
