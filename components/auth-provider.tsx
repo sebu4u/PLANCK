@@ -7,6 +7,8 @@ interface AuthContextType {
   user: any
   loading: boolean
   login: (email: string, password: string) => Promise<any>
+  loginWithGoogle: () => Promise<any>
+  loginWithGitHub: () => Promise<any>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   profile: any // nou: profilul din tabelul profiles
@@ -88,6 +90,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { data, error }
   }
 
+  const loginWithGoogle = async () => {
+    setLoading(true)
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+      }
+    })
+    setLoading(false)
+    return { data, error }
+  }
+
+  const loginWithGitHub = async () => {
+    setLoading(true)
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+      }
+    })
+    setLoading(false)
+    return { data, error }
+  }
+
   const logout = async () => {
     setLoading(true)
     await supabase.auth.signOut()
@@ -103,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, profile }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, loginWithGitHub, logout, refreshUser, profile }}>
       {children}
     </AuthContext.Provider>
   )

@@ -146,70 +146,73 @@ export default function Clasa9Page() {
 
       <div className="pt-16">
         {/* Hero Section */}
-        <section className="relative py-12 px-4 bg-gradient-to-br from-purple-600 via-pink-600 to-purple-800 text-white overflow-hidden">
+        <section className="relative py-8 md:py-12 px-4 bg-gradient-to-br from-purple-600 via-pink-600 to-purple-800 text-white overflow-hidden">
           <div className="cosmic-particles"></div>
           <div className="relative max-w-7xl mx-auto">
             <Link href="/cursuri">
-              <Button variant="ghost" className="mb-6 text-white hover:bg-white/10">
+              <Button variant="ghost" className="mb-4 md:mb-6 text-white hover:bg-white/10 text-sm md:text-base">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Înapoi la cursuri
               </Button>
             </Link>
 
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <Badge className="bg-white/20 text-white mb-4">{courseData.level}</Badge>
-                <h1 className="text-4xl lg:text-5xl font-bold mb-4 cosmic-text-glow">{courseData.title}</h1>
-                <p className="text-xl text-purple-100 mb-6">{courseData.subtitle}</p>
-                <p className="text-lg text-purple-200 mb-8 leading-relaxed">{courseData.description}</p>
+            <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
+              <div className="order-2 lg:order-1">
+                <Badge className="bg-white/20 text-white mb-3 md:mb-4 text-xs md:text-sm">{courseData.level}</Badge>
+                <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold mb-3 md:mb-4 cosmic-text-glow leading-tight">{courseData.title}</h1>
+                <p className="text-lg md:text-xl text-purple-100 mb-4 md:mb-6">{courseData.subtitle}</p>
+                <p className="text-base md:text-lg text-purple-200 mb-6 md:mb-8 leading-relaxed">{courseData.description}</p>
 
                 {/* Course Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
                   <div className="text-center">
-                    <Star className="w-6 h-6 text-yellow-400 mx-auto mb-1" />
-                    <div className="text-lg font-bold">{courseData.rating}</div>
-                    <div className="text-purple-200 text-sm">Rating</div>
+                    <Star className="w-5 h-5 md:w-6 md:h-6 text-yellow-400 mx-auto mb-1" />
+                    <div className="text-base md:text-lg font-bold">{courseData.rating}</div>
+                    <div className="text-purple-200 text-xs md:text-sm">Rating</div>
                   </div>
                   <div className="text-center">
-                    <Users className="w-6 h-6 text-blue-400 mx-auto mb-1" />
-                    <div className="text-lg font-bold">{courseData.students}</div>
-                    <div className="text-purple-200 text-sm">Studenți</div>
+                    <Users className="w-5 h-5 md:w-6 md:h-6 text-blue-400 mx-auto mb-1" />
+                    <div className="text-base md:text-lg font-bold">{courseData.students}</div>
+                    <div className="text-purple-200 text-xs md:text-sm">Studenți</div>
                   </div>
                   <div className="text-center">
-                    <Clock className="w-6 h-6 text-green-400 mx-auto mb-1" />
-                    <div className="text-lg font-bold">{courseData.totalDuration}</div>
-                    <div className="text-purple-200 text-sm">Durată</div>
+                    <Clock className="w-5 h-5 md:w-6 md:h-6 text-green-400 mx-auto mb-1" />
+                    <div className="text-base md:text-lg font-bold">{courseData.totalDuration}</div>
+                    <div className="text-purple-200 text-xs md:text-sm">Durată</div>
                   </div>
                   <div className="text-center">
-                    <BookOpen className="w-6 h-6 text-pink-400 mx-auto mb-1" />
-                    <div className="text-lg font-bold">{courseData.chapters.length}</div>
-                    <div className="text-purple-200 text-sm">Capitole</div>
+                    <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-pink-400 mx-auto mb-1" />
+                    <div className="text-base md:text-lg font-bold">{courseData.chapters.length}</div>
+                    <div className="text-purple-200 text-xs md:text-sm">Capitole</div>
                   </div>
                 </div>
 
                 {/* Pricing */}
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-3xl font-bold">{courseData.price}</span>
-                  <span className="text-xl text-purple-200 line-through">{courseData.originalPrice}</span>
-                  <Badge className="bg-red-500 text-white">-33%</Badge>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4 md:mb-6">
+                  <span className="text-2xl md:text-3xl font-bold">{courseData.price}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg md:text-xl text-purple-200 line-through">{courseData.originalPrice}</span>
+                    <Badge className="bg-red-500 text-white text-xs">-33%</Badge>
+                  </div>
                 </div>
 
-                <div className="flex gap-4">
-                  <Button size="lg" className="bg-white text-purple-600 hover:bg-purple-50 cosmic-glow">
-                    <PlayCircle className="w-5 h-5 mr-2" />
-                    Începe cursul acum
+                <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                  <Button size="lg" variant="outline" disabled className="border-white text-white/50 text-sm md:text-base">
+                    <Lock className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+                    Cursul va fi disponibil curând
                   </Button>
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-white text-white hover:bg-white hover:text-purple-600"
+                    disabled
+                    className="border-white text-white/50 text-sm md:text-base"
                   >
                     Preview gratuit
                   </Button>
                 </div>
               </div>
 
-              <div className="relative">
+              <div className="relative order-1 lg:order-2">
                 <Image
                   src={courseData.image || "/placeholder.svg"}
                   alt={courseData.title}
@@ -220,8 +223,8 @@ export default function Clasa9Page() {
                   style={{ width: '100%', height: 'auto' }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Button size="lg" className="bg-white/90 text-purple-600 hover:bg-white rounded-full w-20 h-20">
-                    <PlayCircle className="w-8 h-8" />
+                  <Button size="lg" className="bg-white/90 text-purple-600 hover:bg-white rounded-full w-16 h-16 md:w-20 md:h-20">
+                    <PlayCircle className="w-6 h-6 md:w-8 md:h-8" />
                   </Button>
                 </div>
               </div>
@@ -230,61 +233,63 @@ export default function Clasa9Page() {
         </section>
 
         {/* Main Content */}
-        <section className="py-16 px-4 max-w-7xl mx-auto">
+        <section className="py-8 md:py-16 px-4 max-w-7xl mx-auto">
           <Tabs defaultValue="curriculum" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8">
-              <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
-              <TabsTrigger value="instructor">Instructor</TabsTrigger>
-              <TabsTrigger value="reviews">Recenzii</TabsTrigger>
-              <TabsTrigger value="faq">FAQ</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 md:mb-8 h-auto">
+              <TabsTrigger value="curriculum" className="text-xs md:text-sm py-2 md:py-3">Curriculum</TabsTrigger>
+              <TabsTrigger value="instructor" className="text-xs md:text-sm py-2 md:py-3">Instructor</TabsTrigger>
+              <TabsTrigger value="reviews" className="text-xs md:text-sm py-2 md:py-3">Recenzii</TabsTrigger>
+              <TabsTrigger value="faq" className="text-xs md:text-sm py-2 md:py-3">FAQ</TabsTrigger>
             </TabsList>
 
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid lg:grid-cols-3 gap-6 md:gap-8">
               <div className="lg:col-span-2">
-                <TabsContent value="curriculum" className="space-y-6">
-                  <div className="mb-6">
-                    <h3 className="text-2xl font-bold mb-4">Conținutul cursului</h3>
-                    <div className="flex items-center gap-4 text-gray-600 mb-4">
+                <TabsContent value="curriculum" className="space-y-4 md:space-y-6">
+                  <div className="mb-4 md:mb-6">
+                    <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Conținutul cursului</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm md:text-base text-gray-600 mb-3 md:mb-4">
                       <span>{courseData.chapters.length} capitole</span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
                       <span>{courseData.chapters.reduce((acc, ch) => acc + ch.lessons, 0)} lecții</span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
                       <span>{courseData.totalDuration} conținut video</span>
                     </div>
                     <Progress value={progressPercentage} className="h-2" />
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-xs md:text-sm text-gray-500 mt-2">
                       {completedChapters} din {courseData.chapters.length} capitole completate
                     </p>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 md:space-y-4">
                     {courseData.chapters.map((chapter, index) => (
                       <Card key={chapter.id} className="border-purple-200 hover:border-purple-400 transition-colors">
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
+                        <CardHeader className="pb-3 md:pb-6">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                             <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-semibold">
-                                  {index + 1}
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-6 h-6 md:w-8 md:h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-semibold text-sm md:text-base">
+                                    {index + 1}
+                                  </div>
+                                  <CardTitle className="text-base md:text-lg leading-tight">{chapter.title}</CardTitle>
                                 </div>
-                                <CardTitle className="text-lg">{chapter.title}</CardTitle>
-                                {chapter.id === 1 && <Badge className="bg-green-100 text-green-700">Gratuit</Badge>}
+                                {chapter.id === 1 && <Badge className="bg-green-100 text-green-700 text-xs w-fit">Gratuit</Badge>}
                               </div>
-                              <CardDescription className="ml-11">{chapter.description}</CardDescription>
+                              <CardDescription className="text-sm md:text-base ml-0 sm:ml-11">{chapter.description}</CardDescription>
                             </div>
-                            <div className="flex items-center gap-2 text-gray-500">
+                            <div className="flex items-center gap-2 text-gray-500 text-sm">
                               <Clock className="w-4 h-4" />
-                              <span className="text-sm">{chapter.duration}</span>
+                              <span>{chapter.duration}</span>
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="ml-11">
-                          <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                        <CardContent className="pt-0 ml-0 sm:ml-11">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs md:text-sm text-gray-600 mb-3">
                             <span>{chapter.lessons} lecții</span>
-                            <span>•</span>
+                            <span className="hidden sm:inline">•</span>
                             <span>{chapter.duration}</span>
                           </div>
-                          <div className="flex flex-wrap gap-2 mb-4">
+                          <div className="flex flex-wrap gap-1 md:gap-2 mb-3 md:mb-4">
                             {chapter.topics.map((topic, idx) => (
                               <Badge key={idx} variant="outline" className="text-xs">
                                 {topic}
@@ -293,8 +298,8 @@ export default function Clasa9Page() {
                           </div>
                           <div className="flex gap-2">
                             <Link href={`/cursuri/clasa-9/${chapter.id}`} passHref legacyBehavior>
-                              <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-                                <PlayCircle className="w-4 h-4 mr-1" />
+                              <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs md:text-sm">
+                                <PlayCircle className="w-3 h-3 md:w-4 md:h-4 mr-1" />
                                 Începe capitolul
                               </Button>
                             </Link>
@@ -418,37 +423,37 @@ export default function Clasa9Page() {
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card className="border-purple-200 sticky top-24">
-                  <CardHeader>
-                    <CardTitle>Ce include cursul</CardTitle>
+              <div className="space-y-4 md:space-y-6 mt-6 lg:mt-0 lg:sticky lg:top-24 lg:self-start">
+                <Card className="border-purple-200">
+                  <CardHeader className="pb-3 md:pb-6">
+                    <CardTitle className="text-lg md:text-xl">Ce include cursul</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-3">
+                    <ul className="space-y-2 md:space-y-3">
                       {courseData.features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span className="text-sm text-gray-700">{feature}</span>
+                        <li key={index} className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-xs md:text-sm text-gray-700 leading-relaxed">{feature}</span>
                         </li>
                       ))}
                     </ul>
                   </CardContent>
                 </Card>
 
-                <Card className="border-purple-200 sticky top-80">
-                  <CardHeader>
-                    <CardTitle>Acțiuni rapide</CardTitle>
+                <Card className="border-purple-200">
+                  <CardHeader className="pb-3 md:pb-6">
+                    <CardTitle className="text-lg md:text-xl">Acțiuni rapide</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+                  <CardContent className="space-y-2 md:space-y-3">
+                    <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm md:text-base">
                       <Download className="w-4 h-4 mr-2" />
                       Descarcă materiale
                     </Button>
-                    <Button variant="outline" className="w-full border-purple-300 hover:border-purple-500">
+                    <Button variant="outline" className="w-full border-purple-300 hover:border-purple-500 text-sm md:text-base">
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Comunitate
                     </Button>
-                    <Button variant="outline" className="w-full border-purple-300 hover:border-purple-500">
+                    <Button variant="outline" className="w-full border-purple-300 hover:border-purple-500 text-sm md:text-base">
                       <Award className="w-4 h-4 mr-2" />
                       Vezi certificat
                     </Button>

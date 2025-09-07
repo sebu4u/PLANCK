@@ -52,6 +52,7 @@
     "expo-asset": "latest",
     "expo-file-system": "latest",
     "expo-gl": "latest",
+    "gsap": "^3.13.0",
     "input-otp": "1.4.1",
     "katex": "^0.16.22",
     "lucide-react": "^0.454.0",

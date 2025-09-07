@@ -7,4 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 	throw new Error('Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+	},
+});

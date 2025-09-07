@@ -29,7 +29,7 @@ export default function LoginPage() {
   const { toast } = useToast()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, loginWithGoogle, loginWithGitHub } = useAuth()
 
   // Redirect dacă userul e deja logat
   React.useEffect(() => {
@@ -102,6 +102,36 @@ export default function LoginPage() {
       })
       router.push("/")
     }
+  }
+
+  const handleGoogleLogin = async () => {
+    setLoading(true)
+    const { error } = await loginWithGoogle()
+    setLoading(false)
+    
+    if (error) {
+      toast({
+        title: "Eroare la autentificare cu Google",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+    // Dacă nu e eroare, utilizatorul va fi redirecționat automat prin OAuth flow
+  }
+
+  const handleGitHubLogin = async () => {
+    setLoading(true)
+    const { error } = await loginWithGitHub()
+    setLoading(false)
+    
+    if (error) {
+      toast({
+        title: "Eroare la autentificare cu GitHub",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+    // Dacă nu e eroare, utilizatorul va fi redirecționat automat prin OAuth flow
   }
 
   // Handle magic link / oAuth callback if Supabase redirects back with a code
@@ -206,6 +236,36 @@ export default function LoginPage() {
               </CardHeader>
 
               <CardContent className="space-y-6">
+                {/* Social Login - Moved to top to encourage OAuth */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleGoogleLogin}
+                    className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 h-12"
+                    disabled={loading}
+                  >
+                    <Chrome className="w-5 h-5 mr-2" />
+                    Google
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleGitHubLogin}
+                    className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 h-12"
+                    disabled={loading}
+                  >
+                    <Github className="w-5 h-5 mr-2" />
+                    GitHub
+                  </Button>
+                </div>
+
+                {/* Divider */}
+                <div className="relative">
+                  <Separator className="bg-gray-200" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="bg-white px-4 text-sm text-gray-500">sau cu email și parolă</span>
+                  </div>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Email Field */}
                   <div className="space-y-2">
@@ -305,34 +365,6 @@ export default function LoginPage() {
                     {loading ? "Se conectează..." : "Conectează-te"}
                   </Button>
                 </form>
-
-                {/* Divider */}
-                <div className="relative">
-                  <Separator className="bg-gray-200" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="bg-white px-4 text-sm text-gray-500">sau continuă cu</span>
-                  </div>
-                </div>
-
-                {/* Social Login */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed transition-all duration-300 h-12 opacity-50"
-                    disabled
-                  >
-                    <Chrome className="w-5 h-5 mr-2" />
-                    Google
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed transition-all duration-300 h-12 opacity-50"
-                    disabled
-                  >
-                    <Github className="w-5 h-5 mr-2" />
-                    GitHub
-                  </Button>
-                </div>
 
                 {/* Sign Up Link */}
                 <div className="text-center pt-4 border-t border-gray-100">

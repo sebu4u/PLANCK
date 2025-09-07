@@ -13,12 +13,12 @@ export default function AuthCallbackPage() {
       // We just need to confirm session is set, then redirect.
       const { data } = await supabase.auth.getSession()
       if (data.session) {
-        router.replace("/login")
+        router.replace("/")
       } else {
-        // If no session yet, wait briefly then check again (email link may be processing)
+        // If no session yet, wait briefly then check again (OAuth callback may be processing)
         setTimeout(async () => {
           const { data: data2 } = await supabase.auth.getSession()
-          if (data2.session) router.replace("/login")
+          if (data2.session) router.replace("/")
           else router.replace("/login")
         }, 800)
       }
