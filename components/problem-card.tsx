@@ -7,6 +7,7 @@ import { BlockMath, InlineMath } from 'react-katex';
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { PlayCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton"
+import { useAnalytics } from "@/lib/analytics"
 
 // Lazy load KaTeX components
 const LazyInlineMath = lazy(() => import('react-katex').then(module => ({ default: module.InlineMath })))
@@ -100,12 +101,22 @@ function MathContent({ content }: { content: string }) {
 
 export function ProblemCard({ problem, solved }: ProblemCardProps) {
   const problemIcon = getProblemIcon(problem.id);
+  const analytics = useAnalytics();
   
   // Funcție pentru a trunchia numele capitolului pe mobil
   const truncateChapterName = (chapterName: string) => {
     // Pe mobil, trunchiază la 25 de caractere și adaugă "..."
     const mobileTruncated = chapterName.length > 25 ? chapterName.substring(0, 25) + "..." : chapterName;
     return mobileTruncated;
+  };
+
+  const handleProblemClick = () => {
+    // Track problem view
+    analytics.trackProblemView({
+      problem_id: problem.id.toString(),
+      problem_difficulty: problem.difficulty,
+      problem_category: problem.category
+    });
   };
   
   return (
@@ -139,7 +150,7 @@ export function ProblemCard({ problem, solved }: ProblemCardProps) {
         )}
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-end">
-        <Link href={`/probleme/${problem.id}`}>
+        <Link href={`/probleme/${problem.id}`} onClick={handleProblemClick}>
           <span className="inline-block mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-center font-bold w-full shadow-md hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-200">
             Vezi problema
           </span>

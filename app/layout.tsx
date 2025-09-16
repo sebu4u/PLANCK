@@ -3,7 +3,9 @@ import type { Metadata, Viewport } from "next"
 import { Inter, Poppins } from "next/font/google"
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
+import { AnalyticsProvider } from "@/components/analytics-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
@@ -66,8 +68,11 @@ export default function RootLayout({
       <body className={`${inter.className} ${poppins.variable}`}>
         <ScrollToTop />
         <AuthProvider>
-          {children}
-          <Toaster />
+          <AnalyticsProvider>
+            {children}
+            <Toaster />
+            <CookieConsentBanner />
+          </AnalyticsProvider>
         </AuthProvider>
       </body>
     </html>

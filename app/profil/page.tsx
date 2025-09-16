@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
+import { PrivacySettings } from "@/components/privacy-settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -236,10 +237,11 @@ const ProfilPage = () => {
             <ProfileHeaderSkeleton />
             <CardContent className="pt-0">
               <Tabs defaultValue="activity" className="w-full mt-4">
-                <TabsList className="grid grid-cols-3 w-full">
+                <TabsList className="grid grid-cols-4 w-full">
                   <TabsTrigger value="activity">Activitate</TabsTrigger>
                   <TabsTrigger value="badges">Badges</TabsTrigger>
-                  <TabsTrigger value="settings">Setari</TabsTrigger>
+                  <TabsTrigger value="settings">Setări</TabsTrigger>
+                  <TabsTrigger value="privacy">Confidențialitate</TabsTrigger>
                 </TabsList>
                 <TabsContent value="activity" className="mt-4">
                   <ActivitySkeleton />
@@ -248,6 +250,9 @@ const ProfilPage = () => {
                   <BadgesSkeleton />
                 </TabsContent>
                 <TabsContent value="settings" className="mt-4">
+                  <SettingsSkeleton />
+                </TabsContent>
+                <TabsContent value="privacy" className="mt-4">
                   <SettingsSkeleton />
                 </TabsContent>
               </Tabs>
@@ -369,10 +374,11 @@ const ProfilPage = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <Tabs defaultValue="activity" className="w-full mt-4">
-              <TabsList className="grid grid-cols-3 w-full">
+              <TabsList className="grid grid-cols-4 w-full">
                 <TabsTrigger value="activity">Activitate</TabsTrigger>
                 <TabsTrigger value="badges">Badges</TabsTrigger>
-                <TabsTrigger value="settings">Setari</TabsTrigger>
+                <TabsTrigger value="settings">Setări</TabsTrigger>
+                <TabsTrigger value="privacy">Confidențialitate</TabsTrigger>
               </TabsList>
 
               <TabsContent value="activity" className="mt-4">
@@ -405,6 +411,10 @@ const ProfilPage = () => {
                     Schimbă parola
                   </Button>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="privacy" className="mt-4">
+                <PrivacySettings />
               </TabsContent>
             </Tabs>
           </CardContent>

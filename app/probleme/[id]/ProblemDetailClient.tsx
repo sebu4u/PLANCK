@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProblemsSidebar } from "@/components/problems-sidebar"
+import { BadgeNotification } from "@/components/badge-notification"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -88,6 +89,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [loadingSolved, setLoadingSolved] = useState(true)
   const [congratulationMessage, setCongratulationMessage] = useState<string | null>(null)
   const [newBadge, setNewBadge] = useState<any>(null)
+  const [showBadgeNotification, setShowBadgeNotification] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth();
@@ -119,7 +121,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       solved_at: new Date().toISOString(),
     });
     
-    // Verifică dacă utilizatorul a câștigat un badge nou
+    // Verifică dacă utilizatorul a câștigat un badge nou (în ultimele 5 secunde)
+    const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
     const { data: newBadges } = await supabase
       .from('user_badges')
       .select(`
@@ -134,16 +137,13 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         )
       `)
       .eq('user_id', user.id)
-      .is('earned_at', null)
+      .gte('earned_at', fiveSecondsAgo)
+      .order('earned_at', { ascending: false })
       .limit(1);
 
     if (newBadges && newBadges.length > 0) {
       setNewBadge(newBadges[0]);
-      // Marchează badge-ul ca câștigat
-      await supabase
-        .from('user_badges')
-        .update({ earned_at: new Date().toISOString() })
-        .eq('id', newBadges[0].id);
+      setShowBadgeNotification(true);
     }
 
     setIsSolved(true);
@@ -163,7 +163,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
     // Ascunde mesajul după 3 secunde
     setTimeout(() => {
       setCongratulationMessage(null);
-      setNewBadge(null);
     }, 3000);
   };
 
@@ -417,24 +416,25 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             <div className="text-6xl mb-4">🎉</div>
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Felicitări!</h3>
             <p className="text-gray-600 mb-6">{congratulationMessage}</p>
-            {newBadge && (
-              <div className="bg-gradient-to-r from-purple-100 to-pink-100 p-4 rounded-lg mb-6">
-                <div className="text-3xl mb-2">{newBadge.badge.icon}</div>
-                <h4 className="font-bold text-gray-900 mb-1">{newBadge.badge.name}</h4>
-                <p className="text-sm text-gray-600">{newBadge.badge.description}</p>
-              </div>
-            )}
             <button
-              onClick={() => {
-                setCongratulationMessage(null);
-                setNewBadge(null);
-              }}
+              onClick={() => setCongratulationMessage(null)}
               className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200"
             >
               Continuă
             </button>
           </div>
         </div>
+      )}
+      
+      {/* Badge Notification */}
+      {showBadgeNotification && newBadge && (
+        <BadgeNotification
+          badge={newBadge.badge}
+          onClose={() => {
+            setShowBadgeNotification(false);
+            setNewBadge(null);
+          }}
+        />
       )}
     </div>
   )

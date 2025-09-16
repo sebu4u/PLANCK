@@ -335,54 +335,29 @@ export default function RegisterPage() {
     setAuthMethod(method)
     
     if (method === "email") {
-      // Animate main card transition
-      if (mainCardRef.current) {
-        gsap.to(mainCardRef.current, {
-          scale: 0.9,
-          rotationY: -10,
-          duration: 0.4,
+      // Simple transition to step 2
+      if (stepRefs.current[0]) {
+        gsap.to(stepRefs.current[0], {
+          opacity: 0,
+          x: -30,
+          duration: 0.3,
           ease: "power2.in",
           onComplete: () => {
-            // Animate to step 2
-            if (stepRefs.current[0]) {
-              gsap.to(stepRefs.current[0], {
-                opacity: 0,
-                x: -50,
-                duration: 0.4,
-                ease: "power2.in",
-                onComplete: () => {
-                  setCurrentStep(2)
-                  
-                  // Animate main card back to normal
-                  if (mainCardRef.current) {
-                    gsap.to(mainCardRef.current, {
-                      scale: 1,
-                      rotationY: 0,
-                      duration: 0.4,
-                      ease: "back.out(1.7)"
-                    })
-                  }
-                  
-                  if (stepRefs.current[1]) {
-                    gsap.fromTo(stepRefs.current[1],
-                      { 
-                        opacity: 0, 
-                        x: 50, 
-                        scale: 0.9,
-                        rotationY: 10
-                      },
-                      { 
-                        opacity: 1, 
-                        x: 0, 
-                        scale: 1,
-                        rotationY: 0,
-                        duration: 0.8, 
-                        ease: "back.out(1.7)" 
-                      }
-                    )
-                  }
+            setCurrentStep(2)
+            
+            if (stepRefs.current[1]) {
+              gsap.fromTo(stepRefs.current[1],
+                { 
+                  opacity: 0, 
+                  x: 30
+                },
+                { 
+                  opacity: 1, 
+                  x: 0,
+                  duration: 0.4, 
+                  ease: "power2.out" 
                 }
-              })
+              )
             }
           }
         })
@@ -426,6 +401,16 @@ export default function RegisterPage() {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validate username length
+    if (formData.username.length > 13) {
+      toast({
+        title: "Username prea lung",
+        description: "Username-ul trebuie să aibă maxim 13 caractere.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       toast({
@@ -463,55 +448,30 @@ export default function RegisterPage() {
     
     setLoading(false)
     
-    // Animate main card transition
-    if (mainCardRef.current) {
-      gsap.to(mainCardRef.current, {
-        scale: 0.8,
-        rotation: 5,
-        duration: 0.4,
+    // Simple transition to success step
+    if (stepRefs.current[1]) {
+      gsap.to(stepRefs.current[1], {
+        opacity: 0,
+        x: -30,
+        duration: 0.3,
         ease: "power2.in",
         onComplete: () => {
-          // Animate to success step
-          if (stepRefs.current[1]) {
-            gsap.to(stepRefs.current[1], {
-              opacity: 0,
-              x: -50,
-              duration: 0.4,
-              ease: "power2.in",
-              onComplete: () => {
-                setCurrentStep(3)
-                setShowConfetti(true)
-                
-                // Animate main card back to normal with celebration effect
-                if (mainCardRef.current) {
-                  gsap.to(mainCardRef.current, {
-                    scale: 1,
-                    rotation: 0,
-                    duration: 0.6,
-                    ease: "elastic.out(1, 0.3)"
-                  })
-                }
-                
-                if (successRef.current) {
-                  gsap.fromTo(successRef.current,
-                    { 
-                      opacity: 0, 
-                      scale: 0.5, 
-                      y: 30,
-                      rotation: -5
-                    },
-                    { 
-                      opacity: 1, 
-                      scale: 1, 
-                      y: 0,
-                      rotation: 0,
-                      duration: 1.2, 
-                      ease: "elastic.out(1, 0.3)" 
-                    }
-                  )
-                }
+          setCurrentStep(3)
+          setShowConfetti(true)
+          
+          if (successRef.current) {
+            gsap.fromTo(successRef.current,
+              { 
+                opacity: 0, 
+                x: 30
+              },
+              { 
+                opacity: 1, 
+                x: 0,
+                duration: 0.4, 
+                ease: "power2.out" 
               }
-            })
+            )
           }
         }
       })
@@ -786,9 +746,14 @@ export default function RegisterPage() {
                     <form onSubmit={handleEmailSubmit} className="space-y-4">
                       {/* Username Field */}
                       <div className="space-y-2">
-                        <Label htmlFor="username" className="text-sm font-medium text-gray-700">
-                          Username
-                        </Label>
+                        <div className="flex justify-between items-center">
+                          <Label htmlFor="username" className="text-sm font-medium text-gray-700">
+                            Username
+                          </Label>
+                          <span className={`text-xs ${formData.username.length > 13 ? 'text-red-500' : 'text-gray-500'}`}>
+                            {formData.username.length}/13
+                          </span>
+                        </div>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <Input
@@ -797,7 +762,8 @@ export default function RegisterPage() {
                             placeholder="Alege un username"
                             value={formData.username}
                             onChange={(e) => updateFormData("username", e.target.value)}
-                            className="pl-10 border-purple-200 focus:border-purple-400 focus:ring-purple-400 h-12"
+                            className={`pl-10 border-purple-200 focus:border-purple-400 focus:ring-purple-400 h-12 ${formData.username.length > 13 ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : ''}`}
+                            maxLength={13}
                             required
                           />
                     </div>
@@ -903,7 +869,7 @@ export default function RegisterPage() {
 
                       <div className="space-y-4">
                         <h2 className="text-3xl font-bold text-gray-800">
-                          Felicitări! 🎉
+                          Buna, {formData.username}! 👋
                         </h2>
                         <p className="text-lg text-gray-600 leading-relaxed">
                           Contul tău Planck a fost creat cu succes. Abia așteptăm să vezi cum clasa ta va străluci alături de tine!
@@ -917,10 +883,10 @@ export default function RegisterPage() {
                       </div>
 
                       <Button
-                        onClick={() => router.push("/cursuri")}
+                        onClick={() => router.push("/probleme")}
                         className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-300 h-12 text-lg font-semibold cosmic-glow"
                       >
-                        Vezi cursurile
+                        Incepe acum
                       </Button>
                 </div>
                   </div>

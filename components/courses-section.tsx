@@ -54,26 +54,23 @@ export function CoursesSection() {
             key={course.id}
             className="border border-purple-200 rounded-3xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="text-purple-600">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold">{course.title}</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="text-purple-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
               </div>
-              <div className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">{course.price}</div>
+              <h3 className="text-xl font-bold">{course.title}</h3>
             </div>
 
             <div className="text-gray-600 mb-4">{course.subtitle}</div>

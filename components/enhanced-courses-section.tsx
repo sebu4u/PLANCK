@@ -156,15 +156,8 @@ export function EnhancedCoursesSection() {
                     </div>
                   </div>
 
-                  {/* Pricing and CTA */}
+                  {/* CTA */}
                   <div className="border-t border-gray-100 pt-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl font-bold text-purple-600">{course.price}</span>
-                        <span className="text-lg text-gray-400 line-through">{course.originalPrice}</span>
-                        <Badge className="bg-red-100 text-red-600">-33%</Badge>
-                      </div>
-                    </div>
 
                     <div className="flex gap-3">
                       <Link href={`/cursuri/curand`} className="flex-1">

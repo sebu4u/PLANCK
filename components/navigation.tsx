@@ -106,7 +106,7 @@ export function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link href="/login">
+              <Link href="/register">
                 <Button
                   variant="outline"
                   size="sm"
@@ -199,7 +199,7 @@ export function Navigation() {
                 </DropdownMenu>
               ) : (
                 <Link
-                  href="/login"
+                  href="/register"
                   className="text-gray-700 hover:text-purple-600 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg hover:bg-purple-50 flex items-center gap-3"
                   onClick={() => setIsOpen(false)}
                 >

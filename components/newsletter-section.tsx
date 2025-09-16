@@ -6,11 +6,13 @@ import { useState } from "react"
 import { Mail, Send, Sparkles, Zap, Star, CheckCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { isValidEmail, subscribeToNewsletter } from "@/lib/newsletter"
+import { useAnalytics } from "@/lib/analytics"
 
 export function NewsletterSection() {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
+  const analytics = useAnalytics()
 
   /**
    * Handles newsletter subscription form submission
@@ -50,6 +52,9 @@ export function NewsletterSection() {
         title: "Abonare reușită! 🎉",
         description: result.message,
       })
+      
+      // Track newsletter signup
+      analytics.trackNewsletterSignup()
       
       // Reset form
       setEmail("")
