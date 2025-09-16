@@ -10,9 +10,58 @@ export const metadata: Metadata = {
   robots: 'index, follow'
 }
 
-export default function CookiePolicyPage() {
-  const cookieInfo = CookieManager.getCookieInfo()
+// Static cookie info for server-side rendering
+const cookieInfo = [
+  // Essential cookies
+  {
+    name: 'supabase_session',
+    purpose: 'Păstrează sesiunea de autentificare utilizator',
+    duration: 'Sesiune (se șterge la închiderea browser-ului)',
+    category: 'essential' as const
+  },
+  {
+    name: 'theme_preference',
+    purpose: 'Păstrează preferința de temă (dark/light)',
+    duration: '1 an',
+    category: 'essential' as const
+  },
+  {
+    name: 'user_preferences',
+    purpose: 'Păstrează setările personale ale utilizatorului',
+    duration: '1 an',
+    category: 'essential' as const
+  },
+  
+  // Analytics cookies
+  {
+    name: '_ga',
+    purpose: 'Identifică utilizatorii unici pentru Google Analytics',
+    duration: '2 ani',
+    category: 'analytics' as const
+  },
+  {
+    name: '_ga_[ID]',
+    purpose: 'Stochează ID-ul de sesiune pentru Google Analytics',
+    duration: '2 ani',
+    category: 'analytics' as const
+  },
+  {
+    name: '_gid',
+    purpose: 'Identifică utilizatorii pentru Google Analytics (24h)',
+    duration: '24 ore',
+    category: 'analytics' as const
+  },
+  
+  // Marketing cookies
+  {
+    name: 'newsletter_tracking',
+    purpose: 'Urmărește abonarea la newsletter și comunicările',
+    duration: '1 an',
+    category: 'marketing' as const
+  }
+]
 
+export default function CookiePolicyPage() {
   const essentialCookies = cookieInfo.filter(c => c.category === 'essential')
   const analyticsCookies = cookieInfo.filter(c => c.category === 'analytics')
   const marketingCookies = cookieInfo.filter(c => c.category === 'marketing')

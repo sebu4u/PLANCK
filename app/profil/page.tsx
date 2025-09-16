@@ -237,11 +237,21 @@ const ProfilPage = () => {
             <ProfileHeaderSkeleton />
             <CardContent className="pt-0">
               <Tabs defaultValue="activity" className="w-full mt-4">
-                <TabsList className="grid grid-cols-4 w-full">
-                  <TabsTrigger value="activity">Activitate</TabsTrigger>
-                  <TabsTrigger value="badges">Badges</TabsTrigger>
-                  <TabsTrigger value="settings">Setări</TabsTrigger>
-                  <TabsTrigger value="privacy">Confidențialitate</TabsTrigger>
+                <div className="w-full sm:hidden">
+                  <div className="overflow-x-auto scrollbar-hide">
+                    <TabsList className="flex gap-1 w-max min-w-full">
+                      <TabsTrigger value="activity" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Activitate</TabsTrigger>
+                      <TabsTrigger value="badges" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Badges</TabsTrigger>
+                      <TabsTrigger value="settings" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Setări</TabsTrigger>
+                      <TabsTrigger value="privacy" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Confidențialitate</TabsTrigger>
+                    </TabsList>
+                  </div>
+                </div>
+                <TabsList className="hidden sm:grid sm:grid-cols-4 w-full">
+                  <TabsTrigger value="activity" className="text-sm">Activitate</TabsTrigger>
+                  <TabsTrigger value="badges" className="text-sm">Badges</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-sm">Setări</TabsTrigger>
+                  <TabsTrigger value="privacy" className="text-sm">Confidențialitate</TabsTrigger>
                 </TabsList>
                 <TabsContent value="activity" className="mt-4">
                   <ActivitySkeleton />
@@ -374,11 +384,21 @@ const ProfilPage = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <Tabs defaultValue="activity" className="w-full mt-4">
-              <TabsList className="grid grid-cols-4 w-full">
-                <TabsTrigger value="activity">Activitate</TabsTrigger>
-                <TabsTrigger value="badges">Badges</TabsTrigger>
-                <TabsTrigger value="settings">Setări</TabsTrigger>
-                <TabsTrigger value="privacy">Confidențialitate</TabsTrigger>
+              <div className="w-full sm:hidden">
+                <div className="overflow-x-auto scrollbar-hide">
+                  <TabsList className="flex gap-1 w-max min-w-full">
+                    <TabsTrigger value="activity" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Activitate</TabsTrigger>
+                    <TabsTrigger value="badges" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Badges</TabsTrigger>
+                    <TabsTrigger value="settings" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Setări</TabsTrigger>
+                    <TabsTrigger value="privacy" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Confidențialitate</TabsTrigger>
+                  </TabsList>
+                </div>
+              </div>
+              <TabsList className="hidden sm:grid sm:grid-cols-4 w-full">
+                <TabsTrigger value="activity" className="text-sm">Activitate</TabsTrigger>
+                <TabsTrigger value="badges" className="text-sm">Badges</TabsTrigger>
+                <TabsTrigger value="settings" className="text-sm">Setări</TabsTrigger>
+                <TabsTrigger value="privacy" className="text-sm">Confidențialitate</TabsTrigger>
               </TabsList>
 
               <TabsContent value="activity" className="mt-4">
