@@ -47,7 +47,7 @@ export function ContentExampleSection() {
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8 animate-fade-in-up">
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-purple-600 mb-4 cosmic-text-glow">
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
             Vezi cum funcționează
           </h2>
           <p className="text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
@@ -61,7 +61,7 @@ export function ContentExampleSection() {
           <CardContent className="p-6">
             {/* Card Title */}
             <div className="text-center mb-4">
-              <h3 className="text-2xl font-bold text-purple-600 mb-2">Problema zilei</h3>
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">Problema zilei</h3>
             </div>
 
             {/* YouTube Video */}

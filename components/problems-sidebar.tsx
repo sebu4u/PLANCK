@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { X, List, Search, Filter, Users, Atom, Award, Star, BookOpen, ArrowRightLeft, ArrowUpDown, ArrowDown, Ruler, CircleDot, Circle, Zap, Flame, Eye, Glasses, HelpCircle, Sun } from "lucide-react"
+import { X, List, Search, Filter, Users, Atom, Award, Star, BookOpen, ArrowRightLeft, ArrowUpDown, ArrowDown, Ruler, CircleDot, Circle, Zap, Flame, Eye, Glasses, HelpCircle, Sun, Waves, Radio, Lightbulb, Orbit, Target, Sparkles } from "lucide-react"
 import {
   Select,
   SelectTrigger,
@@ -76,8 +76,35 @@ const chapterOptions: Record<string, string[]> = {
     "magnetism",
     "probleme diverse."
   ],
-  "a 11-a": ["Toate"],
-  "a 12-a": ["Toate"]
+  "a 11-a": [
+    "Toate",
+    "Oscilații mecanice. Pendul gravitațional",
+    "Unde mecanice",
+    "circuite de curent alternativ",
+    "Circuite serie de curent alternativ",
+    "Circuite paralele de curent alternativ",
+    "Circuite mixte de curent alternativ",
+    "Circuit oscilant. Antena",
+    "Prisma optică. Dispersia luminii",
+    "Interferența luminii. Dispozitivul Young",
+    "Dispozitive interferenționale",
+    "Interferența localizată",
+    "Difracția luminii",
+    "Polarizarea luminii",
+    "probleme diverse"
+  ],
+  "a 12-a": [
+    "Toate",
+    "Efectul fotoelectric extern",
+    "Efectul Compton",
+    "Modelul atomic",
+    "Atomul cu mai mulți electroni. Raze X",
+    "Proprietățile generale ale nucleului atomic",
+    "Reacții nucleare",
+    "Radiații nucleare",
+    "Particule elementare",
+    "probleme diverse"
+  ]
 }
 
 const chapterIcons: Record<string, React.ReactNode> = {
@@ -112,6 +139,30 @@ const chapterIcons: Record<string, React.ReactNode> = {
   "Energia si puterea electrica": <Zap className="w-4 h-4 text-yellow-500 mr-2 inline" />,
   "magnetism": <Star className="w-4 h-4 text-blue-600 mr-2 inline" />,
   "probleme diverse.": <HelpCircle className="w-4 h-4 text-gray-400 mr-2 inline" />,
+  // 11th grade
+  "Oscilații mecanice. Pendul gravitațional": <Waves className="w-4 h-4 text-green-500 mr-2 inline" />,
+  "Unde mecanice": <Waves className="w-4 h-4 text-blue-500 mr-2 inline" />,
+  "circuite de curent alternativ": <Zap className="w-4 h-4 text-orange-500 mr-2 inline" />,
+  "Circuite serie de curent alternativ": <Zap className="w-4 h-4 text-red-500 mr-2 inline" />,
+  "Circuite paralele de curent alternativ": <Zap className="w-4 h-4 text-purple-500 mr-2 inline" />,
+  "Circuite mixte de curent alternativ": <Zap className="w-4 h-4 text-pink-500 mr-2 inline" />,
+  "Circuit oscilant. Antena": <Radio className="w-4 h-4 text-indigo-500 mr-2 inline" />,
+  "Prisma optică. Dispersia luminii": <Sun className="w-4 h-4 text-yellow-500 mr-2 inline" />,
+  "Interferența luminii. Dispozitivul Young": <Target className="w-4 h-4 text-blue-400 mr-2 inline" />,
+  "Dispozitive interferenționale": <Eye className="w-4 h-4 text-purple-400 mr-2 inline" />,
+  "Interferența localizată": <CircleDot className="w-4 h-4 text-green-400 mr-2 inline" />,
+  "Difracția luminii": <Sparkles className="w-4 h-4 text-yellow-400 mr-2 inline" />,
+  "Polarizarea luminii": <Glasses className="w-4 h-4 text-pink-400 mr-2 inline" />,
+  "probleme diverse": <HelpCircle className="w-4 h-4 text-gray-400 mr-2 inline" />,
+  // 12th grade
+  "Efectul fotoelectric extern": <Lightbulb className="w-4 h-4 text-yellow-600 mr-2 inline" />,
+  "Efectul Compton": <Zap className="w-4 h-4 text-blue-600 mr-2 inline" />,
+  "Modelul atomic": <Atom className="w-4 h-4 text-green-600 mr-2 inline" />,
+  "Atomul cu mai mulți electroni. Raze X": <Orbit className="w-4 h-4 text-purple-600 mr-2 inline" />,
+  "Proprietățile generale ale nucleului atomic": <CircleDot className="w-4 h-4 text-red-600 mr-2 inline" />,
+  "Reacții nucleare": <Star className="w-4 h-4 text-orange-600 mr-2 inline" />,
+  "Radiații nucleare": <Sparkles className="w-4 h-4 text-red-500 mr-2 inline" />,
+  "Particule elementare": <Atom className="w-4 h-4 text-indigo-600 mr-2 inline" />,
   // fallback
   "Toate": <BookOpen className="w-4 h-4 text-gray-400 mr-2 inline" />,
 }
@@ -204,7 +255,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
     <>
       {/* Overlay */}
       <div 
-        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-all duration-400 ease-out ${
+        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[110] transition-all duration-400 ease-out ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -212,7 +263,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
       
       {/* Sidebar */}
       <div className={`
-        fixed top-0 right-0 h-full z-50 bg-white shadow-2xl border-l
+        fixed top-0 right-0 h-full z-[120] bg-white shadow-2xl border-l
         transform transition-all duration-400 ease-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         w-[400px] max-w-[80vw] sm:w-[400px]

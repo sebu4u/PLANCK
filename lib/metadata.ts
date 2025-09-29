@@ -80,6 +80,40 @@ export const pageMetadata: Record<string, Metadata> = {
       description: "Cursuri complete de fizică cu videoclipuri HD și explicații detaliate.",
     },
   },
+
+  // Pagina lecțiilor (cursuri -> lectii)
+  "physics-lessons": {
+    title: "Lecții de Fizică Structurate pe Clase și Capitole | PLANCK",
+    description: "Parcurge lecțiile de fizică pentru clasa a 9-a și a 10-a, structurate pe capitole, cu explicații clare și exemple practice.",
+    keywords: "lecții fizică, lecții clasa 9, lecții clasa 10, capitole fizică, conținut educațional fizică",
+    alternates: {
+      canonical: '/cursuri',
+    },
+    openGraph: {
+      title: "Lecții de Fizică Structurate pe Clase și Capitole",
+      description: "Lecții de fizică pentru liceu, organizate pe capitole cu explicații și exemple.",
+      url: 'https://www.planck.academy/cursuri',
+      type: 'website',
+      images: [
+        {
+          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          width: 1200,
+          height: 630,
+          alt: 'PLANCK - Lecții de Fizică',
+        },
+      ],
+    },
+    twitter: {
+      title: "Lecții de Fizică - PLANCK",
+      description: "Lecții structurate pe capitole pentru clasa a 9-a și a 10-a.",
+      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  },
   
   problems: {
     title: "Probleme de Fizică - PLANCK",

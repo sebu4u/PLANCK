@@ -1,116 +1,74 @@
-import { Lock } from "lucide-react"
+import { BookOpen, PlayCircle, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
-const courses = [
-  {
-    id: "clasa-9",
-    title: "Fizica Clasa a 9-a",
-    subtitle: "Mecanica și Optica",
-    rating: 5,
-    students: 0,
-    price: "199 RON",
-    chapters: [
-      { title: "Cinematica punctului material", locked: false },
-      { title: "Dinamica punctului material", locked: false },
-      { title: "Lucrul mecanic și energia", locked: true },
-      { title: "Impulsul și legea conservării", locked: true },
-      { title: "Optica geometrică", locked: true },
-      { title: "Statica și echilibru", locked: true },
-    ],
-  },
-  {
-    id: "clasa-10",
-    title: "Fizica Clasa a 10-a",
-    subtitle: "Termodinamica și Electricitate",
-    rating: 5,
-    students: 0,
-    price: "229 RON",
-    chapters: [
-      { title: "Teoria cinetică a gazelor", locked: false },
-      { title: "Primul principiu al termodinamicii", locked: false },
-      { title: "Al doilea principiu al termodinamicii", locked: true },
-      { title: "Electrostatica", locked: true },
-      { title: "Curentul electric continuu", locked: true },
-      { title: "Câmpul magnetic", locked: true },
-    ],
-  },
+const lessonPreviews = [
+  { id: "cinematica", title: "Cinematica punctului material", grade: "Clasa a 9-a" },
+  { id: "dinamica", title: "Dinamica punctului material", grade: "Clasa a 9-a" },
+  { id: "energie", title: "Lucrul mecanic și energia", grade: "Clasa a 9-a" },
+  { id: "electrostatica", title: "Electrostatica", grade: "Clasa a 10-a" },
+  { id: "curent-continu", title: "Curentul electric continuu", grade: "Clasa a 10-a" },
+  { id: "camp-magnetic", title: "Câmpul magnetic", grade: "Clasa a 10-a" },
 ]
 
 export function CoursesSection() {
   return (
-    <section id="courses" className="py-12 sm:py-16 lg:py-20 px-4 max-w-7xl mx-auto">
-      <div className="text-center mb-12 sm:mb-16 animate-fade-in-up">
-        <h2 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
-          Cursuri de Fizică
-        </h2>
-        <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
-          Învață fizica pas cu pas prin lecții structurate și explicații detaliate
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-8">
-        {courses.map((course) => (
-          <div
-            key={course.id}
-            className="border border-purple-200 rounded-3xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <div className="text-purple-600">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold">{course.title}</h3>
+    <section id="courses" className="bg-white">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8 lg:py-10 min-h-[70vh] flex items-start">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 w-full">
+          <div className="self-center text-center lg:text-left animate-fade-in-up">
+            <div className="flex items-center justify-center lg:justify-start gap-3 mb-4">
+              <BookOpen className="w-6 h-6 text-purple-600" />
+              <span className="text-sm font-semibold text-purple-600 uppercase tracking-wide">Pagina de cursuri</span>
             </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 mb-4">
+              Lecții de Fizică 100% Gratuite
+              <span className="block text-gray-700 font-extrabold">pentru toate clasele de liceu</span>
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+              Descoperă pagina noastră de cursuri unde găsești lecții complete de fizică,
+              structurate pe clase și capitole. Tot conținutul este disponibil gratuit,
+              ca să înveți în ritmul tău.
+            </p>
 
-            <div className="text-gray-600 mb-4">{course.subtitle}</div>
-
-            <div className="flex items-center gap-2 mb-6">
-              <div className="flex items-center text-yellow-400">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-              </div>
-              <span className="font-medium">{course.rating}</span>
-              <span className="text-gray-500">{course.students} studenți</span>
+            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <Link href="/cursuri" className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-md hover:from-purple-700 hover:to-pink-700 transition-colors">
+                <PlayCircle className="w-5 h-5 mr-2" />
+                Deschide pagina de cursuri
+              </Link>
+              <Link href="/cursuri" className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-purple-300 text-purple-700 hover:border-purple-500 hover:text-purple-800 transition-colors">
+                Vezi toate lecțiile <ArrowRight className="w-4 h-4 ml-2" />
+              </Link>
             </div>
-
-            <div className="space-y-2 mb-6">
-              {course.chapters.map((chapter, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 bg-purple-50 rounded-xl">
-                  <span>{chapter.title}</span>
-                  {chapter.locked && <Lock size={16} className="text-purple-600" />}
-                </div>
-              ))}
-            </div>
-
-            <Link href={`/cursuri/curand`}>
-              <button className="w-full py-3 rounded-xl text-white font-medium bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-colors">
-                Începeți cursul
-              </button>
-            </Link>
           </div>
-        ))}
+
+          <div className="animate-fade-in-up lg:animate-fade-in-left">
+            <div className="rounded-3xl border border-purple-200 bg-white shadow-sm p-4 sm:p-6">
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+                {lessonPreviews.map((lesson, index) => (
+                  <Link key={lesson.id} href="/cursuri" className={`group block p-5 rounded-2xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all ${index >= 3 ? 'hidden sm:block' : ''}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full">
+                        {lesson.grade}
+                      </span>
+                      <PlayCircle className="w-4 h-4 text-purple-500 opacity-80 group-hover:opacity-100" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 leading-snug">
+                      {lesson.title}
+                    </h3>
+                    <div className="mt-3 text-sm text-purple-700 inline-flex items-center gap-1">
+                      Începe lecția <ArrowRight className="w-3 h-3" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <div className="mt-6 text-center">
+                <Link href="/cursuri" className="text-sm font-medium text-purple-700 hover:text-purple-800 inline-flex items-center">
+                  Vezi mai multe lecții <ArrowRight className="w-4 h-4 ml-1" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   )

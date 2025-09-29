@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/auth-provider"
 import { AnalyticsProvider } from "@/components/analytics-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
+import { TopLoader } from "@/components/top-loader"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
@@ -67,6 +68,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} ${poppins.variable}`}>
         <ScrollToTop />
+        <TopLoader />
         <AuthProvider>
           <AnalyticsProvider>
             {children}

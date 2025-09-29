@@ -36,7 +36,7 @@ export default function HomePage() {
             
             {/* Buton CTA doar pentru mobil */}
             <div className="block md:hidden mt-8 animate-fade-in-up-delay">
-              <Link href="/probleme">
+              <Link href="/cursuri">
                 <Button 
                   size="lg" 
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 cosmic-glow shadow-lg hover:shadow-xl"
@@ -56,8 +56,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <BenefitsSection />
+      {/* Courses Section - Prima sub Hero */}
+      <div className="scroll-animate-fade-up">
+        <CoursesSection />
+      </div>
 
       {/* Content Example Section */}
       <ContentExampleSection />
@@ -344,10 +346,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Courses Section - CU ANIMAȚII LA SCROLL */}
-      <div className="scroll-animate-fade-up">
-        <CoursesSection />
-      </div>
+      {/* Benefits Section - mutată în locul secțiunii cu lecții */}
+      <BenefitsSection />
 
       {/* Newsletter Section - CU ANIMAȚII LA SCROLL */}
       <div className="scroll-animate-slide-up">

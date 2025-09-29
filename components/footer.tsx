@@ -51,6 +51,11 @@ export function Footer() {
                   Catalog Probleme
                 </Link>
               </li>
+              <li>
+                <Link href="/cursuri" className="hover:text-[hsl(348,83%,47%)] transition-colors">
+                  Lecții de Fizică
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -38,7 +38,7 @@ const benefits = [
 
 export function BenefitsSection() {
   return (
-    <section className="py-12 px-4 bg-gradient-to-br from-white to-purple-50/30 relative overflow-hidden">
+    <section className="py-12 lg:py-20 px-4 bg-gradient-to-br from-white to-purple-50/30 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Moving stars */}
@@ -81,7 +81,7 @@ export function BenefitsSection() {
       <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-12 animate-fade-in-up">
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-purple-600 mb-4 cosmic-text-glow">
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
             De ce să alegi PLANCK?
           </h2>
           <p className="text-xl sm:text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">

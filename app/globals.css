@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -532,6 +541,153 @@
 }
 .scrollbar-hide::-webkit-scrollbar { 
   display: none;  /* Safari and Chrome */
+}
+
+/* Clase pentru evidențierea conținutului în lecții */
+.formula-highlight {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+  position: relative;
+}
+
+.formula-highlight::before {
+  content: '📐';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.formula-highlight .formula-content {
+  margin-left: 28px;
+}
+
+.enunt-highlight {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-left: 4px solid #3b82f6;
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  position: relative;
+}
+
+.enunt-highlight::before {
+  content: '📋';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.enunt-highlight .enunt-content {
+  margin-left: 28px;
+}
+
+.important-highlight {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-left: 4px solid #ef4444;
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+  position: relative;
+}
+
+.important-highlight::before {
+  content: '⚠️';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.important-highlight .important-content {
+  margin-left: 28px;
+}
+
+.definition-highlight {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-left: 4px solid #22c55e;
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
+  position: relative;
+}
+
+.definition-highlight::before {
+  content: '📖';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.definition-highlight .definition-content {
+  margin-left: 28px;
+}
+
+.example-highlight {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  border-left: 4px solid #a855f7;
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 4px rgba(168, 85, 247, 0.1);
+  position: relative;
+}
+
+.example-highlight::before {
+  content: '💡';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.example-highlight .example-content {
+  margin-left: 28px;
+}
+
+/* Responsive design pentru evidențiere */
+@media (max-width: 768px) {
+  .formula-highlight,
+  .enunt-highlight,
+  .important-highlight,
+  .definition-highlight,
+  .example-highlight {
+    padding: 8px 12px;
+    margin: 12px 0;
+    font-size: 0.9rem;
+  }
+  
+  .formula-highlight::before,
+  .enunt-highlight::before,
+  .important-highlight::before,
+  .definition-highlight::before,
+  .example-highlight::before {
+    top: 8px;
+    left: 8px;
+    font-size: 14px;
+  }
+  
+  .formula-highlight .formula-content,
+  .enunt-highlight .enunt-content,
+  .important-highlight .important-content,
+  .definition-highlight .definition-content,
+  .example-highlight .example-content {
+    margin-left: 24px;
+  }
 }
 
 /* Improved mobile touch targets */
