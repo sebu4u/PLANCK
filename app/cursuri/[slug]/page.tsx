@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { PhysicsLessonsClient } from "@/components/physics-lessons-client"
-import { generateMetadata } from "@/lib/metadata"
+import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import { 
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 
   if (!targetLesson) {
-    return generateMetadata('physics-lessons')
+    return generatePageMetadata('physics-lessons')
   }
 
   return {

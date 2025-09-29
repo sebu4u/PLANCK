@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js"
 import type { Metadata } from "next"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
-import { generateMetadata } from "@/lib/metadata"
+import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 
 const PROBLEMS_PER_PAGE = 8
 const PREGENERATED_PAGES = 10
@@ -20,7 +20,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: { page: string } }): Promise<Metadata> {
   const pageNum = Number(params.page) || 1
-  return generateMetadata('problems', {
+  return generatePageMetadata('problems', {
     title: `Catalog probleme - Pagina ${pageNum}`,
     alternates: { canonical: `/probleme/pagina/${pageNum}` },
     openGraph: {
