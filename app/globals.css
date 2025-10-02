@@ -183,6 +183,38 @@
   background: linear-gradient(45deg, #a855f7, #ef4444);
 }
 
+/* Desktop-only: thin gray scrollbar for the lessons sidebar only */
+@media (min-width: 1024px) {
+  .lesson-sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .lesson-sidebar-scroll {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #9ca3af transparent; /* thumb gray-400, transparent track */
+  }
+  .lesson-sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .lesson-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: #9ca3af; /* gray-400 */
+    border-radius: 6px;
+  }
+  .lesson-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 on hover */
+  }
+}
+
+/* Mobile-only: hide scrollbar in the lessons sidebar */
+@media (max-width: 1023px) {
+  .lesson-sidebar-scroll {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .lesson-sidebar-scroll::-webkit-scrollbar { 
+    display: none; /* Safari and Chrome */
+  }
+}
+
 /* Title font using Poppins as primary font */
 .title-font {
   font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -567,6 +599,10 @@
   margin-left: 28px;
 }
 
+/* Normalize inner spacing for highlight cards: remove extra top/bottom margins */
+.formula-highlight .formula-content > :first-child { margin-top: 0 !important; }
+.formula-highlight .formula-content > :last-child { margin-bottom: 0 !important; }
+
 .enunt-highlight {
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   border-left: 4px solid #3b82f6;
@@ -589,6 +625,10 @@
 .enunt-highlight .enunt-content {
   margin-left: 28px;
 }
+
+/* Normalize inner spacing */
+.enunt-highlight .enunt-content > :first-child { margin-top: 0 !important; }
+.enunt-highlight .enunt-content > :last-child { margin-bottom: 0 !important; }
 
 .important-highlight {
   background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
@@ -613,6 +653,10 @@
   margin-left: 28px;
 }
 
+/* Normalize inner spacing */
+.important-highlight .important-content > :first-child { margin-top: 0 !important; }
+.important-highlight .important-content > :last-child { margin-bottom: 0 !important; }
+
 .definition-highlight {
   background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   border-left: 4px solid #22c55e;
@@ -636,6 +680,10 @@
   margin-left: 28px;
 }
 
+/* Normalize inner spacing */
+.definition-highlight .definition-content > :first-child { margin-top: 0 !important; }
+.definition-highlight .definition-content > :last-child { margin-bottom: 0 !important; }
+
 .example-highlight {
   background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
   border-left: 4px solid #a855f7;
@@ -658,6 +706,10 @@
 .example-highlight .example-content {
   margin-left: 28px;
 }
+
+/* Normalize inner spacing */
+.example-highlight .example-content > :first-child { margin-top: 0 !important; }
+.example-highlight .example-content > :last-child { margin-bottom: 0 !important; }
 
 /* Responsive design pentru evidențiere */
 @media (max-width: 768px) {
@@ -688,6 +740,18 @@
   .example-highlight .example-content {
     margin-left: 24px;
   }
+
+  /* Normalize inner spacing on mobile as well */
+  .formula-highlight .formula-content > :first-child,
+  .enunt-highlight .enunt-content > :first-child,
+  .important-highlight .important-content > :first-child,
+  .definition-highlight .definition-content > :first-child,
+  .example-highlight .example-content > :first-child { margin-top: 0 !important; }
+  .formula-highlight .formula-content > :last-child,
+  .enunt-highlight .enunt-content > :last-child,
+  .important-highlight .important-content > :last-child,
+  .definition-highlight .definition-content > :last-child,
+  .example-highlight .example-content > :last-child { margin-bottom: 0 !important; }
 }
 
 /* Improved mobile touch targets */

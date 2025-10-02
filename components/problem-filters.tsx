@@ -241,6 +241,31 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
     } catch {}
   }, [])
 
+  // Listen for updates triggered from navbar dropdown when already on the problems page
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const raw = sessionStorage.getItem(STORAGE_KEY)
+        if (!raw) return
+        const parsed = JSON.parse(raw) as Partial<FilterState>
+        const restored: FilterState = {
+          search: parsed.search ?? "",
+          category: parsed.category ?? "Toate",
+          difficulty: parsed.difficulty ?? "Toate",
+          progress: (parsed as any).progress === "Nerezolvate" || (parsed as any).progress === "Rezolvate" ? (parsed as any).progress : "Toate",
+          class: parsed.class ?? "Toate",
+          chapter: parsed.chapter ?? "Toate",
+        }
+        setFilters(restored)
+        setSelectedClass(restored.class)
+        setSelectedChapter(restored.chapter)
+        onFilterChange(restored)
+      } catch {}
+    }
+    window.addEventListener('problemFiltersUpdated', handler)
+    return () => window.removeEventListener('problemFiltersUpdated', handler)
+  }, [onFilterChange])
+
   return (
     <div className="bg-white border border-purple-200 rounded-lg p-6 space-y-6">
       <div className="flex items-center justify-between">

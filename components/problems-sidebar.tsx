@@ -255,7 +255,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
     <>
       {/* Overlay */}
       <div 
-        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[110] transition-all duration-400 ease-out ${
+        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[350] transition-all duration-400 ease-out ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -263,7 +263,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
       
       {/* Sidebar */}
       <div className={`
-        fixed top-0 right-0 h-full z-[120] bg-white shadow-2xl border-l
+        fixed top-0 right-0 h-full z-[360] bg-white shadow-2xl border-l
         transform transition-all duration-400 ease-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         w-[400px] max-w-[80vw] sm:w-[400px]

@@ -29,6 +29,25 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
   const [isLessonLoading, setIsLessonLoading] = useState(false)
   const lessonCache = useRef<Map<string, Lesson>>(new Map())
 
+  // Apply preselected class from navbar dropdown
+  useEffect(() => {
+    const applyPreselectedClass = () => {
+      try {
+        const cls = sessionStorage.getItem('physicsSelectedClass')
+        if (!cls) return
+        const map: Record<string, number> = { 'a 9-a': 9, 'a 10-a': 10, 'a 11-a': 11, 'a 12-a': 12 }
+        const num = map[cls]
+        if (num) {
+          setCurrentGrade(num)
+        }
+      } catch {}
+    }
+    applyPreselectedClass()
+    const handler = () => applyPreselectedClass()
+    window.addEventListener('physicsClassSelected', handler)
+    return () => window.removeEventListener('physicsClassSelected', handler)
+  }, [])
+
   // Skeletons
   const SidebarSkeleton = () => (
     <div className="w-full lg:w-80 bg-white border-r border-gray-200 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 shadow-lg lg:block">
@@ -415,7 +434,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
                 <div 
-                  className="fixed inset-0 bg-black bg-opacity-50 z-[110] lg:hidden animate-in fade-in duration-300"
+                  className="fixed inset-0 bg-black bg-opacity-50 z-[350] lg:hidden animate-in fade-in duration-300"
                   onClick={() => setIsMobileSidebarOpen(false)}
                 />
       )}
@@ -423,7 +442,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
       {/* Sidebar - Desktop & Mobile */}
       <div className={`
         ${isMobileSidebarOpen 
-          ? 'fixed inset-y-0 right-0 z-[120] w-4/5 block animate-in slide-in-from-right duration-300 ease-out' 
+          ? 'fixed inset-y-0 right-0 z-[360] w-4/5 block animate-in slide-in-from-right duration-300 ease-out' 
           : 'hidden lg:block sticky top-16 self-start z-10'
         }
       `}>

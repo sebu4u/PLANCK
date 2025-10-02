@@ -17,7 +17,8 @@ import {
 import { slugify } from "@/lib/slug"
 
 // Dynamic metadata per lesson
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
   const grades = await getAllGrades()
   let targetLesson: LessonSummary | null = null
   
@@ -25,7 +26,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     const chapters = await getChaptersByGradeId(grade.id)
     for (const chapter of chapters) {
       const lessons = await getLessonSummariesByChapterId(chapter.id)
-      const found = lessons.find(l => slugify(l.title) === params.slug)
+      const found = lessons.find(l => slugify(l.title) === slug)
       if (found) {
         targetLesson = found
         break
@@ -43,12 +44,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     description: `Lecție de fizică: ${targetLesson.title}. Durată estimată: ${targetLesson.estimated_duration || 0} minute.`,
     keywords: `lecție fizică, ${targetLesson.title}, cursuri fizică, educație fizică`,
     alternates: {
-      canonical: `/cursuri/${params.slug}`,
+      canonical: `/cursuri/${slug}`,
     },
     openGraph: {
       title: `${targetLesson.title} | PLANCK`,
       description: `Lecție de fizică: ${targetLesson.title}`,
-      url: `https://www.planck.academy/cursuri/${params.slug}`,
+      url: `https://www.planck.academy/cursuri/${slug}`,
       type: 'article',
       images: [
         {
@@ -88,7 +89,8 @@ export async function generateStaticParams() {
   }))
 }
 
-export default async function PhysicsLessonsBySlugPage({ params }: { params: { slug: string } }) {
+export default async function PhysicsLessonsBySlugPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const grades = await getAllGrades()
 
   const chaptersData: { [gradeId: string]: Chapter[] } = {}
@@ -103,7 +105,7 @@ export default async function PhysicsLessonsBySlugPage({ params }: { params: { s
       const summaries = await getLessonSummariesByChapterId(chapter.id)
       lessonsData[chapter.id] = summaries
       for (const l of summaries) {
-        if (slugify(l.title) === params.slug) {
+        if (slugify(l.title) === slug) {
           initialLessonId = l.id
         }
       }

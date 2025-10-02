@@ -1,10 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { LazyYouTubePlayer, extractYouTubeVideoId } from "@/components/lazy-youtube-player"
 
 export function ContentExampleSection() {
   return (
-    <section className="py-12 px-4 bg-gradient-to-br from-purple-50 to-pink-50/30 relative overflow-hidden">
+    <section className="py-8 lg:py-12 px-4 bg-gradient-to-br from-purple-50 to-pink-50/30 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Moving stars */}
@@ -44,9 +45,9 @@ export function ContentExampleSection() {
         ></div>
       </div>
 
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-8 animate-fade-in-up">
+        <div className="text-center mb-6 lg:mb-8 animate-fade-in-up">
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
             Vezi cum funcționează
           </h2>
@@ -56,47 +57,75 @@ export function ContentExampleSection() {
           <div className="w-24 h-1 bg-gradient-to-r from-purple-400 to-pink-400 mx-auto mt-4 animate-expand"></div>
         </div>
 
-        {/* Main Card */}
-        <Card className="bg-white border-purple-200 hover:border-purple-400 transition-all duration-300 space-card animate-fade-in-up shadow-xl">
-          <CardContent className="p-6">
-            {/* Card Title */}
-            <div className="text-center mb-4">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">Problema zilei</h3>
-            </div>
+        {/* Main Content - Mobile: Stacked, Desktop: Side by Side */}
+        <div className="lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
+          {/* Video Card - Left on Desktop */}
+          <div className="mb-6 lg:mb-0 animate-fade-in-up">
+            <Card className="bg-white border-purple-200 hover:border-purple-400 transition-all duration-300 space-card shadow-xl">
+              <CardContent className="p-4 lg:p-6">
+                {/* Card Title */}
+                <div className="text-center mb-4">
+                  <h3 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">Problema zilei</h3>
+                </div>
 
-            {/* YouTube Video */}
-            <div className="relative w-full mb-4">
-              <div className="aspect-video w-full rounded-lg overflow-hidden shadow-lg">
-                <iframe
-                  src="https://www.youtube.com/embed/QBTWRag_3Ls"
-                  title="Problema zilei - PLANCK"
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
+                {/* YouTube Video with Lazy Loading */}
+                <div className="relative w-full">
+                  <LazyYouTubePlayer
+                    videoId="QBTWRag_3Ls"
+                    title="Problema zilei - PLANCK"
+                    className="w-full"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Content - Right on Desktop */}
+          <div className="lg:text-left text-center animate-fade-in-up-delay">
+            <div className="space-y-6">
+              <div className="hidden lg:block">
+                <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">
+                  Învață fizica cu exemple practice
+                </h3>
+                <p className="text-lg text-gray-600 leading-relaxed">
+                  Fiecare problemă vine cu explicații pas cu pas și rezolvări video detaliate. 
+                  Învață conceptele cheie prin exemple concrete și aplicări practice.
+                </p>
               </div>
-            </div>
 
-            {/* CTA Button */}
-            <div className="text-center">
-              <Link href="/probleme/M007">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 cosmic-glow shadow-lg hover:shadow-xl"
-                >
-                  Vezi problema
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="space-y-3 hidden lg:block">
+                <div className="flex items-center gap-3 lg:justify-start justify-center">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-gray-700">Explicații pas cu pas</span>
+                </div>
+                <div className="flex items-center gap-3 lg:justify-start justify-center">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-gray-700">Rezolvări video interactive</span>
+                </div>
+                <div className="flex items-center gap-3 lg:justify-start justify-center">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-gray-700">Progres personalizat</span>
+                </div>
+              </div>
 
-        {/* Bottom Text */}
-        <div className="text-center mt-4 animate-fade-in-up-delay">
-          <p className="text-lg text-gray-600">
-            Ai acces la sute de probleme explicate pas cu pas.
-          </p>
+              {/* CTA Button */}
+              <div className="pt-4">
+                <Link href="/probleme/M007">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 cosmic-glow shadow-lg hover:shadow-xl"
+                  >
+                    Vezi problema
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Bottom Text */}
+              <p className="text-gray-600 pt-2 hidden lg:block">
+                Ai acces la sute de probleme explicate pas cu pas.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>

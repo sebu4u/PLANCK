@@ -191,7 +191,7 @@ export function PhysicsSidebar({
   }
 
   return (
-    <div className="w-full lg:w-80 bg-white border-r border-gray-200 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 shadow-lg lg:block">
+    <div className="lesson-sidebar-scroll w-full lg:w-80 bg-white border-r border-gray-200 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 shadow-lg lg:block">
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">Lecții de Fizică</h2>
@@ -299,11 +299,11 @@ export function PhysicsSidebar({
                                       onClick={() => onLessonSelect(lesson)}
                                     >
                                        <div className="flex items-center w-full">
-                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold mr-3 ${getLessonNumberColor(grade.grade_number, isCurrentLesson)}`}>
+                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold mr-3 flex-none ${getLessonNumberColor(grade.grade_number, isCurrentLesson)}`}>
                                            {index + 1}
                                          </div>
-                                        <div className="flex-1">
-                                          <div className="font-medium text-gray-800 text-sm">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-gray-800 text-sm break-words">
                                             {lesson.title}
                                           </div>
                                           <div className="flex items-center text-xs text-gray-500">

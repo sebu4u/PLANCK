@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Menu, X, BookOpen, Calculator, Rocket, LogIn, Search as SearchIcon, Loader2, ArrowUpRight } from "lucide-react"
+import { Menu, X, BookOpen, Calculator, Rocket, LogIn, Search as SearchIcon, Loader2, ArrowUpRight, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -22,6 +22,8 @@ type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string;
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
+  const [coursesOpen, setCoursesOpen] = useState(false)
+  const [problemsOpen, setProblemsOpen] = useState(false)
   const { user, logout, loading, profile } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
@@ -39,6 +41,67 @@ export function Navigation() {
   const cacheRef = useRef<Map<string, { results: SearchResultItem[]; hasMore: boolean }>>(new Map())
   const [, startTransition] = useTransition()
   const [popoverWidth, setPopoverWidth] = useState<number | null>(null)
+
+  const problemShortcuts: { chapter: string; classLabel: string }[] = [
+    { chapter: "Principiile mecanicii", classLabel: "a 9-a" },
+    { chapter: "Energia mecanica", classLabel: "a 9-a" },
+    { chapter: "Legea gazului ideal", classLabel: "a 10-a" },
+    { chapter: "Electrostatica", classLabel: "a 10-a" },
+    { chapter: "Unde mecanice", classLabel: "a 11-a" },
+    { chapter: "circuite de curent alternativ", classLabel: "a 11-a" },
+  ]
+
+  const classEmoji: Record<string, string> = {
+    'a 9-a': '🧪',
+    'a 10-a': '⚡',
+    'a 11-a': '🌊',
+    'a 12-a': '🔬',
+    'Toate': '📚',
+  }
+
+  const chapterEmoji: Record<string, string> = {
+    'Principiile mecanicii': '📐',
+    'Energia mecanica': '⚙️',
+    'Legea gazului ideal': '🧪',
+    'Electrostatica': '⚡',
+    'Unde mecanice': '🌊',
+    'circuite de curent alternativ': '🔁',
+  }
+
+  const goToProblemsWith = (classLabel: string, chapter: string) => {
+    try {
+      const payload = {
+        search: "",
+        category: "Toate",
+        difficulty: "Toate",
+        progress: "Toate",
+        class: classLabel,
+        chapter,
+      }
+      sessionStorage.setItem("problemFilters", JSON.stringify(payload))
+    } catch {}
+    if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/probleme')) {
+      try {
+        window.dispatchEvent(new Event('problemFiltersUpdated'))
+      } catch {}
+      // Trigger a soft refresh for visual feedback
+      try { router.refresh() } catch {}
+    } else {
+      router.push("/probleme")
+    }
+  }
+
+  const goToCoursesWith = (classLabel: string) => {
+    try {
+      sessionStorage.setItem('physicsSelectedClass', classLabel)
+    } catch {}
+    if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/cursuri')) {
+      try { window.dispatchEvent(new Event('physicsClassSelected')) } catch {}
+      try { router.refresh() } catch {}
+    } else {
+      router.push('/cursuri')
+    }
+  }
 
   const syncPopoverWidth = useCallback(() => {
     const inputEl = inputRef.current
@@ -259,7 +322,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 lg:z-50 z-[100] bg-white/90 backdrop-blur-md border-b border-purple-200 animate-slide-down">
+    <nav className="fixed top-0 left-0 right-0 z-[300] bg-white/90 backdrop-blur-md border-b border-purple-200 animate-slide-down">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-2 xl:px-2 2xl:px-2">
         <div className="relative h-16 flex items-center justify-between gap-6">
           {/* Logo + Desktop search & links */}
@@ -363,23 +426,74 @@ export function Navigation() {
             </div>
 
             {/* Keep links visible on md and up, even when search is hidden */}
-            <div className="hidden md:flex items-center gap-7 animate-fade-in-delay-1">
-              <Link
-                href="/cursuri"
-                className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium flex items-center gap-2 transition-all durata
-300 hover:scale-105 space-hover rounded-lg"
+            <div className="hidden md:flex items-center gap-4 animate-fade-in-delay-1">
+              <div
+                className="relative"
+                onMouseEnter={() => setCoursesOpen(true)}
+                onMouseLeave={() => setCoursesOpen(false)}
               >
-                <BookOpen size={16} />
-                Cursuri
-              </Link>
-              <Link
-                href="/probleme"
-                className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium flex items-center gap-2 transition-all durata
+                <Link
+                  href="/cursuri"
+                  className="text-gray-700 hover:text-purple-600 pl-2.5 pr-1.5 py-2 text-sm font-medium flex items-center gap-0.5 transition-all durata
 300 hover:scale-105 space-hover rounded-lg"
+                >
+                  <BookOpen size={16} />
+                  Cursuri
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${coursesOpen ? 'rotate-180' : ''}`} />
+                </Link>
+                <div className={`absolute left-0 top-full w-64 z-[400] transition-all duration-200 ${coursesOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
+                >
+                  <div className="rounded-xl border border-purple-100 bg-white shadow-lg overflow-hidden">
+                    <div className="py-2">
+                      <button onClick={() => goToCoursesWith('Toate')} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50">
+                        <BookOpen className="h-4 w-4 text-purple-600" />
+                        Toate cursurile
+                      </button>
+                      <div className="h-px bg-purple-100" />
+                      <button onClick={() => goToCoursesWith('a 9-a')} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50">{classEmoji['a 9-a']} Clasa a 9-a</button>
+                      <button disabled aria-disabled="true" className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">{classEmoji['a 10-a']} Clasa a 10-a (în curând)</button>
+                      <button disabled aria-disabled="true" className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">{classEmoji['a 11-a']} Clasa a 11-a (în curând)</button>
+                      <button disabled aria-disabled="true" className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">{classEmoji['a 12-a']} Clasa a 12-a (în curând)</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                className="relative"
+                onMouseEnter={() => setProblemsOpen(true)}
+                onMouseLeave={() => setProblemsOpen(false)}
               >
-                <Calculator size={16} />
-                Probleme
-              </Link>
+                <Link
+                  href="/probleme"
+                  className="text-gray-700 hover:text-purple-600 pl-2 pr-1.5 py-2 text-sm font-medium flex items-center gap-0.5 transition-all durata
+300 hover:scale-105 space-hover rounded-lg"
+                >
+                  <Calculator size={16} />
+                  Probleme
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${problemsOpen ? 'rotate-180' : ''}`} />
+                </Link>
+                <div className={`absolute left-0 top-full w-64 z-[400] transition-all duration-200 ${problemsOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
+                >
+                  <div className="rounded-xl border border-purple-100 bg-white shadow-lg overflow-hidden">
+                    <div className="py-2">
+                      <button onClick={() => goToProblemsWith('Toate', 'Toate')} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50">
+                        <Calculator className="h-4 w-4 text-purple-600" />
+                        Toate problemele
+                      </button>
+                      <div className="h-px bg-purple-100" />
+                      {problemShortcuts.map((s) => (
+                        <button
+                          key={s.classLabel + s.chapter}
+                          onClick={() => goToProblemsWith(s.classLabel, s.chapter)}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50"
+                        >
+                          {(chapterEmoji[s.chapter] || '📘') + ' ' + s.chapter}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
               <Link
                 href="/despre"
                 className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-all durata

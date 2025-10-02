@@ -136,6 +136,9 @@ export function LessonViewer({
     processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
     processedContent = processedContent.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
     
+    // Remove trailing newlines to prevent extra blank line at the end
+    processedContent = processedContent.replace(/(?:\r?\n)+$/g, '')
+    
     // Procesează link-urile - transformă link-urile către probleme în butoane
     processedContent = processedContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
       // Detectează link-uri către probleme
@@ -315,7 +318,7 @@ export function LessonViewer({
         const tagMatch = trimmed.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU)\]([\s\S]*?)\[\/\1\]$/)
         if (tagMatch) {
           const tagType = tagMatch[1].toLowerCase()
-          const inner = tagMatch[2]
+          const inner = tagMatch[2].trim()
           blocks.push(
             <div key={`tag-${keyPrefix}-${idx}`} className={`${tagType}-highlight`}>
               <div className={`${tagType}-content`}>
