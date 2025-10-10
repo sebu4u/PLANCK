@@ -762,3 +762,33 @@
     min-width: 44px;
   }
 }
+
+/* INDENT block - simple indented text area */
+.indent-highlight {
+  border-left: 4px solid #9ca3af; /* gray-400 */
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: #f9fafb; /* gray-50 */
+  border-radius: 0 8px 8px 0;
+}
+
+.indent-highlight .indent-content {
+  margin-left: 8px;
+}
+
+/* Normalize inner spacing */
+.indent-highlight .indent-content > :first-child { margin-top: 0 !important; }
+.indent-highlight .indent-content > :last-child { margin-bottom: 0 !important; }
+
+/* Responsive: smaller left space on mobile but still noticeable */
+@media (max-width: 768px) {
+  .indent-highlight {
+    padding: 8px 12px;
+    margin: 12px 0;
+    border-left-width: 3px;
+    background: #fafafa;
+  }
+  .indent-highlight .indent-content {
+    margin-left: 6px;
+  }
+}

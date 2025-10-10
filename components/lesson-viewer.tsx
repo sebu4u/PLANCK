@@ -313,9 +313,9 @@ export function LessonViewer({
         return
       }
 
-      if (trimmed.startsWith('[ENUNT]') || trimmed.startsWith('[IMPORTANT]') || trimmed.startsWith('[DEFINITIE]') || trimmed.startsWith('[EXEMPLU]')) {
+      if (trimmed.startsWith('[ENUNT]') || trimmed.startsWith('[IMPORTANT]') || trimmed.startsWith('[DEFINITIE]') || trimmed.startsWith('[EXEMPLU]') || trimmed.startsWith('[INDENT]')) {
         flushParagraph(idx)
-        const tagMatch = trimmed.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU)\]([\s\S]*?)\[\/\1\]$/)
+        const tagMatch = trimmed.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]([\s\S]*?)\[\/\1\]$/)
         if (tagMatch) {
           const tagType = tagMatch[1].toLowerCase()
           const inner = tagMatch[2].trim()
@@ -369,7 +369,7 @@ export function LessonViewer({
   }
 
   const renderContentWithMath = (content: string) => {
-    const tagPattern = /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\])/g
+    const tagPattern = /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\]|\[INDENT\][\s\S]*?\[\/INDENT\])/g
     const segments = content.split(tagPattern)
 
     return (
@@ -377,7 +377,7 @@ export function LessonViewer({
         {segments.map((segment, idx) => {
           if (!segment) return null
 
-          const tagMatch = segment.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU)\]([\s\S]*?)\[\/\1\]$/)
+          const tagMatch = segment.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]([\s\S]*?)\[\/\1\]$/)
           if (tagMatch) {
             const type = tagMatch[1].toLowerCase()
             const innerContent = tagMatch[2]
