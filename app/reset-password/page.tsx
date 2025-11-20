@@ -116,7 +116,8 @@ function ResetPasswordContent() {
         title: "Parolă resetată cu succes!",
         description: "Te poți conecta acum cu noua parolă.",
       })
-      router.push("/login")
+      // Redirect to register page for login
+      router.push("/register")
     }
   }
 
@@ -280,13 +281,13 @@ function ResetPasswordContent() {
 
               {/* Back to Login Link */}
               <div className="text-center pt-4 border-t border-gray-100">
-                <Link
-                  href="/login"
+                <button
+                  onClick={() => router.push("/register")}
                   className="inline-flex items-center text-purple-600 hover:text-purple-700 font-semibold transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Înapoi la login
-                </Link>
+                  Înapoi la autentificare
+                </button>
               </div>
             </CardContent>
           </Card>

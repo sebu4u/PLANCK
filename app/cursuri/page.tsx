@@ -11,7 +11,8 @@ import {
   getLessonSummariesByChapterId,
   Grade,
   Chapter,
-  LessonSummary
+  LessonSummary,
+  Lesson
 } from "@/lib/supabase-physics"
 
 export const metadata: Metadata = generateMetadata('physics-lessons')
@@ -72,7 +73,7 @@ export default async function PhysicsLessonsPage() {
     <div className="min-h-screen bg-white text-gray-900">
       <Navigation />
 
-      <div className="pt-16">
+      <div className="pt-16 relative z-10">
         <StructuredData data={breadcrumbs} />
         <StructuredData data={itemListStructuredData} />
         <PhysicsLessonsClient 

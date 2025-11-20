@@ -84,3 +84,33 @@ create policy "solved_delete_own"
   on public.solved_problems for delete
   to authenticated
   using ((SELECT auth.uid()) = user_id);
+
+-- Realtime Broadcast authorization (does NOT require database replication)
+-- Allows anon and authenticated clients to publish/listen to broadcast messages
+-- This is required for Supabase Realtime broadcast channels to work
+do $$
+begin
+  -- Enable RLS on realtime.messages if table exists (managed by Supabase)
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'realtime'
+      and table_name = 'messages'
+  ) then
+    execute 'alter table realtime.messages enable row level security';
+
+    -- Select (listen)
+    execute 'drop policy if exists "realtime_messages_select_all" on realtime.messages';
+    execute 'create policy "realtime_messages_select_all"
+      on realtime.messages for select
+      to anon, authenticated
+      using (true)';
+
+    -- Insert (broadcast)
+    execute 'drop policy if exists "realtime_messages_insert_all" on realtime.messages';
+    execute 'create policy "realtime_messages_insert_all"
+      on realtime.messages for insert
+      to anon, authenticated
+      with check (true)';
+  end if;
+end $$;

@@ -52,13 +52,13 @@ function VerifyEmailContent() {
 
             <CardContent className="space-y-6">
               <p className="text-gray-700 text-center">
-                Deschide emailul și apasă pe link-ul de confirmare pentru a-ți activa contul. După confirmare te vom redirecționa către pagina de autentificare.
+                Deschide emailul și apasă pe link-ul de confirmare pentru a-ți activa contul. După confirmare vei fi redirecționat către pagina de autentificare.
               </p>
 
               <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                <Button className="flex-1 min-w-0 whitespace-normal break-words text-center bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 h-12 text-lg font-semibold" onClick={() => router.push("/login")}> 
+                <Button className="flex-1 min-w-0 whitespace-normal break-words text-center bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 h-12 text-lg font-semibold" onClick={() => router.push("/register")}> 
                   <ArrowRight className="w-5 h-5 mr-2" />
-                  Am confirmat, mergi la login
+                  Am confirmat, mergi la autentificare
                 </Button>
                 <Button variant="outline" className="flex-1 min-w-0 whitespace-normal break-words text-center border-gray-300 hover:border-gray-400 hover:bg-gray-50 h-12" onClick={handleResend} disabled={resending}>
                   <RefreshCw className="w-5 h-5 mr-2" />

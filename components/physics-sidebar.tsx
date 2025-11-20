@@ -214,7 +214,7 @@ export function PhysicsSidebar({
             const progressPercentage = grade.totalLessons > 0 ? (grade.completedLessons / grade.totalLessons) * 100 : 0
 
             return (
-              <Card key={grade.id} className="border-gray-200">
+              <Card key={grade.id} className="border-gray-200 bg-card">
                 <CardContent className="p-0">
                   {/* Grade Header */}
                   <Button

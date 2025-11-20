@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Filter, X, Atom, Users, Award, Star, BookOpen, Flame, Zap, CircleDot, Circle, Ruler, ArrowUpDown, ArrowDown, ArrowRightLeft, Eye, Sun, Moon, Glasses, HelpCircle, Waves, Radio, Lightbulb, Orbit, Target, Sparkles } from "lucide-react"
+import { Search, X, Atom, Users, Award, Star, BookOpen } from "lucide-react"
 import {
   Select,
   SelectTrigger,
@@ -11,11 +11,13 @@ import {
   SelectContent,
   SelectItem
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 interface ProblemFiltersProps {
   onFilterChange: (filters: FilterState) => void
   totalProblems: number
   filteredCount: number
+  onClosePanel?: () => void
 }
 
 export interface FilterState {
@@ -95,75 +97,78 @@ const chapterOptions: Record<string, string[]> = {
   ]
 }
 
+const iconBase = "mr-2 inline h-4 w-4 text-white/60"
+
 const classIcons: Record<string, React.ReactNode> = {
-  "a 9-a": <Users className="w-4 h-4 text-purple-600 mr-2 inline" />,
-  "a 10-a": <Atom className="w-4 h-4 text-pink-600 mr-2 inline" />,
-  "a 11-a": <Award className="w-4 h-4 text-yellow-600 mr-2 inline" />,
-  "a 12-a": <Star className="w-4 h-4 text-blue-600 mr-2 inline" />,
-  "Toate": <BookOpen className="w-4 h-4 text-gray-400 mr-2 inline" />,
+  "a 9-a": <Users className={iconBase} />,
+  "a 10-a": <Atom className={iconBase} />,
+  "a 11-a": <Award className={iconBase} />,
+  "a 12-a": <Star className={iconBase} />,
+  "Toate": <BookOpen className={iconBase} />,
 }
 
-const chapterIcons: Record<string, React.ReactNode> = {
-  // 9th grade
-  "Miscarea rectilinie si uniforma a punctului material": <ArrowRightLeft className="w-4 h-4 text-purple-500 mr-2 inline" />,
-  "Miscarea rectilinie uniform variata": <ArrowUpDown className="w-4 h-4 text-pink-500 mr-2 inline" />,
-  "Miscarea punctului material sub actiunea greutatii": <ArrowDown className="w-4 h-4 text-blue-500 mr-2 inline" />,
-  "Principiile mecanicii": <Ruler className="w-4 h-4 text-yellow-500 mr-2 inline" />,
-  "Forta de frecare": <CircleDot className="w-4 h-4 text-orange-500 mr-2 inline" />,
-  "Forta elastica": <Circle className="w-4 h-4 text-green-500 mr-2 inline" />,
-  "Legea atractiei universale": <Star className="w-4 h-4 text-indigo-500 mr-2 inline" />,
-  "Miscarea circular uniforma": <Circle className="w-4 h-4 text-pink-500 mr-2 inline" />,
-  "Lucrul mecanic si puterea mecanica": <Zap className="w-4 h-4 text-yellow-600 mr-2 inline" />,
-  "Energia mecanica": <Flame className="w-4 h-4 text-red-500 mr-2 inline" />,
-  "Impulsul punctului material": <ArrowUpDown className="w-4 h-4 text-green-600 mr-2 inline" />,
-  "Ciocniri plastice si elastice": <ArrowRightLeft className="w-4 h-4 text-orange-600 mr-2 inline" />,
-  "Elemente de statica": <Ruler className="w-4 h-4 text-gray-500 mr-2 inline" />,
-  "Principiile opticii geometrice": <Sun className="w-4 h-4 text-yellow-400 mr-2 inline" />,
-  "Lentile": <Eye className="w-4 h-4 text-blue-400 mr-2 inline" />,
-  "Instrumente optice": <Glasses className="w-4 h-4 text-purple-400 mr-2 inline" />,
-  "Probleme diverse.": <HelpCircle className="w-4 h-4 text-gray-400 mr-2 inline" />,
-  // 10th grade
-  "Legea gazului ideal": <Flame className="w-4 h-4 text-orange-500 mr-2 inline" />,
-  "Lucrul mecanic si energia interna": <Zap className="w-4 h-4 text-yellow-600 mr-2 inline" />,
-  "Principiul 1 al termodinamicii": <Flame className="w-4 h-4 text-red-500 mr-2 inline" />,
-  "Principiul 2 al termodinamicii": <Flame className="w-4 h-4 text-pink-500 mr-2 inline" />,
-  "Calorimetrie": <Flame className="w-4 h-4 text-orange-400 mr-2 inline" />,
-  "Electrostatica": <Zap className="w-4 h-4 text-blue-500 mr-2 inline" />,
-  "Rezistenta electrica. Legea lui Ohm": <Zap className="w-4 h-4 text-green-500 mr-2 inline" />,
-  "Gruparea rezistoarelor": <Zap className="w-4 h-4 text-purple-500 mr-2 inline" />,
-  "Legile lui Kirchhoff": <Zap className="w-4 h-4 text-pink-500 mr-2 inline" />,
-  "Energia si puterea electrica": <Zap className="w-4 h-4 text-yellow-500 mr-2 inline" />,
-  "magnetism": <Star className="w-4 h-4 text-blue-600 mr-2 inline" />,
-  "probleme diverse.": <HelpCircle className="w-4 h-4 text-gray-400 mr-2 inline" />,
-  // 11th grade
-  "Oscilații mecanice. Pendul gravitațional": <Waves className="w-4 h-4 text-green-500 mr-2 inline" />,
-  "Unde mecanice": <Waves className="w-4 h-4 text-blue-500 mr-2 inline" />,
-  "circuite de curent alternativ": <Zap className="w-4 h-4 text-orange-500 mr-2 inline" />,
-  "Circuite serie de curent alternativ": <Zap className="w-4 h-4 text-red-500 mr-2 inline" />,
-  "Circuite paralele de curent alternativ": <Zap className="w-4 h-4 text-purple-500 mr-2 inline" />,
-  "Circuite mixte de curent alternativ": <Zap className="w-4 h-4 text-pink-500 mr-2 inline" />,
-  "Circuit oscilant. Antena": <Radio className="w-4 h-4 text-indigo-500 mr-2 inline" />,
-  "Prisma optică. Dispersia luminii": <Sun className="w-4 h-4 text-yellow-500 mr-2 inline" />,
-  "Interferența luminii. Dispozitivul Young": <Target className="w-4 h-4 text-blue-400 mr-2 inline" />,
-  "Dispozitive interferenționale": <Eye className="w-4 h-4 text-purple-400 mr-2 inline" />,
-  "Interferența localizată": <CircleDot className="w-4 h-4 text-green-400 mr-2 inline" />,
-  "Difracția luminii": <Sparkles className="w-4 h-4 text-yellow-400 mr-2 inline" />,
-  "Polarizarea luminii": <Glasses className="w-4 h-4 text-pink-400 mr-2 inline" />,
-  "probleme diverse": <HelpCircle className="w-4 h-4 text-gray-400 mr-2 inline" />,
-  // 12th grade
-  "Efectul fotoelectric extern": <Lightbulb className="w-4 h-4 text-yellow-600 mr-2 inline" />,
-  "Efectul Compton": <Zap className="w-4 h-4 text-blue-600 mr-2 inline" />,
-  "Modelul atomic": <Atom className="w-4 h-4 text-green-600 mr-2 inline" />,
-  "Atomul cu mai mulți electroni. Raze X": <Orbit className="w-4 h-4 text-purple-600 mr-2 inline" />,
-  "Proprietățile generale ale nucleului atomic": <CircleDot className="w-4 h-4 text-red-600 mr-2 inline" />,
-  "Reacții nucleare": <Star className="w-4 h-4 text-orange-600 mr-2 inline" />,
-  "Radiații nucleare": <Sparkles className="w-4 h-4 text-red-500 mr-2 inline" />,
-  "Particule elementare": <Atom className="w-4 h-4 text-indigo-600 mr-2 inline" />,
-  // fallback
-  "Toate": <BookOpen className="w-4 h-4 text-gray-400 mr-2 inline" />,
+const chapterEmojis: Record<string, string> = {
+  // Clasa a 9-a
+  "Miscarea rectilinie si uniforma a punctului material": "↔️",
+  "Miscarea rectilinie uniform variata": "↕️",
+  "Miscarea punctului material sub actiunea greutatii": "⬇️",
+  "Principiile mecanicii": "📐",
+  "Forta de frecare": "⭕",
+  "Forta elastica": "⭕",
+  "Legea atractiei universale": "⭐",
+  "Miscarea circular uniforma": "⭕",
+  "Lucrul mecanic si puterea mecanica": "⚡",
+  "Energia mecanica": "🔥",
+  "Impulsul punctului material": "↕️",
+  "Ciocniri plastice si elastice": "↔️",
+  "Elemente de statica": "📐",
+  "Principiile opticii geometrice": "☀️",
+  "Lentile": "👁️",
+  "Instrumente optice": "👓",
+  "Probleme diverse.": "❓",
+  // Clasa a 10-a
+  "Legea gazului ideal": "🔥",
+  "Lucrul mecanic si energia interna": "⚡",
+  "Principiul 1 al termodinamicii": "🔥",
+  "Principiul 2 al termodinamicii": "🔥",
+  "Calorimetrie": "🔥",
+  "Electrostatica": "⚡",
+  "Rezistenta electrica. Legea lui Ohm": "⚡",
+  "Gruparea rezistoarelor": "⚡",
+  "Legile lui Kirchhoff": "⚡",
+  "Energia si puterea electrica": "⚡",
+  "magnetism": "⭐",
+  "probleme diverse.": "❓",
+  // Clasa a 11-a
+  "Oscilații mecanice. Pendul gravitațional": "🌊",
+  "Unde mecanice": "🌊",
+  "circuite de curent alternativ": "⚡",
+  "Circuite serie de curent alternativ": "⚡",
+  "Circuite paralele de curent alternativ": "⚡",
+  "Circuite mixte de curent alternativ": "⚡",
+  "Circuit oscilant. Antena": "📻",
+  "Prisma optică. Dispersia luminii": "☀️",
+  "Interferența luminii. Dispozitivul Young": "🎯",
+  "Dispozitive interferenționale": "👁️",
+  "Interferența localizată": "⭕",
+  "Difracția luminii": "✨",
+  "Polarizarea luminii": "👓",
+  "probleme diverse": "❓",
+  // Clasa a 12-a
+  "Efectul fotoelectric extern": "💡",
+  "Efectul Compton": "⚡",
+  "Modelul atomic": "⚛️",
+  "Atomul cu mai mulți electroni. Raze X": "🌌",
+  "Proprietățile generale ale nucleului atomic": "⭕",
+  "Reacții nucleare": "⭐",
+  "Radiații nucleare": "✨",
+  "Particule elementare": "⚛️",
+  "probleme diverse": "❓",
+  // Fallback
+  "Toate": "📚",
 }
 
-export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }: ProblemFiltersProps) {
+export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, onClosePanel }: ProblemFiltersProps) {
   const STORAGE_KEY = "problemFilters"
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -189,6 +194,11 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(applied))
     } catch {}
     onFilterChange(applied)
+    if (typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new Event("problemFiltersUpdated"))
+      } catch {}
+    }
   }
 
   const clearFilters = () => {
@@ -205,10 +215,20 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
       sessionStorage.removeItem(STORAGE_KEY)
     } catch {}
     onFilterChange(cleared)
+    if (typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new Event("problemFiltersUpdated"))
+      } catch {}
+    }
+    onClosePanel?.()
   }
 
   const hasActiveFilters =
-    filters.search || filters.difficulty !== "Toate" || filters.progress !== "Toate"
+    !!filters.search ||
+    filters.difficulty !== "Toate" ||
+    filters.progress !== "Toate" ||
+    filters.class !== "Toate" ||
+    filters.chapter !== "Toate"
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -267,145 +287,193 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount }:
   }, [onFilterChange])
 
   return (
-    <div className="bg-white border border-purple-200 rounded-lg p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-purple-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Filtrează problemele</h3>
+    <div className="space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-white/35">
+            Filtre
+          </p>
+          <h3 className="mt-2 text-lg font-semibold text-white">
+            Rafinează căutarea
+          </h3>
         </div>
+        {onClosePanel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClosePanel}
+            className="rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:bg-white/15 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          placeholder="Caută după titlu, cod (ex: M003) sau tag-uri..."
-          value={filters.search}
-          onChange={(e) => updateFilters({ search: e.target.value })}
-          className="pl-10 border-purple-200 focus:border-purple-400"
-        />
-      </div>
+      <div className="space-y-5 text-sm">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Input
+            placeholder="Caută după enunț, cod (ex: M003) sau tag-uri..."
+            value={filters.search}
+            onChange={(e) => updateFilters({ search: e.target.value })}
+            className="h-11 rounded-2xl border-white/10 bg-white/[0.06] pl-11 text-sm text-white placeholder:text-white/40 focus-visible:ring-white/20"
+          />
+        </div>
 
-      {/* Class Filter */}
-      <div className="mb-4">
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Clasa</label>
-        <Select value={selectedClass} onValueChange={value => {
-          setSelectedClass(value)
-          setSelectedChapter("Toate")
-          updateFilters({ class: value, chapter: "Toate" })
-        }}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selectează clasa" />
-          </SelectTrigger>
-          <SelectContent>
-            {classOptions.map(cls => (
-              <SelectItem key={cls} value={cls}>
-                {classIcons[cls]}{cls}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Chapter Filter */}
-      <div className="mb-4">
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Capitol</label>
-        <Select value={selectedChapter} onValueChange={value => {
-          setSelectedChapter(value)
-          updateFilters({ chapter: value })
-        }} disabled={selectedClass === "Toate"}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selectează capitolul" />
-          </SelectTrigger>
-          <SelectContent>
-            {(chapterOptions[selectedClass] || ["Toate"]).map(chap => (
-              <SelectItem key={chap} value={chap}>
-                {chapterIcons[chap] || chapterIcons["Toate"]}{chap}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Difficulty Filter */}
-      <div>
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Dificultate</label>
-        <div className="flex flex-wrap gap-2">
-          {["Toate", "Ușor", "Mediu", "Avansat"].map((difficulty) => (
-            <Button
-              key={difficulty}
-              variant={filters.difficulty === difficulty ? "default" : "outline"}
-              size="sm"
-              onClick={() => updateFilters({ difficulty })}
-              className={
-                filters.difficulty === difficulty
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
-                  : "border-purple-200 hover:border-purple-400 hover:text-purple-600"
-              }
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <label className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
+              Clasa
+            </label>
+            <Select
+              value={selectedClass}
+              onValueChange={(value) => {
+                setSelectedClass(value)
+                setSelectedChapter("Toate")
+                updateFilters({ class: value, chapter: "Toate" })
+              }}
             >
-              {difficulty}
-            </Button>
-          ))}
+              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-white/[0.06] text-sm text-white">
+                <SelectValue placeholder="Selectează clasa" />
+              </SelectTrigger>
+              <SelectContent className="border border-white/10 bg-[#1b1b1b] text-white">
+                {classOptions.map((cls) => (
+                  <SelectItem
+                    key={cls}
+                    value={cls}
+                    className="rounded-xl text-sm text-white/75 focus:bg-white/10 focus:text-white data-[state=checked]:bg-white/10 data-[state=checked]:text-white"
+                  >
+                    {classIcons[cls]} {cls}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
+              Capitol
+            </label>
+            <Select
+              value={selectedChapter}
+              onValueChange={(value) => {
+                setSelectedChapter(value)
+                updateFilters({ chapter: value })
+              }}
+              disabled={selectedClass === "Toate"}
+            >
+              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-white/[0.06] text-sm text-white disabled:text-white/30">
+                <SelectValue placeholder="Selectează capitolul" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[240px] border border-white/10 bg-[#1b1b1b] text-white">
+                {(chapterOptions[selectedClass] || ["Toate"]).map((chap) => (
+                  <SelectItem
+                    key={chap}
+                    value={chap}
+                    className="rounded-xl text-sm text-white/75 focus:bg-white/10 focus:text-white data-[state=checked]:bg-white/10 data-[state=checked]:text-white"
+                  >
+                    <span className="mr-2">{chapterEmojis[chap] || "📘"}</span>
+                    {chap}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
+            Dificultate
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {["Toate", "Ușor", "Mediu", "Avansat"].map((difficulty) => {
+              const isActive = filters.difficulty === difficulty
+              const difficultyColors = {
+                "Toate": {
+                  hover: "hover:border-white/40",
+                  active: "border-white bg-white text-black hover:bg-white"
+                },
+                "Ușor": {
+                  hover: "hover:border-emerald-500/60 hover:text-emerald-300",
+                  active: "border-emerald-500/60 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 hover:border-emerald-500/80"
+                },
+                "Mediu": {
+                  hover: "hover:border-amber-500/60 hover:text-amber-300",
+                  active: "border-amber-500/60 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:border-amber-500/80"
+                },
+                "Avansat": {
+                  hover: "hover:border-rose-500/60 hover:text-rose-300",
+                  active: "border-rose-500/60 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30 hover:border-rose-500/80"
+                }
+              }
+              const colors = difficultyColors[difficulty as keyof typeof difficultyColors] || difficultyColors["Toate"]
+              
+              return (
+                <Button
+                  key={difficulty}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateFilters({ difficulty })}
+                  className={cn(
+                    "rounded-full border border-white/12 bg-white/[0.04] px-4 py-1.5 text-xs font-semibold text-white/65 transition",
+                    colors.hover,
+                    isActive ? colors.active : "hover:bg-white/12"
+                  )}
+                >
+                  {difficulty}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
+            Progres
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {(["Toate", "Nerezolvate", "Rezolvate"] as const).map((progressOption) => {
+              const isActive = filters.progress === progressOption
+              return (
+                <Button
+                  key={progressOption}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateFilters({ progress: progressOption })}
+                  className={cn(
+                    "rounded-full border border-white/12 bg-white/[0.04] px-4 py-1.5 text-xs font-semibold text-white/65 transition hover:border-white/40 hover:bg-white/12 hover:text-white",
+                    progressOption === "Rezolvate" && "col-span-2",
+                    isActive && "border-white bg-white text-black hover:bg-white"
+                  )}
+                >
+                  {progressOption}
+                </Button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Progress Filter */}
-      <div>
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Progres</label>
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant={filters.progress === "Toate" ? "default" : "outline"}
-            size="sm"
-            onClick={() => updateFilters({ progress: "Toate" })}
-            className={
-              filters.progress === "Toate"
-                ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
-                : "border-purple-200 hover:border-purple-400 hover:text-purple-600"
-            }
-          >
-            Toate
-          </Button>
-          <Button
-            variant={filters.progress === "Nerezolvate" ? "default" : "outline"}
-            size="sm"
-            onClick={() => updateFilters({ progress: "Nerezolvate" })}
-            className={
-              filters.progress === "Nerezolvate"
-                ? "bg-gradient-to-r from-green-600 to-green-700 text-white"
-                : "border-green-200 hover:border-green-400 hover:text-green-600"
-            }
-          >
-            Nerezolvate
-          </Button>
-          <Button
-            variant={filters.progress === "Rezolvate" ? "default" : "outline"}
-            size="sm"
-            onClick={() => updateFilters({ progress: "Rezolvate" })}
-            className={
-              filters.progress === "Rezolvate"
-                ? "col-span-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white"
-                : "col-span-2 border-orange-200 hover:border-orange-400 hover:text-orange-600"
-            }
-          >
-            Rezolvate
-          </Button>
-        </div>
-      </div>
-
-      {/* Results Count and Reset Button */}
-      <div className="pt-4 border-t border-purple-100 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          Se afișează <span className="font-semibold text-purple-600">{filteredCount}</span> din{" "}
-          <span className="font-semibold">{totalProblems}</span> probleme
+      <div className="flex flex-col gap-3 border-t border-white/10 pt-5 text-sm text-white/60">
+        <p>
+          Se afișează{" "}
+          <span className="font-semibold text-white">
+            {filteredCount}
+          </span>{" "}
+          din{" "}
+          <span className="font-semibold text-white/80">
+            {totalProblems}
+          </span>{" "}
+          probleme
         </p>
         {hasActiveFilters && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="border-purple-300 hover:border-purple-500 hover:text-purple-600"
+            className="self-start rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/15 hover:text-white"
           >
-            <X className="w-4 h-4 mr-1" />
+            <X className="mr-2 h-3.5 w-3.5" />
             Resetează filtrele
           </Button>
         )}

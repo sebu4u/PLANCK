@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { Problem } from "@/data/problems"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 interface ProblemsSidebarProps {
   isOpen: boolean
@@ -168,9 +169,9 @@ const chapterIcons: Record<string, React.ReactNode> = {
 }
 
 const difficultyColors = {
-  Ușor: "bg-green-100 text-green-800 border-green-200",
-  Mediu: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  Avansat: "bg-red-100 text-red-800 border-red-200"
+  Ușor: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
+  Mediu: "border-amber-500/40 bg-amber-500/15 text-amber-200",
+  Avansat: "border-rose-500/40 bg-rose-500/15 text-rose-200"
 }
 
 export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsSidebarProps) {
@@ -255,7 +256,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
     <>
       {/* Overlay */}
       <div 
-        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[350] transition-all duration-400 ease-out ${
+        className={`fixed inset-0 z-[350] bg-black/50 backdrop-blur-sm transition-all duration-300 ease-out ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -263,38 +264,37 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
       
       {/* Sidebar */}
       <div className={`
-        fixed top-0 right-0 h-full z-[360] bg-white shadow-2xl border-l
-        transform transition-all duration-400 ease-out
-        ${isOpen ? 'translate-x-0' : 'translate-x-full'}
-        w-[400px] max-w-[80vw] sm:w-[400px]
-        ${isOpen ? 'opacity-100' : 'opacity-95'}
+        fixed top-0 left-0 h-full z-[360] bg-[#121212] text-white shadow-[0_30px_80px_rgba(0,0,0,0.65)] border-r border-white/10
+        transform transition-transform duration-300 ease-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        w-[380px] max-w-[85vw]
       `}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-50 to-pink-50">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-center gap-2">
-            <List className="w-5 h-5 text-purple-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Toate problemele</h2>
+            <List className="h-5 w-5 text-white" />
+            <h2 className="text-lg font-semibold text-white">Toate problemele</h2>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="h-8 w-8 p-0 hover:bg-gray-100"
+            className="h-8 w-8 p-0 text-white hover:bg-white/10"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Filters */}
-        <div className="p-4 border-b space-y-3">
+        <div className="space-y-3 border-b border-white/10 p-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-white/40" />
             <Input
               placeholder="Caută probleme..."
               value={filters.search}
               onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="pl-10"
+              className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-white/40"
             />
           </div>
 
@@ -310,7 +310,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
                 }))
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="border-white/10 bg-white/5 text-white">
                 <SelectValue placeholder="Clasa" />
               </SelectTrigger>
               <SelectContent>
@@ -328,7 +328,10 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
               onValueChange={(value) => setFilters(prev => ({ ...prev, chapter: value }))}
               disabled={filters.class === "Toate"}
             >
-              <SelectTrigger className={filters.class === "Toate" ? "opacity-50 cursor-not-allowed" : ""}>
+              <SelectTrigger className={cn(
+                "border-white/10 bg-white/5 text-white",
+                filters.class === "Toate" && "cursor-not-allowed opacity-40"
+              )}>
                 <SelectValue placeholder="Capitolul" />
               </SelectTrigger>
               <SelectContent>
@@ -348,9 +351,9 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
               </SelectContent>
             </Select>
           </div>
-
+          
           {/* Results count */}
-          <div className="text-sm text-gray-500 text-center">
+          <div className="text-center text-sm text-white/50">
             {filteredProblems.length} probleme găsite
           </div>
         </div>
@@ -362,12 +365,12 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
               // Loading skeletons
               Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
-                  <div className="h-12 bg-gray-100 rounded-lg"></div>
+                  <div className="h-12 rounded-lg bg-white/10"></div>
                 </div>
               ))
             ) : filteredProblems.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Filter className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <div className="py-8 text-center text-white/60">
+                <Filter className="mx-auto mb-3 h-12 w-12 text-white/30" />
                 <p>Nu s-au găsit probleme cu filtrele selectate</p>
               </div>
             ) : (
@@ -376,24 +379,24 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
                   key={problem.id}
                   onClick={() => handleProblemClick(problem.id)}
                   className={`
-                    p-3 rounded-lg border cursor-pointer transition-all duration-200
-                    hover:shadow-md hover:border-purple-300 hover:bg-purple-50/50
+                    cursor-pointer rounded-lg border border-white/10 bg-white/5 p-3 transition-all duration-200
+                    hover:border-white/30 hover:bg-white/10 hover:shadow-lg
                     ${problem.id === currentProblemId 
-                      ? 'border-purple-400 bg-purple-100/50 shadow-md' 
-                      : 'border-gray-200 bg-white hover:border-purple-300'
+                      ? 'border-emerald-400/60 bg-emerald-500/15 shadow-lg' 
+                      : ''
                     }
                   `}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-medium text-gray-900 leading-tight flex-1 min-w-0">
+                    <h3 className="min-w-0 flex-1 font-medium leading-tight text-white">
                       {truncateTitle(problem.title)}
                     </h3>
                     
                     {/* Problem ID with difficulty color */}
                     <Badge 
                       className={`
-                        ${difficultyColors[problem.difficulty as keyof typeof difficultyColors] || 'bg-gray-100 text-gray-800 border-gray-200'}
-                        font-mono text-xs px-2 py-1 min-w-[3rem] text-center
+                        ${difficultyColors[problem.difficulty as keyof typeof difficultyColors] || 'border-white/20 bg-white/10 text-white'}
+                        min-w-[3rem] border font-mono text-xs text-center
                       `}
                     >
                       {problem.id}

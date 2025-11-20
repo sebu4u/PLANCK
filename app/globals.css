@@ -40,13 +40,203 @@
   }
 }
 
+@layer components {
+  .problem-card-solved::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-sizing: border-box;
+    padding: 1px;
+    background: radial-gradient(circle at 100% 100%, rgba(34, 197, 94, 0.85) 0%, rgba(34, 197, 94, 0.4) 40%, rgba(34, 197, 94, 0) 70%) no-repeat;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  .problem-card-solved:hover::after {
+    background: radial-gradient(circle at 100% 100%, rgba(52, 211, 153, 0.95) 0%, rgba(16, 185, 129, 0.55) 38%, rgba(16, 185, 129, 0) 68%) no-repeat;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+    scrollbar-color: #4b5563 #111827;
   }
+}
+
+/* Custom Scrollbar Styles for Dashboard */
+.dashboard-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+}
+
+.dashboard-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dashboard-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.dashboard-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.dashboard-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Dashboard Card Hover Effects */
+.dashboard-card {
+  transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth Transitions */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass Effect */
+.glass-effect {
+  background: rgba(19, 19, 22, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Glow Effect */
+.glow-effect {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+/* Dashboard Animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+/* Pulse Animation for Streak */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Prose styles for markdown content */
+.prose {
+  color: inherit;
+}
+
+.prose p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.prose ul, .prose ol {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose code {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.125em 0.375em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background-color: rgba(0, 0, 0, 0.4);
+  padding: 1em;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.prose blockquote {
+  border-left: 4px solid rgba(255, 255, 255, 0.2);
+  padding-left: 1em;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  font-style: italic;
+}
+
+.prose a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+.prose a:hover {
+  text-decoration-color: rgba(255, 255, 255, 0.6);
+}
+
+.prose-invert {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.prose-invert h1, .prose-invert h2, .prose-invert h3, .prose-invert h4, .prose-invert h5, .prose-invert h6 {
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Cosmic background */
@@ -93,17 +283,22 @@
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(147, 51, 234, 0.3), 0 0 30px rgba(147, 51, 234, 0.1);
 }
 
+/* Radial gradient for glow effect */
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-stops));
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1b3a;
+  background: #111827;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(45deg, #9333ea, #dc2626);
+  background: #4b5563;
   border-radius: 4px;
 }
 
@@ -180,7 +375,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(45deg, #a855f7, #ef4444);
+  background: #6b7280;
 }
 
 /* Desktop-only: thin gray scrollbar for the lessons sidebar only */
@@ -215,27 +410,27 @@
   }
 }
 
-/* Title font using Poppins as primary font */
+/* Title font using Mona Sans as primary font */
 .title-font {
-  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+  font-family: var(--font-mona-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
-/* Space-themed hover effects */
-.space-hover:hover {
+/* Space-themed hover effects - REMOVED */
+/* .space-hover:hover {
   background: linear-gradient(45deg, #9333ea, #dc2626);
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 10px 25px rgba(147, 51, 234, 0.3);
-}
+} */
 
-.space-card:hover {
+/* .space-card:hover {
   transform: translateY(-5px) scale(1.02);
   box-shadow: 0 20px 40px rgba(147, 51, 234, 0.2), 0 0 20px rgba(220, 38, 38, 0.1);
-}
+} */
 
 /* Animation keyframes */
 @keyframes fadeIn {
@@ -490,6 +685,26 @@
   transform: translateY(0);
 }
 
+.scroll-animate-fade-up.animate-delay-100 {
+  transition-delay: 0.1s;
+}
+
+.scroll-animate-fade-up.animate-delay-200 {
+  transition-delay: 0.2s;
+}
+
+.scroll-animate-fade-up.animate-delay-300 {
+  transition-delay: 0.3s;
+}
+
+.scroll-animate-fade-up.animate-delay-400 {
+  transition-delay: 0.4s;
+}
+
+.scroll-animate-fade-up.animate-delay-600 {
+  transition-delay: 0.6s;
+}
+
 .scroll-animate-slide-up {
   opacity: 0;
   transform: translateY(80px);
@@ -499,6 +714,22 @@
 .scroll-animate-slide-up.animate {
   opacity: 1;
   transform: translateY(0);
+}
+
+.scroll-animate-slide-up.animate-delay-100 {
+  transition-delay: 0.1s;
+}
+
+.scroll-animate-slide-up.animate-delay-200 {
+  transition-delay: 0.2s;
+}
+
+.scroll-animate-slide-up.animate-delay-300 {
+  transition-delay: 0.3s;
+}
+
+.scroll-animate-slide-up.animate-delay-400 {
+  transition-delay: 0.4s;
 }
 
 .scroll-animate-fade-left {
@@ -512,6 +743,22 @@
   transform: translateX(0);
 }
 
+.scroll-animate-fade-left.animate-delay-100 {
+  transition-delay: 0.1s;
+}
+
+.scroll-animate-fade-left.animate-delay-200 {
+  transition-delay: 0.2s;
+}
+
+.scroll-animate-fade-left.animate-delay-300 {
+  transition-delay: 0.3s;
+}
+
+.scroll-animate-fade-left.animate-delay-400 {
+  transition-delay: 0.4s;
+}
+
 .scroll-animate-fade-right {
   opacity: 0;
   transform: translateX(50px);
@@ -523,6 +770,30 @@
   transform: translateX(0);
 }
 
+.scroll-animate-fade-right.animate-delay-100 {
+  transition-delay: 0.1s;
+}
+
+.scroll-animate-fade-right.animate-delay-200 {
+  transition-delay: 0.2s;
+}
+
+.scroll-animate-fade-right.animate-delay-300 {
+  transition-delay: 0.3s;
+}
+
+.scroll-animate-fade-right.animate-delay-400 {
+  transition-delay: 0.4s;
+}
+
+.scroll-animate-fade-right.animate-delay-600 {
+  transition-delay: 0.6s;
+}
+
+.scroll-animate-fade-left.animate-delay-600 {
+  transition-delay: 0.6s;
+}
+
 .scroll-animate-scale {
   opacity: 0;
   transform: scale(0.8);
@@ -532,6 +803,22 @@
 .scroll-animate-scale.animate {
   opacity: 1;
   transform: scale(1);
+}
+
+.scroll-animate-scale.animate-delay-100 {
+  transition-delay: 0.1s;
+}
+
+.scroll-animate-scale.animate-delay-200 {
+  transition-delay: 0.2s;
+}
+
+.scroll-animate-scale.animate-delay-300 {
+  transition-delay: 0.3s;
+}
+
+.scroll-animate-scale.animate-delay-400 {
+  transition-delay: 0.4s;
 }
 
 /* Mobile optimizations */
@@ -549,10 +836,23 @@
   }
 
   @media (hover: none) {
-    .space-hover:hover,
+    /* .space-hover:hover,
     .space-card:hover {
       transform: none;
       box-shadow: none;
+    } */
+    
+    /* Disable scale effect on touch devices for dashboard cards */
+    /* Target dashboard cards by their common structure */
+    main[class*="lg:ml-[300px]"] .rounded-xl:hover {
+      transform: none !important;
+    }
+  }
+  
+  /* Alternative: Disable scale on touch devices using pointer media query */
+  @media (pointer: coarse) {
+    main[class*="lg:ml-[300px]"] .rounded-xl:hover {
+      transform: none !important;
     }
   }
 
@@ -763,6 +1063,37 @@
   }
 }
 
+/* Scrolling Marquee Animations */
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Faster animation for mobile */
+@media (max-width: 1023px) {
+  @keyframes scroll-left-mobile {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+/* Marquee fade-out effects */
+.marquee-fade-left {
+  background: linear-gradient(to right, #0d1117, transparent);
+}
+
+.marquee-fade-right {
+  background: linear-gradient(to left, #0d1117, transparent);
+}
+
 /* INDENT block - simple indented text area */
 .indent-highlight {
   border-left: 4px solid #9ca3af; /* gray-400 */
@@ -791,4 +1122,240 @@
   .indent-highlight .indent-content {
     margin-left: 6px;
   }
+}
+
+.monaco-editor .insight-insert-highlight {
+  background-color: rgba(34, 197, 94, 0.25) !important;
+  border-left: 3px solid rgba(34, 197, 94, 0.8) !important;
+  margin-left: 0 !important;
+}
+
+.monaco-editor .insight-delete-highlight {
+  background-color: rgba(239, 68, 68, 0.25) !important;
+  border-left: 3px solid rgba(239, 68, 68, 0.8) !important;
+  margin-left: 0 !important;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Animated gradient text */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-gradient-text {
+  background: linear-gradient(
+    90deg,
+    #3b82f6,
+    #8b5cf6,
+    #ec4899,
+    #f59e0b,
+    #10b981,
+    #3b82f6
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.animated-gradient-icon {
+  background: linear-gradient(
+    90deg,
+    #3b82f6,
+    #8b5cf6,
+    #ec4899,
+    #f59e0b,
+    #10b981,
+    #3b82f6
+  );
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.animated-gradient-icon svg {
+  fill: url(#gradient-animated);
+}
+
+/* Animated badge shimmer */
+@keyframes badge-shine {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.badge-animated-shine {
+  background: linear-gradient(
+    120deg,
+    rgba(253, 230, 138, 0.05),
+    rgba(251, 191, 36, 0.35),
+    rgba(253, 230, 138, 0.05)
+  );
+  background-size: 200% 100%;
+  animation: badge-shine 6s linear infinite;
+}
+
+/* Custom theme styles - make cards darker gray with 70% opacity when custom theme is active */
+/* Cards should be darker gray (gray-800) with 70% opacity */
+/* Exclude active Tabs buttons from this rule */
+.has-custom-theme [class*="bg-white"][class*="rounded"]:not([data-state="active"]),
+.has-custom-theme [class*="bg-card"],
+.has-custom-theme [class*="bg-white/["],
+.has-custom-theme [class*="rounded-3xl"][class*="border"][class*="bg-white"],
+.has-custom-theme [class*="rounded-3xl"][class*="bg-white/["] {
+  background-color: rgba(31, 41, 55, 0.7) !important; /* gray-800 with 70% opacity */
+  backdrop-filter: blur(8px);
+}
+
+/* Sidebar background with custom theme - darker gray with 70% opacity */
+.has-custom-theme .lesson-sidebar-scroll {
+  background-color: rgba(31, 41, 55, 0.7) !important; /* gray-800 with 70% opacity */
+  backdrop-filter: blur(8px);
+}
+
+/* Text should remain 100% opacity */
+.has-custom-theme [class*="text-white"],
+.has-custom-theme [class*="text-gray"],
+.has-custom-theme p,
+.has-custom-theme h1,
+.has-custom-theme h2,
+.has-custom-theme h3,
+.has-custom-theme h4,
+.has-custom-theme span,
+.has-custom-theme div[class*="text"] {
+  opacity: 1 !important;
+}
+
+/* Tabs active button should be solid white with black text when custom theme is active */
+.has-custom-theme [data-state="active"][class*="bg-white"],
+.has-custom-theme [data-state="active"][class*="TabsTrigger"] {
+  background-color: #ffffff !important; /* Solid white */
+  color: #000000 !important; /* Black text */
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+}
+
+/* Buttons and filters should have 85% opacity */
+/* Exclude active Tabs buttons and action links (like "Vezi problema") from this rule */
+.has-custom-theme button:not([data-state="active"]):not(a),
+.has-custom-theme [role="button"]:not([data-state="active"]):not(a),
+.has-custom-theme [class*="Button"]:not([data-state="active"]):not(a),
+.has-custom-theme [class*="Select"],
+.has-custom-theme [class*="Input"],
+.has-custom-theme [class*="Filter"] {
+  opacity: 0.85 !important;
+}
+
+/* Exclude action links (like "Vezi problema") from opacity rule */
+.has-custom-theme a[href*="/probleme/"],
+.has-custom-theme a[class*="hover:bg-white"] {
+  opacity: 1 !important;
+}
+
+/* But keep button text at 100% opacity */
+.has-custom-theme button *,
+.has-custom-theme [role="button"] *,
+.has-custom-theme [class*="Button"] * {
+  opacity: 1 !important;
+}
+
+/* Ensure hover effects work on "Vezi problema" button and similar action buttons */
+/* Target links in problem cards that go to problem detail pages */
+.has-custom-theme a[href*="/probleme/"]:hover {
+  opacity: 1 !important;
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease !important;
+}
+
+/* Ensure text inside hovered buttons maintains full opacity */
+.has-custom-theme a[href*="/probleme/"]:hover * {
+  opacity: 1 !important;
+}
+
+/* Make sure hover effects are visible on buttons with hover:bg-white classes in problem cards */
+.has-custom-theme .problem-card a[class*="hover:bg-white"]:hover,
+.has-custom-theme a[class*="hover:bg-white"][href*="/probleme/"]:hover {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  opacity: 1 !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Info catalog section - reduce overlay opacity when custom theme is active */
+.has-custom-theme .info-catalog-section {
+  background-color: rgba(9, 9, 9, 0.3) !important; /* #090909 with 30% opacity instead of 80% */
+  backdrop-filter: none !important; /* Remove blur to make background more visible */
+}
+
+/* KaTeX isolation styles - prevent layout issues */
+.katex {
+  display: inline !important;
+  position: relative !important;
+}
+
+.katex-display {
+  display: block !important;
+  margin: 0.5em 0 !important;
+  text-align: center !important;
+}
+
+.katex-display > .katex {
+  display: inline-block !important;
+  text-align: initial !important;
+}
+
+/* Ensure KaTeX doesn't affect parent layout */
+.katex,
+.katex * {
+  box-sizing: border-box !important;
+}
+
+/* Override any KaTeX styles that might cause layout shifts */
+.katex-html {
+  display: inline-block !important;
+}
+
+.katex .base {
+  display: inline !important;
+}
+
+/* MathLive virtual keyboard - ensure it appears above whiteboard elements */
+.ML__keyboard,
+.ML__keyboard-container,
+[class*="ML__keyboard"],
+math-field::part(virtual-keyboard) {
+  z-index: 10000 !important;
+  position: fixed !important;
+}
+
+/* Ensure MathLive keyboard overlay is above everything */
+.ML__keyboard.is-visible,
+.ML__keyboard-container.is-visible {
+  z-index: 10000 !important;
+}
+
+/* Hide the virtual keyboard toggle button */
+math-field::part(virtual-keyboard-toggle),
+.ML__virtual-keyboard-toggle,
+[class*="virtual-keyboard-toggle"] {
+  display: none !important;
+  visibility: hidden !important;
 }

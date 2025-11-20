@@ -5,10 +5,14 @@ import { Problem } from "@/data/problems"
 import { ProblemFilters, type FilterState } from "@/components/problem-filters"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react"
 import { Pagination, PaginationContent, PaginationItem, PaginationEllipsis } from "@/components/ui/pagination"
 import { useAuth } from "@/components/auth-provider"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { cn } from "@/lib/utils"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { ProblemCardSkeleton } from "@/components/problems/problem-card-skeleton"
 
 // Lazy load ProblemCard component
 const ProblemCard = lazy(() => import("@/components/problem-card").then(module => ({ default: module.ProblemCard })))
@@ -22,39 +26,40 @@ const CLASS_MAP: Record<number, string> = {
   12: "a 12-a"
 };
 
-// Loading skeleton for problem cards
-function ProblemCardSkeleton() {
-  return (
-    <div className="h-full flex flex-col border-0 shadow-xl bg-gradient-to-br from-white/80 via-purple-50 to-pink-50 backdrop-blur-md rounded-lg p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <Skeleton className="w-8 h-8 rounded" />
-        <Skeleton className="w-16 h-6 rounded" />
-        <Skeleton className="w-20 h-6 rounded" />
-      </div>
-      <Skeleton className="w-full h-6 mb-2 rounded" />
-      <Skeleton className="w-3/4 h-4 mb-4 rounded" />
-      <div className="flex flex-wrap gap-1 mt-2">
-        <Skeleton className="w-12 h-5 rounded-full" />
-        <Skeleton className="w-16 h-5 rounded-full" />
-      </div>
-      <div className="flex-1"></div>
-      <Skeleton className="w-full h-10 mt-4 rounded-lg" />
-    </div>
-  )
-}
-
 // Cache for problems data (client-side)
 const problemsCache = new Map<string, { data: Problem[], timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
+const MONTHLY_FREE_PROBLEM_COUNT = 50
+
+const getCurrentMonthKey = () => {
+  const now = new Date()
+  const month = `${now.getUTCMonth() + 1}`.padStart(2, "0")
+  return `${now.getUTCFullYear()}-${month}`
+}
+
+const scoreProblemForMonth = (problemId: string, monthKey: string) => {
+  const input = `${monthKey}:${problemId}`
+  let hash = 0
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) | 0
+  }
+  const unsigned = hash >>> 0
+  return unsigned / 0xffffffff
+}
+
 interface ProblemsClientProps {
   initialProblems: Problem[]
   initialPage?: number
+  initialMonthlyFreeSet?: string[]
 }
 
-export default function ProblemsClient({ initialProblems, initialPage = 1 }: ProblemsClientProps) {
+export default function ProblemsClient({ initialProblems, initialPage = 1, initialMonthlyFreeSet = [] }: ProblemsClientProps) {
   const { user } = useAuth();
+  const { isFree, isPaid } = useSubscriptionPlan()
   const didMountRef = useRef(false)
+  const isMobile = useIsMobile()
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     category: "Toate",
@@ -191,6 +196,23 @@ export default function ProblemsClient({ initialProblems, initialPage = 1 }: Pro
     })
   }, [problems, filters, solvedProblems])
 
+  // Folosește set-ul primit de la server (care include selecțiile manuale dacă există)
+  const monthlyFreeSet = useMemo(() => {
+    if (initialMonthlyFreeSet.length > 0) {
+      return new Set(initialMonthlyFreeSet)
+    }
+    // Fallback la calculul local dacă nu avem date de la server
+    if (!problems.length) return new Set<string>()
+    const monthKey = getCurrentMonthKey()
+    const scored = problems.map((problem) => ({
+      id: problem.id,
+      score: scoreProblemForMonth(problem.id, monthKey),
+    }))
+    scored.sort((a, b) => a.score - b.score)
+    const slice = scored.slice(0, Math.min(MONTHLY_FREE_PROBLEM_COUNT, scored.length))
+    return new Set(slice.map((item) => item.id))
+  }, [initialMonthlyFreeSet, problems])
+
   // Memoized sorted problems
   const sortedProblems = useMemo(() => {
     const noFiltersApplied = 
@@ -201,7 +223,10 @@ export default function ProblemsClient({ initialProblems, initialPage = 1 }: Pro
       filters.class === "Toate" && 
       filters.chapter === "Toate"
 
-    if (noFiltersApplied) {
+    const isFreeOnly = isFree && !isPaid
+
+    // Pentru utilizatorii PLĂTIȚI păstrăm comportamentul existent de featured problems
+    if (noFiltersApplied && !isFreeOnly) {
       const featuredProblemIds = ["M008", "T001", "M033", "T004", "M025", "T014", "M071", "T034"]
       const featuredProblemsMap = new Map()
       const otherProblems: Problem[] = []
@@ -227,22 +252,38 @@ export default function ProblemsClient({ initialProblems, initialPage = 1 }: Pro
     const hasAnyYoutube = filteredProblems.some((p) => typeof p.youtube_url === 'string' && p.youtube_url.trim() !== '')
     
     return [...filteredProblems].sort((a, b) => {
+      // 1) Pentru utilizatorii Free: problemele din rotația lunară ies primele
+      if (isFreeOnly) {
+        const aFree = monthlyFreeSet.has(a.id)
+        const bFree = monthlyFreeSet.has(b.id)
+        if (aFree !== bFree) {
+          return aFree ? -1 : 1
+        }
+      }
+
+      // 2) Apoi logica existentă: nerezolvate înainte de rezolvate
       const aSolved = solvedProblems.includes(a.id)
       const bSolved = solvedProblems.includes(b.id)
       if (aSolved !== bSolved) return aSolved ? 1 : -1
+
+      // 3) Probleme cu video înainte
       if (hasAnyYoutube) {
         const aHas = typeof a.youtube_url === 'string' && a.youtube_url.trim() !== ''
         const bHas = typeof b.youtube_url === 'string' && b.youtube_url.trim() !== ''
         if (aHas !== bHas) return aHas ? -1 : 1
       }
+
+      // 4) Dificultate (Ușor -> Mediu -> Avansat)
       const aRank = difficultyOrder[a.difficulty] ?? 99
       const bRank = difficultyOrder[b.difficulty] ?? 99
       if (aRank !== bRank) return aRank - bRank
+
+      // 5) Mai noi înainte
       const aTime = new Date(a.created_at).getTime()
       const bTime = new Date(b.created_at).getTime()
       return bTime - aTime
     })
-  }, [filteredProblems, solvedProblems, filters])
+  }, [filteredProblems, solvedProblems, filters, isFree, isPaid, monthlyFreeSet])
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
@@ -281,183 +322,251 @@ export default function ProblemsClient({ initialProblems, initialPage = 1 }: Pro
   }, [currentPage])
 
   return (
-    <div className="grid lg:grid-cols-4 gap-8">
-      {/* Filters Sidebar */}
-      <div className="lg:col-span-1">
-        <div className="sticky top-24">
-          <ProblemFilters
-            onFilterChange={handleFilterChange}
-            totalProblems={problems.length}
-            filteredCount={filteredProblems.length}
-          />
-        </div>
-      </div>
-      {/* Problems Grid */}
-      <div className="lg:col-span-3">
-        {loading ? (
-          <div className="grid gap-6 md:grid-cols-2 mb-8">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <ProblemCardSkeleton key={index} />
-            ))}
-          </div>
-        ) : visibleProblems.length > 0 ? (
-          <>
-            <div className="grid gap-6 md:grid-cols-2 mb-8">
-              {visibleProblems.map((problem) => (
-                <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
-                  <ProblemCard problem={problem} solved={solvedProblems.includes(problem.id)} />
-                </Suspense>
-              ))}
-            </div>
-            {/* Pagination */}
-            <div className="flex justify-center gap-4 mt-8">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                  </PaginationItem>
-                  {/* Smart numeric pagination */}
-                  {(() => {
-                    const pages = [] as JSX.Element[]
-                    const neighbor = 1
-                    const { totalPages } = paginationData
-                    
-                    if (totalPages <= 3) {
-                      for (let i = 1; i <= totalPages; i++) {
-                        pages.push(
-                          <PaginationItem key={i}>
-                            <Button
-                              variant={i === currentPage ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setCurrentPage(i)}
-                              className={i === currentPage ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : ""}
-                            >
-                              {i}
-                            </Button>
-                          </PaginationItem>
-                        )
-                      }
-                    } else {
-                      if (currentPage > 1 + neighbor + 1) {
-                        pages.push(
-                          <PaginationItem key={1}>
-                            <Button
-                              variant={1 === currentPage ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setCurrentPage(1)}
-                              className={1 === currentPage ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : ""}
-                            >
-                              1
-                            </Button>
-                          </PaginationItem>
-                        )
-                        pages.push(<PaginationEllipsis key="start-ellipsis" />)
-                      } else {
-                        for (let i = 1; i < Math.max(2, currentPage - neighbor); i++) {
-                          pages.push(
-                            <PaginationItem key={i}>
-                              <Button
-                                variant={i === currentPage ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(i)}
-                                className={i === currentPage ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : ""}
-                              >
-                                {i}
-                              </Button>
-                            </PaginationItem>
-                          )
-                        }
-                      }
-                      for (let i = Math.max(1, currentPage - neighbor); i <= Math.min(totalPages, currentPage + neighbor); i++) {
-                        if (i === 1 || i === totalPages) continue
-                        pages.push(
-                          <PaginationItem key={i}>
-                            <Button
-                              variant={i === currentPage ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setCurrentPage(i)}
-                              className={i === currentPage ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : ""}
-                            >
-                              {i}
-                            </Button>
-                          </PaginationItem>
-                        )
-                      }
-                      if (currentPage < totalPages - neighbor - 1) {
-                        pages.push(<PaginationEllipsis key="end-ellipsis" />)
-                        pages.push(
-                          <PaginationItem key={totalPages}>
-                            <Button
-                              variant={totalPages === currentPage ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setCurrentPage(totalPages)}
-                              className={totalPages === currentPage ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : ""}
-                            >
-                              {totalPages}
-                            </Button>
-                          </PaginationItem>
-                        )
-                      } else {
-                        for (let i = currentPage + neighbor + 1; i <= totalPages; i++) {
-                          pages.push(
-                            <PaginationItem key={i}>
-                              <Button
-                                variant={i === currentPage ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(i)}
-                                className={i === currentPage ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : ""}
-                              >
-                                {i}
-                              </Button>
-                            </PaginationItem>
-                          )
-                        }
-                      }
-                    }
-                    return pages
-                  })()}
-                  <PaginationItem>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.min(paginationData.totalPages, p + 1))}
-                      disabled={currentPage === paginationData.totalPages}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">Nu s-au găsit probleme care să corespundă filtrelor selectate.</p>
-            <Button
-              onClick={() => setFilters({
-                search: "",
-                category: "Toate",
-                difficulty: "Toate",
-                progress: "Toate",
-                class: "Toate",
-                chapter: "Toate",
-              })}
-              className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+    <div className="space-y-8 -mx-6 px-6 sm:-mx-8 sm:px-8 lg:-mx-16 lg:px-16 xl:-mx-20 xl:px-20 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
+        <p>
+          Se afișează {filteredProblems.length} din {problems.length} probleme
+        </p>
+        {isMobile && (
+          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+            <SheetContent
+              side="right"
+              className="w-full border-l border-white/10 bg-[#141414] text-white sm:max-w-md"
             >
-              Resetează filtrele
+              <SheetHeader className="mb-4 text-left">
+                <SheetTitle className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">
+                  Filtre
+                </SheetTitle>
+              </SheetHeader>
+              <ProblemFilters
+              onFilterChange={(newFilters) => {
+                handleFilterChange(newFilters)
+              }}
+                totalProblems={problems.length}
+                filteredCount={filteredProblems.length}
+                onClosePanel={() => setMobileFiltersOpen(false)}
+              />
+            </SheetContent>
+            <Button
+              variant="outline"
+              size="sm"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-white/80 transition hover:bg-white/15 hover:text-white"
+              onClick={() => setMobileFiltersOpen(true)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtre
             </Button>
+          </Sheet>
+        )}
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] lg:items-start">
+        {!isMobile && (
+          <div className="hidden lg:block">
+            <div className="sticky top-28">
+              <ProblemFilters
+                onFilterChange={handleFilterChange}
+                totalProblems={problems.length}
+                filteredCount={filteredProblems.length}
+              />
+            </div>
           </div>
         )}
+
+        <div>
+          {loading ? (
+            <div className="mb-8 grid gap-5 md:grid-cols-2">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <ProblemCardSkeleton key={index} />
+              ))}
+            </div>
+          ) : visibleProblems.length > 0 ? (
+            <>
+              <div className="mb-8 grid gap-5 md:grid-cols-2">
+                {visibleProblems.map((problem) => {
+                  const canAccess =
+                    !isFree || isPaid || monthlyFreeSet.has(problem.id)
+                  const isLocked = isFree && !canAccess
+                  return (
+                    <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
+                      <ProblemCard
+                        problem={problem}
+                        solved={solvedProblems.includes(problem.id)}
+                        isLocked={isLocked}
+                      />
+                    </Suspense>
+                  )
+                })}
+              </div>
+              <div className="mt-8 flex justify-center gap-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                    </PaginationItem>
+                    {(() => {
+                      const pages = [] as JSX.Element[]
+                      const neighbor = 1
+                      const { totalPages } = paginationData
+
+                      if (totalPages <= 3) {
+                        for (let i = 1; i <= totalPages; i++) {
+                          pages.push(
+                            <PaginationItem key={i}>
+                              <Button
+                                variant={i === currentPage ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(i)}
+                                className={cn(
+                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                  i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                )}
+                              >
+                                {i}
+                              </Button>
+                            </PaginationItem>
+                          )
+                        }
+                      } else {
+                        if (currentPage > 1 + neighbor + 1) {
+                          pages.push(
+                            <PaginationItem key={1}>
+                              <Button
+                                variant={1 === currentPage ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(1)}
+                                className={cn(
+                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                  1 === currentPage && "border-white bg-white text-black hover:bg-white"
+                                )}
+                              >
+                                1
+                              </Button>
+                            </PaginationItem>
+                          )
+                          pages.push(<PaginationEllipsis key="start-ellipsis" />)
+                        } else {
+                          for (let i = 1; i < Math.max(2, currentPage - neighbor); i++) {
+                            pages.push(
+                              <PaginationItem key={i}>
+                                <Button
+                                  variant={i === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(i)}
+                                  className={cn(
+                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                    i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                  )}
+                                >
+                                  {i}
+                                </Button>
+                              </PaginationItem>
+                            )
+                          }
+                        }
+                        for (let i = Math.max(1, currentPage - neighbor); i <= Math.min(totalPages, currentPage + neighbor); i++) {
+                          if (i === 1 || i === totalPages) continue
+                          pages.push(
+                            <PaginationItem key={i}>
+                              <Button
+                                variant={i === currentPage ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(i)}
+                                className={cn(
+                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                  i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                )}
+                              >
+                                {i}
+                              </Button>
+                            </PaginationItem>
+                          )
+                        }
+                        if (currentPage < totalPages - neighbor - 1) {
+                          pages.push(<PaginationEllipsis key="end-ellipsis" />)
+                          pages.push(
+                            <PaginationItem key={totalPages}>
+                              <Button
+                                variant={totalPages === currentPage ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(totalPages)}
+                                className={cn(
+                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                  totalPages === currentPage && "border-white bg-white text-black hover:bg-white"
+                                )}
+                              >
+                                {totalPages}
+                              </Button>
+                            </PaginationItem>
+                          )
+                        } else {
+                          for (let i = currentPage + neighbor + 1; i <= totalPages; i++) {
+                            pages.push(
+                              <PaginationItem key={i}>
+                                <Button
+                                  variant={i === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(i)}
+                                  className={cn(
+                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                    i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                  )}
+                                >
+                                  {i}
+                                </Button>
+                              </PaginationItem>
+                            )
+                          }
+                        }
+                      }
+                      return pages
+                    })()}
+                    <PaginationItem>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.min(paginationData.totalPages, p + 1))}
+                        disabled={currentPage === paginationData.totalPages}
+                        className="rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-8 py-12 text-center text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
+              <p className="text-lg text-white">Nu s-au găsit probleme care să corespundă filtrelor selectate.</p>
+              <Button
+                onClick={() => setFilters({
+                  search: "",
+                  category: "Toate",
+                  difficulty: "Toate",
+                  progress: "Toate",
+                  class: "Toate",
+                  chapter: "Toate",
+                })}
+                className="mt-6 rounded-full border border-white/15 bg-white/[0.1] px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              >
+                Resetează filtrele
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
+
 
 

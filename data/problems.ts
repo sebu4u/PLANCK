@@ -12,6 +12,8 @@ export interface Problem {
   classString?: string
   isFree?: boolean
   image_url?: string
+  isFreeMonthly?: boolean
+  canAccess?: boolean
 }
 
 // Problemele se preiau acum din Supabase, nu din acest fișier.

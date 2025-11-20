@@ -421,7 +421,7 @@ export function LessonViewer({
   if (!lesson) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-2xl bg-card">
           <CardContent className="p-12 text-center">
             <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">
@@ -439,7 +439,7 @@ export function LessonViewer({
   return (
     <div className="w-full">
       {/* Progress Bar - Fixed at top, only over lesson content */}
-      <div className={`fixed top-16 left-0 lg:left-80 right-0 z-50 lg:z-50 z-[85] bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all duration-300 ease-in-out ${
+      <div className={`fixed top-16 left-0 lg:left-80 right-0 z-50 lg:z-50 z-[85] bg-white border-b border-gray-200 shadow-sm transition-all duration-300 ease-in-out ${
         showProgressBar 
           ? 'translate-y-0 opacity-100' 
           : '-translate-y-full opacity-0 pointer-events-none'
@@ -523,7 +523,7 @@ export function LessonViewer({
               {/* Lesson Content */}
               <div className="p-4 lg:p-6">
                 <div className="max-w-4xl mx-auto">
-                  <Card className="border-purple-200">
+                  <Card className="border-purple-200 bg-card">
                             <CardContent className="p-4 lg:p-8 lesson-content">
                               <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none prose-headings:break-words prose-p:break-words">
                                 {renderContentWithMath(lesson.content)}

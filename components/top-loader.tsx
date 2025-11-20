@@ -12,6 +12,9 @@ export function TopLoader() {
 	const rafRef = useRef<number | null>(null)
 	const startedRef = useRef(false)
 	const completeTimerRef = useRef<number | null>(null)
+	const pathnameWhenStartedRef = useRef<string | null>(null)
+	const safetyTimerRef = useRef<number | null>(null)
+	const pathnameRef = useRef(pathname)
 
 	// Incremental progress animation towards a ceiling (e.g., 85%) until completion
 	const startIncrementing = () => {
@@ -42,19 +45,33 @@ export function TopLoader() {
 	const begin = () => {
 		if (startedRef.current) return
 		startedRef.current = true
+		pathnameWhenStartedRef.current = pathname
 		setIsVisible(true)
 		setProgress(10)
 		startIncrementing()
+		
+		// Safety timer: if pathname doesn't change within 500ms, complete the loader
+		if (safetyTimerRef.current) window.clearTimeout(safetyTimerRef.current)
+		safetyTimerRef.current = window.setTimeout(() => {
+			if (pathnameWhenStartedRef.current === pathnameRef.current) {
+				complete()
+			}
+		}, 500)
 	}
 
 	const complete = () => {
 		stopIncrementing()
+		if (safetyTimerRef.current) {
+			window.clearTimeout(safetyTimerRef.current)
+			safetyTimerRef.current = null
+		}
 		setProgress(100)
 		if (completeTimerRef.current) window.clearTimeout(completeTimerRef.current)
 		completeTimerRef.current = window.setTimeout(() => {
 			setIsVisible(false)
 			setProgress(0)
 			startedRef.current = false
+			pathnameWhenStartedRef.current = null
 		}, 250)
 	}
 
@@ -69,7 +86,23 @@ export function TopLoader() {
 				if (el.tagName === "A") {
 					const anchor = el as HTMLAnchorElement
 					const href = anchor.getAttribute("href")
-					if (href && href.startsWith("/")) begin()
+					if (href && href.startsWith("/")) {
+						// Normalize href by removing query params and hash for comparison
+						const normalizedHref = href.split("?")[0].split("#")[0]
+						const normalizedPathname = pathnameRef.current.split("?")[0].split("#")[0]
+						
+						// If clicking on link to the same page, ensure loader completes if running
+						if (normalizedHref === normalizedPathname) {
+							// If loader is already running, complete it immediately
+							if (startedRef.current) {
+								complete()
+							}
+							// Don't start a new loader for same-page navigation
+							return
+						}
+						
+						begin()
+					}
 					break
 				}
 				el = el.parentElement
@@ -95,11 +128,36 @@ export function TopLoader() {
 		}
 	}, [])
 
+	// Update pathname ref whenever it changes
+	useEffect(() => {
+		pathnameRef.current = pathname
+	}, [pathname])
+	
 	// When pathname updates, we mark completion to allow page skeletons to continue
 	useEffect(() => {
-		if (startedRef.current) complete()
+		if (startedRef.current) {
+			// If pathname changed from when we started, complete normally
+			if (pathnameWhenStartedRef.current !== pathname) {
+				complete()
+			}
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [pathname])
+	
+	// Cleanup timers on unmount
+	useEffect(() => {
+		return () => {
+			if (safetyTimerRef.current) {
+				window.clearTimeout(safetyTimerRef.current)
+			}
+			if (completeTimerRef.current) {
+				window.clearTimeout(completeTimerRef.current)
+			}
+			if (rafRef.current) {
+				cancelAnimationFrame(rafRef.current)
+			}
+		}
+	}, [])
 
 	// Render bar
 	return (

@@ -10,6 +10,13 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		screens: {
+  			'logo': '1048px',
+  			'burger': '948px',
+		},
+		fontFamily: {
+			'vt323': ['var(--font-vt323)'],
+		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

@@ -11,4 +11,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 	auth: {
 		redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
 	},
+	realtime: {
+		params: {
+			eventsPerSecond: 10,
+		},
+	},
 });

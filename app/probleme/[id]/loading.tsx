@@ -1,171 +1,172 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 
 export default function LoadingProblemDetail() {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-[#141414] text-white flex flex-col">
       {/* Navigation skeleton */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#141414]/80 backdrop-blur-sm border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-32 bg-white/10" />
             <div className="flex items-center gap-4">
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-8 w-20 bg-white/10" />
+              <Skeleton className="h-8 w-8 rounded-full bg-white/10" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="pt-16">
-        {/* Hero Section Skeleton */}
-        <section className="py-12 sm:py-16 lg:py-20 px-4 bg-gradient-to-br from-purple-50 to-pink-50">
-          <div className="max-w-7xl mx-auto">
-            {/* Navigation breadcrumb and sidebar toggle */}
-            <div className="flex items-center justify-between mb-8">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-9 w-32" />
+      <div className="flex-1 pt-20 pb-16">
+        <div className="px-4 sm:px-6 lg:px-12">
+          <div className="mx-auto max-w-[1600px] space-y-10">
+            {/* Top navigation buttons skeleton */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Skeleton className="h-9 w-36 rounded-full bg-white/10" />
+                <Skeleton className="h-6 w-32 bg-white/10" />
+              </div>
+              <div className="hidden sm:flex items-center gap-3">
+                <Skeleton className="h-7 w-24 rounded-full bg-white/10" />
+                <Skeleton className="h-7 w-20 rounded-full bg-white/10" />
+                <Skeleton className="h-7 w-28 rounded-full bg-white/10" />
+              </div>
             </div>
-            
-            <div className="grid lg:grid-cols-3 gap-8 items-start">
-              {/* Main content area */}
-              <div className="lg:col-span-2">
-                {/* Problem icon and badges */}
-                <div className="flex items-center gap-3 mb-6">
-                  <Skeleton className="h-12 w-12 rounded-lg" />
-                  <div className="flex flex-wrap gap-2">
-                    <Skeleton className="h-7 w-16" />
-                    <Skeleton className="h-7 w-20" />
-                    <Skeleton className="h-7 w-24" />
+
+            {/* Main grid layout */}
+            <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.58fr)_minmax(0,0.42fr)] 2xl:grid-cols-[minmax(0,0.6fr)_minmax(0,0.4fr)]">
+              {/* Main content section */}
+              <section className="space-y-8">
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-8 shadow-[0px_24px_70px_-40px_rgba(0,0,0,0.9)]">
+                  <div className="flex flex-col gap-6">
+                    {/* Icon and badges */}
+                    <div className="flex flex-wrap items-start gap-4">
+                      <Skeleton className="h-12 w-12 bg-white/10" />
+                      <div className="flex flex-wrap gap-2">
+                        <Skeleton className="h-8 w-20 rounded bg-white/10" />
+                        <Skeleton className="h-8 w-24 rounded bg-white/10" />
+                        <Skeleton className="h-8 w-16 rounded bg-white/10" />
+                      </div>
+                    </div>
+
+                    {/* Title */}
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full bg-white/10" />
+                      <Skeleton className="h-12 w-4/5 bg-white/10" />
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-full bg-white/10" />
+                      <Skeleton className="h-5 w-full bg-white/10" />
+                      <Skeleton className="h-5 w-3/4 bg-white/10" />
+                    </div>
+
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-2">
+                      <Skeleton className="h-7 w-20 rounded-full bg-white/10" />
+                      <Skeleton className="h-7 w-16 rounded-full bg-white/10" />
+                      <Skeleton className="h-7 w-24 rounded-full bg-white/10" />
+                    </div>
+
+                    {/* Tabs skeleton */}
+                    <div className="w-full">
+                      <div className="flex w-full flex-wrap gap-2 rounded-2xl border border-white/10 bg-white/5 p-1">
+                        <Skeleton className="h-9 flex-1 rounded-full bg-white/10" />
+                        <Skeleton className="h-9 flex-1 rounded-full bg-white/10" />
+                      </div>
+                      
+                      {/* Tab content skeleton */}
+                      <div className="mt-6 rounded-2xl border border-white/8 bg-black/40 p-6">
+                        <div className="space-y-3">
+                          <Skeleton className="h-5 w-full bg-white/10" />
+                          <Skeleton className="h-5 w-full bg-white/10" />
+                          <Skeleton className="h-5 w-4/5 bg-white/10" />
+                          <Skeleton className="h-5 w-full bg-white/10" />
+                          <Skeleton className="h-5 w-3/4 bg-white/10" />
+                          <Skeleton className="h-5 w-full bg-white/10" />
+                        </div>
+                        {/* Image placeholder */}
+                        <div className="mt-6 flex justify-center">
+                          <Skeleton className="w-full max-w-2xl h-80 rounded-xl bg-white/10" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                
-                {/* Title */}
-                <Skeleton className="h-12 w-full mb-4" />
-                <Skeleton className="h-12 w-4/5 mb-4" />
-                
-                {/* Description */}
-                <div className="space-y-2 mb-6">
-                  <Skeleton className="h-5 w-full" />
-                  <Skeleton className="h-5 w-full" />
-                  <Skeleton className="h-5 w-3/4" />
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Skeleton className="h-11 w-48 rounded-full bg-white/10" />
+                  <Skeleton className="h-11 w-40 rounded-full bg-white/10 lg:hidden" />
                 </div>
-                
-                {/* Tags */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                  <Skeleton className="h-7 w-16 rounded-full" />
-                  <Skeleton className="h-7 w-20 rounded-full" />
-                  <Skeleton className="h-7 w-14 rounded-full" />
+              </section>
+
+              {/* Sidebar section */}
+              <aside className="space-y-6">
+                {/* Desktop board skeleton */}
+                <div className="hidden lg:flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.02] p-5 shadow-[0px_24px_80px_-40px_rgba(0,0,0,1)]">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-32 bg-white/10" />
+                      <Skeleton className="h-4 w-48 bg-white/10" />
+                    </div>
+                    <Skeleton className="h-9 w-9 rounded-full bg-white/10" />
+                  </div>
+                  <div className="relative h-[600px] overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                    <Skeleton className="h-full w-full bg-white/5" />
+                  </div>
                 </div>
-              </div>
-              
-              {/* Sidebar */}
-              <div className="lg:col-span-1">
-                <Card className="border-purple-200 sticky top-24">
-                  <CardHeader>
-                    <CardTitle>
-                      <Skeleton className="h-6 w-40" />
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-8" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-12" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-16" />
-                      <Skeleton className="h-4 w-18" />
-                    </div>
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-6 w-16" />
-                    </div>
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-16" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+
+                {/* Mobile board skeleton */}
+                <div className="lg:hidden rounded-3xl border border-white/10 bg-white/[0.02] p-5">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <Skeleton className="h-6 w-20 rounded-full bg-white/10" />
+                    <Skeleton className="h-6 w-24 rounded-full bg-white/10" />
+                  </div>
+                  <Skeleton className="h-6 w-40 bg-white/10 mb-2" />
+                  <Skeleton className="h-4 w-full bg-white/10 mb-4" />
+                  <Skeleton className="h-11 w-full rounded-full bg-white/10" />
+                </div>
+              </aside>
             </div>
           </div>
-        </section>
-
-        {/* Problem Content Skeleton */}
-        <section className="py-16 px-4 max-w-7xl mx-auto">
-          <Card className="border-purple-200 shadow-2xl">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200">
-              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                <Skeleton className="h-8 w-8" />
-                <Skeleton className="h-8 w-48" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border border-gray-100 shadow-inner">
-                {/* Problem statement */}
-                <div className="space-y-3">
-                  <Skeleton className="h-5 w-full" />
-                  <Skeleton className="h-5 w-full" />
-                  <Skeleton className="h-5 w-full" />
-                  <Skeleton className="h-5 w-4/5" />
-                  <Skeleton className="h-5 w-full" />
-                  <Skeleton className="h-5 w-3/4" />
-                </div>
-                
-                {/* Problem image placeholder */}
-                <div className="mt-6 flex justify-center">
-                  <Skeleton className="w-full max-w-2xl h-96 rounded-lg" />
-                </div>
-              </div>
-              
-              {/* Action buttons */}
-              <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
-                <Skeleton className="h-14 w-64" />
-                <Skeleton className="h-14 w-56" />
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+        </div>
       </div>
       
       {/* Footer skeleton */}
-      <div className="bg-gray-50 border-t border-gray-200 py-12">
+      <div className="bg-gray-900 border-t border-white/10 py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="space-y-4">
-              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-6 w-32 bg-white/10" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24 bg-white/10" />
+                <Skeleton className="h-4 w-28 bg-white/10" />
+                <Skeleton className="h-4 w-20 bg-white/10" />
               </div>
             </div>
             <div className="space-y-4">
-              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 w-24 bg-white/10" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-18" />
+                <Skeleton className="h-4 w-20 bg-white/10" />
+                <Skeleton className="h-4 w-24 bg-white/10" />
+                <Skeleton className="h-4 w-18 bg-white/10" />
               </div>
             </div>
             <div className="space-y-4">
-              <Skeleton className="h-6 w-28" />
+              <Skeleton className="h-6 w-28 bg-white/10" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-22" />
-                <Skeleton className="h-4 w-26" />
-                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-22 bg-white/10" />
+                <Skeleton className="h-4 w-26 bg-white/10" />
+                <Skeleton className="h-4 w-20 bg-white/10" />
               </div>
             </div>
             <div className="space-y-4">
-              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-6 w-20 bg-white/10" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-22" />
+                <Skeleton className="h-4 w-24 bg-white/10" />
+                <Skeleton className="h-4 w-28 bg-white/10" />
+                <Skeleton className="h-4 w-22 bg-white/10" />
               </div>
             </div>
           </div>

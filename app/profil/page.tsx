@@ -5,71 +5,39 @@ import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Navigation } from "@/components/navigation";
-import { Pencil, Lock, Facebook, Instagram, Youtube, Mail } from "lucide-react";
+import { Pencil, Settings, Lock, Shield, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import Link from "next/link";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
 import { PrivacySettings } from "@/components/privacy-settings";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import Image from "next/image";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { getNextRankThreshold } from "@/lib/dashboard-data";
 
 // Skeleton components for profile page
-const ProfileHeaderSkeleton = () => (
-  <div className="flex flex-col items-center gap-4 pb-6 pt-8">
-    <div className="relative">
-      <Skeleton className="w-28 h-28 rounded-full" />
-      <Skeleton className="absolute bottom-2 right-2 w-16 h-6 rounded-full" />
-    </div>
-    <div className="flex flex-col items-center gap-3 w-full">
-      <Skeleton className="w-20 h-3 rounded" />
-      <div className="flex items-center gap-2">
-        <Skeleton className="w-32 h-6 rounded" />
-        <Skeleton className="w-6 h-6 rounded" />
-      </div>
-      <Skeleton className="w-16 h-3 rounded" />
-      <Skeleton className="w-48 h-7 rounded" />
-    </div>
-    <div className="w-full flex flex-col items-center">
-      <Skeleton className="w-64 h-20 rounded-md" />
+const ProfileSkeleton = () => (
+  <div className="rounded-xl bg-[#131316] border border-white/10 p-6 animate-pulse">
+    <div className="flex flex-col items-center gap-4">
+      <Skeleton className="w-32 h-32 rounded-full bg-white/5" />
+      <Skeleton className="w-32 h-6 bg-white/5" />
+      <Skeleton className="w-48 h-4 bg-white/5" />
+      <Skeleton className="w-full h-20 bg-white/5 rounded-lg" />
     </div>
   </div>
 );
 
-const ActivitySkeleton = () => (
-  <div className="mt-4">
-    <div className="flex flex-wrap gap-2">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <Skeleton key={index} className="w-16 h-8 rounded-md" />
-      ))}
-    </div>
-  </div>
-);
-
-const BadgesSkeleton = () => (
-  <div className="mt-4">
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="flex items-center gap-3 p-4 border rounded-lg">
-          <Skeleton className="w-12 h-12 rounded-full" />
-          <div className="flex-1">
-            <Skeleton className="w-24 h-4 rounded mb-2" />
-            <Skeleton className="w-32 h-3 rounded" />
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const SettingsSkeleton = () => (
-  <div className="mt-4">
-    <div className="flex items-center justify-between rounded-lg border p-4">
-      <Skeleton className="w-32 h-4 rounded" />
-      <Skeleton className="w-32 h-10 rounded" />
-    </div>
+const StatsSkeleton = () => (
+  <div className="space-y-6">
+    <Skeleton className="w-full h-64 rounded-xl bg-[#131316]" />
+    <Skeleton className="w-full h-64 rounded-xl bg-[#131316]" />
   </div>
 );
 
@@ -82,15 +50,40 @@ const ProfilPage = () => {
   const [nickname, setNickname] = useState("");
   const [nicknameEdit, setNicknameEdit] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-  const [solvedCount, setSolvedCount] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [solvedProblems, setSolvedProblems] = useState<any[]>([]);
-  const [problemsOpen, setProblemsOpen] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [solvedProblemsLoading, setSolvedProblemsLoading] = useState(true);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Get rank icon path
+  const getRankIconPath = (rankName: string): string => {
+    const rankLower = rankName?.toLowerCase() || '';
+    if (rankLower.includes('bronze')) return '/ranks/bronze.png';
+    if (rankLower.includes('silver')) return '/ranks/silver.png';
+    if (rankLower.includes('gold')) return '/ranks/gold.png';
+    if (rankLower.includes('platinum')) return '/ranks/platinum.png';
+    if (rankLower.includes('diamond')) return '/ranks/diamond.png';
+    if (rankLower.includes('masters')) return '/ranks/masters.png';
+    if (rankLower.includes('ascendant')) return '/ranks/ascendant.png';
+    if (rankLower.includes('singularity')) return '/ranks/singularity.png';
+    return '/ranks/bronze.png';
+  };
+
+  // Get rank color
+  const getRankColor = (rankName: string) => {
+    if (rankName?.includes('Bronze')) return 'text-amber-700';
+    if (rankName?.includes('Silver')) return 'text-gray-400';
+    if (rankName?.includes('Gold')) return 'text-yellow-400';
+    if (rankName?.includes('Platinum')) return 'text-cyan-400';
+    if (rankName?.includes('Diamond')) return 'text-blue-400';
+    if (rankName?.includes('Masters')) return 'text-purple-400';
+    if (rankName?.includes('Ascendant')) return 'text-indigo-400';
+    if (rankName?.includes('Singularity')) return 'text-pink-400';
+    return 'text-gray-400';
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -118,76 +111,54 @@ const ProfilPage = () => {
 
   useEffect(() => {
     if (!user) return;
-    const fetchSolvedCount = async () => {
-      const { count } = await supabase
-        .from('solved_problems')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      setSolvedCount(count || 0);
-    };
-    fetchSolvedCount();
-  }, [user]);
+    const fetchUserStats = async () => {
+      setStatsLoading(true);
+      const { data, error } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-  useEffect(() => {
-    if (!user) return;
-    const fetchSolvedProblems = async () => {
-      setSolvedProblemsLoading(true);
-      // 1. Ia toate problem_id rezolvate de user
-      const { data: solved, error: solvedError } = await supabase
-        .from("solved_problems")
-        .select("problem_id, solved_at")
-        .eq("user_id", user.id)
-        .order("solved_at", { ascending: false });
-      if (!solved || solved.length === 0) {
-        setSolvedProblems([]);
-        setSolvedProblemsLoading(false);
-        return;
+      if (data) {
+        setUserStats(data);
+      } else {
+        // Default stats if not found
+        setUserStats({
+          elo: 500,
+          rank: 'Bronze I',
+          current_streak: 0,
+          best_streak: 0,
+          problems_solved_total: 0,
+        });
       }
-      // 2. Ia titlurile problemelor
-      const problemIds = solved.map((s: any) => s.problem_id);
-      const { data: problems, error: problemsError } = await supabase
-        .from("problems")
-        .select("id, title")
-        .in("id", problemIds);
-      if (!problems) {
-        setSolvedProblems([]);
-        setSolvedProblemsLoading(false);
-        return;
-      }
-      // 3. Asociază solved cu titlurile
-      const problemsMap = Object.fromEntries(problems.map((p: any) => [p.id, p.title]));
-      const solvedWithTitles = solved.map((s: any) => ({
-        id: s.problem_id,
-        title: problemsMap[s.problem_id] || "(Fără titlu)",
-        solved_at: s.solved_at,
-      }));
-      setSolvedProblems(solvedWithTitles);
-      setSolvedProblemsLoading(false);
+      setStatsLoading(false);
     };
-    fetchSolvedProblems();
+    fetchUserStats();
   }, [user]);
 
   const handleBioSave = async () => {
+    if (!user) return;
     setSaving(true);
     await supabase.from("profiles").update({ bio }).eq("user_id", user.id);
     setBioEdit(false);
     setSaving(false);
+    toast({ title: 'Bio actualizat cu succes!' });
   };
 
   const handleNicknameSave = async () => {
+    if (!user) return;
     setSaving(true);
     await supabase.from("profiles").update({ nickname }).eq("user_id", user.id);
     setNicknameEdit(false);
     setSaving(false);
+    toast({ title: 'Username actualizat cu succes!' });
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !user) return;
     const file = e.target.files[0];
-    setAvatarFile(file);
     setUploadingAvatar(true);
     try {
-      // 1. Upload imagine în Supabase Storage
       const fileExt = file.name.split('.').pop();
       const filePath = `avatars/${user.id}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
@@ -198,7 +169,6 @@ const ProfilPage = () => {
         setUploadingAvatar(false);
         return;
       }
-      // 2. Obține URL public
       const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
       let publicUrl = publicUrlData?.publicUrl;
       if (!publicUrl) {
@@ -206,16 +176,13 @@ const ProfilPage = () => {
         setUploadingAvatar(false);
         return;
       }
-      // 3. Salvează URL-ul în profiles
       await supabase.from('profiles').update({ user_icon: publicUrl }).eq('user_id', user.id);
-      // 4. Re-fetch profile to get latest avatar (in case of CDN cache)
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("name, bio, user_icon, nickname")
         .eq("user_id", user.id)
         .single();
       if (data) {
-        // Add cache-busting param to avatar URL
         const cacheBustedUrl = data.user_icon ? `${data.user_icon}?t=${Date.now()}` : '';
         setProfile(data);
         setAvatarUrl(cacheBustedUrl);
@@ -230,269 +197,329 @@ const ProfilPage = () => {
 
   if (loading || !user) {
     return (
-      <main className="relative min-h-screen flex flex-col items-center overflow-visible cosmic-bg pt-24 md:pt-32">
+      <div className="min-h-screen bg-[#0D0D0F]">
         <Navigation />
-        <section className="relative z-10 w-full max-w-3xl px-4 py-10 flex flex-col items-center animate-fade-in-up">
-          <Card className="w-full bg-white/80 dark:bg-zinc-900/70 backdrop-blur-lg border border-zinc-200/40 dark:border-zinc-800/60 shadow-xl flex flex-col min-h-[85vh] md:min-h-[70vh]">
-            <ProfileHeaderSkeleton />
-            <CardContent className="pt-0">
-              <Tabs defaultValue="activity" className="w-full mt-4">
-                <div className="w-full sm:hidden">
-                  <div className="overflow-x-auto scrollbar-hide">
-                    <TabsList className="flex gap-1 w-max min-w-full">
-                      <TabsTrigger value="activity" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Activitate</TabsTrigger>
-                      <TabsTrigger value="badges" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Badges</TabsTrigger>
-                      <TabsTrigger value="settings" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Setări</TabsTrigger>
-                      <TabsTrigger value="privacy" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Confidențialitate</TabsTrigger>
-                    </TabsList>
-                  </div>
-                </div>
-                <TabsList className="hidden sm:grid sm:grid-cols-4 w-full">
-                  <TabsTrigger value="activity" className="text-sm">Activitate</TabsTrigger>
-                  <TabsTrigger value="badges" className="text-sm">Badges</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-sm">Setări</TabsTrigger>
-                  <TabsTrigger value="privacy" className="text-sm">Confidențialitate</TabsTrigger>
-                </TabsList>
-                <TabsContent value="activity" className="mt-4">
-                  <ActivitySkeleton />
-                </TabsContent>
-                <TabsContent value="badges" className="mt-4">
-                  <BadgesSkeleton />
-                </TabsContent>
-                <TabsContent value="settings" className="mt-4">
-                  <SettingsSkeleton />
-                </TabsContent>
-                <TabsContent value="privacy" className="mt-4">
-                  <SettingsSkeleton />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </section>
-      </main>
+        <main className="pt-24 px-4 md:px-6 lg:px-8 pb-12">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <ProfileSkeleton />
+              </div>
+              <div className="lg:col-span-2">
+                <StatsSkeleton />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     );
   }
 
+  const nextRankInfo = userStats ? getNextRankThreshold(userStats.elo) : { nextRank: 'Bronze II', threshold: 600, progress: 0 };
+  const rankIconPath = userStats ? getRankIconPath(userStats.rank) : '/ranks/bronze.png';
+  const rankColor = userStats ? getRankColor(userStats.rank) : 'text-gray-400';
+
   return (
     <>
-      <main className="relative min-h-screen flex flex-col items-center overflow-visible cosmic-bg pt-24 md:pt-32">
+      <div className="min-h-screen bg-[#0D0D0F]">
         <Navigation />
-        <section className="relative z-10 w-full max-w-3xl px-4 py-10 flex flex-col items-center animate-fade-in-up">
-          <Card className="w-full bg-white/80 dark:bg-zinc-900/70 backdrop-blur-lg border border-zinc-200/40 dark:border-zinc-800/60 shadow-xl flex flex-col min-h-[85vh] md:min-h-[70vh]">
-          <CardHeader className="flex flex-col items-center gap-4 pb-6 pt-8">
-            {profileLoading ? (
-              <ProfileHeaderSkeleton />
-            ) : (
-              <>
-                <div className="relative group">
-                  <Avatar className="w-28 h-28 shadow-lg border-4 border-white/80 dark:border-zinc-800/80 transition-transform duration-300 group-hover:scale-105">
-                    {avatarUrl ? (
-                      <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
-                    ) : (
-                      <AvatarFallback>
-                        {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  {uploadingAvatar && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60 rounded-full z-10">
-                      <svg className="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                      </svg>
-                    </div>
-                  )}
-                  <label className="absolute bottom-2 right-2 bg-gradient-to-tr from-purple-600 via-pink-400 to-fuchsia-500 text-white rounded-full px-3 py-1 text-xs font-medium shadow cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleAvatarChange}
-                      disabled={uploadingAvatar}
-                    />
-                    Schimbă
-                  </label>
-                </div>
-                <div className="flex flex-col items-center gap-3 w-full">
-                  <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Username</div>
-                  <div className="flex items-center gap-2">
-                    {nicknameEdit ? (
-                      <>
-                        <input
-                          className="border rounded p-1 px-2 text-base mr-2 bg-white/80 dark:bg-zinc-800/80"
-                          value={nickname}
-                          onChange={e => setNickname(e.target.value)}
-                          maxLength={32}
-                          autoFocus
-                        />
-                        <Button size="sm" onClick={handleNicknameSave} disabled={saving}>
-                          Salvează
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setNicknameEdit(false)}>
-                          Anulează
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-lg font-semibold text-zinc-900 dark:text-white">
-                          {nickname || <span className="italic text-gray-400">Adaugă un nickname...</span>}
-                        </span>
-                        <Button size="icon" variant="ghost" className="ml-1 p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setNicknameEdit(true)} aria-label="Editează nickname">
-                          <Pencil size={16} />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nume</div>
-                  <div className="text-xl font-bold text-zinc-900 dark:text-white text-center">
-                    {profile?.name || user.email}
-                  </div>
-                </div>
-                <div className="w-full flex flex-col items-center">
-                  {bioEdit ? (
-                    <div className="flex flex-col items-center gap-2 mt-2 w-full">
-                      <textarea
-                        className="border rounded p-2 w-64 min-h-[60px] bg-white/80 dark:bg-zinc-800/80"
-                        value={bio}
-                        onChange={e => setBio(e.target.value)}
-                        maxLength={300}
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleBioSave} disabled={saving}>
-                          Salvează
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setBioEdit(false)}>
-                          Anulează
-                        </Button>
-                      </div>
-                    </div>
+        <main className="pt-24 px-4 md:px-6 lg:px-8 pb-12">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-white/90 mb-2">Profil</h1>
+              <p className="text-white/60">Gestionează-ți profilul și setările</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Side - Profile Info */}
+              <div className="lg:col-span-1">
+                <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-colors">
+                  {profileLoading ? (
+                    <ProfileSkeleton />
                   ) : (
-                    <div className="mt-2 w-full max-w-md text-gray-700 dark:text-gray-300 text-center flex items-start justify-center">
-                      <div className="w-full border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-2 bg-white/60 dark:bg-zinc-900/40">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-left w-full">{bio || <span className="italic text-gray-400">Adaugă un bio...</span>}</span>
-                          <Button size="icon" variant="ghost" className="p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200" onClick={() => setBioEdit(true)} aria-label="Editează bio">
-                            <Pencil size={16} />
+                    <div className="flex flex-col items-center gap-6">
+                      {/* Avatar with Rank Badge */}
+                      <div className="relative group">
+                        <div className="relative">
+                          <Avatar className="w-32 h-32 shadow-lg border-4 border-white/10">
+                            {avatarUrl ? (
+                              <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
+                            ) : (
+                              <AvatarFallback className="bg-white/5 text-white/90 text-4xl">
+                                {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          {uploadingAvatar && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full z-10">
+                              <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                              </svg>
+                            </div>
+                          )}
+                          {/* Rank Badge Overlay */}
+                          {userStats && (
+                            <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full bg-[#0D0D0F] border-2 border-white/20 flex items-center justify-center overflow-hidden">
+                              <Image
+                                src={rankIconPath}
+                                alt={userStats.rank}
+                                width={40}
+                                height={40}
+                                className="object-contain"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <label className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 bg-white/10 hover:bg-white/20 text-white rounded-lg px-4 py-2 text-sm font-medium shadow cursor-pointer transition-all">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleAvatarChange}
+                            disabled={uploadingAvatar}
+                          />
+                          Schimbă Avatar
+                        </label>
+                      </div>
+
+                      {/* User Info */}
+                      <div className="flex flex-col items-center gap-4 w-full mt-8">
+                        {/* Username */}
+                        <div className="w-full">
+                          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Username</label>
+                          {nicknameEdit ? (
+                            <div className="flex flex-col gap-2">
+                              <input
+                                className="w-full border border-white/10 rounded-lg p-2 px-3 bg-white/5 text-white/90 focus:outline-none focus:border-white/30"
+                                value={nickname}
+                                onChange={e => setNickname(e.target.value)}
+                                maxLength={32}
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={handleNicknameSave} disabled={saving} className="flex-1 bg-white/10 hover:bg-white/20">
+                                  Salvează
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => setNicknameEdit(false)} className="flex-1 border-white/10 hover:bg-white/5">
+                                  Anulează
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/20 transition-all">
+                              <span className="text-white/90 font-medium">
+                                {nickname || <span className="italic text-white/40">Adaugă un username...</span>}
+                              </span>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10" 
+                                onClick={() => setNicknameEdit(true)}
+                              >
+                                <Pencil size={16} />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Name */}
+                        <div className="w-full">
+                          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Nume</label>
+                          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+                            <span className="text-white/90 font-medium">
+                              {profile?.name || user.email}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Bio */}
+                        <div className="w-full">
+                          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Bio</label>
+                          {bioEdit ? (
+                            <div className="flex flex-col gap-2">
+                              <textarea
+                                className="w-full border border-white/10 rounded-lg p-3 bg-white/5 text-white/90 min-h-[80px] focus:outline-none focus:border-white/30"
+                                value={bio}
+                                onChange={e => setBio(e.target.value)}
+                                maxLength={300}
+                              />
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={handleBioSave} disabled={saving} className="flex-1 bg-white/10 hover:bg-white/20">
+                                  Salvează
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => setBioEdit(false)} className="flex-1 border-white/10 hover:bg-white/5">
+                                  Anulează
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/20 transition-all">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="text-white/70 text-sm flex-1">
+                                  {bio || <span className="italic text-white/40">Adaugă un bio...</span>}
+                                </span>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10" 
+                                  onClick={() => setBioEdit(true)}
+                                >
+                                  <Pencil size={16} />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Rank Display */}
+                        {userStats && (
+                          <div className="w-full mt-2">
+                            <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Rank</label>
+                            <div className="p-4 bg-white/5 rounded-lg border border-white/10 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden">
+                                  <Image
+                                    src={rankIconPath}
+                                    alt={userStats.rank}
+                                    width={48}
+                                    height={48}
+                                    className="object-contain"
+                                  />
+                                </div>
+                                <div>
+                                  <h4 className={`text-lg font-bold ${rankColor}`}>{userStats.rank}</h4>
+                                  <p className="text-xs text-white/60">Current Rank</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Settings Buttons */}
+                        <div className="w-full mt-4 space-y-3">
+                          <Button 
+                            onClick={() => setShowChangePasswordModal(true)} 
+                            className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                            variant="outline"
+                          >
+                            <Lock className="w-4 h-4 mr-2" />
+                            Schimbă parola
+                          </Button>
+                          <Button 
+                            onClick={() => setShowPrivacyModal(true)} 
+                            className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                            variant="outline"
+                          >
+                            <Shield className="w-4 h-4 mr-2" />
+                            Setări confidențialitate
                           </Button>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-              </>
-            )}
-          </CardHeader>
-          <CardContent className="pt-0">
-            <Tabs defaultValue="activity" className="w-full mt-4">
-              <div className="w-full sm:hidden">
-                <div className="overflow-x-auto scrollbar-hide">
-                  <TabsList className="flex gap-1 w-max min-w-full">
-                    <TabsTrigger value="activity" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Activitate</TabsTrigger>
-                    <TabsTrigger value="badges" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Badges</TabsTrigger>
-                    <TabsTrigger value="settings" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Setări</TabsTrigger>
-                    <TabsTrigger value="privacy" className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5">Confidențialitate</TabsTrigger>
-                  </TabsList>
-                </div>
               </div>
-              <TabsList className="hidden sm:grid sm:grid-cols-4 w-full">
-                <TabsTrigger value="activity" className="text-sm">Activitate</TabsTrigger>
-                <TabsTrigger value="badges" className="text-sm">Badges</TabsTrigger>
-                <TabsTrigger value="settings" className="text-sm">Setări</TabsTrigger>
-                <TabsTrigger value="privacy" className="text-sm">Confidențialitate</TabsTrigger>
-              </TabsList>
 
-              <TabsContent value="activity" className="mt-4">
-                {solvedProblemsLoading ? (
-                  <ActivitySkeleton />
-                ) : solvedProblems.length === 0 ? (
-                  <span className="text-gray-500 italic">Nu ai rezolvat încă nicio problemă.</span>
+              {/* Right Side - Statistics */}
+              <div className="lg:col-span-2 space-y-6">
+                {statsLoading ? (
+                  <StatsSkeleton />
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {solvedProblems.map((problem) => (
-                      <Link key={problem.id} href={`/probleme/${problem.id}`} className="inline-block">
-                        <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-                          #{problem.id}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
+                  <>
+                    {/* Rank & ELO Card */}
+                    {userStats && (
+                      <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-colors">
+                        <h3 className="text-lg font-semibold text-white/90 mb-6">Rank & ELO</h3>
+
+                        <div className="flex items-center justify-between mb-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden">
+                              <Image
+                                src={rankIconPath}
+                                alt={userStats.rank}
+                                width={64}
+                                height={64}
+                                className="object-contain"
+                              />
+                            </div>
+                            <div>
+                              <h4 className={`text-2xl font-bold ${rankColor}`}>{userStats.rank}</h4>
+                              <p className="text-sm text-white/60">Current Rank</p>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <Trophy className="w-5 h-5 text-yellow-500" />
+                              <p className="text-4xl font-bold text-white/90">{userStats.elo}</p>
+                            </div>
+                            <p className="text-xs text-white/60 mt-1">ELO Rating</p>
+                          </div>
+                        </div>
+
+                        {/* Progress to Next Rank */}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm text-white/70">Progress to {nextRankInfo.nextRank}</p>
+                            <p className="text-sm text-white/60">+{nextRankInfo.threshold - userStats.elo} ELO needed</p>
+                          </div>
+                          <Progress 
+                            value={nextRankInfo.progress} 
+                            className="h-2 bg-white/5"
+                            indicatorClassName="bg-white"
+                          />
+                          <p className="text-xs text-white/50 mt-1">{Math.round(nextRankInfo.progress)}% complete</p>
+                        </div>
+
+                        {/* Quick Stats */}
+                        <div className="grid grid-cols-3 gap-3 mt-6">
+                          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+                            <p className="text-xs text-white/60">Total Solved</p>
+                            <p className="text-lg font-semibold text-white/90">{userStats.problems_solved_total || 0}</p>
+                          </div>
+                          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+                            <p className="text-xs text-white/60">Current Streak</p>
+                            <p className="text-lg font-semibold text-white/90">{userStats.current_streak || 0}🔥</p>
+                          </div>
+                          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
+                            <p className="text-xs text-white/60">Best Streak</p>
+                            <p className="text-lg font-semibold text-white/90">{userStats.best_streak || 0}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Badges Card */}
+                    <UserBadges />
+                  </>
                 )}
-              </TabsContent>
-
-              <TabsContent value="badges" className="mt-4">
-                <UserBadges />
-              </TabsContent>
-
-              <TabsContent value="settings" className="mt-4">
-                <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white/60 dark:bg-zinc-900/40">
-                  <div className="text-sm text-zinc-600 dark:text-zinc-300">Resetare parolă</div>
-                  <Button onClick={() => setShowChangePasswordModal(true)} variant="outline">
-                    <Lock className="w-4 h-4 mr-2" />
-                    Schimbă parola
-                  </Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="privacy" className="mt-4">
-                <PrivacySettings />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-          </Card>
-        </section>
-
-        {/* Modal pentru schimbarea parolei */}
-        <ChangePasswordModal
-          isOpen={showChangePasswordModal}
-          onClose={() => setShowChangePasswordModal(false)}
-        />
-      </main>
-
-      {/* Mini Footer pentru pagina de profil (full-width) */}
-      <footer className="bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 py-12 px-4 w-full">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4">
-            <div>
-              <h3 className="text-2xl font-bold text-black dark:text-white mb-4 title-font">PLANCK</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Platforma educațională de fizică pentru liceeni. Învață, exersează și reușește!
-              </p>
-              <div className="flex gap-4">
-                <Link
-                  href="#"
-                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
-                >
-                  <Facebook size={20} />
-                </Link>
-                <Link
-                  href="#"
-                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
-                >
-                  <Instagram size={20} />
-                </Link>
-                <Link
-                  href="#"
-                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
-                >
-                  <Youtube size={20} />
-                </Link>
-                <Link
-                  href="#"
-                  className="text-gray-600 dark:text-gray-400 hover:text-[hsl(348,83%,47%)] transition-colors"
-                >
-                  <Mail size={20} />
-                </Link>
               </div>
             </div>
           </div>
+        </main>
+      </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-800 mt-8 pt-8 text-center text-gray-600 dark:text-gray-400">
-            <p>&copy; 2024 PLANCK. Toate drepturile rezervate.</p>
+      {/* Password Change Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+      />
+
+      {/* Privacy Settings Modal */}
+      <Dialog open={showPrivacyModal} onOpenChange={setShowPrivacyModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#131316] border border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-white/90">Setări Confidențialitate</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <PrivacySettings />
           </div>
-        </div>
-      </footer>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
 
-export default ProfilPage; 
+export default ProfilPage;

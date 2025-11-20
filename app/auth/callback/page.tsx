@@ -19,7 +19,10 @@ export default function AuthCallbackPage() {
         setTimeout(async () => {
           const { data: data2 } = await supabase.auth.getSession()
           if (data2.session) router.replace("/")
-          else router.replace("/login")
+          else {
+            // If no session, redirect to register page
+            router.replace("/register")
+          }
         }, 800)
       }
     }

@@ -1,9 +1,10 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter, Poppins } from "next/font/google"
+import { Mona_Sans, VT323 } from "next/font/google"
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
 import { AnalyticsProvider } from "@/components/analytics-provider"
+import { KatexProvider } from "@/components/katex-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { TopLoader } from "@/components/top-loader"
@@ -11,11 +12,16 @@ import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
-const poppins = Poppins({ 
+const monaSans = Mona_Sans({ 
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
-  variable: "--font-poppins"
+  variable: "--font-mona-sans"
+})
+
+const vt323 = VT323({ 
+  weight: ["400"],
+  subsets: ["latin"],
+  variable: "--font-vt323"
 })
 
 export const metadata: Metadata = {
@@ -66,14 +72,22 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.className} ${poppins.variable}`}>
+      <body className={`${monaSans.className} ${monaSans.variable} ${vt323.variable}`}>
         <ScrollToTop />
         <TopLoader />
         <AuthProvider>
           <AnalyticsProvider>
-            {children}
+            <KatexProvider>
+              {children}
+            </KatexProvider>
             <Toaster />
             <CookieConsentBanner />
+            <div
+              className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
+              aria-label="Versiunea site-ului"
+            >
+              v1.00.01
+            </div>
           </AnalyticsProvider>
         </AuthProvider>
       </body>

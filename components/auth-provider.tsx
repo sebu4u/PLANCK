@@ -12,14 +12,18 @@ interface AuthContextType {
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   profile: any // nou: profilul din tabelul profiles
+  subscriptionPlan: string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+const FREE_PLAN_IDENTIFIER = "free"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null) // nou: profilul
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string>(FREE_PLAN_IDENTIFIER)
 
   useEffect(() => {
     const getUser = async () => {
@@ -40,12 +44,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!user) {
       setProfile(null)
+      setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
       return
     }
     const fetchProfile = async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade")
+        .select("name, nickname, user_icon, grade, plan")
         .eq("user_id", user.id)
         .single()
       if (data) {
@@ -53,6 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProfile({ ...data, user_icon: `${data.user_icon}?t=${Date.now()}` })
         } else {
           setProfile(data)
+        }
+        if (data.plan && typeof data.plan === "string") {
+          setSubscriptionPlan(data.plan)
+        } else {
+          setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
         }
         return
       }
@@ -65,16 +75,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: (userMeta.name as string) || "",
           nickname: (userMeta.nickname as string) || "",
           grade: (userMeta.grade as string) || null,
+          plan: FREE_PLAN_IDENTIFIER,
           created_at: new Date().toISOString(),
         })
         if (!insertError) {
           const { data: created } = await supabase
             .from("profiles")
-            .select("name, nickname, user_icon, grade")
+            .select("name, nickname, user_icon, grade, plan")
             .eq("user_id", user.id)
             .single()
           if (created) {
             setProfile(created.user_icon ? { ...created, user_icon: `${created.user_icon}?t=${Date.now()}` } : created)
+            setSubscriptionPlan(
+              typeof created.plan === "string" && created.plan.trim().length > 0
+                ? created.plan
+                : FREE_PLAN_IDENTIFIER
+            )
           }
         }
       }
@@ -129,7 +145,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, loginWithGitHub, logout, refreshUser, profile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        loginWithGoogle,
+        loginWithGitHub,
+        logout,
+        refreshUser,
+        profile,
+        subscriptionPlan,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

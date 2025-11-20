@@ -8,6 +8,8 @@ import { Problem } from "@/data/problems"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import ProblemDetailClient from "./ProblemDetailClient"
+import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
+import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 
 interface ProblemPageProps {
   params: Promise<{
@@ -40,5 +42,11 @@ export default async function ProblemPage({ params }: ProblemPageProps) {
   if (!problem) {
     notFound()
   }
-  return <ProblemDetailClient problem={problem} categoryIcons={categoryIcons} difficultyColors={difficultyColors} />
+  return (
+    <CatalogThemeProvider catalogType="physics" pageType="detail">
+      <CatalogThemeBackground defaultBackgroundClass="bg-[#141414]">
+        <ProblemDetailClient problem={problem} categoryIcons={categoryIcons} difficultyColors={difficultyColors} />
+      </CatalogThemeBackground>
+    </CatalogThemeProvider>
+  )
 }

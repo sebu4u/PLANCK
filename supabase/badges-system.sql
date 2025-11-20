@@ -59,12 +59,21 @@ end;
 $$ language plpgsql security definer;
 
 -- Trigger pentru a verifica badge-urile când o problemă este marcată ca rezolvată
+-- Acordă și ELO pentru problema rezolvată
 create or replace function public.handle_problem_solved()
 returns trigger as $$
 begin
-  -- Verifică și acordă badge-uri când o problemă este marcată ca rezolvată
-  perform public.check_and_award_badges(new.user_id);
+  raise notice 'Trigger declanșat pentru user: % și problem: %', NEW.user_id, NEW.problem_id;
+  
+  -- Acordă ELO pentru problema rezolvată (actualizează user_stats, daily_activity, streak, badge-uri)
+  -- Convert problem_id to text if needed
+  perform public.award_elo_for_problem(new.user_id, new.problem_id::text);
   return new;
+exception
+  when others then
+    -- Log error but don't fail the insert
+    raise notice 'EROARE în handle_problem_solved: %', SQLERRM;
+    return new;
 end;
 $$ language plpgsql security definer;
 
