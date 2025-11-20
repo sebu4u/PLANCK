@@ -4,9 +4,16 @@ import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
 import { estimateCostUSD } from '@/lib/insight-cost';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// Lazy initialization of OpenAI client to avoid build-time errors
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing credentials. Please pass an `apiKey`, or set the `OPENAI_API_KEY` environment variable.');
+  }
+  return new OpenAI({
+    apiKey,
+  });
+}
 
 // Maximum prompts per day for Free plan
 const FREE_DAILY_LIMIT = 3;
@@ -236,6 +243,7 @@ export async function POST(req: NextRequest) {
     const t0 = Date.now();
     let stream;
     try {
+      const openai = getOpenAIClient();
       stream = await openai.chat.completions.create({
         model: 'gpt-4o-mini', // Cheapest available model
         messages: chatMessages,
