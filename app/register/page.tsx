@@ -80,6 +80,7 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("")
   const [loading, setLoading] = useState<"google" | "github" | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [containerPadding, setContainerPadding] = useState({ left: 32, right: 32 })
 
   const { toast } = useToast()
   const router = useRouter()
@@ -126,27 +127,85 @@ export default function RegisterPage() {
     }
   }, [userType, selectedClass, showConfetti])
 
+  // Get responsive card width
+  const getCardWidth = () => {
+    if (typeof window === 'undefined') return 480
+    const width = window.innerWidth
+    if (width < 640) return 320
+    if (width < 768) return 400
+    return 480
+  }
+
+  // Get responsive gap
+  const getGap = () => {
+    if (typeof window === 'undefined') return 24
+    const width = window.innerWidth
+    if (width < 640) return 12
+    if (width < 768) return 16
+    return 24
+  }
+
+  // Get responsive padding - calculated to center first card
+  const getPadding = () => {
+    if (typeof window === 'undefined') return 32
+    const cardWidth = getCardWidth()
+    const viewportWidth = window.innerWidth
+    // Center the first card: padding should be (viewportWidth - cardWidth) / 2
+    // This ensures the first card is centered when scrollPosition = 0
+    const calculatedPadding = (viewportWidth - cardWidth) / 2
+    // Only use minimum padding if card is larger than viewport (shouldn't happen in practice)
+    // Otherwise, use calculated padding to center the card
+    return Math.max(0, calculatedPadding)
+  }
+
+  // Update container padding when window resizes or card changes
+  useEffect(() => {
+    const updatePadding = () => {
+      const padding = getPadding()
+      setContainerPadding({ left: padding, right: padding })
+    }
+    
+    // Initial update
+    updatePadding()
+    
+    // Update on resize
+    window.addEventListener('resize', updatePadding)
+    
+    return () => window.removeEventListener('resize', updatePadding)
+  }, []) // Only run on mount and resize, not on card change
+
   // Scroll to center current card
   const scrollToCard = (index: number) => {
     const card = cardRefs.current[index]
     const container = carouselContainerRef.current
     if (card && container) {
       const containerRect = container.getBoundingClientRect()
-      const cardWidth = 480
-      const gap = 24
+      const cardWidth = getCardWidth()
+      const gap = getGap()
+      const padding = getPadding()
       
-      // Calculate padding from the container's padding-left
-      const paddingLeft = (window.innerWidth - cardWidth) / 2
+      // For the first card, it should be centered with scroll = 0
+      // The padding should already center it, so scroll should be 0
+      if (index === 0) {
+        container.scrollTo({
+          left: 0,
+          behavior: 'smooth'
+        })
+        return
+      }
       
-      // Calculate position of card within the flex container (includes padding)
-      const cardPosition = paddingLeft + index * (cardWidth + gap)
+      // Calculate position of card's left edge within the flex container (includes padding)
+      const cardLeftEdge = padding + index * (cardWidth + gap)
       
       // Calculate container center position (viewport center)
       const containerCenter = containerRect.width / 2
       
-      // Calculate scroll position needed to center the card
-      // Card's left edge position - viewport center + card half width = centered
-      const scrollPosition = cardPosition - containerCenter + (cardWidth / 2)
+      // To center the card: card center should be at container center
+      // Card center = cardLeftEdge + (cardWidth / 2)
+      // We need: card center = container scrollLeft + containerCenter
+      // So: scrollLeft = card center - containerCenter
+      // scrollLeft = (cardLeftEdge + cardWidth / 2) - containerCenter
+      const scrollPosition = cardLeftEdge + (cardWidth / 2) - containerCenter
       
       container.scrollTo({
         left: Math.max(0, scrollPosition),
@@ -290,12 +349,13 @@ export default function RegisterPage() {
   // Initial scroll to center first card and handle scroll updates
   useEffect(() => {
     if (carouselContainerRef.current) {
+      // Wait a bit for padding to be calculated and applied
       const scrollTimeout = setTimeout(() => {
         scrollToCard(currentCardIndex)
-      }, 100)
+      }, 150)
       return () => clearTimeout(scrollTimeout)
     }
-  }, [currentCardIndex, cardList.length])
+  }, [currentCardIndex, cardList.length, containerPadding])
 
   // Render individual card content
   const renderCardContent = (cardType: CardType, index: number) => {
@@ -305,34 +365,34 @@ export default function RegisterPage() {
       case "role-selection":
         return (
           <div className="h-full flex flex-col">
-            <div className="text-center space-y-4 flex-shrink-0">
-              <h2 className="text-2xl font-bold text-white">
+            <div className="text-center space-y-3 sm:space-y-4 flex-shrink-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
                 Bine ai venit pe Planck! 👋
               </h2>
-              <p className="text-lg text-gray-400">
+              <p className="text-base sm:text-lg text-gray-400">
                 Hai să începem. Ești elev sau profesor?
               </p>
             </div>
             <div className="flex-grow flex items-center justify-center">
-              <div className="grid grid-cols-2 gap-4 w-full">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full">
                 <Button
                   onClick={() => handleRoleSelect("student")}
-                  className="h-32 bg-[#141414] border border-gray-600/30 hover:border-gray-500/50 hover:bg-[#1a1a1a] text-white transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-105"
+                  className="h-24 sm:h-28 md:h-32 bg-[#141414] border border-gray-600/30 hover:border-gray-500/50 hover:bg-[#1a1a1a] text-white transition-all duration-300 flex flex-col items-center justify-center gap-2 sm:gap-3 group hover:scale-105"
                 >
-                  <GraduationCap className="w-10 h-10 text-white group-hover:scale-110 transition-transform duration-300" />
-                  <span className="text-lg font-semibold">Sunt elev</span>
+                  <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white group-hover:scale-110 transition-transform duration-300" />
+                  <span className="text-sm sm:text-base md:text-lg font-semibold">Sunt elev</span>
                 </Button>
                 <Button
                   onClick={() => handleRoleSelect("teacher")}
-                  className="h-32 bg-[#141414] border border-gray-600/30 hover:border-gray-500/50 hover:bg-[#1a1a1a] text-white transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-105"
+                  className="h-24 sm:h-28 md:h-32 bg-[#141414] border border-gray-600/30 hover:border-gray-500/50 hover:bg-[#1a1a1a] text-white transition-all duration-300 flex flex-col items-center justify-center gap-2 sm:gap-3 group hover:scale-105"
                 >
-                  <Users className="w-10 h-10 text-white group-hover:scale-110 transition-transform duration-300" />
-                  <span className="text-lg font-semibold">Sunt profesor</span>
+                  <Users className="w-8 h-8 sm:w-10 sm:h-10 text-white group-hover:scale-110 transition-transform duration-300" />
+                  <span className="text-sm sm:text-base md:text-lg font-semibold">Sunt profesor</span>
                 </Button>
               </div>
             </div>
-            <div className="text-center pt-4 border-t border-white/10 flex-shrink-0 mt-auto">
-              <p className="text-gray-400">
+            <div className="text-center pt-3 sm:pt-4 border-t border-white/10 flex-shrink-0 mt-auto">
+              <p className="text-sm sm:text-base text-gray-400">
                 Ai deja cont?{" "}
                 <button
                   onClick={() => {
@@ -349,62 +409,62 @@ export default function RegisterPage() {
 
       case "role-confirmation":
         return userType === "student" ? (
-          <div className="text-center space-y-6 h-full flex flex-col justify-center">
-            <div className="space-y-4">
-              <GraduationCap className="w-16 h-16 text-white mx-auto" />
-              <h2 className="text-2xl font-bold text-white">
+          <div className="text-center space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
+            <div className="space-y-3 sm:space-y-4">
+              <GraduationCap className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-white mx-auto" />
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
                 Bine ai venit, elev! 🎓
               </h2>
-              <p className="text-lg text-gray-300 leading-relaxed">
+              <p className="text-sm sm:text-base md:text-lg text-gray-300 leading-relaxed px-2">
                 Îți oferim un călăuză personalizat pentru a învăța fizică și informatică într-un mod interactiv și distractiv!
               </p>
             </div>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               {index > 0 && (
                 <Button
                   onClick={goToPrevious}
-                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
                 >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Înapoi
                 </Button>
               )}
               <Button
                 onClick={handleRoleConfirmContinue}
-                className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
               >
                 Continuă
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
         </div>
           </div>
         ) : (
-          <div className="text-center space-y-6 h-full flex flex-col justify-center">
-            <div className="space-y-4">
-              <Users className="w-16 h-16 text-white mx-auto" />
-              <h2 className="text-2xl font-bold text-white">
+          <div className="text-center space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
+            <div className="space-y-3 sm:space-y-4">
+              <Users className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-white mx-auto" />
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
                 Salut, profesor! 👨‍🏫
               </h2>
-              <p className="text-lg text-gray-300 leading-relaxed">
+              <p className="text-sm sm:text-base md:text-lg text-gray-300 leading-relaxed px-2">
                 În curând vei beneficia de funcții exclusive pentru profesori! Pentru moment, poți crea contul tău și explora platforma.
               </p>
             </div>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               {index > 0 && (
                 <Button
                   onClick={goToPrevious}
-                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
                 >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Înapoi
                 </Button>
               )}
               <Button
                 onClick={handleRoleConfirmContinue}
-                className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
               >
                 Continuă
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
             </div>
                 </div>
@@ -412,16 +472,16 @@ export default function RegisterPage() {
 
       case "class-selection":
         return (
-          <div className="space-y-6 h-full flex flex-col">
-            <div className="text-center flex-shrink-0">
-              <h2 className="text-2xl font-bold text-white mb-2">
+          <div className="space-y-4 sm:space-y-6 h-full flex flex-col">
+            <div className="text-center flex-shrink-0 px-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                 Selectează clasa ta
                         </h2>
-              <p className="text-gray-400">
+              <p className="text-sm sm:text-base text-gray-400">
                 Alege clasa pentru a primi conținut personalizat
                         </p>
                       </div>
-            <div className="grid grid-cols-2 gap-4 flex-grow">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 flex-grow">
                           {[
                             { value: "9", label: "Clasa 9" },
                             { value: "10", label: "Clasa 10" },
@@ -433,7 +493,7 @@ export default function RegisterPage() {
                               key={option.value}
                               variant={selectedClass === option.value ? "default" : "outline"}
                               onClick={() => handleClassSelect(option.value)}
-                              className={`h-14 text-lg font-semibold transition-all duration-300 ${
+                              className={`h-12 sm:h-14 text-sm sm:text-base md:text-lg font-semibold transition-all duration-300 ${
                                 selectedClass === option.value
                       ? "bg-white text-[#0d1117] border-0 hover:bg-gray-200 hover:scale-105"
                       : "bg-white text-[#0d1117] border-white/20 hover:bg-gray-200 hover:border-white/40 hover:scale-105"
@@ -443,13 +503,13 @@ export default function RegisterPage() {
                             </Button>
                           ))}
                         </div>
-            <div className="flex gap-4 justify-center flex-shrink-0">
+            <div className="flex justify-center flex-shrink-0 px-4">
               {index > 0 && (
                 <Button
                   onClick={goToPrevious}
-                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
                 >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Înapoi
                 </Button>
               )}
@@ -459,29 +519,29 @@ export default function RegisterPage() {
 
       case "class-message":
         return (
-          <div className="text-center space-y-6 h-full flex flex-col justify-center">
-            <div className="space-y-4">
-              <Sparkles className="w-16 h-16 text-white mx-auto" />
-              <p className="text-gray-200 font-semibold text-xl leading-relaxed">
+          <div className="text-center space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
+            <div className="space-y-3 sm:space-y-4">
+              <Sparkles className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-white mx-auto" />
+              <p className="text-gray-200 font-semibold text-base sm:text-lg md:text-xl leading-relaxed px-2">
                 {classMessages[selectedClass as keyof typeof classMessages]}
               </p>
                   </div>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               {index > 0 && (
                 <Button
                   onClick={goToPrevious}
-                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
                 >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Înapoi
                 </Button>
               )}
               <Button
                 onClick={handleClassMessageContinue}
-                className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
               >
                 Continuă
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
             </div>
           </div>
@@ -489,18 +549,18 @@ export default function RegisterPage() {
 
       case "username":
         return (
-          <div className="space-y-6 h-full flex flex-col justify-center">
+          <div className="space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
                 Creează numele tău de utilizator
               </h2>
-              <p className="text-gray-400">
+              <p className="text-sm sm:text-base text-gray-400">
                 Alege un nume unic care te reprezintă
               </p>
             </div>
-            <form onSubmit={handleUsernameSubmit} className="space-y-4">
+            <form onSubmit={handleUsernameSubmit} className="space-y-4 px-2">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-gray-300">
+                <Label htmlFor="username" className="text-sm sm:text-base text-gray-300">
                   Nume de utilizator
                 </Label>
                 <Input
@@ -509,27 +569,27 @@ export default function RegisterPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="ex: ionel_2024"
-                  className="bg-[#0d1117] border-white/20 text-white placeholder:text-gray-500 focus:border-white/40 focus:ring-white/20"
+                  className="bg-[#0d1117] border-white/20 text-white placeholder:text-gray-500 focus:border-white/40 focus:ring-white/20 h-11 sm:h-12 text-sm sm:text-base"
                   required
                 />
               </div>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 {index > 0 && (
                   <Button
                     type="button"
                     onClick={goToPrevious}
-                    className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 text-lg font-semibold hover:scale-105 flex-1"
+                    className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:flex-1"
                   >
-                    <ArrowLeft className="w-5 h-5 mr-2" />
+                    <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     Înapoi
                   </Button>
                 )}
                         <Button
                   type="submit"
-                  className={`bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 text-lg font-semibold hover:scale-105 ${index > 0 ? 'flex-1' : 'w-full'}`}
+                  className={`bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 text-base sm:text-lg font-semibold hover:scale-105 ${index > 0 ? 'w-full sm:flex-1' : 'w-full'}`}
                 >
                           Continuă
-                  <ArrowRight className="w-5 h-5 ml-2" />
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
                         </Button>
                   </div>
             </form>
@@ -538,30 +598,30 @@ export default function RegisterPage() {
 
       case "auth-method":
         return (
-          <div className="space-y-6 h-full flex flex-col justify-center">
+          <div className="space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
                             Creează-ți contul
               </h2>
-              <p className="text-gray-400">
+              <p className="text-sm sm:text-base text-gray-400">
                             Alege cum vrei să te înregistrezi
               </p>
             </div>
-                          <div className="space-y-4">
+                          <div className="space-y-3 sm:space-y-4 px-2">
                             <Button
                               variant="outline"
                               onClick={() => handleOAuthLogin("google")}
-                className="w-full h-14 border-white/20 bg-[#0d1117] text-white hover:bg-gray-800 hover:border-white/40 transition-all duration-300 text-lg font-semibold hover:scale-105"
+                className="w-full h-12 sm:h-14 border-white/20 bg-[#0d1117] text-white hover:bg-gray-800 hover:border-white/40 transition-all duration-300 text-base sm:text-lg font-semibold hover:scale-105"
                               disabled={loading !== null}
                             >
                               {loading === "google" ? (
                                 <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                                  Se conectează...
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                                  <span className="text-sm sm:text-base">Se conectează...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Chrome className="w-5 h-5 mr-2" />
+                                  <Chrome className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                                   Continuă cu Google
                                 </>
                               )}
@@ -569,29 +629,29 @@ export default function RegisterPage() {
                             <Button
                               variant="outline"
                               onClick={() => handleOAuthLogin("github")}
-                className="w-full h-14 border-white/20 bg-[#0d1117] text-white hover:bg-gray-800 hover:border-white/40 transition-all duration-300 text-lg font-semibold hover:scale-105"
+                className="w-full h-12 sm:h-14 border-white/20 bg-[#0d1117] text-white hover:bg-gray-800 hover:border-white/40 transition-all duration-300 text-base sm:text-lg font-semibold hover:scale-105"
                               disabled={loading !== null}
                             >
                               {loading === "github" ? (
                                 <>
-                                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                                  Se conectează...
+                                  <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                                  <span className="text-sm sm:text-base">Se conectează...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Github className="w-5 h-5 mr-2" />
+                                  <Github className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                                   Continuă cu GitHub
                                 </>
                               )}
                             </Button>
                           </div>
-            <div className="flex justify-center">
+            <div className="flex justify-center px-4">
               {index > 0 && (
                 <Button
                   onClick={goToPrevious}
-                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+                  className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 w-full sm:w-auto"
                 >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Înapoi
                 </Button>
                     )}
@@ -601,16 +661,16 @@ export default function RegisterPage() {
 
       case "welcome":
         return (
-          <div className="text-center space-y-6 h-full flex flex-col justify-center">
-            <div className="space-y-4">
-              <Star className="w-16 h-16 text-yellow-400 mx-auto animate-pulse" />
-              <h2 className="text-2xl font-bold text-white">
+          <div className="text-center space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
+            <div className="space-y-3 sm:space-y-4">
+              <Star className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-yellow-400 mx-auto animate-pulse" />
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
                 {userType === "student" 
                   ? "Bun venit în comunitatea Planck! 🎉"
                   : "Bun venit, profesor! 🎉"
                 }
               </h2>
-              <p className="text-lg text-gray-300 leading-relaxed">
+              <p className="text-sm sm:text-base md:text-lg text-gray-300 leading-relaxed px-2">
                 {userType === "student"
                   ? "Contul tău a fost creat cu succes! Ești pregătit să începi aventura ta de învățare."
                   : "Contul tău a fost creat cu succes! În curând vei primi acces la funcțiile exclusive pentru profesori."
@@ -619,9 +679,9 @@ export default function RegisterPage() {
             </div>
             <Button
               onClick={() => router.push("/dashboard")}
-              className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-12 px-8 text-lg font-semibold hover:scale-105"
+              className="bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-semibold hover:scale-105 mx-4 sm:mx-auto w-auto"
             >
-              <ArrowRight className="w-5 h-5 mr-2" />
+              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
               Mergi la Dashboard
             </Button>
           </div>
@@ -639,7 +699,7 @@ export default function RegisterPage() {
       {showConfetti && <Confetti />}
 
       {/* Main Register Section */}
-      <section className="relative flex-1 flex items-center justify-center overflow-hidden bg-[#0d1117] pt-16">
+      <section className="relative flex-1 flex items-center justify-center overflow-hidden bg-[#0d1117] pt-12 sm:pt-16">
         {/* Background Effects */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Moving stars */}
@@ -670,8 +730,8 @@ export default function RegisterPage() {
         </div>
 
         {/* Gradient fades on sides - outside carousel to avoid z-index issues */}
-        <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-[#0d1117] via-[#0d1117]/80 to-transparent z-20 pointer-events-none"></div>
-        <div className="absolute right-0 top-0 bottom-0 w-64 bg-gradient-to-l from-[#0d1117] via-[#0d1117]/80 to-transparent z-20 pointer-events-none"></div>
+        <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-r from-[#0d1117] via-[#0d1117]/80 to-transparent z-20 pointer-events-none"></div>
+        <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-l from-[#0d1117] via-[#0d1117]/80 to-transparent z-20 pointer-events-none"></div>
 
         {/* Carousel Container */}
         <div 
@@ -683,11 +743,14 @@ export default function RegisterPage() {
           }}
         >
           {/* Cards Container */}
-          <div className="flex items-center h-full gap-6" style={{ 
-            minWidth: 'fit-content',
-            paddingLeft: 'max(32px, calc(50vw - 240px))',
-            paddingRight: 'max(32px, calc(50vw - 240px))'
-          }}>
+          <div 
+            className="flex items-center h-full gap-3 sm:gap-4 md:gap-6" 
+            style={{ 
+              minWidth: 'fit-content',
+              paddingLeft: `${containerPadding.left}px`,
+              paddingRight: `${containerPadding.right}px`,
+            }}
+          >
             {cardList.map((cardType, index) => {
               const isCurrentCard = index === currentCardIndex
               const isAdjacent = Math.abs(index - currentCardIndex) === 1
@@ -703,10 +766,8 @@ export default function RegisterPage() {
                       cardRefs.current[index] = el
                     }
                   }}
-                  className="flex-shrink-0 snap-center transition-all duration-500 ease-out relative"
+                  className="flex-shrink-0 snap-center transition-all duration-500 ease-out relative w-[320px] sm:w-[400px] md:w-[480px] h-[500px] sm:h-[550px] md:h-[600px]"
                   style={{ 
-                    width: '480px', 
-                    height: '600px',
                     transform: isCurrentCard ? 'scale(1)' : isAdjacent ? 'scale(0.85)' : 'scale(0.8)',
                     pointerEvents: isCurrentCard ? 'auto' : 'none',
                     willChange: 'transform, opacity',
@@ -742,15 +803,15 @@ export default function RegisterPage() {
                         }}
                       />
                     )}
-                    <CardHeader className="text-center pb-6 relative z-10">
-                      <div className="flex items-center justify-center gap-3 mb-4">
-                        <Rocket className="w-8 h-8 text-white" />
-                        <CardTitle className="text-3xl font-bold text-white">
+                    <CardHeader className="text-center pb-4 sm:pb-6 relative z-10 px-4 sm:px-6">
+                      <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                        <Rocket className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
+                        <CardTitle className="text-2xl sm:text-2xl md:text-3xl font-bold text-white">
                           PLANCK
                         </CardTitle>
                 </div>
                     </CardHeader>
-                    <CardContent className="px-6 pb-6 h-[calc(100%-120px)] overflow-y-auto scrollbar-hide relative z-10">
+                    <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 h-[calc(100%-100px)] sm:h-[calc(100%-120px)] overflow-y-auto scrollbar-hide relative z-10">
                       {renderCardContent(cardType, index)}
               </CardContent>
             </Card>

@@ -53,7 +53,8 @@ export default function InsightScrollHero() {
     const chatUrl = '/insight/chat'
 
     if (!user) {
-      router.push(`/login?redirect=${encodeURIComponent(chatUrl)}`)
+      // Redirect to unauthorized page which explains they need an account
+      router.push(`/insight/unauthorized?redirect=${encodeURIComponent(chatUrl)}`)
       return
     }
 
@@ -112,7 +113,7 @@ export default function InsightScrollHero() {
               <InsightActionButtons
                 onThinkDeeper={() => {
                   if (!user) {
-                    router.push('/login?redirect=/insight/chat')
+                    router.push('/insight/unauthorized?redirect=' + encodeURIComponent('/insight/chat'))
                     return
                   }
                   setPlusPlanPopupType('think')
@@ -120,7 +121,7 @@ export default function InsightScrollHero() {
                 }}
                 onTeachMe={() => {
                   if (!user) {
-                    router.push('/login?redirect=/insight/chat')
+                    router.push('/insight/unauthorized?redirect=' + encodeURIComponent('/insight/chat'))
                     return
                   }
                   setPlusPlanPopupType('teach')
@@ -128,7 +129,7 @@ export default function InsightScrollHero() {
                 }}
                 onSolveProblem={() => {
                   if (!user) {
-                    router.push('/login?redirect=/insight/chat')
+                    router.push('/insight/unauthorized?redirect=' + encodeURIComponent('/insight/chat'))
                     return
                   }
                   setProblemsDialogOpen(true)

@@ -85,7 +85,16 @@ export async function POST(req: NextRequest) {
     const user = userData.user;
 
     // Parse request body - support both old format (messages array) and new format (sessionId + input)
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (jsonError) {
+      console.error('Failed to parse request body as JSON:', jsonError);
+      return NextResponse.json(
+        { error: 'Formatul cererii este invalid. Verifică JSON-ul trimis.' },
+        { status: 400 }
+      );
+    }
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages } = body || {};
     
     // Check if this is from IDE - IDE messages should not be saved to chat history
@@ -231,12 +240,42 @@ export async function POST(req: NextRequest) {
       content: m.content,
     }));
 
+    // Check if the last message in history is the current user message
+    // (it might be included if the database query happened after the insert)
+    const lastHistoryMessage = historyMessages.length > 0 ? historyMessages[historyMessages.length - 1] : null;
+    const isLastMessageCurrentUser = lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === userInput;
+
     // Prepare messages for OpenAI Chat Completions API
+    // Note: history may not include the just-inserted user message due to timing,
+    // so we explicitly add the current user input as the last message if it's not already there
     const chatMessages = [
       systemMessage,
       ...toChatCompletionsMessages(sanitizedContextMessages),
-      ...toChatCompletionsMessages(historyMessages)
+      ...toChatCompletionsMessages(historyMessages),
+      // Explicitly add current user message only if it's not already in history
+      ...(isLastMessageCurrentUser ? [] : [{
+        role: 'user' as const,
+        content: userInput,
+      }]),
     ];
+    
+    // Validate that messages array is not empty and has at least one user message
+    if (!chatMessages || chatMessages.length === 0) {
+      console.error('Empty chatMessages array');
+      return NextResponse.json(
+        { error: 'Nu am putut pregăti mesajele pentru chat.' },
+        { status: 500 }
+      );
+    }
+    
+    const hasUserMessage = chatMessages.some((m) => m.role === 'user');
+    if (!hasUserMessage) {
+      console.error('No user message in chatMessages array');
+      return NextResponse.json(
+        { error: 'Mesajul utilizatorului lipsește.' },
+        { status: 400 }
+      );
+    }
 
     // Call OpenAI Chat Completions API with streaming
     // Using gpt-4o-mini - the cheapest available model
@@ -269,6 +308,23 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: 'Limită de rate atinsă. Te rugăm să încerci mai târziu.' },
           { status: 429 }
+        );
+      }
+      
+      // Handle missing API key error (this is a regular Error, not an OpenAI API error)
+      if (openaiError instanceof Error && openaiError.message.includes('Missing credentials')) {
+        console.error('OPENAI_API_KEY is missing or invalid');
+        return NextResponse.json(
+          { error: 'Configurare API invalidă. Contactează administratorul.' },
+          { status: 500 }
+        );
+      }
+      
+      // Handle other OpenAI API errors
+      if (openaiError?.status === 401) {
+        return NextResponse.json(
+          { error: 'Configurare API invalidă. Contactează administratorul.' },
+          { status: 500 }
         );
       }
       
@@ -448,6 +504,29 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('Insight API error:', err);
+    console.error('Error details:', {
+      message: err?.message,
+      status: err?.status,
+      code: err?.code,
+      stack: err?.stack,
+    });
+    
+    // Handle missing API key error
+    if (err instanceof Error && err.message.includes('Missing credentials')) {
+      console.error('OPENAI_API_KEY is missing or invalid');
+      return NextResponse.json(
+        { error: 'Configurare API invalidă. Contactează administratorul.' },
+        { status: 500 }
+      );
+    }
+    
+    // Handle JSON parsing errors
+    if (err instanceof SyntaxError || (err?.message && err.message.includes('JSON'))) {
+      return NextResponse.json(
+        { error: 'Formatul cererii este invalid. Verifică JSON-ul trimis.' },
+        { status: 400 }
+      );
+    }
     
     // Handle OpenAI-specific errors that weren't caught above
     if (err?.status === 429) {
@@ -464,7 +543,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Handle invalid API key
+    // Handle invalid API key from OpenAI
     if (err?.status === 401) {
       return NextResponse.json(
         { error: 'Configurare API invalidă. Contactează administratorul.' },
@@ -472,9 +551,21 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Generic error
+    // Handle other OpenAI API errors
+    if (err?.status && err.status >= 400 && err.status < 500) {
+      const errorMessage = err?.message || err?.error?.message || 'Eroare la cererea către OpenAI.';
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 500 }
+      );
+    }
+    
+    // Generic error - log full error for debugging
     return NextResponse.json(
-      { error: 'Eroare internă. Încearcă din nou.' },
+      { 
+        error: 'Eroare internă. Încearcă din nou.',
+        ...(process.env.NODE_ENV === 'development' && err?.message ? { details: err.message } : {})
+      },
       { status: 500 }
     );
   }

@@ -25,16 +25,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<any>(null) // nou: profilul
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>(FREE_PLAN_IDENTIFIER)
 
+  const isInvalidRefreshTokenError = (message?: string) => {
+    if (!message) return false
+    const normalized = message.toLowerCase()
+    return normalized.includes("refresh token") || normalized.includes("refresh_token")
+  }
+
+  const handleInvalidAuthSession = async (message?: string) => {
+    console.warn("Invalid auth session detected:", message)
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Ignore sign out errors
+    }
+    setUser(null)
+    setProfile(null)
+    setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+  }
+
   useEffect(() => {
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
-      setLoading(false)
+      try {
+        const { data, error } = await supabase.auth.getSession()
+
+        if (error) {
+          if (isInvalidRefreshTokenError(error.message)) {
+            await handleInvalidAuthSession(error.message)
+            setLoading(false)
+            return
+          }
+          console.error("Error getting session:", error)
+        }
+
+        setUser(data?.session?.user ?? null)
+      } catch (err: any) {
+        if (isInvalidRefreshTokenError(err?.message)) {
+          await handleInvalidAuthSession(err?.message)
+        } else {
+          console.error("Unexpected error getting session:", err)
+        }
+      } finally {
+        setLoading(false)
+      }
     }
     getUser()
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+    
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle token refresh errors
+      if (event === 'TOKEN_REFRESHED') {
+        // Token refreshed successfully, update user
+        setUser(session?.user ?? null)
+      } else if (event === 'SIGNED_OUT') {
+        // User signed out, clear state
+        setUser(null)
+        setProfile(null)
+        setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+      } else {
+        // Other events (SIGNED_IN, USER_UPDATED, etc.)
+        setUser(session?.user ?? null)
+      }
     })
+    
     return () => {
       listener.subscription.unsubscribe()
     }
@@ -139,9 +190,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getUser()
-    setUser(data.user)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.auth.getSession()
+
+      if (error) {
+        if (isInvalidRefreshTokenError(error.message)) {
+          await handleInvalidAuthSession(error.message)
+          setLoading(false)
+          return
+        }
+        console.error("Error refreshing session:", error)
+      }
+
+      setUser(data?.session?.user ?? null)
+    } catch (err: any) {
+      if (isInvalidRefreshTokenError(err?.message)) {
+        await handleInvalidAuthSession(err?.message)
+      } else {
+        console.error("Unexpected error refreshing session:", err)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

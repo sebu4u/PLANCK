@@ -492,6 +492,22 @@ function InsightChatPageContent() {
     }
   }, [sessionId]);
 
+  // Redirect unauthenticated users to unauthorized page
+  useEffect(() => {
+    if (authLoading) return; // Wait for auth to load
+    
+    if (!user) {
+      // Redirect to unauthorized page with redirect back to chat
+      if (typeof window !== 'undefined') {
+        const currentUrl = window.location.pathname + (window.location.search || '');
+        router.replace(`/insight/unauthorized?redirect=${encodeURIComponent(currentUrl)}`);
+      } else {
+        router.replace('/insight/unauthorized?redirect=' + encodeURIComponent('/insight/chat'));
+      }
+      return;
+    }
+  }, [user, authLoading, router]);
+
   // Initialize: load sessions and restore or create session
   useEffect(() => {
     if (!user || authLoading) return;
@@ -507,7 +523,8 @@ function InsightChatPageContent() {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
         if (!accessToken) {
-          router.replace('/insight/unauthorized');
+          const currentUrl = window.location.pathname + (window.location.search || '');
+          router.replace(`/insight/unauthorized?redirect=${encodeURIComponent(currentUrl)}`);
           return;
         }
 

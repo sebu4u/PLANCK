@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Navigation } from '@/components/navigation'
 import { Footer } from '@/components/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,9 +12,20 @@ import { Lock, Chrome, Github, ArrowLeft, Brain } from 'lucide-react'
 
 export default function InsightUnauthorizedPage() {
   const router = useRouter()
-  const { loginWithGoogle, loginWithGitHub } = useAuth()
+  const searchParams = useSearchParams()
+  const { user, loading: authLoading, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<"google" | "github" | null>(null)
+
+  // Get redirect URL from query params, default to /insight/chat
+  const redirectUrl = searchParams.get('redirect') || '/insight/chat'
+
+  // If user is already authenticated, redirect them to chat
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push(redirectUrl)
+    }
+  }, [user, authLoading, router, redirectUrl])
 
   const handleGoogleLogin = async () => {
     setLoading("google")
@@ -26,6 +37,12 @@ export default function InsightUnauthorizedPage() {
         variant: "destructive",
       })
       setLoading(null)
+    } else {
+      // Redirect will happen automatically via useEffect when user becomes available
+      // Small delay to ensure auth state is updated
+      setTimeout(() => {
+        router.push(redirectUrl)
+      }, 500)
     }
   }
 
@@ -39,7 +56,27 @@ export default function InsightUnauthorizedPage() {
         variant: "destructive",
       })
       setLoading(null)
+    } else {
+      // Redirect will happen automatically via useEffect when user becomes available
+      // Small delay to ensure auth state is updated
+      setTimeout(() => {
+        router.push(redirectUrl)
+      }, 500)
     }
+  }
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      </div>
+    )
+  }
+
+  // If user is already authenticated, don't render the page (will redirect via useEffect)
+  if (user) {
+    return null
   }
 
   return (
