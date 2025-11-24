@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/logger';
 
 // GET - Get board by ID
 export async function GET(
@@ -16,7 +17,7 @@ export async function GET(
       .single();
 
     if (error || !data) {
-      console.error('Failed to fetch board:', error);
+      logger.error('Failed to fetch board:', error);
       return NextResponse.json(
         { error: 'Tabla nu a fost găsită.' },
         { status: 404 }
@@ -25,7 +26,7 @@ export async function GET(
 
     return NextResponse.json({ board: data });
   } catch (err: any) {
-    console.error('Get board API error:', err);
+    logger.error('Get board API error:', err);
     return NextResponse.json(
       { error: 'Eroare internă.' },
       { status: 500 }
@@ -58,7 +59,7 @@ export async function PATCH(
       .single();
 
     if (error || !data) {
-      console.error('Failed to update board:', error);
+      logger.error('Failed to update board:', error);
       return NextResponse.json(
         { error: 'Nu am putut actualiza tabla.' },
         { status: 500 }
@@ -67,7 +68,7 @@ export async function PATCH(
 
     return NextResponse.json({ board: data });
   } catch (err: any) {
-    console.error('Update board API error:', err);
+    logger.error('Update board API error:', err);
     return NextResponse.json(
       { error: 'Eroare internă.' },
       { status: 500 }
@@ -89,7 +90,7 @@ export async function DELETE(
       .eq('id', boardId);
 
     if (error) {
-      console.error('Failed to delete board:', error);
+      logger.error('Failed to delete board:', error);
       return NextResponse.json(
         { error: 'Nu am putut șterge tabla.' },
         { status: 500 }
@@ -98,7 +99,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('Delete board API error:', err);
+    logger.error('Delete board API error:', err);
     return NextResponse.json(
       { error: 'Eroare internă.' },
       { status: 500 }

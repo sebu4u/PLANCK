@@ -23,17 +23,26 @@ export class FunctionPersistence {
   private onError?: (error: Error) => void;
   private debounceMs: number;
   private saveTimeout: Map<string, NodeJS.Timeout> = new Map();
+  private isUUID: boolean;
 
   constructor(options: FunctionPersistenceOptions) {
     this.boardId = options.boardId;
     this.onError = options.onError;
     this.debounceMs = options.debounceMs || 300;
+    // Check if boardId is a valid UUID
+    this.isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(this.boardId);
   }
 
   /**
    * Load all functions for a board page
    */
   async loadFunctions(pageId: string): Promise<MathFunction[]> {
+    // If not UUID (e.g. PartyKit room ID), return empty or implement local storage
+    if (!this.isUUID) {
+      console.log(`[FunctionPersistence] Board ID ${this.boardId} is not a UUID, skipping Supabase load`);
+      return [];
+    }
+
     try {
       console.log(`[FunctionPersistence] Loading functions for board ${this.boardId}, page ${pageId}`);
       const { data, error } = await supabase
@@ -93,6 +102,12 @@ export class FunctionPersistence {
     pageId: string,
     functionData: Omit<MathFunction, 'id' | 'created_at' | 'updated_at'>
   ): Promise<void> {
+    // If not UUID, skip saving to Supabase to avoid "invalid input syntax for type uuid" error
+    if (!this.isUUID) {
+      console.log(`[FunctionPersistence] Board ID ${this.boardId} is not a UUID, skipping Supabase save`);
+      return;
+    }
+
     try {
       console.log(`[FunctionPersistence] Saving function ${functionData.function_id} for board ${this.boardId}, page ${pageId}`);
       
@@ -143,6 +158,12 @@ export class FunctionPersistence {
    * Delete a function
    */
   async deleteFunction(pageId: string, functionId: string): Promise<void> {
+    // If not UUID, skip Supabase delete
+    if (!this.isUUID) {
+      console.log(`[FunctionPersistence] Board ID ${this.boardId} is not a UUID, skipping Supabase delete`);
+      return;
+    }
+
     try {
       console.log(`[FunctionPersistence] Deleting function ${functionId} for board ${this.boardId}, page ${pageId}`);
       
@@ -200,4 +221,3 @@ export class FunctionPersistence {
     this.saveTimeout.clear();
   }
 }
-

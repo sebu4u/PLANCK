@@ -3,19 +3,21 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Code, FileText, BookOpen, Trophy, BarChart3, Settings } from 'lucide-react'
 import { usePlanckCodeSettings } from './planckcode-settings-provider'
 
 export function PlanckCodeSidebar() {
   const [isHovered, setIsHovered] = useState(false)
   const { openModal } = usePlanckCodeSettings()
+  const pathname = usePathname()
 
   const menuItems = [
     { label: 'IDE', icon: Code, href: '/planckcode/ide' },
     { label: 'Probleme', icon: FileText, href: '/informatica/probleme', disabled: true },
-    { label: 'Learn', icon: BookOpen, href: '#' },
-    { label: 'Competitions', icon: Trophy, href: '#' },
-    { label: 'Leaderboards', icon: BarChart3, href: '#' },
+    { label: 'Learn', icon: BookOpen, href: '/planckcode/learn' },
+    { label: 'Competitions', icon: Trophy, href: '/planckcode/competitions' },
+    { label: 'Leaderboards', icon: BarChart3, href: '/planckcode/leaderboards' },
   ]
 
   const baseButtonClassName =
@@ -62,7 +64,8 @@ export function PlanckCodeSidebar() {
               const Icon = item.icon
               const isLink = item.href !== '#' && !item.disabled
               const isDisabled = item.disabled
-              const className = `${baseButtonClassName} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`
+              const isActive = pathname === item.href
+              const className = `${baseButtonClassName} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${isActive ? 'bg-gray-700 border-l-2 border-white' : ''}`
               
               return (
                 <li key={item.label}>

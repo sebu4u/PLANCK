@@ -70,17 +70,9 @@ export default function SketchPage() {
 
     setIsOpening(true)
     try {
-      const { data, error } = await supabase
-        .from('sketch_boards')
-        .insert({ title: 'Untitled', is_public: true })
-        .select('id')
-        .single()
-
-      if (error || !data?.id) {
-        throw new Error(error?.message || 'Nu am putut crea o tablă nouă.')
-      }
-
-      router.push(`/sketch/board/${data.id}`)
+      // Generate a random room ID for the guest session
+      const roomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      router.push(`/sketch/${roomId}`)
     } catch (err: any) {
       console.error('Failed to open sketch for guest:', err)
       toast({
@@ -225,8 +217,15 @@ export default function SketchPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <div className="relative z-10 flex flex-col gap-3 sm:gap-2.5">
                 <div className="bg-white/10 border border-white/15 rounded-lg sm:rounded-md overflow-hidden shadow-inner">
-                  <div className="aspect-[4/3] sm:aspect-[4/3] w-full bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 flex items-center justify-center text-white/50 text-xs sm:text-[0.7rem] uppercase tracking-[0.2em] sm:tracking-[0.3em] px-2">
-                    Placeholder Image
+                  <div className="aspect-[4/3] sm:aspect-[4/3] w-full relative">
+                    <Image 
+                      src="/sketch-board-snapshots.png" 
+                      alt="Board snapshots at a glance" 
+                      fill
+                      className="object-cover"
+                      priority
+                      quality={95}
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5 sm:space-y-1">

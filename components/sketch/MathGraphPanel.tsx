@@ -837,7 +837,7 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl" onInteractOutside={handleDialogInteractOutside}>
+        <DialogContent className="sm:max-w-xl !z-[300]" onInteractOutside={handleDialogInteractOutside}>
           <DialogHeader>
             <DialogTitle>Adaugă o funcție</DialogTitle>
             <DialogDescription>

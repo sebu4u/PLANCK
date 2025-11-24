@@ -11,26 +11,16 @@ export default function NewBoardPage() {
   useEffect(() => {
     const createBoard = async () => {
       try {
-        const response = await fetch('/api/sketch/boards', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ title: 'Untitled' }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Nu am putut crea tabla');
-        }
-
-        const data = await response.json();
-        const boardId = data.board.id;
-
-        // Redirect to the new board
-        router.push(`/sketch/board/${boardId}`);
+        // Generăm un ID unic pentru cameră
+        // Folosim un format mai prietenos dar unic: timestamp + random
+        const uniqueId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+        
+        // Redirecționăm către noul sistem bazat pe PartyKit
+        router.push(`/sketch/${uniqueId}`);
+        
       } catch (error: any) {
         console.error('Failed to create board:', error);
-        toast.error(error.message || 'Eroare la crearea tablei');
+        toast.error('Eroare la inițializarea tablei');
         router.push('/sketch');
       }
     };
@@ -41,13 +31,12 @@ export default function NewBoardPage() {
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center">
       <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
-        <p>Se creează tabla...</p>
+        <div className="relative">
+          <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full"></div>
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 relative z-10" />
+        </div>
+        <p className="text-lg font-medium text-gray-300">Se inițializează spațiul de lucru...</p>
       </div>
     </div>
   );
 }
-
-
-
-

@@ -1,3 +1,17 @@
+import { validateEnvOrThrow } from './lib/env-validate.mjs'
+
+// Validate environment variables at build time
+try {
+  validateEnvOrThrow()
+} catch (error) {
+  console.error('❌ Environment validation failed:', error.message)
+  // In production builds, we might want to fail the build
+  // In development, we'll continue but warn
+  if (process.env.NODE_ENV === 'production') {
+    throw error
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -9,15 +23,6 @@ const nextConfig = {
   images: {
     domains: ['i.ibb.co'],
   },
-  // Optimizations for dev mode
-  ...(process.env.NODE_ENV === 'development' && {
-    // Reduce file watching on Windows
-    watchOptions: {
-      poll: process.platform === 'win32' ? 1000 : false,
-      aggregateTimeout: 300,
-      ignored: ['**/node_modules', '**/.git', '**/.next'],
-    },
-  }),
   webpack: (config, { isServer, dev }) => {
     // Handle ES modules that need to be transpiled
     if (!isServer) {
@@ -32,6 +37,9 @@ const nextConfig = {
       // Reduce rebuilds by ignoring certain files
       config.watchOptions = {
         ...config.watchOptions,
+        // Reduce file watching on Windows
+        poll: process.platform === 'win32' ? 1000 : false,
+        aggregateTimeout: 300,
         ignored: [
           '**/node_modules/**',
           '**/.git/**',

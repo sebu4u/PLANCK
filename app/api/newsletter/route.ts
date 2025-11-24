@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
 
 // MailerLite API Configuration
 const MAILERLITE_API_KEY = process.env.MAILERLITE_API_KEY
@@ -64,7 +65,7 @@ function getClientIP(request: NextRequest): string {
  */
 async function addSubscriberToMailerLite(email: string) {
   try {
-    console.log('Attempting to add subscriber to MailerLite:', {
+    logger.log('Attempting to add subscriber to MailerLite:', {
       email,
       groupId: MAILERLITE_GROUP_ID,
       apiUrl: MAILERLITE_API_URL
@@ -78,7 +79,7 @@ async function addSubscriberToMailerLite(email: string) {
       // subscribed_at: new Date().toISOString(), // Comentează temporar
     }
 
-    console.log('Request body:', JSON.stringify(requestBody, null, 2))
+    logger.log('Request body:', JSON.stringify(requestBody, null, 2))
 
     const response = await fetch(`${MAILERLITE_API_URL}/subscribers`, {
       method: 'POST',
@@ -89,27 +90,27 @@ async function addSubscriberToMailerLite(email: string) {
       body: JSON.stringify(requestBody),
     })
 
-    console.log('MailerLite API response status:', response.status)
-    console.log('MailerLite API response headers:', Object.fromEntries(response.headers.entries()))
+    logger.log('MailerLite API response status:', response.status)
+    logger.log('MailerLite API response headers:', Object.fromEntries(response.headers.entries()))
 
     if (!response.ok) {
       let errorData = {}
       try {
         errorData = await response.json()
       } catch (parseError) {
-        console.error('Failed to parse error response:', parseError)
+        logger.error('Failed to parse error response:', parseError)
         errorData = { message: response.statusText }
       }
       
-      console.error('MailerLite API error response:', errorData)
+      logger.error('MailerLite API error response:', errorData)
       throw new Error(`MailerLite API error: ${response.status} - ${errorData.message || response.statusText}`)
     }
 
     const result = await response.json()
-    console.log('MailerLite API success response:', result)
+    logger.log('MailerLite API success response:', result)
     return result
   } catch (error) {
-    console.error('MailerLite API error:', error)
+    logger.error('MailerLite API error:', error)
     throw error
   }
 }
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
   try {
     // Check if MailerLite configuration is set
     if (!MAILERLITE_API_KEY || !MAILERLITE_GROUP_ID) {
-      console.error('MailerLite configuration missing:', {
+      logger.error('MailerLite configuration missing:', {
         hasApiKey: !!MAILERLITE_API_KEY,
         hasGroupId: !!MAILERLITE_GROUP_ID
       })
@@ -149,9 +150,9 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    console.log('Request body:', body)
+    logger.log('Request body:', body)
     const { email } = body
-    console.log('Extracted email:', email)
+    logger.log('Extracted email:', email)
 
     // Validate email presence
     if (!email) {
@@ -189,7 +190,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Newsletter subscription error:', error)
+    logger.error('Newsletter subscription error:', error)
     
     // Handle specific MailerLite errors
     if (error instanceof Error) {

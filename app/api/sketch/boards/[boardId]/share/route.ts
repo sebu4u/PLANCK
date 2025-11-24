@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/logger';
 
 // POST - Generate new share token (or get existing)
 export async function POST(
@@ -29,13 +30,15 @@ export async function POST(
       shareUrl: `${req.nextUrl.origin}/sketch/board/${boardId}`,
     });
   } catch (err: any) {
-    console.error('Share token API error:', err);
+    logger.error('Share token API error:', err);
     return NextResponse.json(
       { error: 'Eroare internă.' },
       { status: 500 }
     );
   }
 }
+
+
 
 
 

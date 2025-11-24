@@ -3,6 +3,9 @@ import OpenAI from 'openai';
 import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
 import { estimateCostUSD } from '@/lib/insight-cost';
+import { logger } from '@/lib/logger';
+import { resolvePlanForRequest, parseAccessToken } from '@/lib/subscription-plan-server';
+import type { SubscriptionPlan } from '@/lib/subscription-plan';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -17,6 +20,8 @@ function getOpenAIClient() {
 
 // Maximum prompts per day for Free plan
 const FREE_DAILY_LIMIT = 3;
+// Maximum prompts per month for Plus plan (combined Insight + AI Agent)
+const PLUS_MONTHLY_LIMIT = 800;
 
 /**
  * Converts messages to OpenAI Chat Completions format
@@ -54,10 +59,10 @@ async function postAlertIfNeeded(totalMonthly: number) {
         body: JSON.stringify(payload),
       });
     } catch (e) {
-      console.warn('INSIGHT ALERT WEBHOOK FAILED', e);
+      logger.warn('INSIGHT ALERT WEBHOOK FAILED', e);
     }
   } else {
-    console.warn('INSIGHT ALERT', payload);
+    logger.warn('INSIGHT ALERT', payload);
   }
 }
 
@@ -84,12 +89,17 @@ export async function POST(req: NextRequest) {
     }
     const user = userData.user;
 
+    // Get user's plan
+    const userPlan = await resolvePlanForRequest(supabase, accessToken);
+    const isFreePlan = userPlan === 'free';
+    const isPlusPlan = userPlan === 'plus';
+
     // Parse request body - support both old format (messages array) and new format (sessionId + input)
     let body;
     try {
       body = await req.json();
     } catch (jsonError) {
-      console.error('Failed to parse request body as JSON:', jsonError);
+      logger.error('Failed to parse request body as JSON:', jsonError);
       return NextResponse.json(
         { error: 'Formatul cererii este invalid. Verifică JSON-ul trimis.' },
         { status: 400 }
@@ -118,22 +128,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mesajul utilizatorului este necesar.' }, { status: 400 });
     }
 
-    // Check current usage (read-only check before OpenAI call)
-    const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
-    const { data: usageRow } = await supabase
-      .from('insight_usage')
-      .select('prompts_count')
-      .eq('user_id', user.id)
-      .eq('usage_date', usageDate)
-      .maybeSingle();
+    // Check usage limits based on plan
+    if (isFreePlan) {
+      // Free plan: daily limit check
+      const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
+      const { data: usageRow } = await supabase
+        .from('insight_usage')
+        .select('prompts_count')
+        .eq('user_id', user.id)
+        .eq('usage_date', usageDate)
+        .maybeSingle();
 
-    const currentCount = usageRow?.prompts_count ?? 0;
-    if (currentCount >= FREE_DAILY_LIMIT) {
-      return NextResponse.json(
-        { error: 'Ai atins limita zilnică pentru planul Free (3 solicitări/zi).' },
-        { status: 429 }
-      );
+      const currentCount = usageRow?.prompts_count ?? 0;
+      if (currentCount >= FREE_DAILY_LIMIT) {
+        return NextResponse.json(
+          { error: 'Ai atins limita zilnică pentru planul Free (3 solicitări/zi).' },
+          { status: 429 }
+        );
+      }
+    } else if (isPlusPlan) {
+      // Plus plan: monthly limit check (800 prompts/month combined for Insight + AI Agent)
+      const now = new Date();
+      const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
+
+      const { data: monthlyUsageRow } = await supabase
+        .from('ai_monthly_usage')
+        .select('prompts_count')
+        .eq('user_id', user.id)
+        .eq('usage_month', monthKey)
+        .maybeSingle();
+
+      const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
+      if (currentMonthlyCount >= PLUS_MONTHLY_LIMIT) {
+        return NextResponse.json(
+          { error: `Ai atins limita lunară pentru planul Plus (800 solicitări/lună pentru Insight și AI Agent).` },
+          { status: 429 }
+        );
+      }
     }
+    // Premium plan: no limits (for now, can be extended later)
 
     // Handle session: create if needed, validate ownership if exists
     // Skip session handling for IDE requests as they don't need persistent history
@@ -151,7 +185,7 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (sessErr || !newSession?.id) {
-          console.error('Failed to create session:', sessErr);
+          logger.error('Failed to create session:', sessErr);
           return NextResponse.json({ error: 'Nu am putut crea sesiunea.' }, { status: 500 });
         }
         resolvedSessionId = newSession.id;
@@ -180,7 +214,7 @@ export async function POST(req: NextRequest) {
         });
 
       if (insUserMsgErr) {
-        console.error('Failed to save user message:', insUserMsgErr);
+        logger.error('Failed to save user message:', insUserMsgErr);
         return NextResponse.json({ error: 'Nu am putut salva mesajul.' }, { status: 500 });
       }
     }
@@ -197,7 +231,7 @@ export async function POST(req: NextRequest) {
         .limit(30);
 
       if (historyErr) {
-        console.error('Failed to load history:', historyErr);
+        logger.error('Failed to load history:', historyErr);
         return NextResponse.json({ error: 'Nu am putut încărca istoricul.' }, { status: 500 });
       }
       
@@ -261,7 +295,7 @@ export async function POST(req: NextRequest) {
     
     // Validate that messages array is not empty and has at least one user message
     if (!chatMessages || chatMessages.length === 0) {
-      console.error('Empty chatMessages array');
+      logger.error('Empty chatMessages array');
       return NextResponse.json(
         { error: 'Nu am putut pregăti mesajele pentru chat.' },
         { status: 500 }
@@ -270,7 +304,7 @@ export async function POST(req: NextRequest) {
     
     const hasUserMessage = chatMessages.some((m) => m.role === 'user');
     if (!hasUserMessage) {
-      console.error('No user message in chatMessages array');
+      logger.error('No user message in chatMessages array');
       return NextResponse.json(
         { error: 'Mesajul utilizatorului lipsește.' },
         { status: 400 }
@@ -313,7 +347,7 @@ export async function POST(req: NextRequest) {
       
       // Handle missing API key error (this is a regular Error, not an OpenAI API error)
       if (openaiError instanceof Error && openaiError.message.includes('Missing credentials')) {
-        console.error('OPENAI_API_KEY is missing or invalid');
+        logger.error('OPENAI_API_KEY is missing or invalid');
         return NextResponse.json(
           { error: 'Configurare API invalidă. Contactează administratorul.' },
           { status: 500 }
@@ -363,7 +397,7 @@ export async function POST(req: NextRequest) {
                 try {
                   await stream.return();
                 } catch (returnErr) {
-                  console.warn('Error while returning stream after abort:', returnErr);
+                  logger.warn('Error while returning stream after abort:', returnErr);
                 }
               }
               break;
@@ -404,25 +438,45 @@ export async function POST(req: NextRequest) {
               });
 
             if (insAsstMsgErr) {
-              console.error('Failed to save assistant message:', insAsstMsgErr);
+              logger.error('Failed to save assistant message:', insAsstMsgErr);
             }
           }
 
           if (!clientAborted) {
             // Only increment counter after successful OpenAI call
-            const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-              'insight_check_and_increment',
-              {
-                p_user_id: user.id,
-                p_daily_limit: FREE_DAILY_LIMIT,
-              }
-            );
+            // Use appropriate tracking based on plan
+            if (isFreePlan) {
+              // Free plan: increment daily usage
+              const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
+                'insight_check_and_increment',
+                {
+                  p_user_id: user.id,
+                  p_daily_limit: FREE_DAILY_LIMIT,
+                }
+              );
 
-            if (rpcErr) {
-              console.error('RPC error after OpenAI success', rpcErr);
-            } else if (!incrementAllowed) {
-              console.warn('Counter increment failed after OpenAI success - race condition?');
+              if (rpcErr) {
+                logger.error('RPC error after OpenAI success', rpcErr);
+              } else if (!incrementAllowed) {
+                logger.warn('Counter increment failed after OpenAI success - race condition?');
+              }
+            } else if (isPlusPlan) {
+              // Plus plan: increment monthly usage (combined for Insight + AI Agent)
+              const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
+                'ai_check_and_increment_monthly',
+                {
+                  p_user_id: user.id,
+                  p_monthly_limit: PLUS_MONTHLY_LIMIT,
+                }
+              );
+
+              if (rpcErr) {
+                logger.error('RPC error after OpenAI success (monthly)', rpcErr);
+              } else if (!incrementAllowed) {
+                logger.warn('Monthly counter increment failed after OpenAI success - race condition?');
+              }
             }
+            // Premium plan: no tracking needed (unlimited)
           }
 
           // Calculate cost
@@ -482,7 +536,7 @@ export async function POST(req: NextRequest) {
             controller.close();
             return;
           }
-          console.error('Stream processing error:', streamError);
+          logger.error('Stream processing error:', streamError);
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ type: 'error', error: 'Eroare la procesarea răspunsului.' })}\n\n`
@@ -503,8 +557,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    console.error('Insight API error:', err);
-    console.error('Error details:', {
+    logger.error('Insight API error:', err);
+    logger.error('Error details:', {
       message: err?.message,
       status: err?.status,
       code: err?.code,
@@ -513,7 +567,7 @@ export async function POST(req: NextRequest) {
     
     // Handle missing API key error
     if (err instanceof Error && err.message.includes('Missing credentials')) {
-      console.error('OPENAI_API_KEY is missing or invalid');
+      logger.error('OPENAI_API_KEY is missing or invalid');
       return NextResponse.json(
         { error: 'Configurare API invalidă. Contactează administratorul.' },
         { status: 500 }

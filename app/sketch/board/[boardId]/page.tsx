@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageNavigator } from '@/components/sketch/PageNavigator';
 import { ShareButton } from '@/components/sketch/ShareButton';
@@ -52,6 +52,37 @@ export default function BoardPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [isMathGraphOpen, setIsMathGraphOpen] = useState(false);
+  
+  // Compute effective current page ID - similar to PageNavigator logic
+  // This ensures the graph button appears even when currentPageId isn't set yet
+  // Using useMemo to recalculate when editor or currentPageId changes
+  const effectiveCurrentPageId = useMemo(() => {
+    if (currentPageId) return currentPageId;
+    if (editor?.currentPageId) return editor.currentPageId;
+    // Try to get first page from editor's pages
+    if (editor) {
+      try {
+        const pages = editor.getPages();
+        if (pages.length > 0) {
+          return pages[0].id;
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    // Try to get first page from store
+    if (editor?.store) {
+      try {
+        const pages = editor.store.allRecords().filter((r: any) => r.typeName === 'page');
+        if (pages.length > 0) {
+          return pages[0].id as string;
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    return null;
+  }, [currentPageId, editor]);
   const [showGuestWelcome, setShowGuestWelcome] = useState(false);
   const [welcomeSlide, setWelcomeSlide] = useState(0);
 
@@ -105,6 +136,44 @@ export default function BoardPage() {
       console.warn('Failed to restore last page selection:', err);
     }
   }, [editor, boardId]);
+
+  // Ensure currentPageId is set when editor becomes available with pages
+  useEffect(() => {
+    if (!editor || currentPageId) return;
+
+    // Try to get current page from editor
+    const trySetPageId = () => {
+      try {
+        if (editor.currentPageId) {
+          setCurrentPageId(editor.currentPageId);
+          return;
+        }
+        
+        // Try to get first page from editor's pages
+        const pages = editor.getPages();
+        if (pages.length > 0) {
+          setCurrentPageId(pages[0].id);
+          return;
+        }
+        
+        // Try to get first page from store
+        const storePages = editor.store.allRecords().filter((r: any) => r.typeName === 'page');
+        if (storePages.length > 0) {
+          setCurrentPageId(storePages[0].id as string);
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    };
+
+    // Try immediately
+    trySetPageId();
+
+    // Also try after a short delay in case pages are still loading
+    const timeout = setTimeout(trySetPageId, 100);
+    
+    return () => clearTimeout(timeout);
+  }, [editor, currentPageId]);
 
   useEffect(() => {
     if (!boardId || !currentPageId) {
@@ -240,6 +309,7 @@ export default function BoardPage() {
           {/* Page Navigator */}
           <PageNavigator
             editor={editor}
+            store={editor?.store || null}
             currentPageId={currentPageId}
             onPageChange={(pageId) => {
               setCurrentPageId(pageId);
@@ -252,7 +322,7 @@ export default function BoardPage() {
           </div>
 
           {/* Math Graph Button - Bottom Right, above Share Button */}
-          {currentPageId && (
+          {effectiveCurrentPageId && (
             <div className="hidden sm:block absolute bottom-16 right-4 z-50">
               <Button
                 onClick={() => setIsMathGraphOpen(!isMathGraphOpen)}
@@ -344,7 +414,7 @@ export default function BoardPage() {
         </div>
 
         {/* Math Graph Panel - side panel */}
-        {currentPageId && (
+        {effectiveCurrentPageId && (
           <div
             className={cn(
               "hidden sm:block overflow-hidden transition-[width] duration-300 ease-out",
@@ -354,7 +424,7 @@ export default function BoardPage() {
           >
             <MathGraphPanel
               boardId={boardId}
-              pageId={currentPageId}
+              pageId={effectiveCurrentPageId}
               open={isMathGraphOpen}
               onOpenChange={setIsMathGraphOpen}
             />

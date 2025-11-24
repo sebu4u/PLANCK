@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
+import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('Failed to fetch sessions:', error);
+      logger.error('Failed to fetch sessions:', error);
       return NextResponse.json({ error: 'Nu am putut lista sesiunile.' }, { status: 500 });
     }
 
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ sessions: sessionsWithMessages });
   } catch (err: any) {
-    console.error('Sessions API error:', err);
+    logger.error('Sessions API error:', err);
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }
@@ -77,13 +78,13 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Failed to create session:', error);
+      logger.error('Failed to create session:', error);
       return NextResponse.json({ error: 'Nu am putut crea sesiunea.' }, { status: 500 });
     }
 
     return NextResponse.json({ sessionId: data?.id });
   } catch (err: any) {
-    console.error('Create session API error:', err);
+    logger.error('Create session API error:', err);
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }
@@ -122,13 +123,13 @@ export async function PATCH(req: NextRequest) {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Failed to update session:', error);
+      logger.error('Failed to update session:', error);
       return NextResponse.json({ error: 'Nu am putut redenumi sesiunea.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('Update session API error:', err);
+    logger.error('Update session API error:', err);
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }
@@ -166,13 +167,13 @@ export async function DELETE(req: NextRequest) {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Failed to delete session:', error);
+      logger.error('Failed to delete session:', error);
       return NextResponse.json({ error: 'Nu am putut șterge sesiunea.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('Delete session API error:', err);
+    logger.error('Delete session API error:', err);
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }

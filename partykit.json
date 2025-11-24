@@ -1,0 +1,6 @@
+{
+  "name": "planck-sketch",
+  "main": "partykit/planck-sketch-server.ts",
+  "compatibilityDate": "2025-02-24"
+}
+

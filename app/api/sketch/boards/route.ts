@@ -1,39 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { User } from '@supabase/supabase-js';
 import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
+import { logger } from '@/lib/logger';
+import { parseAccessToken, resolvePlanForRequest } from '@/lib/subscription-plan-server';
+import { isPaidPlan } from '@/lib/subscription-plan';
 
 const FREE_PLAN_BOARD_LIMIT =
   Number(process.env.FREE_PLAN_BOARD_LIMIT ?? process.env.NEXT_PUBLIC_FREE_PLAN_BOARD_LIMIT ?? '3') || 3;
-const FREE_PLAN_IDENTIFIERS = new Set(['free', 'free_plan', 'free-tier', 'gratuit']);
-
-const resolveUserPlan = (user: User | null) => {
-  if (!user) {
-    return 'free';
-  }
-
-  const planSources = [
-    (user.user_metadata as Record<string, any> | undefined)?.plan,
-    (user.user_metadata as Record<string, any> | undefined)?.plan_tier,
-    (user.user_metadata as Record<string, any> | undefined)?.planTier,
-    (user.user_metadata as Record<string, any> | undefined)?.subscription_plan,
-    (user.app_metadata as Record<string, any> | undefined)?.plan,
-    (user.app_metadata as Record<string, any> | undefined)?.plan_tier,
-    (user.app_metadata as Record<string, any> | undefined)?.planTier,
-    (user.app_metadata as Record<string, any> | undefined)?.subscription_plan,
-  ];
-
-  const resolved = planSources.find(
-    (value) => typeof value === 'string' && value.trim().length > 0
-  );
-
-  return (resolved as string | undefined)?.trim().toLowerCase() || 'free';
-};
-
-const userHasFreePlan = (user: User | null) => {
-  const plan = resolveUserPlan(user);
-  return FREE_PLAN_IDENTIFIERS.has(plan) || !plan;
-};
 
 // POST - Create new board (requires authentication)
 export async function POST(req: NextRequest) {
@@ -69,16 +42,21 @@ export async function POST(req: NextRequest) {
     const user = userData.user;
 
     const body = await req.json();
-    const { title } = body || {};
+    const { title, roomId } = body || {};
 
-    if (userHasFreePlan(user) && FREE_PLAN_BOARD_LIMIT > 0) {
+    // Resolve user plan using the same logic as catalog problems
+    const userPlan = await resolvePlanForRequest(supabase, accessToken);
+    const userHasPaidPlanValue = isPaidPlan(userPlan);
+
+    // Only check limit for free plan users (not for plus/premium)
+    if (!userHasPaidPlanValue && FREE_PLAN_BOARD_LIMIT > 0) {
       const { count, error: countError } = await supabase
         .from('sketch_boards')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
       if (countError) {
-        console.error('Failed to count boards:', countError);
+        logger.error('Failed to count boards:', countError);
         return NextResponse.json(
           { error: 'Nu am putut verifica numărul de table existente.' },
           { status: 500 }
@@ -95,18 +73,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Generate room ID for PartyKit if not provided
+    const generatedRoomId = roomId || (Date.now().toString(36) + Math.random().toString(36).substring(2, 8));
+
     const { data, error } = await supabase
       .from('sketch_boards')
       .insert({
         user_id: user.id,
         title: title || 'Untitled',
         is_public: true,
+        room_id: generatedRoomId,
       })
-      .select('id, title, share_token, created_at')
+      .select('id, title, share_token, created_at, room_id')
       .single();
 
     if (error) {
-      console.error('Failed to create board:', error);
+      logger.error('Failed to create board:', error);
       return NextResponse.json(
         { error: 'Nu am putut crea tabla.' },
         { status: 500 }
@@ -115,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ board: data });
   } catch (err: any) {
-    console.error('Create board API error:', err);
+    logger.error('Create board API error:', err);
     return NextResponse.json(
       { error: 'Eroare internă.' },
       { status: 500 }
@@ -149,12 +131,12 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('sketch_boards')
-      .select('id, title, share_token, created_at, updated_at')
+      .select('id, title, share_token, created_at, updated_at, room_id')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('Failed to fetch boards:', error);
+      logger.error('Failed to fetch boards:', error);
       return NextResponse.json(
         { error: 'Nu am putut lista tablele.' },
         { status: 500 }
@@ -163,7 +145,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ boards: data || [] });
   } catch (err: any) {
-    console.error('List boards API error:', err);
+    logger.error('List boards API error:', err);
     return NextResponse.json({ boards: [] });
   }
 }

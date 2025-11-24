@@ -25,6 +25,7 @@ import { ProblemBoard } from "@/components/problems/problem-board"
 import { cn } from "@/lib/utils"
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { createTLStore, defaultShapeUtils } from "@tldraw/tldraw"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -125,6 +126,9 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [desktopBoardExpanded, setDesktopBoardExpanded] = useState(false)
   const { user } = useAuth();
   const problemIcon = getProblemIcon(problem.id);
+
+  // Create a shared store for the desktop whiteboard (minimized and maximized share the same instance)
+  const desktopBoardStore = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), [])
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
@@ -329,18 +333,18 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                       onValueChange={(value) => setActiveTab(value as 'statement' | 'video')}
                       className="w-full"
                     >
-                      <TabsList className="flex w-full flex-wrap gap-2 rounded-2xl border border-white/10 bg-white/5 p-1">
+                      <TabsList className="flex w-full gap-1 sm:gap-2 rounded-2xl border border-white/10 bg-white/5 p-1 overflow-hidden">
                         <TabsTrigger
                           value="statement"
-                          className="flex-1 rounded-full text-sm font-medium text-white/60 data-[state=active]:bg-white data-[state=active]:text-black"
+                          className="flex-[0_0_calc(50%-0.125rem)] sm:flex-1 min-w-0 rounded-full text-sm font-medium text-white/60 data-[state=active]:bg-white data-[state=active]:text-black px-2 sm:px-4 py-2 text-center overflow-hidden"
                         >
-                          Enunț
+                          <span className="truncate block">Enunț</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="video"
-                          className="flex-1 rounded-full text-sm font-medium text-white/60 data-[state=active]:bg-white data-[state=active]:text-black"
+                          className="flex-[0_0_calc(50%-0.125rem)] sm:flex-1 min-w-0 rounded-full text-sm font-medium text-white/60 data-[state=active]:bg-white data-[state=active]:text-black px-2 sm:px-4 py-2 text-center overflow-hidden"
                         >
-                          Video
+                          <span className="truncate block">Video</span>
                         </TabsTrigger>
                       </TabsList>
                       <TabsContent value="statement" className="mt-6">
@@ -414,27 +418,30 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
               </section>
 
               <aside className="space-y-6">
-                <div className="hidden lg:flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.02] p-5 shadow-[0px_24px_80px_-40px_rgba(0,0,0,1)]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold text-white">Tabla de lucru</h2>
-                      <p className="mt-1 text-sm text-white/50">
-                        Rezolvă problema direct pe această tablă. Salvează dacă ai cont.
-                      </p>
+                {/* Only show minimized board when dialog is not expanded */}
+                {!desktopBoardExpanded && (
+                  <div className="hidden lg:flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.02] p-5 shadow-[0px_24px_80px_-40px_rgba(0,0,0,1)]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold text-white">Tabla de lucru</h2>
+                        <p className="mt-1 text-sm text-white/50">
+                          Rezolvă problema direct pe această tablă. Salvează dacă ai cont.
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDesktopBoardExpanded(true)}
+                        className="hidden rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/20 lg:inline-flex"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDesktopBoardExpanded(true)}
-                      className="hidden rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/20 lg:inline-flex"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </Button>
+                    <div className="relative h-[600px] overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                      <ProblemBoard problemId={problem.id} store={desktopBoardStore} />
+                    </div>
                   </div>
-                  <div className="relative h-[600px] overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                    <ProblemBoard problemId={problem.id} />
-                  </div>
-                </div>
+                )}
 
                 <div className="lg:hidden rounded-3xl border border-white/10 bg-white/[0.02] p-5">
                   <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
@@ -525,13 +532,33 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             </Button>
           </div>
           <div className="h-[75vh] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-            <ProblemBoard problemId={problem.id} />
+            <ProblemBoard problemId={problem.id} store={desktopBoardStore} />
           </div>
         </DialogContent>
       </Dialog>
 
-      <Drawer open={mobileBoardVisible} onOpenChange={setMobileBoardVisible}>
-        <DrawerContent className="bg-[#141414] text-white border-t border-white/10">
+      <Drawer 
+        open={mobileBoardVisible} 
+        onOpenChange={(open) => {
+          // Prevent automatic closing from swipe/scroll gestures
+          // Only allow closing via the button
+          if (open) {
+            setMobileBoardVisible(true)
+          }
+        }}
+        dismissible={false}
+      >
+        <DrawerContent 
+          className="bg-[#141414] text-white border-t border-white/10"
+          onPointerDownOutside={(e) => {
+            // Prevent closing on outside click
+            e.preventDefault()
+          }}
+          onEscapeKeyDown={(e) => {
+            // Prevent closing on escape key
+            e.preventDefault()
+          }}
+        >
           <DrawerHeader className="text-center">
             <DrawerTitle className="text-base font-semibold uppercase tracking-[0.3em] text-white/60">
               Tabla de lucru
@@ -541,11 +568,12 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             <div className="h-[70vh] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
               <ProblemBoard problemId={problem.id} />
             </div>
-            <DrawerClose asChild>
-              <Button className="mt-4 w-full rounded-full border border-white/15 bg-white/10 py-3 text-sm font-semibold text-white hover:bg-white/20">
-                Închide tabla
-              </Button>
-            </DrawerClose>
+            <Button 
+              className="mt-4 w-full rounded-full border border-white/15 bg-white/10 py-3 text-sm font-semibold text-white hover:bg-white/20"
+              onClick={() => setMobileBoardVisible(false)}
+            >
+              Închide tabla
+            </Button>
           </div>
         </DrawerContent>
       </Drawer>

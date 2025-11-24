@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/logger';
 
 // GET - Validate share token and get board
 export async function GET(
@@ -35,13 +36,15 @@ export async function GET(
       shareToken: data.share_token,
     });
   } catch (err: any) {
-    console.error('Share token validation error:', err);
+    logger.error('Share token validation error:', err);
     return NextResponse.json(
       { error: 'Eroare internă.' },
       { status: 500 }
     );
   }
 }
+
+
 
 
 

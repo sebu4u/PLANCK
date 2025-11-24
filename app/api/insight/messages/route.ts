@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
+import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -35,13 +36,13 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Failed to fetch messages:', error);
+      logger.error('Failed to fetch messages:', error);
       return NextResponse.json({ error: 'Nu am putut încărca mesajele.' }, { status: 500 });
     }
 
     return NextResponse.json({ messages: data || [] });
   } catch (err: any) {
-    console.error('Messages API error:', err);
+    logger.error('Messages API error:', err);
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }

@@ -73,9 +73,9 @@ export function Footer({ backgroundColor = "bg-black", borderColor = "border-gra
                 </Link>
               </li>
               <li>
-                <Link href="/informatica/probleme" className="hover:text-purple-400 transition-colors">
+                <span className="text-gray-400 cursor-default">
                   Probleme de Informatică
-                </Link>
+                </span>
               </li>
               <li>
                 <Link href="/planckcode" className="hover:text-purple-400 transition-colors">

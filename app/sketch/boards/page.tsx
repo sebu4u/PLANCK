@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navigation } from '@/components/navigation';
 import { BoardCard } from '@/components/sketch/BoardCard';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth-provider';
+import { useSubscriptionPlan } from '@/hooks/use-subscription-plan';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import {
@@ -24,36 +25,11 @@ interface Board {
   title: string;
   updated_at: string;
   created_at: string;
+  room_id?: string;
 }
 
 const FREE_PLAN_BOARD_LIMIT =
   Number(process.env.NEXT_PUBLIC_FREE_PLAN_BOARD_LIMIT ?? '3') || 3;
-const FREE_PLAN_IDENTIFIERS = new Set(['free', 'free_plan', 'free-tier', 'gratuit']);
-
-const resolveUserPlan = (user: any) => {
-  if (!user) {
-    return 'free';
-  }
-
-  const metadata = (user.user_metadata as Record<string, any>) || {};
-  const appMetadata = (user.app_metadata as Record<string, any>) || {};
-  const planSources = [
-    metadata.plan,
-    metadata.plan_tier,
-    metadata.planTier,
-    metadata.subscription_plan,
-    appMetadata.plan,
-    appMetadata.plan_tier,
-    appMetadata.planTier,
-    appMetadata.subscription_plan,
-  ];
-
-  const resolved = planSources.find(
-    (value) => typeof value === 'string' && value.trim().length > 0
-  );
-
-  return (resolved as string | undefined)?.trim().toLowerCase() || 'free';
-};
 
 export default function BoardsPage() {
   const router = useRouter();
@@ -63,13 +39,15 @@ export default function BoardsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
 
-  const planTier = useMemo(() => resolveUserPlan(user), [user]);
-  const isFreePlanUser = !planTier || FREE_PLAN_IDENTIFIERS.has(planTier);
+  const { isFree, isPaid } = useSubscriptionPlan();
+  // Only check limit for free plan users (not for plus/premium)
+  // If user has paid plan (plus/premium), they can create unlimited boards
   const hasReachedFreePlanLimit =
-    isFreePlanUser && FREE_PLAN_BOARD_LIMIT > 0 && boards.length >= FREE_PLAN_BOARD_LIMIT;
+    isFree && !isPaid && FREE_PLAN_BOARD_LIMIT > 0 && boards.length >= FREE_PLAN_BOARD_LIMIT;
   const freePlanLimitMessage = `Ai atins limita de ${FREE_PLAN_BOARD_LIMIT} table pe planul Free. Șterge una existentă pentru a crea alta.`;
 
   useEffect(() => {
+    // Only show popup for free plan users who have reached the limit
     if (hasReachedFreePlanLimit) {
       setShowLimitModal(true);
     }
@@ -140,13 +118,16 @@ export default function BoardsPage() {
         throw new Error('Not authenticated');
       }
 
+      // Generate a unique room ID for PartyKit
+      const roomId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+
       const response = await fetch('/api/sketch/boards', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ title: 'Untitled' }),
+        body: JSON.stringify({ title: 'Untitled', roomId }),
       });
 
       if (!response.ok) {
@@ -155,10 +136,10 @@ export default function BoardsPage() {
       }
 
       const data = await response.json();
-      const boardId = data.board.id;
+      const boardRoomId = data.board.room_id || roomId;
 
-      // Redirect to the new board
-      router.push(`/sketch/board/${boardId}`);
+      // Redirect to the PartyKit board
+      router.push(`/sketch/${boardRoomId}`);
     } catch (error: any) {
       console.error('Failed to create board:', error);
       toast.error(error.message || 'Failed to create board');
@@ -238,7 +219,7 @@ export default function BoardsPage() {
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">My Boards</h1>
           <p className="text-gray-400">Manage your sketch boards</p>
-          {isFreePlanUser && (
+          {isFree && !isPaid && (
             <p className="text-sm text-gray-500 mt-2">
               Plan Free: poți salva până la {FREE_PLAN_BOARD_LIMIT} table în același timp.
             </p>

@@ -33,6 +33,9 @@ export async function getUserStats(userId: string, accessToken: string): Promise
   const supabase = createAuthenticatedClient(accessToken)
 
   try {
+    // Check and reset streak if user skipped a day
+    await supabase.rpc('check_and_reset_streak_if_needed', { user_uuid: userId })
+
     const { data, error } = await supabase
       .from('user_stats')
       .select('*')

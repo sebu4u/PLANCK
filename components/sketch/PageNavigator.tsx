@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 interface PageNavigatorProps {
   editor: Editor | null;
+  store: any; // TLStore
   currentPageId: string | null;
   onPageChange?: (pageId: string) => void;
 }
@@ -20,7 +21,7 @@ interface PageThumbnail {
 
 const MAX_VISIBLE_PAGES = 4;
 
-export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavigatorProps) {
+export function PageNavigator({ editor, store, currentPageId, onPageChange }: PageNavigatorProps) {
   const [pages, setPages] = useState<TLPage[]>([]);
   const [viewportStartIndex, setViewportStartIndex] = useState(0);
   const [thumbnails, setThumbnails] = useState<Map<string, PageThumbnail>>(new Map());
@@ -31,26 +32,33 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
   const hoverTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const thumbnailsRef = useRef<Map<string, PageThumbnail>>(new Map());
 
-  // Get pages from editor and detect theme
+  // Get pages from store and detect theme
   useEffect(() => {
-    if (!editor) return;
+    if (!store) return;
 
     const updatePages = () => {
-      const allPages = editor.getPages();
-      setPages(allPages);
+      try {
+        const allPages = store.allRecords().filter((r: any) => r.typeName === 'page');
+        // Sort pages by index
+        allPages.sort((a: any, b: any) => (a.index || '').localeCompare(b.index || ''));
+        setPages(allPages);
+      } catch (e) {
+        console.error("Error getting pages from store", e);
+      }
     };
 
     const updateTheme = () => {
-      // Check if editor has user preferences for theme
-      try {
-        // Try to get theme from user preferences
-        const prefs = editor.user.getUserPreferences();
-        if (prefs && 'isDarkMode' in prefs) {
-          setIsDarkMode(prefs.isDarkMode as boolean);
-          return;
+      if (editor) {
+        try {
+          // Try to get theme from user preferences
+          const prefs = editor.user.getUserPreferences();
+          if (prefs && 'isDarkMode' in prefs) {
+            setIsDarkMode(prefs.isDarkMode as boolean);
+            return;
+          }
+        } catch (e) {
+          // Ignore
         }
-      } catch (e) {
-        // Ignore
       }
       
       // Fallback: check CSS class or default to dark
@@ -68,7 +76,7 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
     updateTheme();
 
     // Listen to store changes for pages
-    const unsubscribeStore = editor.store.listen(() => {
+    const unsubscribeStore = store.listen(() => {
       updatePages();
     }, { source: 'user', scope: 'document' });
 
@@ -91,13 +99,12 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
       clearInterval(themeInterval);
       observer.disconnect();
     };
-  }, [editor]);
+  }, [store, editor]);
 
-  // Compute effective current page id for initial render (fallback to editor or first page)
+  // Compute effective current page id
   const effectiveCurrentPageId = useMemo(() => {
     if (currentPageId) return currentPageId;
-    const fromEditor = editor?.currentPageId;
-    if (fromEditor) return fromEditor;
+    if (editor?.currentPageId) return editor.currentPageId;
     return pages.length > 0 ? pages[0].id : null;
   }, [currentPageId, editor, pages]);
 
@@ -241,9 +248,9 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
 
   // Handle page click
   const handlePageClick = useCallback((pageId: string) => {
-    if (!editor) return;
-    
-    editor.setCurrentPage(pageId);
+    if (editor) {
+      editor.setCurrentPage(pageId);
+    }
     if (onPageChange) {
       onPageChange(pageId);
     }
@@ -329,7 +336,7 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
       console.error('Error deleting page:', error);
       toast.error('Eroare la ștergerea paginii');
     }
-  }, [editor, currentPageId, onPageChange]);
+  }, [editor, effectiveCurrentPageId, onPageChange]);
 
   // Handle create page
   const handleCreatePage = useCallback(async () => {
@@ -369,22 +376,6 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
           }
 
           toast.success('Pagină nouă creată');
-        } else {
-          // Page not yet in store, wait a bit more
-          await new Promise(resolve => setTimeout(resolve, 100));
-          const updatedPages = editor.getPages();
-          if (updatedPages.length > pageCount) {
-            const latestPage = updatedPages[updatedPages.length - 1];
-            if (editor.store.has(latestPage.id)) {
-              editor.setCurrentPage(latestPage.id);
-              if (onPageChange) {
-                onPageChange(latestPage.id);
-              }
-              toast.success('Pagină nouă creată');
-            } else {
-              toast.error('Eroare la setarea paginii noi');
-            }
-          }
         }
       } else {
         toast.error('Eroare la crearea paginii');
@@ -415,7 +406,7 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
     return pages.slice(viewportStartIndex, viewportStartIndex + MAX_VISIBLE_PAGES);
   }, [pages, viewportStartIndex]);
 
-  if (!editor || pages.length === 0) {
+  if (!store || pages.length === 0) {
     return null;
   }
 
@@ -596,4 +587,3 @@ export function PageNavigator({ editor, currentPageId, onPageChange }: PageNavig
     </div>
   );
 }
-

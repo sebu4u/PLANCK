@@ -4,9 +4,12 @@ import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation";
 import { isPaidPlan } from "@/lib/subscription-plan";
 import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
+import { logger } from "@/lib/logger";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Server-side: access environment variables directly
+// These are validated at build time in next.config.mjs
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
@@ -55,7 +58,7 @@ export async function GET(
     .order("order_index", { ascending: true });
 
   if (examplesError) {
-    console.error("[coding-problems/[slug]] Failed to load examples:", examplesError);
+    logger.error("[coding-problems/[slug]] Failed to load examples:", examplesError);
   }
 
   return NextResponse.json({

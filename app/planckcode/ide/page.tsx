@@ -555,10 +555,22 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
       return
     }
 
-    const extension = newFileType === 'cpp' ? '.cpp' : '.txt'
-    const fileName = newFileName.trim().endsWith(extension) 
-      ? newFileName.trim() 
-      : newFileName.trim() + extension
+    const trimmedName = newFileName.trim()
+    let fileName: string
+
+    if (newFileType === 'cpp') {
+      // For C++ files, always ensure .cpp extension
+      fileName = trimmedName.endsWith('.cpp') 
+        ? trimmedName 
+        : trimmedName + '.cpp'
+    } else {
+      // For text files, check if filename already has an extension
+      // If it contains a dot (not at the start), assume it has an extension
+      const hasExtension = trimmedName.includes('.') && trimmedName.indexOf('.') > 0
+      fileName = hasExtension 
+        ? trimmedName 
+        : trimmedName + '.txt'
+    }
 
     // Check if file already exists
     if (files.some(f => f.name === fileName)) {
@@ -1305,15 +1317,27 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
           </div>
           
           <div className="flex items-center gap-2 ml-4">
-            <Button
-              variant="outline"
-              className={`bg-transparent border-white text-white hover:bg-white/10 font-medium px-4 h-8 flex items-center gap-2 text-sm ${isInsightOpen ? 'bg-white/10 text-white' : ''}`}
-              onClick={() => setIsInsightOpen((prev) => !prev)}
-              aria-pressed={isInsightOpen}
-            >
-              <Sparkles className="w-4 h-4" />
-              {isInsightOpen ? 'Close Insight' : 'AI Agent'}
-            </Button>
+            <div className="group relative inline-flex">
+              {/* Glow effect on hover - behind everything */}
+              <span className="absolute -inset-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
+              
+              {/* Gradient border wrapper - creates the border effect */}
+              <span className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
+              <span className="absolute inset-[1px] rounded-md bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
+              
+              <Button
+                variant="outline"
+                className={`bg-transparent border-white text-white hover:border-transparent transition-all duration-300 font-medium px-4 h-8 flex items-center gap-2 text-sm relative z-10 ${isInsightOpen ? 'bg-white/10 text-white' : ''}`}
+                onClick={() => setIsInsightOpen((prev) => !prev)}
+                aria-pressed={isInsightOpen}
+              >
+                <Sparkles className="w-4 h-4" />
+                {/* Gradient text on hover */}
+                <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300">
+                  {isInsightOpen ? 'Close Insight' : 'AI Agent'}
+                </span>
+              </Button>
+            </div>
             <Button
               variant="outline"
               className="bg-transparent border-white text-white hover:bg-white/10 font-medium px-4 h-8 flex items-center gap-2 text-sm"

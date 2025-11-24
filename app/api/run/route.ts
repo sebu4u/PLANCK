@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
+import { logger } from '@/lib/logger';
 
 interface FileItem {
   name: string;
@@ -27,7 +28,7 @@ async function createZipArchiveBase64(files: FileItem[]): Promise<string> {
   const zip = new JSZip();
   for (const file of files) {
     const content = file.content ?? '';
-    console.log(`Adding file to ZIP: ${file.name} (${content.length} bytes)`);
+    logger.log(`Adding file to ZIP: ${file.name} (${content.length} bytes)`);
     zip.file(file.name, content);
   }
   const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -134,10 +135,10 @@ function buildAutoDisplayBlock(fileName: string, indent: string, globalStreamNam
 }
 
 function injectOutputFileReading(mainContent: string): string {
-  console.log('=== Analyzing code for ofstream declarations ===');
+  logger.log('=== Analyzing code for ofstream declarations ===');
   
   if (mainContent.includes('__auto_read_') || /\bint\s+__auto_user_main\b/.test(mainContent)) {
-    console.log('Auto-display block already injected, skipping');
+    logger.log('Auto-display block already injected, skipping');
     return mainContent;
   }
 
@@ -163,7 +164,7 @@ function injectOutputFileReading(mainContent: string): string {
   while ((match = directPattern.exec(mainContent)) !== null) {
     const streamName = match[1];
     const fileName = match[2];
-    console.log(`  - File: ${fileName} (stream: ${streamName})`);
+    logger.log(`  - File: ${fileName} (stream: ${streamName})`);
     recordOutputFile(fileName, streamName, match.index ?? 0);
   }
 
@@ -175,17 +176,17 @@ function injectOutputFileReading(mainContent: string): string {
     const openMatch = searchWindow.match(openRegex);
     if (openMatch) {
       const fileName = openMatch[1];
-      console.log(`  - File: ${fileName} via ${streamName}.open`);
+      logger.log(`  - File: ${fileName} via ${streamName}.open`);
       recordOutputFile(fileName, streamName, match.index ?? 0);
     }
   }
   
   if (outputFiles.size === 0) {
-    console.log('No output files detected, skipping injection');
+    logger.log('No output files detected, skipping injection');
     return mainContent; // No output files to inject
   }
   
-  console.log('Detected output files to auto-display:', Array.from(outputFiles.keys()));
+  logger.log('Detected output files to auto-display:', Array.from(outputFiles.keys()));
   
   // Ensure fstream is included
   let modifiedContent = mainContent;
@@ -199,13 +200,13 @@ function injectOutputFileReading(mainContent: string): string {
     } else {
       modifiedContent = '#include <fstream>\n' + modifiedContent;
     }
-    console.log('Added #include <fstream>');
+    logger.log('Added #include <fstream>');
   }
   
   const mainRange = findMainFunctionRange(modifiedContent);
 
   if (!mainRange) {
-    console.warn('Main function brace parsing failed, skipping injection');
+    logger.warn('Main function brace parsing failed, skipping injection');
     return modifiedContent;
   }
 
@@ -269,16 +270,16 @@ function injectOutputFileReading(mainContent: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('=== Run Code API Called ===');
+  logger.log('=== Run Code API Called ===');
   
   try {
     const body: RunCodeRequest = await request.json();
     const { files, stdin } = body;
 
-    console.log('Files received:', files?.length || 0);
+    logger.log('Files received:', files?.length || 0);
 
     if (!files || !Array.isArray(files) || files.length === 0) {
-      console.log('Invalid files input');
+      logger.log('Invalid files input');
       return NextResponse.json(
         { error: 'At least one file is required' },
         { status: 400 }
@@ -297,7 +298,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Main file:', mainFile.name);
+    logger.log('Main file:', mainFile.name);
 
     // Get all other files (including .txt files and other .cpp files)
     const otherFiles = files.filter(f => f.name !== mainFile!.name);
@@ -305,21 +306,21 @@ export async function POST(request: NextRequest) {
     // Inject code to auto-display output files created with ofstream
     const modifiedMainContent = injectOutputFileReading(mainFile.content);
     if (modifiedMainContent !== mainFile.content) {
-      console.log('Injected output file reading code');
+      logger.log('Injected output file reading code');
     }
 
     // Encode main file to base64
     const base64Code = Buffer.from(modifiedMainContent).toString('base64');
-    console.log('Main file encoded to base64');
+    logger.log('Main file encoded to base64');
 
     // Create additional files archive - IMPORTANT: ALL other files must be sent
     // This includes .txt files that the user can read from, and other .cpp files
     let additionalFilesBase64: string | undefined;
     
     if (otherFiles.length > 0) {
-      console.log('Creating ZIP for', otherFiles.length, 'additional files:', otherFiles.map(f => f.name));
+      logger.log('Creating ZIP for', otherFiles.length, 'additional files:', otherFiles.map(f => f.name));
       additionalFilesBase64 = await createZipArchiveBase64(otherFiles);
-      console.log('Additional files ZIP created');
+      logger.log('Additional files ZIP created');
     }
 
     // Call Judge0 API - use base64 encoding to handle compilation errors with non-UTF-8 characters
@@ -333,7 +334,7 @@ export async function POST(request: NextRequest) {
     
     for (const judge0Url of endpoints) {
       try {
-        console.log(`Attempting to call Judge0 at: ${judge0Url}`);
+        logger.log(`Attempting to call Judge0 at: ${judge0Url}`);
         
         const requestBody: any = {
           source_code: base64Code,
@@ -343,7 +344,7 @@ export async function POST(request: NextRequest) {
         // Add stdin if provided
         if (stdin !== undefined && stdin !== null && stdin !== '') {
           requestBody.stdin = Buffer.from(stdin).toString('base64');
-          console.log('Added stdin to request (length:', stdin.length, 'chars)');
+          logger.log('Added stdin to request (length:', stdin.length, 'chars)');
         }
 
         // Add additional files if present
@@ -360,26 +361,26 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify(requestBody),
         });
 
-        console.log(`Judge0 response status: ${response.status}`);
+        logger.log(`Judge0 response status: ${response.status}`);
 
         if (response.ok) {
-          console.log(`Success with ${judge0Url}`);
+          logger.log(`Success with ${judge0Url}`);
           break; // Success, exit loop
         } else {
           const errorText = await response.text();
           lastError = `Judge0 API error (${response.status}): ${errorText}`;
-          console.warn(`Failed with ${judge0Url}:`, lastError);
+          logger.warn(`Failed with ${judge0Url}:`, lastError);
           response = null;
         }
       } catch (fetchError) {
         lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-        console.error(`Failed to fetch ${judge0Url}:`, fetchError);
+        logger.error(`Failed to fetch ${judge0Url}:`, fetchError);
         response = null;
       }
     }
 
     if (!response || !response.ok) {
-      console.error('All Judge0 endpoints failed. Last error:', lastError);
+      logger.error('All Judge0 endpoints failed. Last error:', lastError);
       return NextResponse.json(
         { error: lastError || 'Failed to connect to Judge0 API' },
         { status: 500 }
@@ -389,20 +390,20 @@ export async function POST(request: NextRequest) {
     let result: Judge0Response;
     try {
       result = await response.json();
-      console.log('Judge0 result status:', result.status?.id, result.status?.description);
+      logger.log('Judge0 result status:', result.status?.id, result.status?.description);
     } catch (parseError) {
       // If JSON parsing fails, try to read as text for debugging
       try {
         const responseClone = response.clone();
         const textResponse = await responseClone.text();
-        console.error('Failed to parse Judge0 JSON response:', parseError);
-        console.error('Response text:', textResponse.substring(0, 500));
+        logger.error('Failed to parse Judge0 JSON response:', parseError);
+        logger.error('Response text:', textResponse.substring(0, 500));
         return NextResponse.json(
           { error: 'Failed to parse Judge0 response', details: textResponse.substring(0, 200) },
           { status: 500 }
         );
       } catch (readError) {
-        console.error('Failed to read Judge0 response:', readError);
+        logger.error('Failed to read Judge0 response:', readError);
         return NextResponse.json(
           { error: 'Failed to read Judge0 response', details: readError instanceof Error ? readError.message : 'Unknown error' },
           { status: 500 }
@@ -416,7 +417,7 @@ export async function POST(request: NextRequest) {
       try {
         return Buffer.from(str, 'base64').toString('utf-8');
       } catch (e) {
-        console.error('Failed to decode base64:', e);
+        logger.error('Failed to decode base64:', e);
         return str; // Return as is if decode fails
       }
     };
@@ -426,8 +427,8 @@ export async function POST(request: NextRequest) {
     // Status ID 6 = Compilation Error
     // Status ID 11+ = Runtime errors, TLE, etc.
     
-    console.log('Judge0 result status:', result.status?.id, result.status?.description);
-    console.log('Has stdout:', !!result.stdout, 'Has stderr:', !!result.stderr, 'Has compile_output:', !!result.compile_output);
+    logger.log('Judge0 result status:', result.status?.id, result.status?.description);
+    logger.log('Has stdout:', !!result.stdout, 'Has stderr:', !!result.stderr, 'Has compile_output:', !!result.compile_output);
     
     const responseData = {
       stdout: decodeBase64(result.stdout),
@@ -438,13 +439,13 @@ export async function POST(request: NextRequest) {
       memory: result.memory || null,
     };
     
-    console.log('Returning decoded response to client');
+    logger.log('Returning decoded response to client');
     return NextResponse.json(responseData);
   } catch (error) {
-    console.error('Error running code:', error);
+    logger.error('Error running code:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error('Error stack:', errorStack);
+    logger.error('Error stack:', errorStack);
     return NextResponse.json(
       { 
         error: 'Internal server error', 

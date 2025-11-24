@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -535,7 +536,7 @@ function InsightChatPageContent() {
         
         if (sessionIdFromQuery) {
           // Verify session exists in loaded sessions
-          const foundSession = loadedSessions.find(s => s.id === sessionIdFromQuery);
+          const foundSession = loadedSessions.find((s: Session) => s.id === sessionIdFromQuery);
           if (foundSession) {
             setSessionId(sessionIdFromQuery);
             await loadSessionMessages(sessionIdFromQuery, accessToken);
@@ -545,7 +546,7 @@ function InsightChatPageContent() {
             // Session not found yet, wait a bit and try loading again
             setTimeout(async () => {
               const refreshedSessions = await loadSessions(accessToken);
-              const foundSession = refreshedSessions.find(s => s.id === sessionIdFromQuery);
+              const foundSession = refreshedSessions.find((s: Session) => s.id === sessionIdFromQuery);
               if (foundSession) {
                 setSessionId(sessionIdFromQuery);
                 await loadSessionMessages(sessionIdFromQuery, accessToken);
@@ -565,7 +566,7 @@ function InsightChatPageContent() {
           
           if (wasOnChatPage && savedSessionId && loadedSessions.length > 0) {
             // User is refreshing the page, restore current session
-            const savedSession = loadedSessions.find(s => s.id === savedSessionId);
+            const savedSession = loadedSessions.find((s: Session) => s.id === savedSessionId);
             if (savedSession) {
               // Session exists, restore it (refresh)
               setSessionId(savedSessionId);
@@ -656,7 +657,7 @@ function InsightChatPageContent() {
     const baseLineHeight = 20; // Base line height in pixels (matching style)
     const paddingVertical = 16; // Top + bottom padding when there's content (8px * 2)
     const lineHeightWithPadding = baseLineHeight + paddingVertical; // Total height per line
-    const maxHeight = (baseLineHeight * 12) + paddingVertical; // 12 rows maximum
+    const maxHeight = (baseLineHeight * 10) + paddingVertical; // 10 rows maximum (UPDATED)
     const minHeight = 28; // Fixed minimum height for one line (when empty: 20px line-height + 8px padding)
     
     // If textarea is empty, set fixed height and return early
@@ -690,7 +691,7 @@ function InsightChatPageContent() {
     textarea.style.maxHeight = originalMaxHeight;
     textarea.style.height = originalHeight;
     
-    // If content fits within 12 rows, grow textarea
+    // If content fits within 10 rows, grow textarea
     if (scrollHeight <= maxHeight) {
       const newHeight = Math.max(minHeight, scrollHeight);
       setTextareaHeight(newHeight);
@@ -701,7 +702,7 @@ function InsightChatPageContent() {
       textarea.style.paddingTop = '8px';
       textarea.style.paddingBottom = '8px';
     } else {
-      // Show scrollbar after 12 rows
+      // Show scrollbar after 10 rows
       setTextareaHeight(maxHeight);
       textarea.style.height = `${maxHeight}px`;
       textarea.style.maxHeight = `${maxHeight}px`;
@@ -1206,7 +1207,7 @@ function InsightChatPageContent() {
     );
   }
 
-  const sidebarBaseClasses = 'bg-[#141414] border-r border-gray-800 flex flex-col';
+  const sidebarBaseClasses = 'bg-[#141414] border-r border-[#2f2f2f] flex flex-col';
   const sidebarClassName = isMobile
     ? `${sidebarBaseClasses} fixed inset-y-0 left-0 z-50 h-full w-[85vw] max-w-xs transform transition-transform duration-300 ${
         mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -1216,6 +1217,25 @@ function InsightChatPageContent() {
 
   return (
     <div className="h-screen bg-[#141414] text-white flex overflow-hidden">
+      <style dangerouslySetInnerHTML={{__html: `
+        .sidebar-scrollable::-webkit-scrollbar {
+          width: 6px;
+        }
+        .sidebar-scrollable::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-scrollable::-webkit-scrollbar-thumb {
+          background: #2f2f2f;
+          border-radius: 3px;
+        }
+        .sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+          background: #3f3f3f;
+        }
+        .sidebar-scrollable {
+          scrollbar-width: thin;
+          scrollbar-color: #2f2f2f transparent;
+        }
+      `}} />
       {/* Sidebar */}
       {isMobile && mobileSidebarOpen && (
         <div
@@ -1226,54 +1246,60 @@ function InsightChatPageContent() {
 
       <div className={sidebarClassName}>
         {/* Logo */}
-        <div className="p-4 border-b border-gray-800 flex items-center justify-start">
-          <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">I</span>
-          </div>
+        <div className="p-4 flex items-center justify-start">
+          <Image
+            src="/insight-logo.png"
+            alt="Insight Logo"
+            width={32}
+            height={32}
+            className="rounded-full"
+          />
         </div>
 
-        {/* Search Bar */}
-        {!sidebarCollapsed && (!isMobile || mobileSidebarOpen) && (
-          <div className="p-3 border-b border-gray-800 space-y-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search Ctrl+K"
-                className="pl-9 pr-3 h-8 bg-[#212121] border-gray-600 text-white placeholder:text-gray-400 text-sm"
-              />
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto relative sidebar-scrollable">
+          {/* Search Bar */}
+          {!sidebarCollapsed && (!isMobile || mobileSidebarOpen) && (
+            <div className="p-3 space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white z-10" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="pl-9 pr-16 h-8 bg-[#212121] border border-[#2f2f2f] rounded-full text-white placeholder:text-white text-sm"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7e7e7e] text-xs pointer-events-none">Ctrl+K</span>
+              </div>
+              <button
+                onClick={handleNewChat}
+                className="w-full px-3 py-2 bg-[#212121] hover:bg-[#2a3038] border border-[#2f2f2f] rounded-xl text-white text-sm font-medium transition-colors flex items-center gap-2 justify-start"
+              >
+                <Plus className="w-4 h-4" />
+                New Chat
+              </button>
             </div>
-            <button
-              onClick={handleNewChat}
-              className="w-full px-3 py-2 bg-[#212121] hover:bg-[#2a3038] border border-gray-700 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2 justify-center"
-            >
-              <Plus className="w-4 h-4" />
-              New Chat
-            </button>
-          </div>
-        )}
-        {showCollapsedUI && sidebarCollapsed && (
-          <div className="p-3 border-b border-gray-800 space-y-2">
-            <button
-              onClick={() => setSidebarCollapsed(false)}
-              className="w-full p-2 rounded hover:bg-gray-800 transition-colors flex items-center justify-center"
-              title="Search"
-            >
-              <Search className="w-4 h-4 text-gray-400" />
-            </button>
-            <button
-              onClick={handleNewChat}
-              className="w-full p-2 rounded hover:bg-gray-800 transition-colors flex items-center justify-center"
-              title="New Chat"
-            >
-              <Plus className="w-4 h-4 text-gray-400" />
-            </button>
-          </div>
-        )}
+          )}
+          {showCollapsedUI && sidebarCollapsed && (
+            <div className="p-3 space-y-2">
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="w-full p-2 rounded hover:bg-gray-800 transition-colors flex items-center justify-center"
+                title="Search"
+              >
+                <Search className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={handleNewChat}
+                className="w-full p-2 rounded hover:bg-gray-800 transition-colors flex items-center justify-center"
+                title="New Chat"
+              >
+                <Plus className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+          )}
 
-        {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto">
+          {/* Sessions List */}
           {sidebarCollapsed ? (
             <div className="py-2 space-y-1">
               {filteredSessions.slice(0, 10).map((session) => (
@@ -1342,7 +1368,7 @@ function InsightChatPageContent() {
                       className={`w-full px-3 py-2 pr-10 text-left text-sm truncate transition-colors ${
                         sessionId === session.id
                           ? 'bg-[#212121] text-white'
-                          : 'text-gray-300 hover:bg-gray-800/50'
+                          : 'text-gray-300 hover:bg-[#2f2f2f]'
                       }`}
                     >
                       {session.title || 'Nou chat'}
@@ -1430,10 +1456,12 @@ function InsightChatPageContent() {
               ))}
             </div>
           )}
+          {/* Fadeout gradient at bottom */}
+          <div className="sticky bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#141414] to-transparent pointer-events-none" />
         </div>
 
         {/* User Avatar & Toggle Sidebar */}
-        <div className={`p-3 border-t border-gray-800 flex items-center gap-2 transition-all duration-300 ${
+        <div className={`p-3 flex items-center gap-2 transition-all duration-300 ${
           sidebarCollapsed ? 'flex-col' : 'flex-row'
         }`}>
           <DropdownMenu>
@@ -1551,6 +1579,11 @@ function InsightChatPageContent() {
           <span className="text-sm font-medium">Înapoi acasă</span>
         </button>
 
+        {/* Mobile fade gradient at top when messages exist */}
+        {isMobile && hasMessages && (
+          <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black to-transparent z-[5] pointer-events-none" />
+        )}
+
         {/* Messages */}
         <div className={`flex-1 overflow-y-auto ${hasMessages ? 'px-8 py-6' : 'px-8'}`} style={{ minHeight: 0 }}>
           {hasMessages ? (
@@ -1562,19 +1595,23 @@ function InsightChatPageContent() {
                   const filteredMessages = messages.filter((m) => m.role !== 'system');
                   const isLastMessage = i === filteredMessages.length - 1;
                   const isLastAssistantMessage = isAssistant && isLastMessage;
+                  const isFirstMessage = i === 0;
                   
                   return (
                     <div
                       key={i}
                       className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
-                      style={isLastAssistantMessage ? { paddingBottom: '70px' } : undefined}
+                      style={{
+                        ...(isLastAssistantMessage ? { paddingBottom: '70px' } : {}),
+                        ...(isFirstMessage ? { paddingTop: '64px' } : {})
+                      }}
                     >
                       {isAssistant ? (
                         <div className="w-full py-2">
                           <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">
                             {m.content === '' && loadingMessage ? (
                               <span className="flex items-center gap-2">
-                                <span>{loadingMessage}</span>
+                                <span className="shimmer-text">{loadingMessage}</span>
                                 <span className="flex gap-1">
                                   <span className="animate-pulse">●</span>
                                   <span className="animate-pulse delay-75">●</span>
@@ -1627,33 +1664,33 @@ function InsightChatPageContent() {
           // Floating chatbar when messages exist
           <div className="absolute bottom-0 left-0 right-0 px-8 py-4 pointer-events-none">
             <div className="max-w-3xl mx-auto">
-              <div className="relative flex items-end gap-2 bg-[#212121] border border-gray-600 rounded-3xl p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-gray-500 transition-all duration-200 drop-shadow-lg max-[600px]:mt-4">
+              <div className="relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] rounded-full p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 drop-shadow-lg max-[600px]:mt-4">
                 <button
                   className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
                   disabled
                   title="Atașează fișier (în curând)"
                 >
-                  <Paperclip className="w-4 h-4 text-gray-400" />
+                  <Paperclip className="w-4 h-4 text-white" />
                 </button>
                 <Textarea
                   ref={textareaRef}
-                  placeholder="What do you want to know?"
+                  placeholder={isMobile ? "Ask Insight" : "What do you want to know?"}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
                   rows={1}
-                  className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="flex-1 bg-transparent border-0 text-white placeholder:text-[#8e8e8e] resize-none focus-visible:ring-0 focus-visible:ring-offset-0 self-center mb-0.5"
                   disabled={busy}
                   style={{ 
-                    minHeight: '28px', 
-                    height: input.trim() ? `${textareaHeight}px` : '28px',
-                    maxHeight: input.trim() ? '288px' : '28px',
-                    overflowY: input.trim() && textareaHeight > 24 * 12 ? 'auto' : 'hidden',
+                    minHeight: '24px', 
+                    height: input.trim() ? `${textareaHeight}px` : '24px',
+                    maxHeight: input.trim() ? '216px' : '24px',
+                    overflowY: input.trim() && textareaHeight > 20 * 10 ? 'auto' : 'hidden',
                     overflowX: 'hidden',
                     fontSize: '14px',
-                    lineHeight: '20px',
-                    paddingTop: input.trim() ? '8px' : '4px',
-                    paddingBottom: input.trim() ? '8px' : '4px',
+                    lineHeight: '24px',
+                    paddingTop: input.trim() ? '8px' : '0px',
+                    paddingBottom: input.trim() ? '8px' : '0px',
                     paddingLeft: '0.75rem',
                     paddingRight: '0.75rem',
                     display: 'block'
@@ -1677,11 +1714,11 @@ function InsightChatPageContent() {
                     disabled={busy || !input.trim()}
                     className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
                   >
-                    <Send className="w-4 h-4 text-gray-400" />
+                    <Send className="w-4 h-4 text-white" />
                   </button>
                 )}
               </div>
-              <div className="text-xs text-gray-500 mt-2 text-center pointer-events-auto max-[600px]:hidden">
+              <div className="text-xs text-[#7e7e7e] mt-2 text-center pointer-events-auto max-[600px]:hidden">
                 Plan Free: limită 3 mesaje/zi. Apasă Enter pentru a trimite, Shift+Enter pentru
                 linie nouă.
               </div>
@@ -1696,33 +1733,33 @@ function InsightChatPageContent() {
                 {formatWelcomeText(welcomeText)}
               </div>
               <div className="w-full">
-                <div className="relative flex items-end gap-2 bg-[#212121] border border-gray-600 rounded-3xl p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-gray-500 transition-all duration-200">
+                <div className="relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] rounded-full p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200">
                   <button
                     className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
                     disabled
                     title="Atașează fișier (în curând)"
                   >
-                    <Paperclip className="w-4 h-4 text-gray-400" />
+                    <Paperclip className="w-4 h-4 text-white" />
                   </button>
                   <Textarea
                     ref={textareaRef}
-                    placeholder="What do you want to know?"
+                    placeholder={isMobile ? "Ask Insight" : "What do you want to know?"}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     rows={1}
-                    className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="flex-1 bg-transparent border-0 text-white placeholder:text-[#8e8e8e] resize-none focus-visible:ring-0 focus-visible:ring-offset-0 self-center mb-0.5"
                     disabled={busy}
                     style={{ 
-                      minHeight: '28px', 
-                      height: input.trim() ? `${textareaHeight}px` : '28px',
-                      maxHeight: input.trim() ? '288px' : '28px',
-                      overflowY: input.trim() && textareaHeight > 24 * 12 ? 'auto' : 'hidden',
+                      minHeight: '24px', 
+                      height: input.trim() ? `${textareaHeight}px` : '24px',
+                      maxHeight: input.trim() ? '216px' : '24px',
+                      overflowY: input.trim() && textareaHeight > 20 * 10 ? 'auto' : 'hidden',
                       overflowX: 'hidden',
                       fontSize: '14px',
-                      lineHeight: '20px',
-                      paddingTop: input.trim() ? '8px' : '4px',
-                      paddingBottom: input.trim() ? '8px' : '4px',
+                      lineHeight: '24px',
+                      paddingTop: input.trim() ? '8px' : '0px',
+                      paddingBottom: input.trim() ? '8px' : '0px',
                       paddingLeft: '0.75rem',
                       paddingRight: '0.75rem',
                       display: 'block'
@@ -1746,7 +1783,7 @@ function InsightChatPageContent() {
                       disabled={busy || !input.trim()}
                       className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
                     >
-                      <Send className="w-4 h-4 text-gray-400" />
+                      <Send className="w-4 h-4 text-white" />
                     </button>
                   )}
                 </div>
@@ -1765,7 +1802,7 @@ function InsightChatPageContent() {
         {!hasMessages && (
           <div className="absolute bottom-4 left-0 right-0 px-8 pointer-events-none">
             <div className="max-w-3xl mx-auto">
-              <div className="text-xs text-gray-500 text-center pointer-events-auto">
+              <div className="text-xs text-[#7e7e7e] text-center pointer-events-auto">
                 Plan Free: limită 3 mesaje/zi. Apasă Enter pentru a trimite, Shift+Enter pentru
                 linie nouă.
               </div>

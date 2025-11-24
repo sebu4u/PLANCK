@@ -20,6 +20,10 @@ export function DailyActivityCard({
 }: DailyActivityCardProps) {
   const today = new Date()
   const todayString = today.toISOString().split("T")[0]
+  
+  // Get today's time from activities array (more accurate than total_time_minutes)
+  const todayActivity = activities.find(a => a.activity_date === todayString)
+  const timeTodayActual = todayActivity?.time_minutes || 0
 
   // Formatter pentru header (data de azi, format complet)
   const todayFullLabel = today.toLocaleDateString("ro-RO", {
@@ -42,12 +46,18 @@ export function DailyActivityCard({
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day)
       const dateString = date.toISOString().split("T")[0]
-      const activity = activities.find(a => a.activity_date === dateString)
+      // Normalize activity_date to ensure proper comparison (handle both date strings and Date objects)
+      const activity = activities.find(a => {
+        const activityDate = typeof a.activity_date === 'string' 
+          ? a.activity_date 
+          : new Date(a.activity_date).toISOString().split('T')[0]
+        return activityDate === dateString
+      })
 
       heatmapDays.push({
         date: dateString,
-        level: activity?.activity_level || 0,
-        count: activity?.problems_solved || 0,
+        level: activity?.activity_level ?? 0,
+        count: activity?.problems_solved ?? 0,
         isToday: dateString === todayString,
       })
     }
@@ -98,24 +108,24 @@ export function DailyActivityCard({
           <div>
             <p className="text-xs text-white/60">Streak Curent</p>
             <p className="text-2xl font-bold text-white/90 flex items-center gap-1">
-              {currentStreak} <span className="text-lg">🔥</span>
+              {currentStreak ?? 0} <span className="text-lg">🔥</span>
             </p>
           </div>
           <div>
             <p className="text-xs text-white/60">Best Streak</p>
-            <p className="text-2xl font-bold text-white/70">{bestStreak}</p>
+            <p className="text-2xl font-bold text-white/70">{bestStreak ?? 0}</p>
           </div>
         </div>
         <div className="text-right">
           <p className="text-xs text-white/60">Astăzi</p>
           <p className={`text-sm ${
-            Math.min(problemsToday, 3) === 3 
+            Math.min(problemsToday ?? 0, 3) === 3 
               ? 'text-green-500 font-semibold' 
               : 'text-white/85'
           }`}>
-            {Math.min(problemsToday, 3)}/3 probleme
+            {Math.min(problemsToday ?? 0, 3)}/3 probleme
           </p>
-          <p className="text-sm text-white/85">{timeToday} min</p>
+          <p className="text-sm text-white/85">{timeTodayActual} min</p>
         </div>
       </div>
 
@@ -176,12 +186,12 @@ export function DailyActivityCard({
       </div>
 
       {/* Motivational Message */}
-      {currentStreak > 0 && (
+      {(currentStreak ?? 0) > 0 && (
         <div className="mt-4 p-3 bg-white/[0.03] rounded-lg border border-white/5">
           <p className="text-sm text-white/70">
-            {problemsToday === 0
-              ? `🔥 Complete 1 more problem to save your ${currentStreak}-day streak!`
-              : `✨ Great work! Your streak is ${currentStreak} days and counting!`}
+            {(problemsToday ?? 0) === 0
+              ? `🔥 Complete 1 more problem to save your ${currentStreak ?? 0}-day streak!`
+              : `✨ Great work! Your streak is ${currentStreak ?? 0} days and counting!`}
           </p>
         </div>
       )}

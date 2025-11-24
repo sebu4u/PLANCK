@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Server-side: access environment variables directly
+// These are validated at build time in next.config.mjs
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase env vars for server client');
+  throw new Error('Missing Supabase env vars for server client: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
 }
 
 /**

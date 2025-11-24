@@ -3,6 +3,7 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { isAdmin, getAccessTokenFromRequest } from "@/lib/admin-check"
 import { currentMonthKey } from "@/lib/monthly-free-rotation"
+import { logger } from "@/lib/logger"
 
 /**
  * GET - Obține problemele selectate manual pentru o lună
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
       .eq("month_key", monthKey)
 
     if (selectError) {
-      console.error("[admin/monthly-free-problems] Failed to fetch selections:", selectError)
+      logger.error("[admin/monthly-free-problems] Failed to fetch selections:", selectError)
       return NextResponse.json({ error: "Nu am putut încărca selecțiile." }, { status: 500 })
     }
 
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
       .in("id", problemIds)
 
     if (problemsError) {
-      console.error("[admin/monthly-free-problems] Failed to fetch problems:", problemsError)
+      logger.error("[admin/monthly-free-problems] Failed to fetch problems:", problemsError)
       return NextResponse.json({ error: "Nu am putut încărca detaliile problemelor." }, { status: 500 })
     }
 
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
       problems: problems || [],
     })
   } catch (err: any) {
-    console.error("[admin/monthly-free-problems] GET error:", err)
+    logger.error("[admin/monthly-free-problems] GET error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
       .in("id", problem_ids)
 
     if (checkError) {
-      console.error("[admin/monthly-free-problems] Failed to verify problems:", checkError)
+      logger.error("[admin/monthly-free-problems] Failed to verify problems:", checkError)
       return NextResponse.json({ error: "Nu am putut verifica problemele." }, { status: 500 })
     }
 
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
       .eq("month_key", month_key)
 
     if (deleteError) {
-      console.error("[admin/monthly-free-problems] Failed to delete existing selections:", deleteError)
+      logger.error("[admin/monthly-free-problems] Failed to delete existing selections:", deleteError)
       return NextResponse.json({ error: "Nu am putut șterge selecțiile existente." }, { status: 500 })
     }
 
@@ -148,7 +149,7 @@ export async function POST(req: NextRequest) {
       .select()
 
     if (insertError) {
-      console.error("[admin/monthly-free-problems] Failed to insert selections:", insertError)
+      logger.error("[admin/monthly-free-problems] Failed to insert selections:", insertError)
       return NextResponse.json({ error: "Nu am putut salva selecțiile." }, { status: 500 })
     }
 
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
       problem_ids: validProblemIds,
     })
   } catch (err: any) {
-    console.error("[admin/monthly-free-problems] POST error:", err)
+    logger.error("[admin/monthly-free-problems] POST error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }
@@ -198,7 +199,7 @@ export async function DELETE(req: NextRequest) {
       .eq("month_key", monthKey)
 
     if (deleteError) {
-      console.error("[admin/monthly-free-problems] Failed to delete selections:", deleteError)
+      logger.error("[admin/monthly-free-problems] Failed to delete selections:", deleteError)
       return NextResponse.json({ error: "Nu am putut șterge selecțiile." }, { status: 500 })
     }
 
@@ -208,7 +209,7 @@ export async function DELETE(req: NextRequest) {
       message: "Selecțiile au fost șterse. Sistemul va folosi algoritmul automat.",
     })
   } catch (err: any) {
-    console.error("[admin/monthly-free-problems] DELETE error:", err)
+    logger.error("[admin/monthly-free-problems] DELETE error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }

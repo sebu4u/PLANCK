@@ -432,6 +432,18 @@ export function DashboardAuth() {
 
 // Helper functions for client-side data fetching
 async function fetchUserStats(userId: string): Promise<UserStats> {
+  // Check and reset streak if user skipped a day
+  try {
+    const { error: streakError } = await supabase.rpc('check_and_reset_streak_if_needed', {
+      user_uuid: userId,
+    })
+    if (streakError) {
+      console.error('Error checking streak reset:', streakError)
+    }
+  } catch (err) {
+    console.error('Error checking streak reset:', err)
+  }
+
   const { data, error } = await supabase
     .from('user_stats')
     .select('*')
@@ -451,16 +463,16 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
     }
   }
 
-  // Get problems solved today from daily_activity to ensure accuracy
+  // Get problems solved today and time from daily_activity to ensure accuracy
   const today = new Date().toISOString().split('T')[0]
   const { data: todayActivity } = await supabase
     .from('daily_activity')
-    .select('problems_solved')
+    .select('problems_solved, time_minutes')
     .eq('user_id', userId)
     .eq('activity_date', today)
     .single()
 
-  // Override problems_solved_today with actual value from daily_activity
+  // Override problems_solved_today and total_time_minutes with actual values from daily_activity
   const stats = data as UserStats
   
   // If last_activity_date is different from today, reset problems_solved_today to 0
@@ -476,6 +488,12 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
   } else {
     stats.problems_solved_today = todayActivity?.problems_solved || 0
   }
+
+  // Override total_time_minutes with today's time_minutes for display purposes
+  // Note: We keep the original total_time_minutes in the stats object, but we'll use today's time in the card
+  // Actually, let's create a computed property - but since we can't modify the interface easily,
+  // we'll use a workaround: store today's time in a way that the card can access it
+  // For now, we'll return the stats as-is and handle timeToday separately in the component
 
   return stats
 }

@@ -27,6 +27,7 @@ interface Board {
   title: string;
   updated_at: string;
   created_at: string;
+  room_id?: string;
 }
 
 interface BoardCardProps {
@@ -112,7 +113,13 @@ export function BoardCard({ board, onUpdate }: BoardCardProps) {
   };
 
   const handleCardClick = () => {
-    router.push(`/sketch/board/${board.id}`);
+    // If board has a room_id (PartyKit board), navigate to the PartyKit page
+    // Otherwise, fall back to the legacy board page
+    if (board.room_id) {
+      router.push(`/sketch/${board.room_id}`);
+    } else {
+      router.push(`/sketch/board/${board.id}`);
+    }
   };
 
   return (
@@ -123,7 +130,7 @@ export function BoardCard({ board, onUpdate }: BoardCardProps) {
       >
         {/* Preview Area */}
         <div className="aspect-video w-full bg-black/30 relative overflow-hidden">
-          <BoardPreview boardId={board.id} className="absolute inset-0" />
+          <BoardPreview boardId={board.id} roomId={board.room_id} className="absolute inset-0" />
         </div>
 
         {/* Card Footer */}

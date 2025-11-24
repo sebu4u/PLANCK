@@ -326,8 +326,10 @@ create policy "dashboard_updates_select_all"
 -- FUNCTIONS
 -- ============================================
 
--- Function to update user streak
-create or replace function public.update_user_streak(user_uuid uuid)
+-- Function to check and reset streak if needed (called when viewing dashboard)
+-- This resets streak to 0 if user skipped a day, and updates best_streak
+-- NOTE: This only checks last_activity_date, not daily_activity, to avoid race conditions
+create or replace function public.check_and_reset_streak_if_needed(user_uuid uuid)
 returns void as $$
 declare
   last_activity date;
@@ -335,6 +337,44 @@ declare
   current_streak_count integer;
 begin
   -- Get last activity date and current streak
+  select last_activity_date, current_streak into last_activity, current_streak_count
+  from public.user_stats
+  where user_id = user_uuid;
+
+  -- If no activity yet, do nothing (will be initialized when solving first problem)
+  if last_activity is null then
+    return;
+  end if;
+
+  -- If activity is today, do nothing (user has activity today)
+  if last_activity = today then
+    return;
+  end if;
+
+  -- If last activity was before today (including yesterday), reset streak to 0 and update best_streak
+  -- This covers both cases: yesterday (last_activity = today - 1 day) and older (last_activity < today - 1 day)
+  if last_activity < today then
+    update public.user_stats
+    set current_streak = 0,
+        best_streak = greatest(best_streak, current_streak_count)
+    where user_id = user_uuid;
+  end if;
+end;
+$$ language plpgsql security definer;
+
+-- Function to update user streak (called when solving a problem)
+-- NOTE: This function is called AFTER last_activity_date is updated to today in award_elo_for_problem
+-- We use old_last_activity_date (saved before update) to determine if we should increment or reset streak
+create or replace function public.update_user_streak(user_uuid uuid, old_last_activity_date date default null)
+returns void as $$
+declare
+  last_activity date;
+  today date := current_date;
+  current_streak_count integer;
+  has_activity_yesterday boolean;
+  old_activity date;
+begin
+  -- Get current values
   select last_activity_date, current_streak into last_activity, current_streak_count
   from public.user_stats
   where user_id = user_uuid;
@@ -349,23 +389,42 @@ begin
     return;
   end if;
 
-  -- If activity is today, do nothing
-  if last_activity = today then
+  -- Determine old last_activity_date
+  -- If provided as parameter, use it; otherwise try to infer from daily_activity
+  if old_last_activity_date is not null then
+    old_activity := old_last_activity_date;
+  else
+    -- Try to get from daily_activity (check yesterday)
+    select activity_date into old_activity
+    from public.daily_activity
+    where user_id = user_uuid
+      and activity_date = today - interval '1 day'
+      and problems_solved > 0
+    limit 1;
+    
+    -- If not found, assume gap (will reset to 1)
+    if old_activity is null then
+      old_activity := today - interval '2 days'; -- Force gap > 1 day
+    end if;
+  end if;
+
+  -- If activity is today (shouldn't happen as we just updated it, but check anyway)
+  if old_activity = today then
     return;
   end if;
 
   -- If activity was yesterday, increment streak
-  if last_activity = today - interval '1 day' then
+  if old_activity = today - interval '1 day' then
     update public.user_stats
     set current_streak = current_streak + 1,
-        best_streak = greatest(best_streak, current_streak + 1),
-        last_activity_date = today
+        best_streak = greatest(best_streak, current_streak + 1)
     where user_id = user_uuid;
-  -- If gap is more than 1 day, reset streak
+  -- If gap is more than 1 day OR current_streak is 0 (was reset), set to 1
   else
+    -- Update best_streak before resetting (use current_streak_count which might be 0 if reset)
     update public.user_stats
-    set current_streak = 1,
-        last_activity_date = today
+    set best_streak = greatest(best_streak, current_streak_count),
+        current_streak = 1
     where user_id = user_uuid;
   end if;
 end;
@@ -460,6 +519,7 @@ declare
   challenge_id uuid;
   challenge_bonus integer;
   challenge_completed boolean;
+  old_last_activity_date date;
 begin
   -- Get problem difficulty (handle both text and uuid types)
   -- Try direct match first, then try casting
@@ -515,13 +575,19 @@ begin
   values (user_uuid, 500, 'Bronze III')
   on conflict (user_id) do nothing;
   
+  -- Save old last_activity_date before updating (needed for streak calculation)
+  select last_activity_date into old_last_activity_date
+  from public.user_stats
+  where user_id = user_uuid;
+  
   -- Update user_stats: increment ELO, problems solved
   -- IMPORTANT: Reset problems_solved_today to 0 if last_activity_date is different from today
   -- Then increment it to 1 (so it becomes 1, not 0+1 from previous day)
+  -- NOTE: We update last_activity_date here, but update_user_streak will use old_last_activity_date
   update public.user_stats
   set elo = elo + elo_to_award,
       problems_solved_today = case 
-        when last_activity_date is distinct from today_date then 1
+        when old_last_activity_date is distinct from today_date then 1
         else problems_solved_today + 1
       end,
       problems_solved_total = problems_solved_total + 1,
@@ -600,8 +666,8 @@ begin
     set activity_level = new_activity_level
     where user_id = user_uuid and activity_date = today_date;
     
-    -- Update streak
-    perform public.update_user_streak(user_uuid);
+    -- Update streak (pass old_last_activity_date so function knows if we should increment or reset)
+    perform public.update_user_streak(user_uuid, old_last_activity_date);
     
     -- Check and award badges (already exists)
     perform public.check_and_award_badges(user_uuid);

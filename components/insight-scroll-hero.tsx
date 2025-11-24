@@ -93,19 +93,20 @@ export default function InsightScrollHero() {
               <button
                 onClick={handleChatClick}
                 disabled={busy}
-                className="relative w-full flex items-end gap-2 bg-[#212121] border border-gray-600 rounded-2xl p-2 sm:p-3 shadow-lg backdrop-blur-sm hover:shadow-xl hover:border-gray-500 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative w-full flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] rounded-full p-2 sm:p-3 shadow-lg backdrop-blur-sm hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="p-1.5 sm:p-2 rounded flex-shrink-0 pointer-events-none">
-                  <Paperclip className="w-4 h-4 text-gray-400" />
+                  <Paperclip className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex-1 text-left text-white placeholder:text-gray-400 text-sm sm:text-base pointer-events-none min-h-[24px] flex items-center">
-                  <span className="text-gray-400">What do you want to know?</span>
+                <div className="flex-1 text-left text-white placeholder:text-[#8e8e8e] text-sm sm:text-base pointer-events-none min-h-[24px] flex items-center self-center mb-0.5">
+                  <span className="text-[#8e8e8e] sm:hidden">Ask Insight</span>
+                  <span className="text-[#8e8e8e] hidden sm:block">What do you want to know?</span>
                 </div>
                 <div className="p-1.5 sm:p-2 rounded flex-shrink-0 pointer-events-none">
-                  <Send className="w-4 h-4 text-gray-400" />
+                  <Send className="w-4 h-4 text-white" />
                 </div>
               </button>
-              <div className="text-[10px] sm:text-xs text-gray-500 mt-1.5 sm:mt-2 text-center px-2">
+              <div className="text-[10px] sm:text-xs text-[#7e7e7e] mt-1.5 sm:mt-2 text-center px-2">
                 Plan Free: limită 3 mesaje/zi. Apasă Enter pentru a trimite, Shift+Enter pentru
                 linie nouă.
               </div>

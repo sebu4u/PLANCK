@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Chrome, Github, Loader2, Send, X, Copy, Check, Sparkles, ChevronDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
+import Image from "next/image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -241,6 +242,7 @@ export function InsightIdeChat({
   const [shouldSendContext, setShouldSendContext] = useState(false)
   const [mode, setMode] = useState<"agent" | "ask">("agent")
   const [selectedModel, setSelectedModel] = useState("gpt-4o-mini")
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => message.role !== "system"),
@@ -332,6 +334,7 @@ export function InsightIdeChat({
 
     setBusy(true)
     setIsStreaming(true)
+    setIsGenerating(false)
     setError(null)
 
     try {
@@ -498,20 +501,62 @@ export function InsightIdeChat({
             if (data.type === "text" && data.content) {
               assistantBuffer += data.content
               
-              // Always show the text as it streams, even if we detect JSON
-              setMessages((prev) => {
-                const updated = [...prev]
-                for (let i = updated.length - 1; i >= 0; i--) {
-                  if (updated[i].role === "assistant") {
-                    updated[i] = {
-                      ...updated[i],
-                      content: (updated[i].content || "") + data.content,
+              // Detect if content looks like JSON (code_edit type) - check early
+              // Check for JSON patterns: opening brace, "type" field, or "code_edit"
+              const hasOpeningBrace = assistantBuffer.includes('{')
+              const hasTypeField = assistantBuffer.includes('"type"') || assistantBuffer.includes("'type'")
+              const hasCodeEdit = assistantBuffer.includes('code_edit') || assistantBuffer.includes('codeEdit')
+              
+              // Early detection: if we see opening brace and type field, likely JSON
+              // Or if we see code_edit pattern
+              // Also check the new content chunk itself for JSON patterns
+              const newContentHasJson = data.content.includes('{') || 
+                                       data.content.includes('"type"') ||
+                                       data.content.includes('code_edit')
+              
+              const looksLikeJson = (hasOpeningBrace && hasTypeField) || 
+                                   (hasOpeningBrace && hasCodeEdit) ||
+                                   (hasTypeField && hasCodeEdit) ||
+                                   (hasOpeningBrace && newContentHasJson)
+              
+              if (looksLikeJson && mode === "agent") {
+                // JSON detected - set generating flag and don't show content
+                if (!isGenerating) {
+                  console.log("Insight: JSON detected, setting isGenerating to true")
+                  setIsGenerating(true)
+                  // Clear any existing content from the message to show only "Generating..."
+                  setMessages((prev) => {
+                    const updated = [...prev]
+                    for (let i = updated.length - 1; i >= 0; i--) {
+                      if (updated[i].role === "assistant") {
+                        updated[i] = {
+                          ...updated[i],
+                          content: "",
+                        }
+                        break
+                      }
                     }
-                    break
-                  }
+                    return updated
+                  })
                 }
-                return updated
-              })
+                // Don't update message content when generating JSON
+              } else if (!isGenerating) {
+                // Normal text - show as it streams (only if not generating)
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === "assistant") {
+                      updated[i] = {
+                        ...updated[i],
+                        content: (updated[i].content || "") + data.content,
+                      }
+                      break
+                    }
+                  }
+                  return updated
+                })
+              }
+              // If isGenerating is true, don't update message content at all
             } else if (data.type === "session" && data.sessionId) {
               setSessionId(data.sessionId)
             } else if (data.type === "error") {
@@ -529,6 +574,9 @@ export function InsightIdeChat({
 
         if (structured?.type === "code_edit") {
           console.log("Insight: Found code_edit JSON:", structured)
+          // Reset generating flag
+          setIsGenerating(false)
+          
           if (mode === "agent") {
             // Apply the code changes
             const applied = onApplyCodeEdit(structured)
@@ -663,6 +711,7 @@ export function InsightIdeChat({
           }
         } else if (mode === "agent") {
           // No structured edit; auto-insert any code snippets into IDE and avoid leaving full code in chat
+          setIsGenerating(false)
           const segments = parseSegments(assistantBuffer)
           const codeSegments = segments.filter((s) => s.type === "code") as Array<{ type: "code"; content: string }>
           if (codeSegments.length > 0) {
@@ -687,14 +736,21 @@ export function InsightIdeChat({
               return updated
             })
           }
+        } else {
+          // Ask mode without code_edit - reset generating flag
+          setIsGenerating(false)
         }
         // Otherwise (Ask mode without code_edit), keep the original message as-is
+      } else {
+        // No JSON detected - reset generating flag
+        setIsGenerating(false)
       }
     } catch (err) {
       if ((err as any)?.name === "AbortError") {
         return
       }
       console.error("Insight IDE chat error:", err)
+      setIsGenerating(false)
       const message =
         err instanceof Error ? err.message : "Eroare la comunicarea cu Insight."
       setError(message)
@@ -707,6 +763,7 @@ export function InsightIdeChat({
       abortControllerRef.current = null
       setBusy(false)
       setIsStreaming(false)
+      setIsGenerating(false)
       setShouldSendContext(false)
     }
   }, [
@@ -722,6 +779,7 @@ export function InsightIdeChat({
     onApplyCodeEdit,
     onInsertCode,
     mode,
+    isGenerating,
   ])
 
   const handleGoogleLogin = useCallback(async () => {
@@ -790,7 +848,22 @@ export function InsightIdeChat({
   )
 
   const renderAssistantMessage = useCallback(
-    (content: string, index: number) => {
+    (content: string, index: number, isLastMessage: boolean = false) => {
+      // Show generating message if this is the last message and we're generating
+      // Show it even if content exists (it will be replaced after JSON processing)
+      if (isLastMessage && isGenerating) {
+        return (
+          <div className="flex items-center justify-center py-8">
+            <span className="text-shimmer text-lg font-medium">Generating...</span>
+          </div>
+        )
+      }
+      
+      // If content is empty and this is the last message, don't render anything
+      if (!content.trim() && isLastMessage) {
+        return null
+      }
+      
       const segments = parseSegments(content)
       if (segments.length === 0) {
         if (!content.trim()) {
@@ -877,7 +950,7 @@ export function InsightIdeChat({
         </div>
       )
     },
-    [copiedSnippet, handleCopySnippet, handleInsertSnippet, markdownComponents, mode],
+    [copiedSnippet, handleCopySnippet, handleInsertSnippet, markdownComponents, mode, isGenerating],
   )
 
   return (
@@ -887,9 +960,13 @@ export function InsightIdeChat({
     >
       <header className="flex items-center justify-between px-4 py-3 border-b border-[#3b3b3b]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#1f6feb] flex items-center justify-center text-white text-sm font-semibold">
-            AI
-          </div>
+          <Image
+            src="/insight-logo.png"
+            alt="Insight Logo"
+            width={32}
+            height={32}
+            className="rounded-full"
+          />
           <div>
             <h2 className="text-white font-semibold text-base">Insight</h2>
             <p className="text-xs text-gray-400">
@@ -954,6 +1031,7 @@ export function InsightIdeChat({
             ) : (
               visibleMessages.map((message, index) => {
                 const isAssistant = message.role === "assistant"
+                const isLastMessage = index === visibleMessages.length - 1
                 return (
                   <div
                     key={`${message.role}-${index}`}
@@ -962,7 +1040,7 @@ export function InsightIdeChat({
                     {isAssistant ? (
                       <div className="w-full lg:max-w-none space-y-3">
                         <div className="text-xs uppercase tracking-wide text-gray-500">Insight</div>
-                        {renderAssistantMessage(message.content, index)}
+                        {renderAssistantMessage(message.content, index, isLastMessage)}
                       </div>
                     ) : (
                       <div className="max-w-[75%] rounded-2xl bg-[#262626] text-white px-4 py-3 shadow-sm">
@@ -979,7 +1057,7 @@ export function InsightIdeChat({
               })
             )}
 
-            {busy && (
+            {busy && !isGenerating && (
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Insight scrie...

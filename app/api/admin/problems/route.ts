@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { isAdmin, getAccessTokenFromRequest } from "@/lib/admin-check"
+import { logger } from "@/lib/logger"
 
 /**
  * GET - Obține toate problemele de fizică pentru interfața admin
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
     const { data: problems, error: problemsError } = await query
 
     if (problemsError) {
-      console.error("[admin/problems] Failed to fetch problems:", problemsError)
+      logger.error("[admin/problems] Failed to fetch problems:", problemsError)
       return NextResponse.json({ error: "Nu am putut încărca problemele." }, { status: 500 })
     }
 
@@ -63,10 +64,12 @@ export async function GET(req: NextRequest) {
       count: problems?.length || 0,
     })
   } catch (err: any) {
-    console.error("[admin/problems] GET error:", err)
+    logger.error("[admin/problems] GET error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }
+
+
 
 
 
