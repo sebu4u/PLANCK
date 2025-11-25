@@ -14,3 +14,6 @@ update public.sketch_boards
 set room_id = encode(gen_random_bytes(8), 'hex')
 where room_id is null;
 
+
+
+

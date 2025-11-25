@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 
@@ -55,6 +56,8 @@ int main() {
     cout << "Hello World!" << endl;
     return 0;
 }`
+
+const STORAGE_KEY = 'planckcode-ide-state'
 
 const MONACO_THEME_DEFINITIONS: Record<PlanckCodeThemeId, MonacoEditor.IStandaloneThemeData> = {
   'planck-dark': {
@@ -376,16 +379,58 @@ interface RunResponse {
 export default function IDEPage() {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
-  const [files, setFiles] = useState<FileItem[]>([
-    { id: '1', name: 'main.cpp', content: defaultCode, type: 'cpp' }
-  ])
-  const [activeFileId, setActiveFileId] = useState<string>('1')
+  
+  // Load saved state from localStorage on mount
+  const loadSavedState = (): { files: FileItem[], activeFileId: string } | null => {
+    if (typeof window === 'undefined') return null
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Validate the structure
+        if (
+          parsed &&
+          Array.isArray(parsed.files) &&
+          parsed.files.length > 0 &&
+          typeof parsed.activeFileId === 'string'
+        ) {
+          // Ensure all required fields exist
+          const validFiles = parsed.files.every((f: any) =>
+            f && typeof f.id === 'string' && typeof f.name === 'string' && 
+            typeof f.content === 'string' && (f.type === 'cpp' || f.type === 'txt')
+          )
+          
+          if (validFiles) {
+            // Ensure activeFileId exists in files, otherwise use first file
+            const activeFileExists = parsed.files.find((f: FileItem) => f.id === parsed.activeFileId)
+            return {
+              files: parsed.files,
+              activeFileId: activeFileExists ? parsed.activeFileId : parsed.files[0].id
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load IDE state from localStorage:', error)
+    }
+    return null
+  }
+
+  const savedState = loadSavedState()
+  const [files, setFiles] = useState<FileItem[]>(() => {
+    return savedState?.files || [{ id: '1', name: 'main.cpp', content: defaultCode, type: 'cpp' }]
+  })
+  const [activeFileId, setActiveFileId] = useState<string>(() => {
+    return savedState?.activeFileId || '1'
+  })
   const [output, setOutput] = useState<RunResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
   const [stdin, setStdin] = useState<string>('')
   const [isInsightOpen, setIsInsightOpen] = useState<boolean>(false)
+  const searchParams = useSearchParams()
   
   // Interactive execution state
   const [isInteractiveMode, setIsInteractiveMode] = useState<boolean>(true)
@@ -397,10 +442,33 @@ export default function IDEPage() {
   const [compilerAvailable, setCompilerAvailable] = useState<boolean | null>(null)
   const [pendingInsightEdit, setPendingInsightEdit] = useState<PendingInsightEdit | null>(null)
   
+  // Save state to localStorage whenever files or activeFileId changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    try {
+      const stateToSave = {
+        files,
+        activeFileId
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave))
+    } catch (error) {
+      console.warn('Failed to save IDE state to localStorage:', error)
+    }
+  }, [files, activeFileId])
+
+  // Auto-open Insight sidebar based on query param (e.g., ?agent=open)
+  useEffect(() => {
+    const intent = searchParams?.get('agent')
+    if (intent === 'open') {
+      setIsInsightOpen(true)
+    }
+  }, [searchParams])
+
   // New file dialog state
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState<boolean>(false)
   const [newFileName, setNewFileName] = useState<string>('')
-  const [newFileType, setNewFileType] = useState<'cpp' | 'txt'>('cpp')
+  const [newFileType, setNewFileType] = useState<'cpp' | 'txt'>('txt')
   
   // Editor references
   const editorRef = useRef<import('monaco-editor').editor.IStandaloneCodeEditor | null>(null)
@@ -591,7 +659,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
     setActiveFileId(newFile.id)
     setIsNewFileDialogOpen(false)
     setNewFileName('')
-    setNewFileType('cpp')
+    setNewFileType('txt')
   }
 
   const handleDeleteFile = (fileId: string) => {
@@ -1632,7 +1700,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
                 <SelectTrigger className="bg-[#2d2d2d] border-[#3b3b3b] text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#2d2d2d] border-[#3b3b3b] text-white">
+                <SelectContent className="z-[350] bg-[#2d2d2d] border-[#3b3b3b] text-white">
                   <SelectItem value="cpp">C++ (.cpp)</SelectItem>
                   <SelectItem value="txt">Text (.txt)</SelectItem>
                 </SelectContent>

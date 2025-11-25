@@ -75,6 +75,40 @@
   }
 }
 
+/* Prevent mobile Chrome address bar from affecting viewport */
+@media (max-width: 768px) {
+  html {
+    /* Prevent address bar from hiding/showing on scroll */
+    height: 100%;
+    height: -webkit-fill-available;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  body {
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+    /* Prevent pull-to-refresh and overscroll that causes address bar to hide */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    /* Allow scrolling but prevent bounce effects */
+    touch-action: pan-y;
+    /* Prevent address bar interaction */
+    position: relative;
+    width: 100%;
+  }
+  
+  /* Prevent overscroll on scrollable containers */
+  main,
+  [role="main"],
+  [data-scrollable],
+  .overflow-y-auto,
+  .overflow-auto {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Custom Scrollbar Styles for Dashboard */
 .dashboard-scrollbar {
   scrollbar-width: thin;

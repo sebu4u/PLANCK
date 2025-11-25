@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { PlanckCodeSidebar } from "@/components/planckcode-sidebar"
@@ -52,18 +53,24 @@ export default function PlanckCodePage() {
 
             {/* CTA Buttons */}
             <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4">
-              <Button 
-                size="lg" 
+              <Button
+                asChild
+                size="lg"
                 className="bg-white text-black hover:bg-gray-200 transition-all duration-300 font-vt323 text-lg sm:text-xl px-8 py-6 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
               >
-                Începe gratuit
+                <Link href="/planckcode/ide">
+                  Începe gratuit
+                </Link>
               </Button>
-              <Button 
+              <Button
+                asChild
                 variant="outline"
-                size="lg" 
+                size="lg"
                 className="bg-transparent border-white text-white hover:bg-white hover:text-black transition-all duration-300 font-vt323 text-lg sm:text-xl px-8 py-6 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
               >
-                Vezi cursurile de C++
+                <Link href="/planckcode/learn">
+                  Vezi cursurile de C++
+                </Link>
               </Button>
             </div>
           </div>
@@ -91,8 +98,15 @@ export default function PlanckCodePage() {
               <Button size="lg" className="bg-white text-black hover:bg-gray-200 font-vt323 text-xl px-8 py-6">
                 Deschide setul de probleme
               </Button>
-              <Button variant="outline" size="lg" className="bg-transparent border border-white text-white hover:bg-white/10 font-vt323 text-xl px-8 py-6">
-                Vezi leaderboard
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="bg-transparent border border-white text-white hover:bg-white/10 font-vt323 text-xl px-8 py-6"
+              >
+                <Link href="/planckcode/leaderboards">
+                  Vezi leaderboard
+                </Link>
               </Button>
             </div>
           </div>
@@ -187,8 +201,14 @@ export default function PlanckCodePage() {
             <div className="scroll-animate-fade-right font-vt323 space-y-6 text-gray-300 text-lg leading-relaxed">
               <p className="text-2xl text-white">Nu este un „AI care scrie cod".</p>
               <p>Este un partener de antrenament pentru olimpiade, proiecte și învățare rapidă.</p>
-              <Button size="lg" className="bg-white text-black hover:bg-gray-100 font-vt323 text-xl px-8 py-6">
-                Activează Agentul PlanckCode
+              <Button
+                asChild
+                size="lg"
+                className="bg-white text-black hover:bg-gray-100 font-vt323 text-xl px-8 py-6"
+              >
+                <Link href="/planckcode/ide?agent=open">
+                  Activează Agentul PlanckCode
+                </Link>
               </Button>
             </div>
           </div>
@@ -396,10 +416,13 @@ export default function PlanckCodePage() {
             </p>
             <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button 
+                asChild
                 size="lg" 
                 className="bg-white text-black hover:bg-gray-200 transition-all duration-300 font-vt323 text-xl sm:text-2xl px-10 py-7"
               >
-                Începe acum gratuit
+                <Link href="/planckcode/ide">
+                  Începe acum gratuit
+                </Link>
               </Button>
               <Button 
                 variant="outline"
