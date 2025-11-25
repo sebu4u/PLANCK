@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
@@ -376,7 +376,7 @@ interface RunResponse {
   memory: number | null
 }
 
-export default function IDEPage() {
+function IDEPageContent() {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
   
@@ -1729,6 +1729,18 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function IDEPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-gray-400">Loading IDE...</div>
+      </div>
+    }>
+      <IDEPageContent />
+    </Suspense>
   )
 }
 
