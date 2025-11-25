@@ -31,13 +31,12 @@ export function CatalogThemeBackground({
       <div className={`relative has-custom-theme`}>
         {/* Fixed background image - stops before footer */}
         <div
-          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat h-screen-mobile"
           style={{
             backgroundImage: `url(${themeImage})`,
             backgroundAttachment: 'fixed',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            height: '100vh',
             maxHeight: '100vh',
           }}
         />

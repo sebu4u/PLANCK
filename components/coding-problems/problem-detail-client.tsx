@@ -224,11 +224,11 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   return (
     <PlanckCodeSettingsProvider>
       <CatalogThemeProvider catalogType="info" pageType="detail">
-        <div className="h-screen bg-[#070707] text-white overflow-hidden flex flex-col">
+        <div className="h-screen-mobile bg-[#070707] text-white overflow-hidden flex flex-col">
           <Navigation />
           <PlanckCodeSidebar />
           
-          <main className="md:ml-16 mt-16 h-[calc(100vh-64px)] flex overflow-hidden">
+          <main className="md:ml-16 mt-16 h-screen-minus-64 flex overflow-hidden">
             {isReady ? (
               <ResizablePanelGroup direction="horizontal" className="flex-1 max-md:flex-col">
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-auto max-md:!min-h-[50vh]">

@@ -1297,11 +1297,11 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
   }
 
   return (
-    <div className="h-screen bg-black text-white overflow-hidden">
+    <div className="h-screen-mobile bg-black text-white overflow-hidden">
       <Navigation />
       <PlanckCodeSidebar />
 
-      <div className="md:ml-16 mt-16 h-[calc(100vh-64px)] flex overflow-hidden">
+      <div className="md:ml-16 mt-16 h-screen-minus-64 flex overflow-hidden">
         <div className={`relative flex-1 flex flex-col overflow-hidden transition-[margin,width] duration-300 ${isInsightOpen ? 'lg:mr-[420px]' : ''}`}>
           {pendingInsightEdit && (
             <div className="absolute right-6 top-3 z-30 flex items-center gap-2 rounded-md bg-[#181818] px-2.5 py-1.5 shadow-lg border border-white/10">
@@ -1654,7 +1654,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
 
       {/* Insight Sidebar */}
       <aside
-        className={`fixed top-16 right-0 h-[calc(100vh-4rem)] w-full max-w-[420px] bg-[#181818] border-l border-[#3b3b3b] transition-transform duration-300 ease-in-out z-40 lg:z-auto ${
+        className={`fixed top-16 right-0 h-screen-minus-4rem w-full max-w-[420px] bg-[#181818] border-l border-[#3b3b3b] transition-transform duration-300 ease-in-out z-40 lg:z-auto ${
           isInsightOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         aria-hidden={!isInsightOpen}
@@ -1735,7 +1735,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
 export default function IDEPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen bg-black text-white flex items-center justify-center">
+      <div className="h-screen-mobile bg-black text-white flex items-center justify-center">
         <div className="text-gray-400">Loading IDE...</div>
       </div>
     }>

@@ -1216,7 +1216,7 @@ function InsightChatPageContent() {
   const showCollapsedUI = !isMobile;
 
   return (
-    <div className="h-screen bg-[#141414] text-white flex overflow-hidden">
+    <div className="h-screen-mobile bg-[#141414] text-white flex overflow-hidden">
       <style dangerouslySetInnerHTML={{__html: `
         .sidebar-scrollable::-webkit-scrollbar {
           width: 6px;

@@ -47,7 +47,7 @@ export function HomePageContent() {
       <Navigation />
 
       {/* Hero Section cu temă spațială */}
-      <section id="hero-section" className="relative h-screen flex items-center overflow-hidden cosmic-bg">
+      <section id="hero-section" className="relative h-screen-mobile flex items-center overflow-hidden cosmic-bg">
         <div className="cosmic-particles"></div>
         <BlackHoleAnimation />
         <div className="absolute inset-0 flex items-center z-10">
@@ -214,7 +214,7 @@ export function HomePageContent() {
           }}
         />
         {/* ColorBends background - only in upper part */}
-        <div className="absolute top-0 left-0 right-0 h-screen w-full z-0">
+        <div className="absolute top-0 left-0 right-0 h-screen-mobile w-full z-0">
           <ColorBends
             colors={["#0000ff", "#00ff00", "#ff0000"]}
             rotation={0}

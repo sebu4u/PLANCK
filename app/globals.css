@@ -2,6 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile viewport height fix utility classes */
+@layer utilities {
+  .h-screen-mobile {
+    height: 100vh; /* default desktop */
+  }
+  
+  @media (max-width: 768px) {
+    .h-screen-mobile {
+      height: calc(var(--vh) * 100);
+    }
+  }
+  
+  .h-screen-minus-64 {
+    height: calc(100vh - 64px); /* default desktop */
+  }
+  
+  @media (max-width: 768px) {
+    .h-screen-minus-64 {
+      height: calc(var(--vh) * 100 - 64px);
+    }
+  }
+  
+  .h-screen-minus-4rem {
+    height: calc(100vh - 4rem); /* default desktop */
+  }
+  
+  @media (max-width: 768px) {
+    .h-screen-minus-4rem {
+      height: calc(var(--vh) * 100 - 4rem);
+    }
+  }
+  
+  .h-80vh-mobile {
+    height: 80vh; /* default desktop */
+  }
+  
+  @media (max-width: 768px) {
+    .h-80vh-mobile {
+      height: calc(var(--vh) * 80);
+    }
+  }
+  
+  .h-100vh-mobile {
+    height: 100vh; /* default desktop */
+  }
+  
+  @media (max-width: 768px) {
+    .h-100vh-mobile {
+      height: calc(var(--vh) * 100);
+    }
+  }
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -37,6 +90,7 @@
     --space-blue: 220 91% 15%;
     --space-purple: 260 91% 25%;
     --cosmic-glow: 240 100% 80%;
+    --vh: 1vh; /* Fallback for mobile viewport height fix */
   }
 }
 

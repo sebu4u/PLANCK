@@ -10,6 +10,7 @@ import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { TopLoader } from "@/components/top-loader"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MobileViewportFix } from "@/components/mobile-viewport-fix"
+import { RealVHProvider } from "@/components/real-vh-provider"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
@@ -76,6 +77,7 @@ export default function RootLayout({
       </head>
       <body className={`${monaSans.className} ${monaSans.variable} ${vt323.variable}`}>
         <ErrorBoundary>
+          <RealVHProvider />
           <MobileViewportFix />
           <ScrollToTop />
           <TopLoader />

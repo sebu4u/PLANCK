@@ -89,7 +89,7 @@ export default function SketchPage() {
       <Navigation />
       
       {/* Hero Section with ColorBends Background */}
-      <section className="relative h-screen w-full overflow-hidden bg-black flex items-center justify-center">
+      <section className="relative h-screen-mobile w-full overflow-hidden bg-black flex items-center justify-center">
         {/* ColorBends Background */}
         <div className="absolute inset-0 w-full h-full z-0">
           <ColorBends
@@ -448,7 +448,7 @@ export default function SketchPage() {
         </div>
       </section>
 
-      <section className="relative w-full h-auto min-h-[500px] sm:h-[80vh] md:h-[100vh] md:min-h-[640px] overflow-hidden py-12 sm:py-0">
+      <section className="relative w-full h-auto min-h-[500px] sm:h-80vh-mobile md:h-100vh-mobile md:min-h-[640px] overflow-hidden py-12 sm:py-0">
         <div 
           className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url(/sketch-ai-placeholder.jpg)' }}

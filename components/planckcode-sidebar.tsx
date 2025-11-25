@@ -25,10 +25,9 @@ export function PlanckCodeSidebar() {
 
   return (
     <aside
-      className={`hidden md:block fixed left-0 top-16 z-[299] bg-[#181818] border-r border-[#3b3b3b] transition-all duration-300 ease-in-out ${
+      className={`hidden md:block fixed left-0 top-16 z-[299] bg-[#181818] border-r border-[#3b3b3b] transition-all duration-300 ease-in-out h-screen-minus-64 ${
         isHovered ? 'w-[200px]' : 'w-16'
       }`}
-      style={{ height: 'calc(100vh - 64px)' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
