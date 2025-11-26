@@ -66,24 +66,126 @@ export function FunctionPlot({
   const pendingDomainRef = useRef<{ x: [number, number]; y: [number, number] } | null>(null);
   const panAnimationRef = useRef<number | null>(null);
 
+  const isDomainFinite = (domain: [number, number]) =>
+    Number.isFinite(domain[0]) && Number.isFinite(domain[1]);
+
+  const sanitizeDomain = useCallback(
+    (candidate: [number, number], fallback: [number, number]): [number, number] => {
+      if (!candidate || !Array.isArray(candidate) || candidate.length !== 2) {
+        return fallback;
+      }
+      
+      let [min, max] = candidate;
+
+      // Check for NaN, Infinity, or other non-finite values
+      if (!Number.isFinite(min) || !Number.isFinite(max)) {
+        return fallback;
+      }
+
+      // Ensure min < max
+      if (max < min) {
+        [min, max] = [max, min];
+      }
+
+      // Ensure range is not zero or too small
+      const range = max - min;
+      if (range === 0 || !Number.isFinite(range) || range < 1e-10) {
+        const delta = Math.max(Math.abs(min || 1) * 0.1, 1);
+        min = min - delta;
+        max = max + delta;
+      }
+
+      // Final validation
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+        return fallback;
+      }
+
+      return [min, max];
+    },
+    []
+  );
+
   const applyDomains = useCallback(
     (newX: [number, number], newY: [number, number], notify = true) => {
       if (!plotRef.current || !plotRef.current.meta) return;
-      const normalizedX: [number, number] = [newX[0], newX[1]];
-      const normalizedY: [number, number] = [newY[0], newY[1]];
-      plotRef.current.meta.xScale.domain(normalizedX);
-      plotRef.current.meta.yScale.domain(normalizedY);
-      if (plotRef.current.meta.zoomBehavior) {
-        plotRef.current.meta.zoomBehavior.xScale.domain(normalizedX);
-        plotRef.current.meta.zoomBehavior.yScale.domain(normalizedY);
-      }
-      currentDomainRef.current = { x: normalizedX, y: normalizedY };
-      plotRef.current.draw();
-      if (notify && onZoomChange) {
-        onZoomChange(normalizedX, normalizedY);
+      
+      try {
+        const fallbackX = currentDomainRef.current.x ?? xDomain;
+        const fallbackY = currentDomainRef.current.y ?? yDomain;
+        const normalizedX = sanitizeDomain(newX, fallbackX);
+        const normalizedY = sanitizeDomain(newY, fallbackY);
+        
+        // Double-check before applying
+        if (!isDomainFinite(normalizedX) || !isDomainFinite(normalizedY)) {
+          console.warn('[FunctionPlot] Invalid domain detected, using fallback');
+          return;
+        }
+        
+        // Ensure range is valid
+        if (normalizedX[1] <= normalizedX[0] || normalizedY[1] <= normalizedY[0]) {
+          console.warn('[FunctionPlot] Invalid domain range, using fallback');
+          return;
+        }
+        
+        // Wrap domain setters in try-catch to catch any function-plot errors
+        try {
+          // Set domains with validation
+          const xDom = [normalizedX[0], normalizedX[1]] as [number, number];
+          const yDom = [normalizedY[0], normalizedY[1]] as [number, number];
+          
+          plotRef.current.meta.xScale.domain(xDom);
+          plotRef.current.meta.yScale.domain(yDom);
+          
+          if (plotRef.current.meta.zoomBehavior) {
+            try {
+              plotRef.current.meta.zoomBehavior.xScale.domain(xDom);
+              plotRef.current.meta.zoomBehavior.yScale.domain(yDom);
+            } catch (zoomErr) {
+              // Ignore zoom behavior errors
+              console.warn('[FunctionPlot] Zoom behavior error (ignored):', zoomErr);
+            }
+          }
+          
+          currentDomainRef.current = { x: normalizedX, y: normalizedY };
+          
+          // Wrap draw() in try-catch as it might throw on invalid domains
+          try {
+            plotRef.current.draw();
+          } catch (drawErr: any) {
+            if (drawErr?.message?.includes('non-finite') || drawErr?.message?.includes('finite')) {
+              console.warn('[FunctionPlot] Draw error due to invalid domain, resetting:', drawErr);
+              // Reset to fallback and try again
+              plotRef.current.meta.xScale.domain(fallbackX);
+              plotRef.current.meta.yScale.domain(fallbackY);
+              currentDomainRef.current = { x: fallbackX, y: fallbackY };
+              plotRef.current.draw();
+              return;
+            }
+            throw drawErr;
+          }
+          
+          if (notify && onZoomChange) {
+            onZoomChange(normalizedX, normalizedY);
+          }
+        } catch (err) {
+          console.warn('[FunctionPlot] Error applying domains:', err);
+          // Reset to safe fallback
+          if (plotRef.current?.meta) {
+            try {
+              plotRef.current.meta.xScale.domain(fallbackX);
+              plotRef.current.meta.yScale.domain(fallbackY);
+              currentDomainRef.current = { x: fallbackX, y: fallbackY };
+              plotRef.current.draw();
+            } catch (resetErr) {
+              console.error('[FunctionPlot] Failed to reset domains:', resetErr);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[FunctionPlot] Error in applyDomains:', err);
       }
     },
-    [onZoomChange]
+    [onZoomChange, sanitizeDomain, xDomain, yDomain]
   );
 
   const scheduleDomainUpdate = useCallback(
@@ -202,20 +304,39 @@ export function FunctionPlot({
       if (onZoomChange && !disableZoom) {
         const interval = setInterval(() => {
           if (!plotRef.current?.meta) return;
-          const meta = plotRef.current.meta;
-          const newXDomain: [number, number] = [meta.xScale.domain()[0], meta.xScale.domain()[1]];
-          const newYDomain: [number, number] = [meta.yScale.domain()[0], meta.yScale.domain()[1]];
-          const prevX = currentDomainRef.current.x;
-          const prevY = currentDomainRef.current.y;
+          try {
+            const meta = plotRef.current.meta;
+            const xDom = meta.xScale.domain();
+            const yDom = meta.yScale.domain();
+            
+            // Validate domains before using
+            if (!xDom || !yDom || xDom.length !== 2 || yDom.length !== 2) return;
+            
+            const newXDomain: [number, number] = [xDom[0], xDom[1]];
+            const newYDomain: [number, number] = [yDom[0], yDom[1]];
+            
+            // Sanitize before comparing
+            if (!isDomainFinite(newXDomain) || !isDomainFinite(newYDomain)) {
+              return;
+            }
+            
+            const prevX = currentDomainRef.current.x;
+            const prevY = currentDomainRef.current.y;
 
-          if (
-            newXDomain[0] !== prevX[0] ||
-            newXDomain[1] !== prevX[1] ||
-            newYDomain[0] !== prevY[0] ||
-            newYDomain[1] !== prevY[1]
-          ) {
-            currentDomainRef.current = { x: newXDomain, y: newYDomain };
-            onZoomChange(newXDomain, newYDomain);
+            if (
+              newXDomain[0] !== prevX[0] ||
+              newXDomain[1] !== prevX[1] ||
+              newYDomain[0] !== prevY[0] ||
+              newYDomain[1] !== prevY[1]
+            ) {
+              // Apply sanitization before updating
+              const sanitizedX = sanitizeDomain(newXDomain, prevX);
+              const sanitizedY = sanitizeDomain(newYDomain, prevY);
+              currentDomainRef.current = { x: sanitizedX, y: sanitizedY };
+              onZoomChange(sanitizedX, sanitizedY);
+            }
+          } catch (err) {
+            console.warn('[FunctionPlot] Error in domain check interval:', err);
           }
         }, 200);
 
@@ -273,6 +394,12 @@ export function FunctionPlot({
         // Fallback to center if we can't compute
       }
 
+      // Validate cursor position
+      if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) {
+        cursorX = (x0 + x1) / 2;
+        cursorY = (y0 + y1) / 2;
+      }
+
       // Zoom keeping the cursor point fixed
       const leftDistX = cursorX - x0;
       const rightDistX = x1 - cursorX;
@@ -283,6 +410,13 @@ export function FunctionPlot({
       const newX1 = cursorX + Math.max(rightDistX * scaleFactor, minRange);
       const newY0 = cursorY - Math.max(bottomDistY * scaleFactor, minRange);
       const newY1 = cursorY + Math.max(topDistY * scaleFactor, minRange);
+
+      // Validate before applying
+      if (!Number.isFinite(newX0) || !Number.isFinite(newX1) || 
+          !Number.isFinite(newY0) || !Number.isFinite(newY1)) {
+        console.warn('[FunctionPlot] Invalid zoom values, skipping');
+        return;
+      }
 
       applyDomains([newX0, newX1], [newY0, newY1], true);
     };
@@ -327,11 +461,26 @@ export function FunctionPlot({
       const unitsPerPixelX = (startX[1] - startX[0]) / innerWidth;
       const unitsPerPixelY = (startY[1] - startY[0]) / innerHeight;
 
+      // Validate calculations
+      if (!Number.isFinite(unitsPerPixelX) || !Number.isFinite(unitsPerPixelY)) {
+        return;
+      }
+
       const deltaXUnits = dx * unitsPerPixelX * PAN_SENSITIVITY;
       const deltaYUnits = -dy * unitsPerPixelY * PAN_SENSITIVITY;
 
+      // Validate deltas
+      if (!Number.isFinite(deltaXUnits) || !Number.isFinite(deltaYUnits)) {
+        return;
+      }
+
       const newX: [number, number] = [startX[0] - deltaXUnits, startX[1] - deltaXUnits];
       const newY: [number, number] = [startY[0] - deltaYUnits, startY[1] - deltaYUnits];
+
+      // Validate domains before scheduling update
+      if (!isDomainFinite(newX) || !isDomainFinite(newY)) {
+        return;
+      }
 
       scheduleDomainUpdate(newX, newY);
     };

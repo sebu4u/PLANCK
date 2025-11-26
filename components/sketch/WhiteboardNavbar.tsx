@@ -4,26 +4,46 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Rocket, ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
+
+interface UserInfo {
+  connectionId: string;
+  userId?: string;
+  name?: string;
+  nickname?: string;
+  userIcon?: string;
+  email?: string;
+}
 
 interface WhiteboardNavbarProps {
   roomId: string;
-  connectedUsers: string[];
+  connectedUsers: UserInfo[];
 }
 
 export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarProps) {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Generate initials or display user IDs
-  const getUserInitials = (userId: string) => {
-    // Use first 2 characters of user ID as fallback
-    return userId.substring(0, 2).toUpperCase();
+  // Get user display name
+  const getUserDisplayName = (userInfo: UserInfo) => {
+    return userInfo.nickname || userInfo.name || userInfo.email || `User ${userInfo.connectionId.substring(0, 4)}`;
+  };
+
+  // Get user initials
+  const getUserInitials = (userInfo: UserInfo) => {
+    const displayName = getUserDisplayName(userInfo);
+    // Extract first letter of each word, max 2 letters
+    const words = displayName.trim().split(/\s+/);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return displayName.substring(0, 2).toUpperCase();
   };
 
   // Generate color based on user ID for consistent avatar colors
-  const getUserColor = (userId: string) => {
+  const getUserColor = (userInfo: UserInfo) => {
+    const id = userInfo.userId || userInfo.connectionId;
     const colors = [
       "bg-blue-500",
       "bg-green-500",
@@ -35,8 +55,8 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
       "bg-teal-500",
     ];
     let hash = 0;
-    for (let i = 0; i < userId.length; i++) {
-      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
     }
     return colors[Math.abs(hash) % colors.length];
   };
@@ -90,14 +110,20 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
         </span>
         <div className="flex items-center gap-2">
           {connectedUsers.length > 0 ? (
-            connectedUsers.map((userId) => (
+            connectedUsers.map((userInfo) => (
               <Avatar
-                key={userId}
-                className={`h-8 w-8 border-2 border-gray-700 ${getUserColor(userId)}`}
-                title={`User ${userId}`}
+                key={userInfo.connectionId}
+                className={`h-8 w-8 border-2 border-gray-700 ${getUserColor(userInfo)}`}
+                title={getUserDisplayName(userInfo)}
               >
+                {userInfo.userIcon ? (
+                  <AvatarImage
+                    src={userInfo.userIcon}
+                    alt={getUserDisplayName(userInfo)}
+                  />
+                ) : null}
                 <AvatarFallback className="text-xs font-semibold text-white bg-transparent">
-                  {getUserInitials(userId)}
+                  {getUserInitials(userInfo)}
                 </AvatarFallback>
               </Avatar>
             ))

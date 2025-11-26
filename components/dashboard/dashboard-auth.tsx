@@ -94,51 +94,18 @@ export function DashboardAuth() {
             if (Date.now() - timestamp < cacheExpiry) {
               setDashboardData(data)
               setLoading(false)
-              // Still fetch in background to update cache
-              fetchDashboardDataBackground(user.id, cacheKey)
+              // Still fetch in background to update cache (but don't update UI)
+              fetchDashboardDataBackground(user.id, cacheKey, true)
               return
             }
           }
         }
 
-        // Fetch critical data first (stats, activities, challenge)
-        const [statsData, activitiesData, challengeData] = await Promise.all([
-          fetchUserStats(user.id),
-          fetchDailyActivity(user.id),
-          fetchDailyChallenge(user.id),
-        ])
-
-        // Set initial data to show UI faster
-        setDashboardData({
-          stats: statsData,
-          activities: activitiesData,
-          challenge: challengeData,
-          roadmap: [],
-          recommendations: [],
-          sketches: [],
-          continueItems: [],
-          achievements: [],
-          insights: getLearningInsightsPlaceholder(),
-          tasks: [],
-          updates: [],
-          eloTodayGain: 0,
-          eloWeekGain: 0,
-          eloHistory: [],
-        })
-        setLoading(false)
-
-        // Fetch non-critical data in background
-        fetchDashboardDataBackground(user.id, cacheKey)
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-        setLoading(false)
-      }
-    }
-
-    const fetchDashboardDataBackground = async (userId: string, cacheKey: string) => {
-      try {
-        // Fetch non-critical data in parallel
+        // Fetch ALL data before showing the dashboard
         const [
+          statsData,
+          activitiesData,
+          challengeData,
           roadmapData,
           recommendationsData,
           sketchesData,
@@ -148,22 +115,26 @@ export function DashboardAuth() {
           eloQuickStats,
           eloHistoryData,
         ] = await Promise.all([
-          fetchUserRoadmap(userId),
-          fetchRecommendations(userId),
-          fetchRecentSketches(userId),
-          fetchAchievements(userId),
-          fetchUserTasks(userId),
+          fetchUserStats(user.id),
+          fetchDailyActivity(user.id),
+          fetchDailyChallenge(user.id),
+          fetchUserRoadmap(user.id),
+          fetchRecommendations(user.id),
+          fetchRecentSketches(user.id),
+          fetchAchievements(user.id),
+          fetchUserTasks(user.id),
           fetchDashboardUpdates(),
-          fetchEloQuickStats(userId),
-          fetchEloHistory(userId),
+          fetchEloQuickStats(user.id),
+          fetchEloHistory(user.id),
         ])
 
         const continueLearningData = await fetchContinueLearning()
-        
-        const fullData = {
-          stats: null as any, // Will be set from initial fetch
-          activities: null as any,
-          challenge: null as any,
+
+        // Set complete data all at once
+        const completeData = {
+          stats: statsData,
+          activities: activitiesData,
+          challenge: challengeData,
           roadmap: roadmapData,
           recommendations: recommendationsData,
           sketches: sketchesData,
@@ -177,31 +148,91 @@ export function DashboardAuth() {
           eloHistory: eloHistoryData,
         }
 
-        // Update with full data
-        setDashboardData((prev) => ({
-          ...prev!,
-          ...fullData,
-          stats: prev!.stats,
-          activities: prev!.activities,
-          challenge: prev!.challenge,
-        }))
-
+        setDashboardData(completeData)
+        
         // Cache in dev mode
-        if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-          setDashboardData((prev) => {
-            const cachedData = {
-              ...prev!,
-              ...fullData,
-              stats: prev!.stats,
-              activities: prev!.activities,
-              challenge: prev!.challenge,
-            }
+        if (isDev && typeof window !== 'undefined') {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            data: completeData,
+            timestamp: Date.now(),
+          }))
+        }
+
+        // Only set loading to false after ALL data is loaded
+        setLoading(false)
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+        setLoading(false)
+      }
+    }
+
+    const fetchDashboardDataBackground = async (userId: string, cacheKey: string, silent: boolean = false) => {
+      try {
+        // Fetch all data in parallel for cache update
+        const [
+          statsData,
+          activitiesData,
+          challengeData,
+          roadmapData,
+          recommendationsData,
+          sketchesData,
+          achievementsData,
+          tasksData,
+          updatesData,
+          eloQuickStats,
+          eloHistoryData,
+        ] = await Promise.all([
+          fetchUserStats(userId),
+          fetchDailyActivity(userId),
+          fetchDailyChallenge(userId),
+          fetchUserRoadmap(userId),
+          fetchRecommendations(userId),
+          fetchRecentSketches(userId),
+          fetchAchievements(userId),
+          fetchUserTasks(userId),
+          fetchDashboardUpdates(),
+          fetchEloQuickStats(userId),
+          fetchEloHistory(userId),
+        ])
+
+        const continueLearningData = await fetchContinueLearning()
+        
+        const fullData = {
+          stats: statsData,
+          activities: activitiesData,
+          challenge: challengeData,
+          roadmap: roadmapData,
+          recommendations: recommendationsData,
+          sketches: sketchesData,
+          continueItems: continueLearningData,
+          achievements: achievementsData,
+          insights: getLearningInsightsPlaceholder(),
+          tasks: tasksData,
+          updates: updatesData,
+          eloTodayGain: eloQuickStats.todayGain,
+          eloWeekGain: eloQuickStats.weekGain,
+          eloHistory: eloHistoryData,
+        }
+
+        // Only update cache, don't update UI if silent mode
+        if (silent) {
+          if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
             sessionStorage.setItem(cacheKey, JSON.stringify({
-              data: cachedData,
+              data: fullData,
               timestamp: Date.now(),
             }))
-            return cachedData
-          })
+          }
+        } else {
+          // Update UI only if not in silent mode (for realtime updates)
+          setDashboardData(fullData)
+          
+          // Cache in dev mode
+          if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              data: fullData,
+              timestamp: Date.now(),
+            }))
+          }
         }
       } catch (error) {
         console.error('Error fetching background dashboard data:', error)
@@ -222,25 +253,31 @@ export function DashboardAuth() {
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
-          // Refresh stats and activities when user_stats is updated
-          const [updatedStats, updatedActivities, eloQuickStats] = await Promise.all([
-            fetchUserStats(user.id),
-            fetchDailyActivity(user.id),
-            fetchEloQuickStats(user.id),
-          ])
-          
-          const updatedEloHistory = await fetchEloHistory(user.id)
-          setDashboardData((prev) => {
-            if (!prev) return null
-            return {
-              ...prev,
-              stats: updatedStats,
-              activities: updatedActivities,
-              eloTodayGain: eloQuickStats.todayGain,
-              eloWeekGain: eloQuickStats.weekGain,
-              eloHistory: updatedEloHistory,
-            }
-          })
+          try {
+            // Refresh stats and activities when user_stats is updated
+            const [updatedStats, updatedActivities, eloQuickStats] = await Promise.all([
+              fetchUserStats(user.id),
+              fetchDailyActivity(user.id),
+              fetchEloQuickStats(user.id),
+            ])
+            
+            const updatedEloHistory = await fetchEloHistory(user.id)
+            setDashboardData((prev) => {
+              if (!prev) return null
+              return {
+                ...prev,
+                stats: updatedStats,
+                activities: updatedActivities,
+                eloTodayGain: eloQuickStats.todayGain,
+                eloWeekGain: eloQuickStats.weekGain,
+                eloHistory: updatedEloHistory,
+              }
+            })
+          } catch (error) {
+            // Silently handle errors in realtime updates to prevent unhandled errors
+            console.warn('Error updating dashboard stats from realtime:', error)
+            // Don't throw - allow dashboard to continue functioning
+          }
         }
       )
       .subscribe()
@@ -257,15 +294,21 @@ export function DashboardAuth() {
           filter: `user_id=eq.${user.id}`,
         },
         async () => {
-          // Refresh activities when daily_activity changes
-          const updatedActivities = await fetchDailyActivity(user.id)
-          setDashboardData((prev) => {
-            if (!prev) return null
-            return {
-              ...prev,
-              activities: updatedActivities,
-            }
-          })
+          try {
+            // Refresh activities when daily_activity changes
+            const updatedActivities = await fetchDailyActivity(user.id)
+            setDashboardData((prev) => {
+              if (!prev) return null
+              return {
+                ...prev,
+                activities: updatedActivities,
+              }
+            })
+          } catch (error) {
+            // Silently handle errors in realtime updates to prevent unhandled errors
+            console.warn('Error updating dashboard activities from realtime:', error)
+            // Don't throw - allow dashboard to continue functioning
+          }
         }
       )
       .subscribe()
@@ -438,10 +481,23 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
       user_uuid: userId,
     })
     if (streakError) {
-      console.error('Error checking streak reset:', streakError)
+      // Only log if error has meaningful information
+      if (streakError.message || streakError.code) {
+        console.warn('Warning: Streak reset check failed:', {
+          message: streakError.message,
+          code: streakError.code,
+          details: streakError.details,
+        })
+      }
+      // Continue execution even if streak check fails
     }
   } catch (err) {
-    console.error('Error checking streak reset:', err)
+    // Log error but don't throw - allow function to continue
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    if (errorMessage && errorMessage !== '{}') {
+      console.warn('Warning: Streak reset check encountered an error:', errorMessage)
+    }
+    // Continue execution even if streak check fails
   }
 
   const { data, error } = await supabase

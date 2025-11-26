@@ -11,6 +11,8 @@ import { Plus, RotateCcw, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileMathKeyboard } from './MobileMathKeyboard';
 
 interface MathGraphPanelProps {
   boardId: string;
@@ -46,6 +48,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   const [graphHeight, setGraphHeight] = useState(360);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
+  const mathFieldHandleRef = useRef<any>(null);
+  const isMobile = useIsMobile();
 
   const persistenceRef = useRef<FunctionPersistence | null>(null);
   const realtimeSyncRef = useRef<FunctionRealtimeSync | null>(null);
@@ -66,6 +70,7 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   const handleKeyboardClose = () => {
     setIsKeyboardOpen(false);
     setCurrentEquation('');
+    mathFieldHandleRef.current = null;
   };
 
   const handleKeyboardOpen = () => {
@@ -245,10 +250,65 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       setCurrentEquation('');
       setError(null);
       setIsKeyboardOpen(false);
+      mathFieldHandleRef.current = null;
     } catch (err: any) {
       console.error('[MathGraphPanel] Failed to add function:', err);
       setError(err.message || 'Eroare la adăugarea funcției');
     }
+  };
+
+  const insertFromMobileKeyboard = (fragment: string) => {
+    if (!fragment) return;
+    const mathField = mathFieldHandleRef.current;
+    try {
+      if (mathField?.executeCommand) {
+        mathField.focus({ preventScroll: true });
+        mathField.executeCommand('insert', fragment);
+        return;
+      }
+      if (mathField) {
+        mathField.value = `${mathField.value || ''}${fragment}`;
+        setCurrentEquation(mathField.value);
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to insert fragment via MathLive:', err);
+    }
+    setCurrentEquation((prev) => `${prev}${fragment}`);
+  };
+
+  const deleteFromMobileKeyboard = () => {
+    const mathField = mathFieldHandleRef.current;
+    try {
+      if (mathField?.executeCommand) {
+        mathField.focus({ preventScroll: true });
+        mathField.executeCommand('deleteBackward');
+        return;
+      }
+      if (mathField?.value) {
+        mathField.value = mathField.value.slice(0, -1);
+        setCurrentEquation(mathField.value);
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to delete via MathLive:', err);
+    }
+    setCurrentEquation((prev) => prev.slice(0, -1));
+  };
+
+  const clearFromMobileKeyboard = () => {
+    const mathField = mathFieldHandleRef.current;
+    try {
+      if (mathField?.executeCommand) {
+        mathField.executeCommand('deleteAll');
+      }
+      if (mathField) {
+        mathField.value = '';
+      }
+    } catch (err) {
+      console.warn('Failed to clear equation via MathLive:', err);
+    }
+    setCurrentEquation('');
   };
 
   const handleUpdateFunction = async (functionId: string, updates: Partial<MathFunction>) => {
@@ -739,8 +799,12 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       <div
         ref={panelRef}
         className={cn(
-          "relative w-full sm:w-[620px] lg:w-[720px] bg-[#f5f6f8] text-gray-900 border-l border-gray-200 flex flex-col overflow-hidden flex-shrink-0 transform transition-all duration-300 ease-out",
-          isPanelVisible ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+          "relative w-full h-full sm:w-[620px] lg:w-[720px] bg-[#f5f6f8] text-gray-900 border-l border-gray-200 flex flex-col flex-shrink-0 transform transition-all duration-300 ease-out",
+          // On mobile: no horizontal translation (animation handled by parent)
+          // On desktop: slide from right to left
+          isPanelVisible 
+            ? "opacity-100 sm:translate-x-0" 
+            : "opacity-0 sm:translate-x-full"
         )}
         onClickCapture={(event) => {
           const target = event.target as HTMLElement;
@@ -754,127 +818,182 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
           variant="ghost"
           size="icon"
           onClick={() => onOpenChange(false)}
-          className="absolute right-4 top-4 z-20 text-gray-500 hover:text-gray-900 hover:bg-white/80 shadow-md"
+          className="absolute right-4 top-4 z-20 text-gray-500 hover:text-gray-900 hover:bg-white/80 shadow-md hidden sm:flex"
         >
           <X className="h-5 w-5" />
         </Button>
 
-        <div className="flex flex-col h-full">
-          <div
-            className="relative flex-shrink-0 w-full"
-            style={{ flexBasis: '50%', minHeight: '360px' }}
-          >
-            <div ref={graphContainerRef} className="absolute inset-0">
-              <FunctionPlot
-                functions={functionData}
-                width={graphWidth}
-                height={graphHeight}
-                xDomain={xDomain}
-                yDomain={yDomain}
-                grid={true}
-                disableZoom={false}
-                onZoomChange={handleZoomChange}
-                className="rounded-none border-none"
-                backgroundColor="#ffffff"
-                gridColor="#d4d7de"
-                axisColor="#6b7280"
-              />
-            </div>
-            <div className="absolute top-6 left-6 flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleResetZoom}
-                className="h-9 rounded-full bg-white/80 text-gray-700 hover:text-gray-900 hover:bg-white shadow-md"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset Zoom
-              </Button>
-            </div>
+        {/* Graph Section - Fixed height, not scrollable */}
+        <div
+          className="relative flex-shrink-0 w-full bg-white"
+          style={{ height: '320px', minHeight: '320px' }}
+        >
+          <div ref={graphContainerRef} className="absolute inset-0">
+            <FunctionPlot
+              functions={functionData}
+              width={graphWidth}
+              height={graphHeight}
+              xDomain={xDomain}
+              yDomain={yDomain}
+              grid={true}
+              disableZoom={false}
+              onZoomChange={handleZoomChange}
+              className="rounded-none border-none"
+              backgroundColor="#ffffff"
+              gridColor="#d4d7de"
+              axisColor="#6b7280"
+            />
           </div>
+          <div className="absolute top-6 left-6 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetZoom}
+              className="h-9 rounded-full bg-white/80 text-gray-700 hover:text-gray-900 hover:bg-white shadow-md"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset Zoom
+            </Button>
+          </div>
+        </div>
 
-          <div className="border-t border-gray-200" />
+        <div className="border-t border-gray-200" />
 
-          <div className="flex-1 overflow-hidden">
-            <div className="h-full overflow-y-auto px-6 py-6 space-y-6">
-              <Button
-                onClick={handleKeyboardOpen}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adaugă funcție
-              </Button>
+        {/* Functions List Section - Scrollable */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="px-6 py-6 space-y-6">
+            <Button
+              onClick={handleKeyboardOpen}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Adaugă funcție
+            </Button>
 
-              <Separator className="bg-gray-200" />
+            <Separator className="bg-gray-200" />
 
-              <div className="flex flex-col gap-3 pb-6">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-                    Funcții active
-                  </p>
-                  <p className="text-sm font-medium text-gray-600">
-                    {functions.length} funcție{functions.length === 1 ? '' : 'i'}
-                  </p>
-                </div>
-                <FunctionList
-                  functions={functions}
-                  onUpdate={handleUpdateFunction}
-                  onDelete={handleDeleteFunction}
-                  onSelect={setSelectedFunctionId}
-                  selectedFunctionId={selectedFunctionId}
-                />
+            <div className="flex flex-col gap-3 pb-6">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                  Funcții active
+                </p>
+                <p className="text-sm font-medium text-gray-600">
+                  {functions.length} funcție{functions.length === 1 ? '' : 'i'}
+                </p>
               </div>
+              <FunctionList
+                functions={functions}
+                onUpdate={handleUpdateFunction}
+                onDelete={handleDeleteFunction}
+                onSelect={setSelectedFunctionId}
+                selectedFunctionId={selectedFunctionId}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      <Dialog
-        open={isKeyboardOpen}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            handleKeyboardClose();
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-xl !z-[300]" onInteractOutside={handleDialogInteractOutside}>
-          <DialogHeader>
-            <DialogTitle>Adaugă o funcție</DialogTitle>
-            <DialogDescription>
-              Tastatura matematică se deschide automat pentru a introduce ecuația.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <MathInput
-              value={currentEquation}
-              onChange={setCurrentEquation}
-                onError={() => setError(null)}
-              placeholder="ex: x^2 + 2*x + 1 sau sin(x)"
-              showVirtualKeyboard={true}
-              autoFocus
-              hideErrorMessage
-            />
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={handleKeyboardClose}>
-                Renunță
-              </Button>
-              <Button
-                onClick={handleAddFunction}
-                disabled={!currentEquation.trim() || isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adaugă funcția
-              </Button>
+      {/* Desktop Dialog */}
+      {!isMobile && (
+        <Dialog
+          open={isKeyboardOpen}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              handleKeyboardClose();
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-xl !z-[300]" onInteractOutside={handleDialogInteractOutside}>
+            <DialogHeader>
+              <DialogTitle>Adaugă o funcție</DialogTitle>
+              <DialogDescription>
+                Tastatura matematică se deschide automat pentru a introduce ecuația.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <MathInput
+                value={currentEquation}
+                onChange={setCurrentEquation}
+                onError={(msg) => setError(msg)}
+                placeholder="ex: x^2 + 2*x + 1 sau sin(x)"
+                showVirtualKeyboard={true}
+                autoFocus={true}
+                hideErrorMessage
+              />
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={handleKeyboardClose}>
+                  Renunță
+                </Button>
+                <Button
+                  onClick={handleAddFunction}
+                  disabled={!currentEquation.trim() || isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adaugă funcția
+                </Button>
+              </div>
+              {error && (
+                <p className="text-sm text-red-600 text-right">
+                  {error}
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Mobile Fullscreen Input */}
+      {isMobile && isKeyboardOpen && (
+        <div className="fixed inset-0 z-[400] bg-white flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <button
+              type="button"
+              onClick={handleKeyboardClose}
+              className="text-gray-500 hover:text-gray-700 text-sm font-medium"
+            >
+              Renunță
+            </button>
+            <h2 className="text-base font-semibold text-gray-900">Adaugă funcție</h2>
+            <button
+              type="button"
+              onClick={handleAddFunction}
+              disabled={!currentEquation.trim() || isLoading}
+              className="text-blue-600 hover:text-blue-700 text-sm font-semibold disabled:opacity-40"
+            >
+              Gata
+            </button>
+          </div>
+
+          {/* Equation Display */}
+          <div className="flex-1 flex flex-col justify-center px-4 py-6 bg-white">
+            <div className="text-center mb-2">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Ecuația ta</p>
+              <div className="min-h-[80px] flex items-center justify-center bg-gray-50 rounded-2xl border-2 border-gray-200 px-4 py-4">
+                {currentEquation ? (
+                  <span className="text-2xl font-mono text-gray-900 break-all">{currentEquation}</span>
+                ) : (
+                  <span className="text-xl text-gray-400">Introdu o funcție...</span>
+                )}
+              </div>
             </div>
             {error && (
-              <p className="text-sm text-red-600 text-right">
-                {error}
-              </p>
+              <p className="text-sm text-red-500 text-center mt-2">{error}</p>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Keyboard */}
+          <div className="flex-shrink-0 px-3 pb-6 pt-2 bg-gray-100 border-t border-gray-200">
+            <MobileMathKeyboard
+              onInsert={insertFromMobileKeyboard}
+              onDelete={deleteFromMobileKeyboard}
+              onClear={clearFromMobileKeyboard}
+              onSubmit={handleAddFunction}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

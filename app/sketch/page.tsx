@@ -84,6 +84,13 @@ export default function SketchPage() {
     }
   }
 
+  const handleScrollToFeatures = () => {
+    const element = document.getElementById('infinite-canvas-section')
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
       <Navigation />
@@ -139,7 +146,7 @@ export default function SketchPage() {
           >
             <Button
               size="lg"
-              className="bg-white text-black hover:bg-gray-200 transition-all duration-300 w-full sm:w-auto sm:flex-initial px-6 sm:px-8 py-5 sm:py-6 text-sm sm:text-base lg:text-lg font-medium rounded-2xl sm:rounded-3xl"
+              className="bg-white text-black hover:text-black hover:bg-white/90 hover:shadow-lg hover:shadow-white/30 transition-all duration-300 w-full sm:w-auto sm:flex-initial px-6 sm:px-8 py-5 sm:py-6 text-sm sm:text-base lg:text-lg font-medium rounded-2xl sm:rounded-3xl"
               onClick={handleOpenSketch}
               disabled={isOpening}
             >
@@ -148,8 +155,8 @@ export default function SketchPage() {
             <Button
               variant="outline"
               size="lg"
-              className="border-gray-500/30 text-white hover:bg-gray-700/30 hover:border-gray-500/50 transition-all duration-300 w-full sm:w-auto sm:flex-initial px-6 sm:px-8 py-5 sm:py-6 text-sm sm:text-base lg:text-lg font-medium bg-gray-700/60 backdrop-blur-sm rounded-2xl sm:rounded-3xl"
-              onClick={(e) => e.preventDefault()}
+              className="border-gray-500/30 text-white hover:text-white hover:bg-white/10 hover:border-white/40 hover:shadow-lg hover:shadow-white/20 transition-all duration-300 w-full sm:w-auto sm:flex-initial px-6 sm:px-8 py-5 sm:py-6 text-sm sm:text-base lg:text-lg font-medium bg-gray-700/60 backdrop-blur-sm rounded-2xl sm:rounded-3xl"
+              onClick={handleScrollToFeatures}
             >
               See How It Works
             </Button>
@@ -184,6 +191,7 @@ export default function SketchPage() {
             </motion.div>
 
             <motion.div 
+              id="infinite-canvas-section"
               className="relative z-10 w-full max-w-4xl text-center space-y-3 sm:space-y-4 px-2 sm:px-0"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}

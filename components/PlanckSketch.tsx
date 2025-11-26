@@ -7,24 +7,50 @@ import "@tldraw/tldraw/tldraw.css";
 import PartySocket from "partysocket";
 import { PageNavigator } from "@/components/sketch/PageNavigator";
 import { ShareButton } from "@/components/sketch/ShareButton";
-import { Calculator } from "lucide-react";
+import { Calculator, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MathGraphPanel } from "@/components/sketch/MathGraphPanel";
 import { WhiteboardNavbar } from "@/components/sketch/WhiteboardNavbar";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth-provider";
 
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST || "localhost:1999";
 
+interface UserInfo {
+  connectionId: string;
+  userId?: string;
+  name?: string;
+  nickname?: string;
+  userIcon?: string;
+  email?: string;
+}
+
+// Record types that are ephemeral (per-user, NOT shared between users)
+// These include camera position, zoom, cursor state, etc.
+const EPHEMERAL_TYPES = new Set([
+  'instance',
+  'instance_page_state', 
+  'instance_presence',
+  'camera',
+]);
+
+// Check if a record is ephemeral (should not be synced between users)
+const isEphemeralRecord = (record: any): boolean => {
+  return EPHEMERAL_TYPES.has(record?.typeName);
+};
+
 export default function PlanckSketch({ roomId }: { roomId: string }) {
   const store = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), []);
+  const { user, profile } = useAuth();
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [lastEvent, setLastEvent] = useState<string>("");
   const [editor, setEditor] = useState<Editor | null>(null);
   const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [isMathGraphOpen, setIsMathGraphOpen] = useState(false);
-  const [connectedUsers, setConnectedUsers] = useState<string[]>([]);
+  const [connectedUsers, setConnectedUsers] = useState<UserInfo[]>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [editorReadyVersion, setEditorReadyVersion] = useState(0);
+  const socketRef = useRef<PartySocket | null>(null);
   
   // Compute effective current page ID - ensures graph button appears even when currentPageId isn't set yet
   // Using useMemo to recalculate when editor, currentPageId, or store changes
@@ -102,10 +128,26 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       room: roomId,
       party: "main",
     });
+    
+    socketRef.current = socket;
 
     const onOpen = () => {
       console.log("[PlanckSketch] Connected to PartyKit!");
       setConnectionStatus('connected');
+      
+      // Send user info to server if user is logged in
+      if (user && socket) {
+        const userInfo = {
+          type: "user-info",
+          userId: user.id,
+          name: profile?.name || user.user_metadata?.name,
+          nickname: profile?.nickname,
+          userIcon: profile?.user_icon,
+          email: user.email,
+        };
+        socket.send(JSON.stringify(userInfo));
+        console.log("[PlanckSketch] Sent user info to server");
+      }
     };
 
     const onClose = () => {
@@ -118,22 +160,40 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         const msg = JSON.parse(evt.data);
 
         if (msg.type === "init") {
-          setLastEvent(`Init: ${Object.keys(msg.payload).length} objects`);
+          // Filter out ephemeral records from init payload
+          // This ensures we don't apply another user's camera/zoom state
+          const filteredPayload = Object.values(msg.payload).filter(
+            (record: any) => !isEphemeralRecord(record)
+          );
+          setLastEvent(`Init: ${filteredPayload.length} objects`);
           store.mergeRemoteChanges(() => {
-            store.put(Object.values(msg.payload));
+            store.put(filteredPayload);
           });
         } else if (msg.type === "update") {
           const { added, updated, removed } = msg.payload;
-          const count = (added ? Object.keys(added).length : 0) + (updated ? Object.keys(updated).length : 0);
+          
+          // Filter out ephemeral records from updates
+          // Each user maintains their own camera position, zoom level, etc.
+          const filteredAdded = added 
+            ? Object.values(added).filter((record: any) => !isEphemeralRecord(record))
+            : [];
+          const filteredUpdated = updated
+            ? Object.values(updated).filter((record: any) => !isEphemeralRecord(record))
+            : [];
+          const filteredRemoved = removed
+            ? Object.keys(removed).filter((id: string) => !isEphemeralRecord(removed[id]))
+            : [];
+          
+          const count = filteredAdded.length + filteredUpdated.length;
           setLastEvent(`Recv: ${count} changes`);
 
           store.mergeRemoteChanges(() => {
-            if (added && Object.keys(added).length > 0) store.put(Object.values(added));
-            if (updated && Object.keys(updated).length > 0) store.put(Object.values(updated));
-            if (removed && Object.keys(removed).length > 0) store.remove(Object.keys(removed));
+            if (filteredAdded.length > 0) store.put(filteredAdded);
+            if (filteredUpdated.length > 0) store.put(filteredUpdated);
+            if (filteredRemoved.length > 0) store.remove(filteredRemoved);
           });
         } else if (msg.type === "presence") {
-          // Update connected users list
+          // Update connected users list with user info
           if (msg.users && Array.isArray(msg.users)) {
             setConnectedUsers(msg.users);
           }
@@ -154,19 +214,27 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         const payload: any = { added: {}, updated: {}, removed: {} };
         let hasChanges = false;
 
+        // Filter out ephemeral records when sending updates
+        // This ensures camera position, zoom, and cursor state stay local to each user
         for (const [id, record] of Object.entries(changes.changes.added)) {
-          payload.added[id] = record;
-          hasChanges = true;
+          if (!isEphemeralRecord(record)) {
+            payload.added[id] = record;
+            hasChanges = true;
+          }
         }
 
         for (const [id, [from, to]] of Object.entries(changes.changes.updated)) {
-          payload.updated[id] = to;
-          hasChanges = true;
+          if (!isEphemeralRecord(to)) {
+            payload.updated[id] = to;
+            hasChanges = true;
+          }
         }
 
-        for (const [id] of Object.entries(changes.changes.removed)) {
-          payload.removed[id] = { id };
-          hasChanges = true;
+        for (const [id, record] of Object.entries(changes.changes.removed)) {
+          if (!isEphemeralRecord(record)) {
+            payload.removed[id] = { id };
+            hasChanges = true;
+          }
         }
 
         if (hasChanges) {
@@ -180,8 +248,25 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       socket.close();
       cleanupListener();
       setConnectionStatus('disconnected');
+      socketRef.current = null;
     };
   }, [store, roomId]);
+
+  // Send user info when user or profile changes (after connection is established)
+  useEffect(() => {
+    if (socketRef.current && connectionStatus === 'connected' && user) {
+      const userInfo = {
+        type: "user-info",
+        userId: user.id,
+        name: profile?.name || user.user_metadata?.name,
+        nickname: profile?.nickname,
+        userIcon: profile?.user_icon,
+        email: user.email,
+      };
+      socketRef.current.send(JSON.stringify(userInfo));
+      console.log("[PlanckSketch] Sent updated user info to server");
+    }
+  }, [user, profile, connectionStatus]);
 
   // Right-click panning handler
   useEffect(() => {
@@ -428,6 +513,21 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           }}
         />
 
+        {/* Mobile Graph Toggle */}
+        {effectiveCurrentPageId && (
+          <div className="sm:hidden absolute top-4 right-4 z-40">
+            <Button
+              size="icon"
+              variant="secondary"
+              onClick={() => setIsMathGraphOpen(true)}
+              className="rounded-full bg-white/90 text-gray-900 shadow-lg border border-gray-200 hover:bg-white"
+              aria-label={isMathGraphOpen ? "Deschide graficul matematic" : "Deschide graficul matematic"}
+            >
+              <Calculator className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+
         {/* Math Graph Button */}
         {effectiveCurrentPageId && (
           <div className="hidden sm:block absolute bottom-16 right-4 z-50">
@@ -452,21 +552,50 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         </div>
         </div>
 
-        {/* Math Graph Panel - Sits alongside editor in flex container */}
+        {/* Math Graph Panel - Sits alongside editor in flex container (Desktop) */}
         {effectiveCurrentPageId && (
           <div
             className={cn(
-              "hidden sm:block border-l border-gray-200 bg-white shadow-xl transition-[width,opacity] duration-300 ease-out overflow-hidden relative",
-              isMathGraphOpen ? "w-[620px] lg:w-[720px] opacity-100" : "w-0 opacity-0"
+              "hidden sm:flex border-l border-gray-200 bg-white shadow-xl transition-[width,opacity] duration-300 ease-out relative flex-col",
+              isMathGraphOpen ? "w-[620px] lg:w-[720px] opacity-100" : "w-0 opacity-0 overflow-hidden"
             )}
           >
-            <div className="w-[620px] lg:w-[720px] h-full absolute right-0">
+            <div className="w-[620px] lg:w-[720px] h-full flex flex-col">
                <MathGraphPanel
                   boardId={roomId}
                   pageId={effectiveCurrentPageId}
                   open={isMathGraphOpen}
                   onOpenChange={setIsMathGraphOpen}
                 />
+            </div>
+          </div>
+        )}
+        {/* Mobile Fullscreen Graph Panel */}
+        {effectiveCurrentPageId && (
+          <div
+            className={cn(
+              "sm:hidden fixed inset-x-0 bottom-0 top-16 bg-white z-40 transition-transform duration-300 ease-out flex flex-col",
+              isMathGraphOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
+            )}
+          >
+            <div className="absolute top-3 right-4 z-50">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsMathGraphOpen(false)}
+                className="rounded-full bg-black/5 text-gray-700 hover:bg-black/10"
+                aria-label="Închide graficul matematic"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex-1 w-full pt-4 px-4 flex flex-col min-h-0">
+              <MathGraphPanel
+                boardId={roomId}
+                pageId={effectiveCurrentPageId}
+                open={isMathGraphOpen}
+                onOpenChange={setIsMathGraphOpen}
+              />
             </div>
           </div>
         )}

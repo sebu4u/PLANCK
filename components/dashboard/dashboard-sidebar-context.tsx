@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from "react"
 
 interface DashboardSidebarContextType {
   isOpen: boolean
@@ -13,10 +13,16 @@ const DashboardSidebarContext = createContext<DashboardSidebarContextType | unde
 export function DashboardSidebarProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const toggle = () => setIsOpen(prev => !prev)
+  const toggle = useCallback(() => setIsOpen(prev => !prev), [])
+
+  const value = useMemo(() => ({
+    isOpen,
+    setIsOpen,
+    toggle,
+  }), [isOpen, toggle])
 
   return (
-    <DashboardSidebarContext.Provider value={{ isOpen, setIsOpen, toggle }}>
+    <DashboardSidebarContext.Provider value={value}>
       {children}
     </DashboardSidebarContext.Provider>
   )

@@ -38,6 +38,8 @@ interface MathInputProps {
   showVirtualKeyboard?: boolean;
   autoFocus?: boolean;
   hideErrorMessage?: boolean;
+  disableNativeKeyboard?: boolean;
+  onMathFieldReady?: (field: any) => void;
 }
 
 export function MathInput({
@@ -49,10 +51,25 @@ export function MathInput({
   showVirtualKeyboard = true,
   autoFocus = false,
   hideErrorMessage = false,
+  disableNativeKeyboard = false,
+  onMathFieldReady,
 }: MathInputProps) {
   const mathFieldRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!mathFieldRef.current) return;
+    if (disableNativeKeyboard) {
+      mathFieldRef.current.setAttribute('virtual-keyboard-mode', 'off');
+      mathFieldRef.current.setAttribute('inputmode', 'none');
+      mathFieldRef.current.setAttribute('readonly', 'true');
+    } else {
+      mathFieldRef.current.setAttribute('virtual-keyboard-mode', showVirtualKeyboard ? 'onfocus' : 'manual');
+      mathFieldRef.current.setAttribute('inputmode', 'text');
+      mathFieldRef.current.removeAttribute('readonly');
+    }
+  }, [showVirtualKeyboard, disableNativeKeyboard]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -72,6 +89,23 @@ export function MathInput({
         mathField.setAttribute('remove-extraneous-parentheses', 'true');
         mathField.setAttribute('plonk-sound', 'false');
         
+        if (disableNativeKeyboard) {
+          // Completely disable MathLive's virtual keyboard on mobile
+          mathField.setAttribute('virtual-keyboard-mode', 'off');
+          mathField.setAttribute('inputmode', 'none');
+          mathField.setAttribute('readonly', 'true');
+          mathField.setAttribute('data-custom-keyboard', 'true');
+          mathField.style.caretColor = '#2563eb';
+          // Prevent focus from triggering any keyboard
+          mathField.addEventListener('focus', (e: FocusEvent) => {
+            e.preventDefault();
+            // Blur any input that might trigger native keyboard
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          });
+        }
+
         // Set initial value
         if (value) {
           mathField.value = value;
@@ -132,29 +166,35 @@ export function MathInput({
           }
         });
 
-        // Open virtual keyboard automatically on focus
-        if (showVirtualKeyboard) {
-          mathField.addEventListener('focus', () => {
-            // Small delay to ensure MathLive is ready
-            setTimeout(() => {
-              try {
-                // Try multiple methods to open the keyboard
-                if (mathField.executeCommand) {
-                  mathField.executeCommand('toggleVirtualKeyboard');
-                } else if (mathField.showVirtualKeyboard) {
-                  mathField.showVirtualKeyboard();
-                } else if (mathField.virtualKeyboardState === 'hidden') {
-                  mathField.executeCommand?.('toggleVirtualKeyboard');
-                }
-              } catch (e) {
-                console.warn('Could not open virtual keyboard:', e);
+        const openVirtualKeyboard = () => {
+          // Small delay to ensure MathLive is ready
+          setTimeout(() => {
+            try {
+              if (mathField.executeCommand) {
+                mathField.executeCommand('toggleVirtualKeyboard');
+              } else if (mathField.showVirtualKeyboard) {
+                mathField.showVirtualKeyboard();
+              } else if (mathField.virtualKeyboardState === 'hidden') {
+                mathField.executeCommand?.('toggleVirtualKeyboard');
               }
-            }, 150);
+            } catch (e) {
+              console.warn('Could not open virtual keyboard:', e);
+            }
+          }, 150);
+        };
+
+        // Open virtual keyboard automatically on focus
+        if (showVirtualKeyboard && !disableNativeKeyboard) {
+          mathField.addEventListener('focus', () => {
+            openVirtualKeyboard();
           });
         }
 
         mathFieldRef.current = mathField;
         containerRef.current.appendChild(mathField);
+        if (onMathFieldReady) {
+          onMathFieldReady(mathField);
+        }
       }
 
       // Update value if it changes externally
@@ -172,7 +212,7 @@ export function MathInput({
         });
       }
     });
-  }, [value, onChange, onError, showVirtualKeyboard, autoFocus]);
+  }, [value, onChange, onError, showVirtualKeyboard, autoFocus, disableNativeKeyboard, onMathFieldReady]);
 
   return (
     <div className={`w-full ${className}`}>
