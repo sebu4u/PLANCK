@@ -14,6 +14,10 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
+# PartyKit Configuration (Obligatoriu pentru Whiteboard)
+NEXT_PUBLIC_PARTYKIT_HOST=your-project-name.username.partykit.dev
+
+
 # OpenAI API - IMPORTANT pentru modelul AI Insight! (Obligatoriu)
 OPENAI_API_KEY=your_openai_api_key_here
 ```
@@ -142,6 +146,16 @@ ADMIN_EMAILS=admin@example.com
      - **anon public** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
      - **service_role** → `SUPABASE_SERVICE_ROLE_KEY` (⚠️ Ține secret!)
 
+### PartyKit Host
+
+1. **Deploy PartyKit Server**
+   - Rulează `npx partykit deploy` în terminal
+   - Copiază URL-ul generat (ex: `planck-sketch.andrei.partykit.dev`)
+
+2. **Configurează Variabila**
+   - Adaugă URL-ul (fără `https://`) ca valoare pentru `NEXT_PUBLIC_PARTYKIT_HOST`
+
+
 ## ✅ Verificare Deployment
 
 ### 1. Verifică dacă variabilele sunt setate
@@ -216,6 +230,7 @@ Pe Vercel, poți verifica în **Settings** → **Environment Variables**.
 - [ ] ✅ Toate variabilele de mediu sunt configurate pe platformă
 - [ ] ✅ `OPENAI_API_KEY` este validă și are credit în cont
 - [ ] ✅ `SUPABASE_SERVICE_ROLE_KEY` este setată corect
+- [ ] ✅ `NEXT_PUBLIC_PARTYKIT_HOST` este setată și PartyKit server este deployed
 - [ ] ✅ Site-ul a fost redeployed după adăugarea variabilelor
 - [ ] ✅ AI Insight funcționează pe site-ul publicat
 - [ ] ✅ Autentificarea funcționează corect
