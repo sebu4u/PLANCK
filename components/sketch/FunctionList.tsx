@@ -22,7 +22,10 @@ export function FunctionList({
   onSelect,
   selectedFunctionId,
 }: FunctionListProps) {
-  if (functions.length === 0) {
+  // Ensure functions is always an array
+  const safeFunctions = functions || [];
+  
+  if (safeFunctions.length === 0) {
     return (
       <div className="p-6 text-center text-gray-500 text-sm bg-white rounded-xl border border-gray-200">
         Nu există funcții. Apăsați „Adaugă funcție” pentru a începe.
@@ -32,7 +35,7 @@ export function FunctionList({
 
   return (
     <div className="flex flex-col gap-2 p-2">
-      {functions.map((func) => {
+      {safeFunctions.map((func) => {
         const isSelected = selectedFunctionId === func.function_id;
 
         return (

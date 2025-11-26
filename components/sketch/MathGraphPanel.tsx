@@ -96,7 +96,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       pageId,
       onFunctionUpdate: (updatedFunctions) => {
         console.log('[MathGraphPanel] Received function update:', updatedFunctions);
-        setFunctions(updatedFunctions);
+        // Ensure we always set an array, never undefined
+        setFunctions(updatedFunctions || []);
       },
       onError: (err) => {
         console.error('[MathGraphPanel] Realtime sync error:', err);
@@ -118,7 +119,7 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   }, [boardId, pageId]);
 
   useEffect(() => {
-    if (selectedFunctionId && !functions.some((f) => f.function_id === selectedFunctionId)) {
+    if (selectedFunctionId && functions && !functions.some((f) => f.function_id === selectedFunctionId)) {
       setSelectedFunctionId(undefined);
     }
   }, [functions, selectedFunctionId]);
@@ -170,7 +171,9 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(() => {
-      adjustYDomainForRange(xDomain, functions);
+      if (functions && functions.length > 0) {
+        adjustYDomainForRange(xDomain, functions);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -212,7 +215,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
 
     try {
       const functionId = `func-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const colorIndex = functions.length % DEFAULT_COLORS.length;
+      const safeFunctions = functions || [];
+      const colorIndex = safeFunctions.length % DEFAULT_COLORS.length;
       const color = DEFAULT_COLORS[colorIndex];
 
       const newFunction: Omit<MathFunction, 'id' | 'created_at' | 'updated_at'> = {
@@ -234,16 +238,21 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      setFunctions((prev) => [...prev, fullFunction]);
+      setFunctions((prev) => {
+        const prevFunctions = prev || [];
+        return [...prevFunctions, fullFunction];
+      });
 
       // Broadcast update
       if (realtimeSyncRef.current) {
-        await realtimeSyncRef.current.broadcastUpdate([...functions, fullFunction]);
+        const currentFunctions = functions || [];
+        await realtimeSyncRef.current.broadcastUpdate([...currentFunctions, fullFunction]);
       }
 
       // Adjust Y domain once after adding the function
       requestAnimationFrame(() => {
-        adjustYDomainForRange(xDomain, [...functions, fullFunction]);
+        const currentFunctions = functions || [];
+        adjustYDomainForRange(xDomain, [...currentFunctions, fullFunction]);
       });
 
       // Clear input
@@ -315,7 +324,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
     if (!persistenceRef.current || !pageId) return;
 
     try {
-      const functionToUpdate = functions.find((f) => f.function_id === functionId);
+      const safeFunctions = functions || [];
+      const functionToUpdate = safeFunctions.find((f) => f.function_id === functionId);
       if (!functionToUpdate) return;
 
       const updatedFunction = { ...functionToUpdate, ...updates };
@@ -336,7 +346,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
 
       // Broadcast update
       if (realtimeSyncRef.current) {
-        const updatedFunctions = functions.map((f) =>
+        const safeFunctions = functions || [];
+        const updatedFunctions = safeFunctions.map((f) =>
           f.function_id === functionId ? updatedFunction : f
         );
         await realtimeSyncRef.current.broadcastUpdate(updatedFunctions);
@@ -358,7 +369,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
 
       // Broadcast update
       if (realtimeSyncRef.current) {
-        const updatedFunctions = functions.filter((f) => f.function_id !== functionId);
+        const safeFunctions = functions || [];
+        const updatedFunctions = safeFunctions.filter((f) => f.function_id !== functionId);
         await realtimeSyncRef.current.broadcastUpdate(updatedFunctions);
       }
     } catch (err: any) {
@@ -377,15 +389,17 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
     setYDomain(defaultYDomain);
     // After reset, adjust Y domain once based on current functions and default X range
     requestAnimationFrame(() => {
-      adjustYDomainForRange(defaultXDomain, functions);
+      if (functions && functions.length > 0) {
+        adjustYDomainForRange(defaultXDomain, functions);
+      }
     });
   };
 
   // Estimate Y range for visible functions over an X interval
   const estimateYRange = useCallback(
     (xMin: number, xMax: number, functionList?: MathFunction[]) => {
-      const list = functionList ?? functions;
-      if (!list.length) {
+      const list = functionList ?? (functions || []);
+      if (!list || !list.length) {
         return null;
       }
       const numSamples = 101;
@@ -732,8 +746,9 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   };
 
   // Validate and convert MathFunction to FunctionData for plotting
-  const functionData: FunctionData[] = functions
-    .filter((f) => f.is_visible && f.equation && f.equation.trim())
+  const safeFunctions = functions || [];
+  const functionData: FunctionData[] = safeFunctions
+    .filter((f) => f && f.is_visible && f.equation && f.equation.trim())
     .map((f) => {
       try {
         let convertedEquation = convertMathToJS(f.equation);
@@ -878,11 +893,11 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
                   Funcții active
                 </p>
                 <p className="text-sm font-medium text-gray-600">
-                  {functions.length} funcție{functions.length === 1 ? '' : 'i'}
+                  {safeFunctions.length} funcție{safeFunctions.length === 1 ? '' : 'i'}
                 </p>
               </div>
               <FunctionList
-                functions={functions}
+                functions={safeFunctions}
                 onUpdate={handleUpdateFunction}
                 onDelete={handleDeleteFunction}
                 onSelect={setSelectedFunctionId}

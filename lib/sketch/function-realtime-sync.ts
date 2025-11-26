@@ -124,7 +124,8 @@ export class FunctionRealtimeSync {
         this.lastFunctionsHash = hash;
 
         if (this.onFunctionUpdate) {
-          this.onFunctionUpdate(functions as MathFunction[]);
+          // Ensure we always pass an array, never undefined
+          this.onFunctionUpdate((functions || []) as MathFunction[]);
         }
       }
     } catch (error) {
@@ -178,8 +179,9 @@ export class FunctionRealtimeSync {
         return;
       }
 
-      if (data && this.onFunctionUpdate) {
-        this.onFunctionUpdate(data as MathFunction[]);
+      if (this.onFunctionUpdate) {
+        // Ensure we always pass an array, never null or undefined
+        this.onFunctionUpdate((data || []) as MathFunction[]);
       }
     } catch (error) {
       console.error('[FunctionRealtimeSync] Error reloading functions:', error);
