@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     getUser()
     
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle token refresh errors
       if (event === 'TOKEN_REFRESHED') {
         // Token refreshed successfully, update user
@@ -80,6 +80,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null)
         setProfile(null)
         setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+      } else if (event === 'TOKEN_REFRESHED' && !session) {
+        // Token refresh failed - handle invalid refresh token
+        await handleInvalidAuthSession('Token refresh failed');
       } else {
         // Other events (SIGNED_IN, USER_UPDATED, etc.)
         setUser(session?.user ?? null)

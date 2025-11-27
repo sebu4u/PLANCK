@@ -167,26 +167,67 @@ export function MathInput({
         });
 
         const openVirtualKeyboard = () => {
-          // Small delay to ensure MathLive is ready
-          setTimeout(() => {
-            try {
-              if (mathField.executeCommand) {
-                mathField.executeCommand('toggleVirtualKeyboard');
-              } else if (mathField.showVirtualKeyboard) {
-                mathField.showVirtualKeyboard();
-              } else if (mathField.virtualKeyboardState === 'hidden') {
-                mathField.executeCommand?.('toggleVirtualKeyboard');
-              }
-            } catch (e) {
-              console.warn('Could not open virtual keyboard:', e);
-            }
-          }, 150);
+          // Check if element is visible before opening keyboard
+          const isVisible = () => {
+            if (!mathField) return false;
+            const rect = mathField.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 && 
+                   window.getComputedStyle(mathField).visibility !== 'hidden' &&
+                   window.getComputedStyle(mathField).display !== 'none';
+          };
+
+          // Use multiple animation frames to ensure DOM is ready and visible
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                if (!isVisible()) {
+                  // Retry once more if not visible
+                  setTimeout(() => {
+                    if (isVisible()) {
+                      try {
+                        if (mathField.executeCommand) {
+                          mathField.executeCommand('toggleVirtualKeyboard');
+                        } else if (mathField.showVirtualKeyboard) {
+                          mathField.showVirtualKeyboard();
+                        } else if (mathField.virtualKeyboardState === 'hidden') {
+                          mathField.executeCommand?.('toggleVirtualKeyboard');
+                        }
+                      } catch (e) {
+                        console.warn('Could not open virtual keyboard:', e);
+                      }
+                    }
+                  }, 100);
+                  return;
+                }
+                
+                try {
+                  if (mathField.executeCommand) {
+                    mathField.executeCommand('toggleVirtualKeyboard');
+                  } else if (mathField.showVirtualKeyboard) {
+                    mathField.showVirtualKeyboard();
+                  } else if (mathField.virtualKeyboardState === 'hidden') {
+                    mathField.executeCommand?.('toggleVirtualKeyboard');
+                  }
+                } catch (e) {
+                  console.warn('Could not open virtual keyboard:', e);
+                }
+              }, 200);
+            });
+          });
         };
 
         // Open virtual keyboard automatically on focus
         if (showVirtualKeyboard && !disableNativeKeyboard) {
+          let focusTimeout: NodeJS.Timeout | null = null;
           mathField.addEventListener('focus', () => {
-            openVirtualKeyboard();
+            // Clear any pending timeout
+            if (focusTimeout) {
+              clearTimeout(focusTimeout);
+            }
+            // Delay to ensure dialog is fully rendered
+            focusTimeout = setTimeout(() => {
+              openVirtualKeyboard();
+            }, 100);
           });
         }
 

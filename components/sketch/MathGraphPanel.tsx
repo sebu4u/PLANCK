@@ -48,6 +48,7 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   const [graphHeight, setGraphHeight] = useState(360);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
+  const [isDialogReady, setIsDialogReady] = useState(false);
   const mathFieldHandleRef = useRef<any>(null);
   const isMobile = useIsMobile();
 
@@ -69,6 +70,7 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
 
   const handleKeyboardClose = () => {
     setIsKeyboardOpen(false);
+    setIsDialogReady(false);
     setCurrentEquation('');
     mathFieldHandleRef.current = null;
   };
@@ -76,6 +78,8 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   const handleKeyboardOpen = () => {
     setCurrentEquation('');
     setIsKeyboardOpen(true);
+    // Reset dialog ready state - will be set by useEffect when dialog opens
+    setIsDialogReady(false);
   };
 
   // Initialize persistence and realtime sync
@@ -177,6 +181,24 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Set dialog ready when keyboard dialog opens (desktop only)
+  useEffect(() => {
+    if (!isMobile && isKeyboardOpen) {
+      // Reset first
+      setIsDialogReady(false);
+      // Use multiple animation frames to ensure dialog is fully rendered and MathInput is mounted
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            setIsDialogReady(true);
+          }, 200);
+        });
+      });
+    } else if (!isKeyboardOpen) {
+      setIsDialogReady(false);
+    }
+  }, [isKeyboardOpen, isMobile]);
 
   const loadFunctions = async () => {
     if (!persistenceRef.current || !pageId) return;
@@ -380,8 +402,34 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   };
 
   const handleZoomChange = useCallback((newXDomain: [number, number], newYDomain: [number, number]) => {
-    setXDomain(newXDomain);
-    setYDomain(newYDomain);
+    // Validate that all values are finite before setting
+    if (
+      !Array.isArray(newXDomain) || newXDomain.length !== 2 ||
+      !Array.isArray(newYDomain) || newYDomain.length !== 2
+    ) {
+      console.warn('[MathGraphPanel] Invalid domain arrays received in handleZoomChange');
+      return;
+    }
+
+    const [xMin, xMax] = newXDomain;
+    const [yMin, yMax] = newYDomain;
+
+    if (
+      !Number.isFinite(xMin) || !Number.isFinite(xMax) ||
+      !Number.isFinite(yMin) || !Number.isFinite(yMax)
+    ) {
+      console.warn('[MathGraphPanel] Non-finite domain values received, ignoring zoom change');
+      return;
+    }
+
+    // Ensure valid ranges
+    if (xMax <= xMin || yMax <= yMin) {
+      console.warn('[MathGraphPanel] Invalid domain ranges (max <= min), ignoring zoom change');
+      return;
+    }
+
+    setXDomain([xMin, xMax]);
+    setYDomain([yMin, yMax]);
   }, []);
 
   const handleResetZoom = () => {
@@ -456,30 +504,69 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
 
   // Apply Y domain so that origin is centered when function spans negative and positive values
   const applyYDomainFromRange = (minY: number, maxY: number) => {
+    // Validate that inputs are finite
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+      console.warn('[MathGraphPanel] Invalid Y range values (non-finite), using default domain');
+      setYDomain(defaultYDomain);
+      return;
+    }
+
+    // Ensure minY < maxY
+    if (minY > maxY) {
+      [minY, maxY] = [maxY, minY];
+    }
+
+    let lower: number;
+    let upper: number;
+
     if (minY < 0 && maxY > 0) {
       const maxAbs = Math.max(Math.abs(minY), Math.abs(maxY));
       const padding = maxAbs * 0.1 || 1;
-      const upper = maxAbs + padding;
-      const lower = -upper;
-      setYDomain([lower, upper]);
+      upper = maxAbs + padding;
+      lower = -upper;
     } else if (minY >= 0) {
-      const upper = Math.max(maxY * 1.2, defaultYDomain[1]);
-      const lower = Math.min(-1, defaultYDomain[0]);
-      setYDomain([lower, upper]);
+      upper = Math.max(maxY * 1.2, defaultYDomain[1]);
+      lower = Math.min(-1, defaultYDomain[0]);
     } else {
       // All negative values
       const lowerAbs = Math.max(Math.abs(minY) * 1.2, Math.abs(defaultYDomain[0]));
-      const lower = -lowerAbs;
-      const upper = Math.max(1, defaultYDomain[1]);
-      setYDomain([lower, upper]);
+      lower = -lowerAbs;
+      upper = Math.max(1, defaultYDomain[1]);
     }
+
+    // Final validation - ensure both values are finite
+    if (!Number.isFinite(lower) || !Number.isFinite(upper) || upper <= lower) {
+      console.warn('[MathGraphPanel] Computed Y domain is invalid, using default domain');
+      setYDomain(defaultYDomain);
+      return;
+    }
+
+    setYDomain([lower, upper]);
   };
 
   // Convenience: compute range on a given xDomain and apply Y domain once
   const adjustYDomainForRange = (xDom: [number, number], functionList?: MathFunction[]) => {
+    // Validate xDomain first
+    if (!Array.isArray(xDom) || xDom.length !== 2) {
+      console.warn('[MathGraphPanel] Invalid xDomain in adjustYDomainForRange');
+      return;
+    }
+
     const [xMin, xMax] = xDom;
+    if (!Number.isFinite(xMin) || !Number.isFinite(xMax) || xMax <= xMin) {
+      console.warn('[MathGraphPanel] Invalid xDomain values in adjustYDomainForRange');
+      return;
+    }
+
     const range = estimateYRange(xMin, xMax, functionList);
     if (!range) return;
+
+    // Validate range values before applying
+    if (!Number.isFinite(range.minY) || !Number.isFinite(range.maxY)) {
+      console.warn('[MathGraphPanel] Non-finite Y range computed, skipping domain adjustment');
+      return;
+    }
+
     applyYDomainFromRange(range.minY, range.maxY);
   };
 
@@ -932,8 +1019,31 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
                 onError={(msg) => setError(msg)}
                 placeholder="ex: x^2 + 2*x + 1 sau sin(x)"
                 showVirtualKeyboard={true}
-                autoFocus={true}
+                autoFocus={isDialogReady}
                 hideErrorMessage
+                onMathFieldReady={(field) => {
+                  mathFieldHandleRef.current = field;
+                  // Focus and open keyboard after field is ready and dialog is ready
+                  if (isDialogReady) {
+                    setTimeout(() => {
+                      try {
+                        field.focus();
+                        // Explicitly open virtual keyboard after focus
+                        if (field.executeCommand) {
+                          setTimeout(() => {
+                            try {
+                              field.executeCommand('toggleVirtualKeyboard');
+                            } catch (err) {
+                              console.warn('Could not open virtual keyboard:', err);
+                            }
+                          }, 100);
+                        }
+                      } catch (err) {
+                        console.warn('Could not focus math field:', err);
+                      }
+                    }, 200);
+                  }
+                }}
               />
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={handleKeyboardClose}>
