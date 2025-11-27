@@ -13,6 +13,7 @@ interface State {
   hasError: boolean
   error: Error | null
   errorInfo: ErrorInfo | null
+  showDetails?: boolean
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -91,10 +92,21 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
-                <h2 className="font-semibold text-destructive">Detalii eroare (doar în development):</h2>
-                <pre className="text-xs overflow-auto text-destructive/80">
+            <div className="flex justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => this.setState(prev => ({ ...prev, showDetails: !prev.showDetails }))}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                {this.state.showDetails ? "Ascunde detalii tehnice" : "Arată detalii tehnice"}
+              </Button>
+            </div>
+
+            {(process.env.NODE_ENV === 'development' || this.state.showDetails) && this.state.error && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2 text-left">
+                <h2 className="font-semibold text-destructive text-sm">Detalii eroare:</h2>
+                <pre className="text-xs overflow-auto text-destructive/80 whitespace-pre-wrap break-all max-h-60">
                   {this.state.error.toString()}
                   {this.state.errorInfo?.componentStack && (
                     <div className="mt-2 pt-2 border-t border-destructive/20">

@@ -29,7 +29,7 @@ interface UserInfo {
 // These include camera position, zoom, cursor state, etc.
 const EPHEMERAL_TYPES = new Set([
   'instance',
-  'instance_page_state', 
+  'instance_page_state',
   'instance_presence',
   'camera',
 ]);
@@ -40,7 +40,14 @@ const isEphemeralRecord = (record: any): boolean => {
 };
 
 export default function PlanckSketch({ roomId }: { roomId: string }) {
-  const store = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), []);
+  const store = useMemo(() => {
+    try {
+      return createTLStore({ shapeUtils: defaultShapeUtils });
+    } catch (err) {
+      console.error("[PlanckSketch] Failed to create TLStore:", err);
+      return null;
+    }
+  }, []);
   const { user, profile } = useAuth();
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -54,7 +61,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
   const socketRef = useRef<PartySocket | null>(null);
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectionStatusRef = useRef<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
-  
+
   // Compute effective current page ID - ensures graph button appears even when currentPageId isn't set yet
   // Using useMemo to recalculate when editor, currentPageId, or store changes
   const effectiveCurrentPageId = useMemo(() => {
@@ -127,12 +134,12 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
   }, []);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !store) return;
 
     // Validate PartyKit host configuration
     // In production, localhost is not allowed (must be a real PartyKit host)
     if (!PARTYKIT_HOST || (process.env.NODE_ENV === 'production' && (PARTYKIT_HOST === "localhost:1999" || PARTYKIT_HOST.includes("localhost")))) {
-      const errorMsg = process.env.NODE_ENV === 'production' 
+      const errorMsg = process.env.NODE_ENV === 'production'
         ? "Configurare PartyKit lipsă sau invalidă pentru producție. NEXT_PUBLIC_PARTYKIT_HOST trebuie să fie setat la URL-ul PartyKit de producție."
         : "NEXT_PUBLIC_PARTYKIT_HOST nu este configurat. Verifică variabilele de mediu.";
       setConnectionError(errorMsg);
@@ -165,12 +172,22 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       }
     }, 10000);
 
-    const socket = new PartySocket({
-      host: PARTYKIT_HOST,
-      room: roomId,
-      party: "main",
-    });
-    
+    let socket: PartySocket;
+    try {
+      socket = new PartySocket({
+        host: PARTYKIT_HOST,
+        room: roomId,
+        party: "main",
+      });
+    } catch (err) {
+      console.error("[PlanckSketch] Failed to create PartySocket:", err);
+      const errorMsg = "Eroare la inițializarea conexiunii PartyKit. Verifică configurația.";
+      setConnectionError(errorMsg);
+      setConnectionStatus('error');
+      connectionStatusRef.current = 'error';
+      return;
+    }
+
     socketRef.current = socket;
 
     const onOpen = () => {
@@ -183,7 +200,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       setConnectionStatus('connected');
       connectionStatusRef.current = 'connected';
       setConnectionError(null);
-      
+
       // Send user info to server if user is logged in
       if (user && socket) {
         const userInfo = {
@@ -206,11 +223,11 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = null;
       }
-      
+
       // Only set error if we were connecting or connected (not if we intentionally closed)
       const currentStatus = connectionStatusRef.current;
       if (currentStatus === 'connecting' || currentStatus === 'connected') {
-        const errorMsg = event?.code === 1006 
+        const errorMsg = event?.code === 1006
           ? `Conexiunea la server a fost întreruptă. Verifică că serverul PartyKit este accesibil la ${PARTYKIT_HOST}.`
           : "Conexiunea la server a fost închisă. Te rugăm să reîncerci.";
         setConnectionError(errorMsg);
@@ -225,40 +242,40 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
     const onError = (error: Event | Error | unknown) => {
       try {
         // Safely log error without triggering Next.js error boundaries
-        const errorInfo = error instanceof Error 
+        const errorInfo = error instanceof Error
           ? error.message || error.toString()
           : error instanceof Event
-          ? `Event: ${error.type}`
-          : error && typeof error === 'object' && 'toString' in error
-          ? String(error)
-          : 'Unknown error';
-        
+            ? `Event: ${error.type}`
+            : error && typeof error === 'object' && 'toString' in error
+              ? String(error)
+              : 'Unknown error';
+
         // Use console.warn instead of console.error to avoid triggering error boundaries
         console.warn("[PlanckSketch] PartySocket error:", errorInfo);
-        
+
         // Clear timeout
         if (connectionTimeoutRef.current) {
           clearTimeout(connectionTimeoutRef.current);
           connectionTimeoutRef.current = null;
         }
-        
+
         // Only update state if we're not already in error state to avoid loops
         if (connectionStatusRef.current === 'error') {
           return;
         }
-        
+
         let errorMsg = "Eroare la conectarea la serverul PartyKit.";
         if (error instanceof Error) {
           errorMsg = error.message || errorMsg;
         } else if (error instanceof Event) {
           errorMsg = `Eroare de conexiune: ${error.type}. Verifică că serverul PartyKit este accesibil.`;
         }
-        
+
         // Check if it's a network/host error
         if (PARTYKIT_HOST === "localhost:1999" || PARTYKIT_HOST.includes("localhost")) {
           errorMsg = "Configurare PartyKit invalidă pentru producție. NEXT_PUBLIC_PARTYKIT_HOST trebuie să fie setat la URL-ul PartyKit de producție.";
         }
-        
+
         setConnectionError(errorMsg);
         setConnectionStatus('error');
         connectionStatusRef.current = 'error';
@@ -284,10 +301,10 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           });
         } else if (msg.type === "update") {
           const { added, updated, removed } = msg.payload;
-          
+
           // Filter out ephemeral records from updates
           // Each user maintains their own camera position, zoom level, etc.
-          const filteredAdded = added 
+          const filteredAdded = added
             ? Object.values(added).filter((record: any) => !isEphemeralRecord(record)) as TLRecord[]
             : [];
           const filteredUpdated = updated
@@ -296,7 +313,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           const filteredRemoved = removed
             ? Object.keys(removed).filter((id: string) => !isEphemeralRecord(removed[id]))
             : [];
-          
+
           const count = filteredAdded.length + filteredUpdated.length;
           setLastEvent(`Recv: ${count} changes`);
 
@@ -390,7 +407,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
 
   // Listen for page changes via store listener
   useEffect(() => {
-    if (!editor || editorReadyVersion === 0) return;
+    if (!editor || editorReadyVersion === 0 || !store) return;
 
     // Listen to store changes and check for instance record updates
     const unsubscribe = store.listen((entry) => {
@@ -477,7 +494,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
 
       const handlePointerDown = (event: PointerEvent) => {
         const isTouch = event.pointerType === 'touch' || event.pointerType === 'pen';
-        
+
         if (isTouch && isDrawingToolActive()) {
           return;
         }
@@ -679,82 +696,88 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       {/* Navbar */}
       <WhiteboardNavbar roomId={roomId} connectedUsers={connectedUsers} />
-      
+
       {/* Main Editor Area - Flex Grow to fill available space */}
       <div className="flex-1 relative min-w-0 flex overflow-hidden">
         <div className="flex-1 relative h-full min-w-0">
-        <div ref={containerRef} className="absolute inset-0">
-          <Tldraw 
-            store={store}
-            licenseKey="tldraw-2026-02-28/WyJmWVRrODVnNSIsWyIqIl0sMTYsIjIwMjYtMDItMjgiXQ.LfYobRlq42wKRiuYggl0DPR+eDYcMWDlRyU0d1RmYpLmMclP+vlJhHz4AGYtmcuQT39nYGP0ywhBwliKp3f4pg"
-            onMount={(editor) => {
-                setEditor(editor);
-                setCurrentPageId(editor.getCurrentPageId());
-                setEditorReadyVersion((version) => version + 1);
-                
-                // Set default pen size to smallest ('s')
-                try {
-                  const currentSize = editor.getStyleForNextShape(DefaultSizeStyle);
-                  if (currentSize !== 's') {
-                    editor.setStyleForNextShapes(DefaultSizeStyle, 's');
+          <div ref={containerRef} className="absolute inset-0">
+            {store ? (
+              <Tldraw
+                store={store}
+                licenseKey="tldraw-2026-02-28/WyJmWVRrODVnNSIsWyIqIl0sMTYsIjIwMjYtMDItMjgiXQ.LfYobRlq42wKRiuYggl0DPR+eDYcMWDlRyU0d1RmYpLmMclP+vlJhHz4AGYtmcuQT39nYGP0ywhBwliKp3f4pg"
+                onMount={(editor) => {
+                  setEditor(editor);
+                  setCurrentPageId(editor.getCurrentPageId());
+                  setEditorReadyVersion((version) => version + 1);
+
+                  // Set default pen size to smallest ('s')
+                  try {
+                    const currentSize = editor.getStyleForNextShape(DefaultSizeStyle);
+                    if (currentSize !== 's') {
+                      editor.setStyleForNextShapes(DefaultSizeStyle, 's');
+                    }
+                  } catch (err) {
+                    console.warn('[PlanckSketch] Failed to set default pen size:', err);
                   }
-                } catch (err) {
-                  console.warn('[PlanckSketch] Failed to set default pen size:', err);
-                }
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-red-500">
+                Eroare la inițializarea tablei de desen.
+              </div>
+            )}
+          </div>
+
+          {/* Page Navigator */}
+          <PageNavigator
+            editor={editor}
+            store={store}
+            currentPageId={currentPageId}
+            onPageChange={(pageId) => {
+              if (editor) {
+                editor.setCurrentPage(pageId as TLPageId);
+                setCurrentPageId(pageId);
+              }
             }}
           />
-        </div>
-        
-        {/* Page Navigator */}
-        <PageNavigator
-          editor={editor}
-          store={store}
-          currentPageId={currentPageId}
-          onPageChange={(pageId) => {
-            if (editor) {
-               editor.setCurrentPage(pageId as TLPageId);
-               setCurrentPageId(pageId);
-            }
-          }}
-        />
 
-        {/* Mobile Graph Toggle */}
-        {effectiveCurrentPageId && (
-          <div className="sm:hidden absolute top-4 right-4 z-40">
-            <Button
-              size="icon"
-              variant="secondary"
-              onClick={() => setIsMathGraphOpen(true)}
-              className="rounded-full bg-white/90 text-gray-900 shadow-lg border border-gray-200 hover:bg-white"
-              aria-label={isMathGraphOpen ? "Deschide graficul matematic" : "Deschide graficul matematic"}
-            >
-              <Calculator className="h-5 w-5" />
-            </Button>
+          {/* Mobile Graph Toggle */}
+          {effectiveCurrentPageId && (
+            <div className="sm:hidden absolute top-4 right-4 z-40">
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={() => setIsMathGraphOpen(true)}
+                className="rounded-full bg-white/90 text-gray-900 shadow-lg border border-gray-200 hover:bg-white"
+                aria-label={isMathGraphOpen ? "Deschide graficul matematic" : "Deschide graficul matematic"}
+              >
+                <Calculator className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {/* Math Graph Button */}
+          {effectiveCurrentPageId && (
+            <div className="hidden sm:block absolute bottom-16 right-4 z-50">
+              <Button
+                onClick={() => setIsMathGraphOpen(!isMathGraphOpen)}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                size="lg"
+                title={isMathGraphOpen ? "Închide graficare matematică" : "Deschide graficare matematică"}
+              >
+                <Calculator className="h-5 w-5 mr-2" />
+                graph
+              </Button>
+            </div>
+          )}
+
+          {/* Share Button - Bottom Right, below Math Graph Button */}
+          <div className="hidden sm:block absolute bottom-4 right-4 z-50">
+            <ShareButton
+              boardId={roomId}
+              shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/sketch/${roomId}` : `/sketch/${roomId}`}
+            />
           </div>
-        )}
-
-        {/* Math Graph Button */}
-        {effectiveCurrentPageId && (
-          <div className="hidden sm:block absolute bottom-16 right-4 z-50">
-            <Button
-              onClick={() => setIsMathGraphOpen(!isMathGraphOpen)}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-              size="lg"
-              title={isMathGraphOpen ? "Închide graficare matematică" : "Deschide graficare matematică"}
-            >
-              <Calculator className="h-5 w-5 mr-2" />
-              graph
-            </Button>
-          </div>
-        )}
-
-        {/* Share Button - Bottom Right, below Math Graph Button */}
-        <div className="hidden sm:block absolute bottom-4 right-4 z-50">
-          <ShareButton 
-            boardId={roomId} 
-            shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/sketch/${roomId}` : `/sketch/${roomId}`} 
-          />
-        </div>
         </div>
 
         {/* Math Graph Panel - Sits alongside editor in flex container (Desktop) */}
@@ -766,12 +789,12 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
             )}
           >
             <div className="w-[620px] lg:w-[720px] h-full flex flex-col">
-               <MathGraphPanel
-                  boardId={roomId}
-                  pageId={effectiveCurrentPageId}
-                  open={isMathGraphOpen}
-                  onOpenChange={setIsMathGraphOpen}
-                />
+              <MathGraphPanel
+                boardId={roomId}
+                pageId={effectiveCurrentPageId}
+                open={isMathGraphOpen}
+                onOpenChange={setIsMathGraphOpen}
+              />
             </div>
           </div>
         )}
