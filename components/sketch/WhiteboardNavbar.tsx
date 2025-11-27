@@ -27,12 +27,14 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
 
   // Get user display name
   const getUserDisplayName = (userInfo: UserInfo) => {
-    return userInfo.nickname || userInfo.name || userInfo.email || `User ${userInfo.connectionId.substring(0, 4)}`;
+    if (!userInfo) return "Unknown User";
+    return userInfo.nickname || userInfo.name || userInfo.email || `User ${(userInfo.connectionId || "").substring(0, 4)}`;
   };
 
   // Get user initials
   const getUserInitials = (userInfo: UserInfo) => {
-    const displayName = getUserDisplayName(userInfo);
+    if (!userInfo) return "?";
+    const displayName = getUserDisplayName(userInfo) || "?";
     // Extract first letter of each word, max 2 letters
     const words = displayName.trim().split(/\s+/);
     if (words.length >= 2) {
@@ -43,7 +45,8 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
 
   // Generate color based on user ID for consistent avatar colors
   const getUserColor = (userInfo: UserInfo) => {
-    const id = userInfo.userId || userInfo.connectionId;
+    if (!userInfo) return "bg-gray-500";
+    const id = userInfo.userId || userInfo.connectionId || "unknown";
     const colors = [
       "bg-blue-500",
       "bg-green-500",

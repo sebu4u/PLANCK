@@ -325,7 +325,9 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         } else if (msg.type === "presence") {
           // Update connected users list with user info
           if (msg.users && Array.isArray(msg.users)) {
-            setConnectedUsers(msg.users);
+            // Filter out any users with missing connectionId to prevent crashes
+            const validUsers = msg.users.filter((u: any) => u && typeof u.connectionId === 'string');
+            setConnectedUsers(validUsers);
           }
         }
       } catch (e) {
