@@ -31,7 +31,7 @@ const nextConfig = {
         fs: false,
       };
     }
-    
+
     // Optimize for dev mode
     if (dev) {
       // Reduce rebuilds by ignoring certain files
@@ -46,11 +46,11 @@ const nextConfig = {
           '**/.next/**',
         ],
       };
-      
+
       // Optimize module resolution
       config.resolve.symlinks = false;
     }
-    
+
     return config;
   },
   transpilePackages: ['function-plot', 'mathlive'],

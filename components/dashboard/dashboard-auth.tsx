@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
@@ -44,6 +44,9 @@ export function DashboardAuth() {
   const [animationComplete, setAnimationComplete] = useState(false)
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const animationCompletionTriggered = useRef(false)
+  const isInitialLoadRef = useRef(true)
+  const isFetchingRef = useRef(false)
+  const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     activities: DailyActivity[]
@@ -81,12 +84,16 @@ export function DashboardAuth() {
     }
 
     const fetchDashboardData = async () => {
+      // Prevent multiple simultaneous fetches
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+
       try {
         // Check cache in dev mode
         const cacheKey = `dashboard_cache_${user.id}`
         const cacheExpiry = 5 * 60 * 1000 // 5 minutes
         const isDev = process.env.NODE_ENV === 'development'
-        
+
         if (isDev && typeof window !== 'undefined') {
           const cached = sessionStorage.getItem(cacheKey)
           if (cached) {
@@ -94,6 +101,8 @@ export function DashboardAuth() {
             if (Date.now() - timestamp < cacheExpiry) {
               setDashboardData(data)
               setLoading(false)
+              isInitialLoadRef.current = false
+              isFetchingRef.current = false
               // Still fetch in background to update cache (but don't update UI)
               fetchDashboardDataBackground(user.id, cacheKey, true)
               return
@@ -102,6 +111,7 @@ export function DashboardAuth() {
         }
 
         // Fetch ALL data before showing the dashboard
+        // Skip streak check on initial load to prevent triggering realtime updates
         const [
           statsData,
           activitiesData,
@@ -115,7 +125,7 @@ export function DashboardAuth() {
           eloQuickStats,
           eloHistoryData,
         ] = await Promise.all([
-          fetchUserStats(user.id),
+          fetchUserStats(user.id, isInitialLoadRef.current),
           fetchDailyActivity(user.id),
           fetchDailyChallenge(user.id),
           fetchUserRoadmap(user.id),
@@ -149,7 +159,7 @@ export function DashboardAuth() {
         }
 
         setDashboardData(completeData)
-        
+
         // Cache in dev mode
         if (isDev && typeof window !== 'undefined') {
           sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -160,9 +170,13 @@ export function DashboardAuth() {
 
         // Only set loading to false after ALL data is loaded
         setLoading(false)
+        isInitialLoadRef.current = false
+        isFetchingRef.current = false
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
         setLoading(false)
+        isInitialLoadRef.current = false
+        isFetchingRef.current = false
       }
     }
 
@@ -182,7 +196,7 @@ export function DashboardAuth() {
           eloQuickStats,
           eloHistoryData,
         ] = await Promise.all([
-          fetchUserStats(userId),
+          fetchUserStats(userId, true), // Skip streak check in background fetch
           fetchDailyActivity(userId),
           fetchDailyChallenge(userId),
           fetchUserRoadmap(userId),
@@ -196,7 +210,7 @@ export function DashboardAuth() {
         ])
 
         const continueLearningData = await fetchContinueLearning()
-        
+
         const fullData = {
           stats: statsData,
           activities: activitiesData,
@@ -225,7 +239,7 @@ export function DashboardAuth() {
         } else {
           // Update UI only if not in silent mode (for realtime updates)
           setDashboardData(fullData)
-          
+
           // Cache in dev mode
           if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
             sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -253,31 +267,42 @@ export function DashboardAuth() {
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
-          try {
-            // Refresh stats and activities when user_stats is updated
-            const [updatedStats, updatedActivities, eloQuickStats] = await Promise.all([
-              fetchUserStats(user.id),
-              fetchDailyActivity(user.id),
-              fetchEloQuickStats(user.id),
-            ])
-            
-            const updatedEloHistory = await fetchEloHistory(user.id)
-            setDashboardData((prev) => {
-              if (!prev) return null
-              return {
-                ...prev,
-                stats: updatedStats,
-                activities: updatedActivities,
-                eloTodayGain: eloQuickStats.todayGain,
-                eloWeekGain: eloQuickStats.weekGain,
-                eloHistory: updatedEloHistory,
-              }
-            })
-          } catch (error) {
-            // Silently handle errors in realtime updates to prevent unhandled errors
-            console.warn('Error updating dashboard stats from realtime:', error)
-            // Don't throw - allow dashboard to continue functioning
+          // Ignore updates during initial load to prevent flickering
+          if (isInitialLoadRef.current || isFetchingRef.current) return
+
+          // Clear any pending timeout
+          if (realtimeUpdateTimeoutRef.current) {
+            clearTimeout(realtimeUpdateTimeoutRef.current)
           }
+
+          // Debounce realtime updates to prevent rapid flickering
+          realtimeUpdateTimeoutRef.current = setTimeout(async () => {
+            try {
+              // Skip streak check in realtime updates to prevent loops
+              const [updatedStats, updatedActivities, eloQuickStats] = await Promise.all([
+                fetchUserStats(user.id, true), // Skip streak check
+                fetchDailyActivity(user.id),
+                fetchEloQuickStats(user.id),
+              ])
+
+              const updatedEloHistory = await fetchEloHistory(user.id)
+              setDashboardData((prev) => {
+                if (!prev) return null
+                return {
+                  ...prev,
+                  stats: updatedStats,
+                  activities: updatedActivities,
+                  eloTodayGain: eloQuickStats.todayGain,
+                  eloWeekGain: eloQuickStats.weekGain,
+                  eloHistory: updatedEloHistory,
+                }
+              })
+            } catch (error) {
+              // Silently handle errors in realtime updates to prevent unhandled errors
+              console.warn('Error updating dashboard stats from realtime:', error)
+              // Don't throw - allow dashboard to continue functioning
+            }
+          }, 500) // 500ms debounce
         }
       )
       .subscribe()
@@ -294,29 +319,45 @@ export function DashboardAuth() {
           filter: `user_id=eq.${user.id}`,
         },
         async () => {
-          try {
-            // Refresh activities when daily_activity changes
-            const updatedActivities = await fetchDailyActivity(user.id)
-            setDashboardData((prev) => {
-              if (!prev) return null
-              return {
-                ...prev,
-                activities: updatedActivities,
-              }
-            })
-          } catch (error) {
-            // Silently handle errors in realtime updates to prevent unhandled errors
-            console.warn('Error updating dashboard activities from realtime:', error)
-            // Don't throw - allow dashboard to continue functioning
+          // Ignore updates during initial load to prevent flickering
+          if (isInitialLoadRef.current || isFetchingRef.current) return
+
+          // Clear any pending timeout
+          if (realtimeUpdateTimeoutRef.current) {
+            clearTimeout(realtimeUpdateTimeoutRef.current)
           }
+
+          // Debounce realtime updates to prevent rapid flickering
+          realtimeUpdateTimeoutRef.current = setTimeout(async () => {
+            try {
+              // Refresh activities when daily_activity changes
+              const updatedActivities = await fetchDailyActivity(user.id)
+              setDashboardData((prev) => {
+                if (!prev) return null
+                return {
+                  ...prev,
+                  activities: updatedActivities,
+                }
+              })
+            } catch (error) {
+              // Silently handle errors in realtime updates to prevent unhandled errors
+              console.warn('Error updating dashboard activities from realtime:', error)
+              // Don't throw - allow dashboard to continue functioning
+            }
+          }, 500) // 500ms debounce
         }
       )
       .subscribe()
 
     // Cleanup subscriptions on unmount
     return () => {
+      if (realtimeUpdateTimeoutRef.current) {
+        clearTimeout(realtimeUpdateTimeoutRef.current)
+      }
       supabase.removeChannel(statsChannel)
       supabase.removeChannel(activityChannel)
+      isFetchingRef.current = false
+      isInitialLoadRef.current = true
     }
   }, [user, authLoading, router])
 
@@ -337,6 +378,26 @@ export function DashboardAuth() {
       }
     }
   }, [])
+
+  // Memoize userData to prevent recreation on every render
+  // Must be called before any conditional returns to follow Rules of Hooks
+  const userData = useMemo(() => {
+    if (!user) {
+      return {
+        id: '',
+        email: '',
+        avatar_url: undefined,
+        username: undefined,
+      }
+    }
+    return {
+      id: user.id,
+      email: user.email!,
+      avatar_url: profile?.user_icon,
+      username: profile?.nickname || profile?.name,
+    }
+  }, [user?.id, user?.email, profile?.user_icon, profile?.nickname, profile?.name])
+
   const shouldShowWelcome =
     isFirstVisit &&
     user &&
@@ -387,13 +448,6 @@ export function DashboardAuth() {
 
   if (!user) return null
 
-  const userData = {
-    id: user.id,
-    email: user.email!,
-    avatar_url: profile?.user_icon,
-    username: profile?.nickname || profile?.name,
-  }
-
   const nextRankInfo = getNextRankThreshold(dashboardData.stats.elo)
 
   return (
@@ -410,60 +464,60 @@ export function DashboardAuth() {
         />
 
         <main className="lg:ml-[300px] p-6 md:p-8 lg:p-10 animate-fade-in-up">
-        <div className="max-w-[1000px] mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white/90 mb-2">
-              Welcome back, {userData.username || 'Student'}! 👋
-            </h1>
-            <p className="text-white/60">Here's your learning progress today</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <DailyActivityCard
-              activities={dashboardData.activities}
-              currentStreak={dashboardData.stats.current_streak}
-              bestStreak={dashboardData.stats.best_streak}
-              problemsToday={dashboardData.stats.problems_solved_today}
-              timeToday={dashboardData.stats.total_time_minutes}
-            />
-            <RankEloCard
-              elo={dashboardData.stats.elo}
-              rank={dashboardData.stats.rank}
-              nextRank={nextRankInfo.nextRank}
-              nextThreshold={nextRankInfo.threshold}
-              progress={nextRankInfo.progress}
-              eloHistory={dashboardData.eloHistory}
-              todayGain={dashboardData.eloTodayGain}
-              weekGain={dashboardData.eloWeekGain}
-            />
-          </div>
-
-          <div className="mb-6">
-            <ContinueLearningCard items={dashboardData.continueItems} />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {dashboardData.challenge && <DailyChallengeCard challenge={dashboardData.challenge} />}
-            <SketchCard sketches={dashboardData.sketches} />
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-6 mb-6">
-            <div className="flex-[2]">
-              <AchievementsCard achievements={dashboardData.achievements} />
+          <div className="max-w-[1000px] mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-white/90 mb-2">
+                Welcome back, {userData.username || 'Student'}! 👋
+              </h1>
+              <p className="text-white/60">Here's your learning progress today</p>
             </div>
-            <div className="flex-[3]">
-              <LearningInsightsCard insights={dashboardData.insights} />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <DailyActivityCard
+                activities={dashboardData.activities}
+                currentStreak={dashboardData.stats.current_streak}
+                bestStreak={dashboardData.stats.best_streak}
+                problemsToday={dashboardData.stats.problems_solved_today}
+                timeToday={dashboardData.stats.total_time_minutes}
+              />
+              <RankEloCard
+                elo={dashboardData.stats.elo}
+                rank={dashboardData.stats.rank}
+                nextRank={nextRankInfo.nextRank}
+                nextThreshold={nextRankInfo.threshold}
+                progress={nextRankInfo.progress}
+                eloHistory={dashboardData.eloHistory}
+                todayGain={dashboardData.eloTodayGain}
+                weekGain={dashboardData.eloWeekGain}
+              />
+            </div>
+
+            <div className="mb-6">
+              <ContinueLearningCard items={dashboardData.continueItems} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {dashboardData.challenge && <DailyChallengeCard challenge={dashboardData.challenge} />}
+              <SketchCard sketches={dashboardData.sketches} />
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6 mb-6">
+              <div className="flex-[2]">
+                <AchievementsCard achievements={dashboardData.achievements} />
+              </div>
+              <div className="flex-[3]">
+                <LearningInsightsCard insights={dashboardData.insights} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <RoadmapCard steps={dashboardData.roadmap} />
+              <RecommendationsCard recommendations={dashboardData.recommendations} />
+              <AiAssistantCard />
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            <RoadmapCard steps={dashboardData.roadmap} />
-            <RecommendationsCard recommendations={dashboardData.recommendations} />
-            <AiAssistantCard />
-          </div>
-        </div>
         </main>
-        
+
         {/* Footer */}
         <footer className="lg:ml-[300px]">
           <Footer backgroundColor="bg-[#080808]" borderColor="border-[#1a1a1a]" />
@@ -474,30 +528,32 @@ export function DashboardAuth() {
 }
 
 // Helper functions for client-side data fetching
-async function fetchUserStats(userId: string): Promise<UserStats> {
-  // Check and reset streak if user skipped a day
-  try {
-    const { error: streakError } = await supabase.rpc('check_and_reset_streak_if_needed', {
-      user_uuid: userId,
-    })
-    if (streakError) {
-      // Only log if error has meaningful information
-      if (streakError.message || streakError.code) {
-        console.warn('Warning: Streak reset check failed:', {
-          message: streakError.message,
-          code: streakError.code,
-          details: streakError.details,
-        })
+async function fetchUserStats(userId: string, skipStreakCheck: boolean = false): Promise<UserStats> {
+  // Check and reset streak if user skipped a day (only on initial load, not on realtime updates)
+  if (!skipStreakCheck) {
+    try {
+      const { error: streakError } = await supabase.rpc('check_and_reset_streak_if_needed', {
+        user_uuid: userId,
+      })
+      if (streakError) {
+        // Only log if error has meaningful information
+        if (streakError.message || streakError.code) {
+          console.warn('Warning: Streak reset check failed:', {
+            message: streakError.message,
+            code: streakError.code,
+            details: streakError.details,
+          })
+        }
+        // Continue execution even if streak check fails
+      }
+    } catch (err) {
+      // Log error but don't throw - allow function to continue
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage && errorMessage !== '{}') {
+        console.warn('Warning: Streak reset check encountered an error:', errorMessage)
       }
       // Continue execution even if streak check fails
     }
-  } catch (err) {
-    // Log error but don't throw - allow function to continue
-    const errorMessage = err instanceof Error ? err.message : String(err)
-    if (errorMessage && errorMessage !== '{}') {
-      console.warn('Warning: Streak reset check encountered an error:', errorMessage)
-    }
-    // Continue execution even if streak check fails
   }
 
   const { data, error } = await supabase
@@ -530,7 +586,7 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
 
   // Override problems_solved_today and total_time_minutes with actual values from daily_activity
   const stats = data as UserStats
-  
+
   // If last_activity_date is different from today, reset problems_solved_today to 0
   const lastActivityDate = stats.last_activity_date ? new Date(stats.last_activity_date).toISOString().split('T')[0] : null
   if (lastActivityDate !== today) {
@@ -540,7 +596,7 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
       .from('user_stats')
       .update({ problems_solved_today: 0 })
       .eq('user_id', userId)
-      .then(() => {}) // Fire and forget
+      .then(() => { }) // Fire and forget
   } else {
     stats.problems_solved_today = todayActivity?.problems_solved || 0
   }
@@ -619,65 +675,65 @@ async function fetchEloQuickStats(userId: string): Promise<EloQuickStats> {
 async function fetchEloHistory(userId: string): Promise<number[]> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
+
   // Get current ELO
   const { data: userStats } = await supabase
     .from('user_stats')
     .select('elo')
     .eq('user_id', userId)
     .single()
-  
+
   const currentElo = userStats?.elo || 500
-  
+
   // Get all solved problems from the last 7 days
   const sevenDaysAgo = new Date(today)
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6) // 6 days ago + today = 7 days
-  
+
   const { data: solvedProblems } = await supabase
     .from('solved_problems')
     .select('problem_id, solved_at')
     .eq('user_id', userId)
     .gte('solved_at', sevenDaysAgo.toISOString())
     .order('solved_at', { ascending: true })
-  
+
   if (!solvedProblems || solvedProblems.length === 0) {
     // If no problems solved, return array with current ELO for all days
     return Array(7).fill(currentElo)
   }
-  
+
   // Get problem difficulties
   const problemIds = Array.from(new Set(solvedProblems.map(sp => sp.problem_id)))
   const { data: problems } = await supabase
     .from('problems')
     .select('id, difficulty')
     .in('id', problemIds)
-  
+
   const difficultyToElo: Record<string, number> = {
     'Ușor': 15,
     'Mediu': 21,
     'Avansat': 30,
   }
-  
+
   const eloByProblemId = new Map<string, number>()
   problems?.forEach((p: any) => {
     const elo = difficultyToElo[p.difficulty] ?? 15
     eloByProblemId.set(p.id, elo)
   })
-  
+
   // Group solved problems by day (ELO gained per day)
   const eloByDay = new Map<string, number>()
-  
+
   for (const sp of solvedProblems as any[]) {
     const solvedAt = new Date(sp.solved_at)
     const dayKey = solvedAt.toISOString().split('T')[0]
     const elo = eloByProblemId.get(sp.problem_id) ?? 15
     eloByDay.set(dayKey, (eloByDay.get(dayKey) || 0) + elo)
   }
-  
+
   // Calculate ELO at the end of each day for the last 7 days
   // Start from 7 days ago and work forward to today
   const eloHistory: number[] = []
-  
+
   // Calculate total ELO gained in the last 7 days
   let totalGained = 0
   for (let i = 0; i < 7; i++) {
@@ -686,23 +742,23 @@ async function fetchEloHistory(userId: string): Promise<number[]> {
     const dayKey = date.toISOString().split('T')[0]
     totalGained += eloByDay.get(dayKey) || 0
   }
-  
+
   // ELO 7 days ago = current ELO - total gains
   // Ensure it's at least 500 (minimum starting ELO)
   let eloAtStartOfPeriod = Math.max(500, currentElo - totalGained)
-  
+
   // Build history by adding gains day by day
   for (let i = 0; i < 7; i++) {
     const date = new Date(today)
     date.setDate(date.getDate() - (6 - i))
     const dayKey = date.toISOString().split('T')[0]
     const eloGained = eloByDay.get(dayKey) || 0
-    
+
     // ELO at end of this day = ELO at start + gains
     eloAtStartOfPeriod += eloGained
     eloHistory.push(eloAtStartOfPeriod)
   }
-  
+
   return eloHistory
 }
 
@@ -984,34 +1040,34 @@ async function fetchContinueLearning(): Promise<ContinueLearningItem[]> {
     // Import functions dynamically to avoid server-side issues
     const { getAllGrades, getChaptersByGradeId, getLessonSummariesByChapterId } = await import('@/lib/supabase-physics')
     const { slugify } = await import('@/lib/slug')
-    
+
     // Get all grades
     const grades = await getAllGrades()
-    
+
     if (!grades || grades.length === 0) {
       return getContinueLearningPlaceholder()
     }
-    
+
     const items: ContinueLearningItem[] = []
-    
+
     // Get lessons from first 2 grades, first 2 chapters each
     for (const grade of grades.slice(0, 2)) {
       const chapters = await getChaptersByGradeId(grade.id)
-      
+
       if (!chapters || chapters.length === 0) continue
-      
+
       // Get lessons from first 2 chapters of this grade
       for (const chapter of chapters.slice(0, 2)) {
         const lessons = await getLessonSummariesByChapterId(chapter.id)
-        
+
         if (!lessons || lessons.length === 0) continue
-        
+
         // Get first 2 lessons from this chapter
         const lessonsToAdd = lessons.slice(0, 2)
-        
+
         for (const lesson of lessonsToAdd) {
           if (items.length >= 4) break // Limit to 4 items total
-          
+
           const slug = slugify(lesson.title)
           items.push({
             type: 'lesson' as const,
@@ -1020,18 +1076,18 @@ async function fetchContinueLearning(): Promise<ContinueLearningItem[]> {
             url: `/cursuri/${slug}`,
           })
         }
-        
+
         if (items.length >= 4) break
       }
-      
+
       if (items.length >= 4) break
     }
-    
+
     // If we have items, return them
     if (items.length > 0) {
       return items
     }
-    
+
     // Fallback to placeholder
     return getContinueLearningPlaceholder()
   } catch (error) {

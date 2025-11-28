@@ -186,7 +186,7 @@ export async function getGradeWithChapters(gradeId: string): Promise<{
 }> {
   const grade = await getGradeById(gradeId)
   const chapters = grade ? await getChaptersByGradeId(gradeId) : []
-  
+
   return { grade, chapters }
 }
 
@@ -196,7 +196,7 @@ export async function getChapterWithLessons(chapterId: string): Promise<{
 }> {
   const chapter = await getChapterById(chapterId)
   const lessons = chapter ? await getLessonsByChapterId(chapterId) : []
-  
+
   return { chapter, lessons }
 }
 
@@ -205,7 +205,7 @@ export async function getFullGradeData(gradeId: string): Promise<{
   chapters: Array<Chapter & { lessons: Lesson[] }>
 }> {
   const { grade, chapters } = await getGradeWithChapters(gradeId)
-  
+
   if (!grade) {
     return { grade: null, chapters: [] }
   }

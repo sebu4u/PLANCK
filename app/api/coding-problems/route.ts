@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation";
-import { isPaidPlan } from "@/lib/subscription-plan";
+import { isPaidPlan, FREE_PLAN_FULL_ACCESS } from "@/lib/subscription-plan";
 import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
@@ -182,7 +182,9 @@ export async function GET(request: NextRequest) {
   const userPlan = await resolvePlanForRequest(authedSupabase, accessToken)
   const enriched = (data ?? []).map((item) => {
     const isFreeMonthly = monthlyFreeSet.has(item.id)
-    const canAccess = isPaidPlan(userPlan)
+    // TEMPORARY: Allow free plan users and unauthenticated users full access when FREE_PLAN_FULL_ACCESS is true
+    // To revert: change this back to: const canAccess = isPaidPlan(userPlan)
+    const canAccess = FREE_PLAN_FULL_ACCESS || isPaidPlan(userPlan)
     return {
       ...item,
       isFreeMonthly,

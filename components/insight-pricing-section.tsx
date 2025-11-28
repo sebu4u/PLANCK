@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 
 interface PricingPlan {
   id: string
@@ -23,6 +24,8 @@ interface InsightPricingSectionProps {
 }
 
 export default function InsightPricingSection({ variant = 'default' }: InsightPricingSectionProps = {}) {
+  const router = useRouter()
+  
   // Date pentru planurile de pricing
   const pricingPlans: PricingPlan[] = useMemo(() => [
     {
@@ -180,6 +183,13 @@ export default function InsightPricingSection({ variant = 'default' }: InsightPr
               {/* Buton CTA - poziționat la baza cardului */}
               <div className="mt-auto">
                 <button
+                  onClick={() => {
+                    if (plan.id === 'free') {
+                      router.push('/probleme')
+                    } else if (plan.id === 'plus' || plan.id === 'pro') {
+                      router.push('/pricing')
+                    }
+                  }}
                   className={`w-full ${variant === 'homepage' ? 'py-2.5 px-5 text-sm' : 'py-2.5 sm:py-3 px-4 sm:px-6 text-sm sm:text-base'} rounded-lg font-medium transition-all duration-200 ${
                     plan.isRecommended
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'

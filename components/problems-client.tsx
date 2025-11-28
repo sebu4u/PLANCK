@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react"
 import { Pagination, PaginationContent, PaginationItem, PaginationEllipsis } from "@/components/ui/pagination"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { FREE_PLAN_FULL_ACCESS } from "@/lib/subscription-plan"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -384,9 +385,17 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
             <>
               <div className="mb-8 grid gap-5 md:grid-cols-2">
                 {visibleProblems.map((problem) => {
-                  const canAccess =
-                    !isFree || isPaid || monthlyFreeSet.has(problem.id)
-                  const isLocked = isFree && !canAccess
+                  // TEMPORARY: Allow free plan users and unauthenticated users full access when FREE_PLAN_FULL_ACCESS is true
+                  // To revert: change this back to: const canAccess = !isFree || isPaid || monthlyFreeSet.has(problem.id)
+                  let canAccess: boolean
+                  if (FREE_PLAN_FULL_ACCESS) {
+                    // When flag is enabled, everyone has access (paid users, free users, and unauthenticated users)
+                    canAccess = true
+                  } else {
+                    // Original logic: paid users or free users with monthly free problems
+                    canAccess = !isFree || isPaid || monthlyFreeSet.has(problem.id)
+                  }
+                  const isLocked = !canAccess
                   return (
                     <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
                       <ProblemCard

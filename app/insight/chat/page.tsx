@@ -1664,7 +1664,7 @@ function InsightChatPageContent() {
           // Floating chatbar when messages exist
           <div className="absolute bottom-0 left-0 right-0 px-8 py-4 pointer-events-none">
             <div className="max-w-3xl mx-auto">
-              <div className="relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] rounded-full p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 drop-shadow-lg max-[600px]:mt-4">
+              <div className={`relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 drop-shadow-lg max-[600px]:mt-4 ${input.trim() && textareaHeight > 40 ? 'rounded-2xl' : 'rounded-full'}`}>
                 <button
                   className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
                   disabled
@@ -1733,7 +1733,7 @@ function InsightChatPageContent() {
                 {formatWelcomeText(welcomeText)}
               </div>
               <div className="w-full">
-                <div className="relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] rounded-full p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200">
+                <div className={`relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 ${input.trim() && textareaHeight > 40 ? 'rounded-2xl' : 'rounded-full'}`}>
                   <button
                     className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
                     disabled

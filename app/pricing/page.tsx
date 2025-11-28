@@ -7,6 +7,13 @@ import { Home, Check, Loader2, Rocket, X } from "lucide-react"
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 function AnimatedPrice({ value }: { value: number }) {
   const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 })
@@ -24,6 +31,7 @@ export default function PricingPage() {
   const [activeTab, setActiveTab] = useState<"individual" | "schools">("individual")
   const [isYearly, setIsYearly] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [popupOpen, setPopupOpen] = useState(false)
 
   // Generate stable star positions only on client
   const stars = useMemo(() => {
@@ -304,6 +312,13 @@ export default function PricingPage() {
                       </ul>
 
                       <button
+                        onClick={() => {
+                          if (plan.id === "plus" || plan.id === "pro") {
+                            setPopupOpen(true)
+                          } else if (plan.id === "free") {
+                            router.push('/probleme')
+                          }
+                        }}
                         className={cn(
                           "w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                           plan.highlight
@@ -363,7 +378,10 @@ export default function PricingPage() {
                       </ul>
 
                       <div className="mt-auto pt-6 border-t border-white/5">
-                        <button className="w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group">
+                        <button 
+                          onClick={() => setPopupOpen(true)}
+                          className="w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group"
+                        >
                           {plan.cta}
                           <span className="group-hover:translate-x-1 transition-transform">→</span>
                         </button>
@@ -379,6 +397,28 @@ export default function PricingPage() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Popup Dialog */}
+      <Dialog open={popupOpen} onOpenChange={setPopupOpen}>
+        <DialogContent className="bg-[#1A1B1E]/90 backdrop-blur-sm border-white/40 text-white max-w-md rounded-2xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.2)]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-white text-center">
+              Almost there.
+            </DialogTitle>
+            <DialogDescription className="text-gray-300 text-center mt-4 text-base leading-relaxed">
+              Lucrăm la un Planck Pro care chiar merită banii.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={() => setPopupOpen(false)}
+              className="px-8 py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-200 transition-colors shadow-lg shadow-white/10"
+            >
+              Închide
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

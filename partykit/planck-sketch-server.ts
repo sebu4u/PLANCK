@@ -4,7 +4,7 @@ import type * as Party from "partykit/server";
 // These include camera position, zoom, cursor state, etc.
 const EPHEMERAL_TYPES = new Set([
   'instance',
-  'instance_page_state', 
+  'instance_page_state',
   'instance_presence',
   'camera',
 ]);
@@ -27,7 +27,7 @@ export default class SketchServer implements Party.Server {
   connections: Map<string, Party.Connection> = new Map();
   userInfo: Map<string, UserInfo> = new Map(); // connectionId -> UserInfo
 
-  constructor(readonly room: Party.Room) {}
+  constructor(readonly room: Party.Room) { }
 
   async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
     console.log(`[PartyKit] Connection established: ${conn.id} in room ${this.room.id}`);
@@ -42,7 +42,7 @@ export default class SketchServer implements Party.Server {
 
     // Load state from storage
     const allRecords = (await this.room.storage.get<Record<string, any>>("records")) || {};
-    
+
     // Filter out ephemeral records before sending to new client
     // Each user maintains their own camera position, zoom level, etc.
     const filteredRecords: Record<string, any> = {};
@@ -61,7 +61,7 @@ export default class SketchServer implements Party.Server {
 
   async onClose(conn: Party.Connection) {
     console.log(`[PartyKit] Connection closed: ${conn.id} in room ${this.room.id}`);
-    
+
     // Remove connection from map
     this.connections.delete(conn.id);
     this.userInfo.delete(conn.id);
@@ -73,6 +73,7 @@ export default class SketchServer implements Party.Server {
   private broadcastPresence() {
     // Build array of user info for all connected users
     const users: UserInfo[] = Array.from(this.userInfo.values());
+    console.log(`[PartyKit] Broadcasting presence: ${users.length} users in room ${this.room.id}`);
     const presenceMessage = JSON.stringify({
       type: "presence",
       users: users,
@@ -82,7 +83,7 @@ export default class SketchServer implements Party.Server {
 
   async onMessage(message: string, sender: Party.Connection) {
     // console.log(`[PartyKit] Message from ${sender.id}: ${message.slice(0, 50)}...`);
-    
+
     try {
       const data = JSON.parse(message);
 
@@ -98,6 +99,13 @@ export default class SketchServer implements Party.Server {
         };
         this.userInfo.set(sender.id, userInfo);
         // Broadcast updated user list to all clients
+        this.broadcastPresence();
+        return;
+      }
+
+      // Handle explicit presence requests
+      if (data.type === "request-presence") {
+        // Send presence update to all clients (including the requester)
         this.broadcastPresence();
         return;
       }

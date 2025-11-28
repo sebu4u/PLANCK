@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     getUser()
-    
+
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle token refresh errors
       if (event === 'TOKEN_REFRESHED') {
@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null)
       }
     })
-    
+
     return () => {
       listener.subscription.unsubscribe()
     }
@@ -108,8 +108,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq("user_id", user.id)
         .single()
       if (data) {
+        // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
         if (data.user_icon) {
-          setProfile({ ...data, user_icon: `${data.user_icon}?t=${Date.now()}` })
+          const iconUrl = data.user_icon.includes('?t=') 
+            ? data.user_icon 
+            : `${data.user_icon}?t=${Date.now()}`
+          setProfile({ ...data, user_icon: iconUrl })
         } else {
           setProfile(data)
         }
@@ -139,7 +143,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             .eq("user_id", user.id)
             .single()
           if (created) {
-            setProfile(created.user_icon ? { ...created, user_icon: `${created.user_icon}?t=${Date.now()}` } : created)
+            // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
+            if (created.user_icon) {
+              const iconUrl = created.user_icon.includes('?t=') 
+                ? created.user_icon 
+                : `${created.user_icon}?t=${Date.now()}`
+              setProfile({ ...created, user_icon: iconUrl })
+            } else {
+              setProfile(created)
+            }
             setSubscriptionPlan(
               typeof created.plan === "string" && created.plan.trim().length > 0
                 ? created.plan

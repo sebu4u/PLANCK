@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -44,7 +44,7 @@ interface DashboardSidebarProps {
   onOpenChange?: (open: boolean) => void
 }
 
-export function DashboardSidebar({
+function DashboardSidebarComponent({
   user,
   stats,
   tasks,
@@ -156,27 +156,33 @@ export function DashboardSidebar({
     </div>
   ), [localTasks, handleTaskToggle])
 
+  // Memoize user info to prevent unnecessary re-renders
+  const userDisplayName = useMemo(() => user.username || user.email.split('@')[0], [user.username, user.email])
+  const userInitial = useMemo(() => user.username?.[0]?.toUpperCase() || user.email[0].toUpperCase(), [user.username, user.email])
+  const rankIconPath = useMemo(() => getRankIconPath(stats.rank), [stats.rank])
+  const eloToNextRank = useMemo(() => Math.max(0, 600 - stats.elo), [stats.elo])
+
   const SidebarContent = () => (
     <ScrollArea ref={scrollAreaRef} className="h-full dashboard-scrollbar">
       <div className="p-5 space-y-6">
         {/* Section 1: User Header */}
         <div className="flex items-center gap-3 pb-5 border-b border-white/8">
           <Avatar className="w-10 h-10 border border-white/10">
-            <AvatarImage src={user.avatar_url} />
+            <AvatarImage src={user.avatar_url} key={user.avatar_url} />
             <AvatarFallback className="bg-gradient-to-br from-purple-500 to-blue-500 text-white text-sm">
-              {user.username?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+              {userInitial}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white/90 truncate">
-              {user.username || user.email.split('@')[0]}
+              {userDisplayName}
             </p>
             <div className="flex items-center gap-1.5">
               <p className="text-xs text-white/70">
                 {stats.rank} · {stats.elo} ELO
               </p>
               <Image
-                src={getRankIconPath(stats.rank)}
+                src={rankIconPath}
                 alt={stats.rank}
                 width={16}
                 height={16}
@@ -189,7 +195,7 @@ export function DashboardSidebar({
               />
             </div>
             <p className="text-xs text-white/60">
-              +{Math.max(0, 600 - stats.elo)} până la Silver I
+              +{eloToNextRank} până la Silver I
             </p>
           </div>
         </div>
@@ -440,4 +446,56 @@ export function DashboardSidebar({
     </>
   )
 }
+
+// Memoize the component to prevent re-renders when props haven't changed
+// The comparison function returns true if props are equal (no re-render needed)
+export const DashboardSidebar = memo(DashboardSidebarComponent, (prevProps, nextProps) => {
+  // Compare user object
+  if (
+    prevProps.user.id !== nextProps.user.id ||
+    prevProps.user.avatar_url !== nextProps.user.avatar_url ||
+    prevProps.user.username !== nextProps.user.username ||
+    prevProps.user.email !== nextProps.user.email
+  ) {
+    return false // Props changed, re-render needed
+  }
+
+  // Compare stats object (only key fields that affect display)
+  if (
+    prevProps.stats.elo !== nextProps.stats.elo ||
+    prevProps.stats.rank !== nextProps.stats.rank ||
+    prevProps.stats.current_streak !== nextProps.stats.current_streak ||
+    prevProps.stats.problems_solved_today !== nextProps.stats.problems_solved_today ||
+    prevProps.stats.total_time_minutes !== nextProps.stats.total_time_minutes
+  ) {
+    return false // Props changed, re-render needed
+  }
+
+  // Compare arrays (shallow comparison for length and IDs)
+  if (
+    prevProps.tasks.length !== nextProps.tasks.length ||
+    prevProps.continueItems.length !== nextProps.continueItems.length ||
+    prevProps.recentAchievements.length !== nextProps.recentAchievements.length ||
+    prevProps.updates.length !== nextProps.updates.length
+  ) {
+    return false // Props changed, re-render needed
+  }
+
+  // Deep compare tasks (they can be toggled)
+  const tasksEqual = prevProps.tasks.every((task, idx) => 
+    task.id === nextProps.tasks[idx]?.id && 
+    task.is_completed === nextProps.tasks[idx]?.is_completed
+  )
+  if (!tasksEqual) {
+    return false // Props changed, re-render needed
+  }
+
+  // Compare other props
+  if (prevProps.open !== nextProps.open) {
+    return false // Props changed, re-render needed
+  }
+
+  // All props are equal, no re-render needed
+  return true
+})
 

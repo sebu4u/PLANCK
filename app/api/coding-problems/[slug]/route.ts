@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation";
-import { isPaidPlan } from "@/lib/subscription-plan";
+import { isPaidPlan, FREE_PLAN_FULL_ACCESS } from "@/lib/subscription-plan";
 import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
@@ -44,7 +44,10 @@ export async function GET(
   ]);
 
   const isFreeMonthly = monthlyFreeSet.has(problem.id);
-  if (!isPaidPlan(userPlan)) {
+  // TEMPORARY: Allow free plan users and unauthenticated users full access when FREE_PLAN_FULL_ACCESS is true
+  // To revert: change this back to: if (!isPaidPlan(userPlan))
+  const hasAccess = FREE_PLAN_FULL_ACCESS || isPaidPlan(userPlan);
+  if (!hasAccess) {
     return NextResponse.json(
       { error: "Problem locked", code: "PROBLEM_LOCKED" },
       { status: 403 }

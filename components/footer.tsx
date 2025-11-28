@@ -105,6 +105,11 @@ export function Footer({ backgroundColor = "bg-black", borderColor = "border-gra
                 </Link>
               </li>
               <li>
+                <Link href="/pricing" className="hover:text-purple-400 transition-colors">
+                  Pricing
+                </Link>
+              </li>
+              <li>
                 <Link href="/despre" className="hover:text-purple-400 transition-colors">
                   Despre noi
                 </Link>

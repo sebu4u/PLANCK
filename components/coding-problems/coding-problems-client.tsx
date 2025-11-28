@@ -14,6 +14,7 @@ import {
 import { CodingProblemFilterBar } from "./filter-bar"
 import { CodingProblemGrid } from "./problem-grid"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { FREE_PLAN_FULL_ACCESS } from "@/lib/subscription-plan"
 
 const DEFAULT_FILTERS: CodingProblemFiltersState = {
   search: "",
@@ -166,8 +167,9 @@ export function CodingProblemsClient({
         loading={loading}
         canAccessProblem={(problem) => {
           if (isPaid) return true
-          // Utilizatorii Free nu au acces la problemele de informatică
-          return false
+          // TEMPORARY: Allow free plan users and unauthenticated users full access when FREE_PLAN_FULL_ACCESS is true
+          // To revert: change this back to: return false
+          return FREE_PLAN_FULL_ACCESS
         }}
       />
 

@@ -56,6 +56,8 @@ export function MathInput({
 }: MathInputProps) {
   const mathFieldRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const keyboardOpenAttemptedRef = useRef<boolean>(false);
+  const focusHandlerRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -82,7 +84,8 @@ export function MathInput({
       if (!mathFieldRef.current) {
         const mathField = document.createElement('math-field') as any;
         mathField.setAttribute('style', 'width: 100%; min-height: 60px;');
-        mathField.setAttribute('virtual-keyboard-mode', showVirtualKeyboard ? 'onfocus' : 'manual');
+        // Use 'manual' mode to prevent automatic toggling, we'll control it manually
+        mathField.setAttribute('virtual-keyboard-mode', showVirtualKeyboard ? 'manual' : 'manual');
         mathField.setAttribute('virtual-keyboard-layout', 'auto');
         mathField.setAttribute('smart-fence', 'true');
         mathField.setAttribute('smart-superscript', 'true');
@@ -167,68 +170,54 @@ export function MathInput({
         });
 
         const openVirtualKeyboard = () => {
-          // Check if element is visible before opening keyboard
-          const isVisible = () => {
-            if (!mathField) return false;
-            const rect = mathField.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0 && 
-                   window.getComputedStyle(mathField).visibility !== 'hidden' &&
-                   window.getComputedStyle(mathField).display !== 'none';
-          };
-
-          // Use multiple animation frames to ensure DOM is ready and visible
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setTimeout(() => {
-                if (!isVisible()) {
-                  // Retry once more if not visible
-                  setTimeout(() => {
-                    if (isVisible()) {
-                      try {
-                        if (mathField.executeCommand) {
-                          mathField.executeCommand('toggleVirtualKeyboard');
-                        } else if (mathField.showVirtualKeyboard) {
-                          mathField.showVirtualKeyboard();
-                        } else if (mathField.virtualKeyboardState === 'hidden') {
-                          mathField.executeCommand?.('toggleVirtualKeyboard');
-                        }
-                      } catch (e) {
-                        console.warn('Could not open virtual keyboard:', e);
-                      }
-                    }
-                  }, 100);
-                  return;
+          // Prevent multiple attempts in quick succession
+          if (keyboardOpenAttemptedRef.current) return;
+          
+          // Small delay to ensure MathLive is ready
+          setTimeout(() => {
+            try {
+              // Check current keyboard state first
+              const currentState = mathField.virtualKeyboardState || 'hidden';
+              
+              // If keyboard is already visible or showing, don't do anything
+              if (currentState === 'visible' || currentState === 'showing') {
+                return;
+              }
+              
+              // Only open if keyboard is hidden or hiding
+              if (currentState === 'hidden' || currentState === 'hiding') {
+                keyboardOpenAttemptedRef.current = true;
+                
+                if (mathField.showVirtualKeyboard) {
+                  mathField.showVirtualKeyboard();
+                } else if (mathField.executeCommand) {
+                  // Use showVirtualKeyboard command if available
+                  try {
+                    mathField.executeCommand('showVirtualKeyboard');
+                  } catch {
+                    // Fallback to toggle only if show doesn't work
+                    mathField.executeCommand('toggleVirtualKeyboard');
+                  }
                 }
                 
-                try {
-                  if (mathField.executeCommand) {
-                    mathField.executeCommand('toggleVirtualKeyboard');
-                  } else if (mathField.showVirtualKeyboard) {
-                    mathField.showVirtualKeyboard();
-                  } else if (mathField.virtualKeyboardState === 'hidden') {
-                    mathField.executeCommand?.('toggleVirtualKeyboard');
-                  }
-                } catch (e) {
-                  console.warn('Could not open virtual keyboard:', e);
-                }
-              }, 200);
-            });
-          });
+                // Reset flag after a delay to allow future opens
+                setTimeout(() => {
+                  keyboardOpenAttemptedRef.current = false;
+                }, 2000);
+              }
+            } catch (e) {
+              console.warn('Could not open virtual keyboard:', e);
+              keyboardOpenAttemptedRef.current = false;
+            }
+          }, 400);
         };
 
-        // Open virtual keyboard automatically on focus
+        // Store the handler reference for cleanup
+        focusHandlerRef.current = openVirtualKeyboard;
+
+        // Open virtual keyboard automatically on focus (only for desktop)
         if (showVirtualKeyboard && !disableNativeKeyboard) {
-          let focusTimeout: NodeJS.Timeout | null = null;
-          mathField.addEventListener('focus', () => {
-            // Clear any pending timeout
-            if (focusTimeout) {
-              clearTimeout(focusTimeout);
-            }
-            // Delay to ensure dialog is fully rendered
-            focusTimeout = setTimeout(() => {
-              openVirtualKeyboard();
-            }, 100);
-          });
+          mathField.addEventListener('focus', openVirtualKeyboard);
         }
 
         mathFieldRef.current = mathField;
@@ -244,15 +233,30 @@ export function MathInput({
       }
 
       if (autoFocus && mathFieldRef.current) {
-        requestAnimationFrame(() => {
+        // Delay focus to ensure Dialog is fully rendered
+        setTimeout(() => {
           try {
-            mathFieldRef.current.focus();
+            mathFieldRef.current?.focus();
+            // Also manually open keyboard after focus
+            if (showVirtualKeyboard && !disableNativeKeyboard && focusHandlerRef.current) {
+              setTimeout(() => {
+                focusHandlerRef.current?.();
+              }, 200);
+            }
           } catch (err) {
             console.warn('Could not focus math field:', err);
           }
-        });
+        }, 100);
       }
     });
+
+    // Cleanup: remove event listener when component unmounts or dependencies change
+    return () => {
+      if (mathFieldRef.current && focusHandlerRef.current) {
+        mathFieldRef.current.removeEventListener('focus', focusHandlerRef.current);
+        focusHandlerRef.current = null;
+      }
+    };
   }, [value, onChange, onError, showVirtualKeyboard, autoFocus, disableNativeKeyboard, onMathFieldReady]);
 
   return (
