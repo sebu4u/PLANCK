@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import React, { useState, useEffect, lazy, Suspense } from 'react';
@@ -136,6 +137,7 @@ function MathContent({ content }: { content: string }) {
 export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardProps) {
   const problemIcon = getProblemIcon(problem.id)
   const analytics = useAnalytics()
+  const router = useRouter()
 
   const chapterLabel = truncateChapterLabel(problem.category)
   const primaryStatement = problem.statement?.trim()
@@ -160,11 +162,27 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
     })
   }
 
+  const handleLockedCardClick = () => {
+    router.push('/pricing')
+  }
+
+  const handleUnlockedCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Nu naviga dacă click-ul a fost pe buton sau pe link
+    const target = e.target as HTMLElement
+    if (target.closest('a') || target.closest('button')) {
+      return
+    }
+    handleProblemClick()
+    router.push(`/probleme/${problem.id}`)
+  }
+
   return (
     <Card
+      onClick={isLocked ? handleLockedCardClick : handleUnlockedCardClick}
       className={cn(
         "relative flex h-full flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)] transition-all duration-300 hover:bg-white/[0.08]",
-        solved ? "problem-card-solved" : "hover:border-white/20"
+        solved ? "problem-card-solved" : "hover:border-white/20",
+        "cursor-pointer"
       )}
     >
       {isLocked && (

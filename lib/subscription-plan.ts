@@ -35,20 +35,3 @@ export const resolvePlanFromCandidates = (candidates: unknown[]): SubscriptionPl
 
 export const isPaidPlan = (plan: SubscriptionPlan) => plan === PLUS_PLAN || plan === PREMIUM_PLAN
 
-/**
- * TEMPORARY FEATURE FLAG: Allow free plan users and unauthenticated users to access all problems
- * 
- * Set this to `true` to temporarily grant:
- * - Free plan users access to the entire problem catalog (physics and coding problems)
- * - Unauthenticated users access to the entire problem catalog
- * 
- * Set this to `false` to restore the original behavior:
- * - Free users only get 50 problems/month (from monthly rotation)
- * - Unauthenticated users have no access
- * 
- * To revert to the original implementation:
- * 1. Set FREE_PLAN_FULL_ACCESS to `false`
- * 2. The system will automatically restore the original access restrictions
- */
-export const FREE_PLAN_FULL_ACCESS = true
-
