@@ -59,6 +59,7 @@ export default function SketchPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [isOpening, setIsOpening] = useState(false)
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false)
 
   const handleOpenSketch = async () => {
     if (user) {
@@ -82,6 +83,62 @@ export default function SketchPage() {
       })
       setIsOpening(false)
     }
+  }
+
+  const handleTryFree = async () => {
+    if (isCreatingBoard) return
+
+    setIsCreatingBoard(true)
+    try {
+      if (user) {
+        // User is authenticated - create board via API
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+
+        if (!accessToken) {
+          throw new Error('Not authenticated')
+        }
+
+        // Generate a unique room ID for PartyKit
+        const roomId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
+
+        const response = await fetch('/api/sketch/boards', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ title: 'Untitled', roomId }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to create board')
+        }
+
+        const data = await response.json()
+        const boardRoomId = data.board.room_id || roomId
+
+        // Redirect to the new board
+        router.push(`/sketch/${boardRoomId}`)
+      } else {
+        // Guest user - generate random room ID and redirect
+        const roomId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
+        router.push(`/sketch/${roomId}`)
+      }
+    } catch (err: any) {
+      console.error('Failed to create board:', err)
+      toast({
+        title: 'Nu am putut crea tabla',
+        description: err?.message || 'Încearcă din nou în câteva momente.',
+        variant: 'destructive',
+      })
+      setIsCreatingBoard(false)
+    }
+  }
+
+  const handleSeePlans = () => {
+    router.push('/pricing')
   }
 
   const handleScrollToFeatures = () => {
@@ -418,8 +475,12 @@ export default function SketchPage() {
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
             >
-              <Button className="px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg rounded-full bg-white text-black hover:bg-gray-200 transition w-full sm:w-auto">
-                Try Planck Sketch Free
+              <Button 
+                className="px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg rounded-full bg-white text-black hover:bg-gray-200 transition w-full sm:w-auto"
+                onClick={handleTryFree}
+                disabled={isCreatingBoard}
+              >
+                {isCreatingBoard ? 'Creating board...' : 'Try Planck Sketch Free'}
               </Button>
             </motion.div>
           </motion.div>
@@ -492,7 +553,10 @@ export default function SketchPage() {
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.5, ease: "easeOut", delay: 0.4 }}
               >
-                <Button className="px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg rounded-full bg-gray-900 text-white hover:bg-gray-800 transition shadow-lg w-full sm:w-auto">
+                <Button 
+                  className="px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg rounded-full bg-gray-900 text-white hover:bg-gray-800 transition shadow-lg w-full sm:w-auto"
+                  onClick={handleSeePlans}
+                >
                   see plans
                 </Button>
               </motion.div>

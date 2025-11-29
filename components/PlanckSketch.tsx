@@ -7,12 +7,13 @@ import "@tldraw/tldraw/tldraw.css";
 import PartySocket from "partysocket";
 import { PageNavigator } from "@/components/sketch/PageNavigator";
 import { ShareButton } from "@/components/sketch/ShareButton";
-import { Calculator, X } from "lucide-react";
+import { Calculator, X, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MathGraphPanel } from "@/components/sketch/MathGraphPanel";
 import { WhiteboardNavbar } from "@/components/sketch/WhiteboardNavbar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
+import { useRouter } from "next/navigation";
 
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST || "localhost:1999";
 
@@ -42,6 +43,7 @@ const isEphemeralRecord = (record: any): boolean => {
 export default function PlanckSketch({ roomId }: { roomId: string }) {
   const store = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), []);
   const { user, profile } = useAuth();
+  const router = useRouter();
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastEvent, setLastEvent] = useState<string>("");
@@ -54,6 +56,8 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
   const socketRef = useRef<PartySocket | null>(null);
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectionStatusRef = useRef<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+  const [showGuestWelcome, setShowGuestWelcome] = useState(false);
+  const [welcomeSlide, setWelcomeSlide] = useState(0);
   
   // Compute effective current page ID - ensures graph button appears even when currentPageId isn't set yet
   // Using useMemo to recalculate when editor, currentPageId, or store changes
@@ -534,6 +538,54 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
     };
   }, [editorReadyVersion, editor]);
 
+  // Check if user is not authenticated and show guest welcome card
+  useEffect(() => {
+    if (!roomId) return;
+    
+    // If user is authenticated, don't show the card
+    if (user) {
+      setShowGuestWelcome(false);
+      return;
+    }
+
+    // Check if card was already dismissed for this room
+    const storageKey = `planck-sketch:guestWelcome:${roomId}`;
+    if (typeof window !== 'undefined') {
+      const dismissed = window.localStorage.getItem(storageKey);
+      if (!dismissed) {
+        setShowGuestWelcome(true);
+      }
+    }
+  }, [roomId, user]);
+
+  const guestWelcomeSlides = [
+    {
+      badge: 'Planck Sketch',
+      title: 'Whiteboard infinit + pagini multiple',
+      description:
+        'Lucrează liber pe o pânză fără margini și organizează capitolele pe pagini separate. Fără cont, tabla se salvează local — cu un cont îți păstrezi progresul oriunde.',
+    },
+    {
+      badge: 'Math Graphs',
+      title: 'Grafice și formule inteligente',
+      description:
+        'Scrie ecuații și vezi grafice animate direct pe Sketch. Panoul Math Graph transformă formulele în vizualizări pe care le poți insera instant pe tablă.',
+    },
+    {
+      badge: 'Insight AI',
+      title: 'AI Sketch Copilot',
+      description:
+        'Primește explicații pas cu pas, idei pentru lecții și ajutor la demonstrații. Creează-ți cont pentru a salva conversațiile și preferințele AI.',
+    },
+  ];
+
+  const handleDismissWelcome = () => {
+    if (!roomId) return;
+    setShowGuestWelcome(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(`planck-sketch:guestWelcome:${roomId}`, '1');
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -615,6 +667,84 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
             shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/sketch/${roomId}` : `/sketch/${roomId}`} 
           />
         </div>
+
+        {/* Guest Welcome Card */}
+        {showGuestWelcome && (
+          <div className="absolute inset-0 z-40 flex items-start justify-center sm:items-center pointer-events-none px-4 pt-6 sm:pt-0">
+            <div className="w-full max-w-lg bg-white text-gray-900 border border-gray-300 rounded-2xl shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] pointer-events-auto overflow-hidden h-[380px] flex flex-col">
+              <div className="w-full h-28 sm:h-32 bg-gradient-to-r from-gray-200 via-gray-100 to-white relative">
+                <div className="absolute inset-0 bg-[url('/sketch-welcome-placeholder.jpg')] bg-cover bg-center opacity-10" />
+                <div className="absolute inset-0 backdrop-blur-[2px]" />
+                <button
+                  onClick={handleDismissWelcome}
+                  className="absolute top-3 right-3 p-2 rounded-full bg-white/80 text-gray-600 hover:text-gray-900 hover:bg-white"
+                  aria-label="Închide"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 p-6 space-y-4 flex flex-col">
+                <div className="mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-[0.3em]">
+                    {guestWelcomeSlides[welcomeSlide].badge}
+                  </p>
+                  <h2 className="text-2xl font-semibold mt-1">{guestWelcomeSlides[welcomeSlide].title}</h2>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {guestWelcomeSlides[welcomeSlide].description}
+                  </p>
+                </div>
+
+                <div className="mt-auto flex items-center justify-between">
+                  <button
+                    className="p-2 text-gray-400 hover:text-gray-900 disabled:opacity-30"
+                    disabled={welcomeSlide === 0}
+                    onClick={() => setWelcomeSlide((prev) => Math.max(0, prev - 1))}
+                    aria-label="Slide anterior"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div className="flex items-center gap-3">
+                    {guestWelcomeSlides.map((_, index) => (
+                      <button
+                        key={index}
+                        className={cn(
+                          'h-2.5 w-2.5 rounded-full bg-gray-300 transition-transform',
+                          index === welcomeSlide ? 'bg-gray-900 scale-125' : ''
+                        )}
+                        onClick={() => setWelcomeSlide(index)}
+                        aria-label={`Slide ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                  {welcomeSlide === guestWelcomeSlides.length - 1 ? (
+                    <Button
+                      className="bg-gray-900 text-white hover:bg-gray-800"
+                      onClick={() => {
+                        handleDismissWelcome();
+                        router.push('/register?redirect=/sketch/boards');
+                      }}
+                    >
+                      Creează cont
+                    </Button>
+                  ) : (
+                    <button
+                      className="p-2 text-gray-400 hover:text-gray-900"
+                      onClick={() =>
+                        setWelcomeSlide((prev) => Math.min(guestWelcomeSlides.length - 1, prev + 1))
+                      }
+                      aria-label="Slide următor"
+                    >
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
 
         {/* Math Graph Panel - Sits alongside editor in flex container (Desktop) */}

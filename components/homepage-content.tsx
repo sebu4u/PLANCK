@@ -336,17 +336,23 @@ export function HomePageContent() {
           {/* CTA Buttons */}
           <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:justify-start">
             <Button 
+              asChild
               size="lg" 
               className="bg-white text-black hover:bg-gray-200 transition-all duration-300 font-vt323 text-base sm:text-lg md:text-xl px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
             >
-              Începe gratuit
+              <Link href="/planckcode/ide">
+                Începe gratuit
+              </Link>
             </Button>
             <Button 
+              asChild
               variant="outline"
               size="lg" 
               className="bg-transparent border-white text-white hover:bg-white hover:text-black transition-all duration-300 font-vt323 text-base sm:text-lg md:text-xl px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
             >
-              Vezi cursurile de C++
+              <Link href="/planckcode/learn">
+                Vezi cursurile de C++
+              </Link>
             </Button>
           </div>
         </div>

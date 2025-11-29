@@ -6,9 +6,9 @@ import { PhysicsLessonsClient } from "@/components/physics-lessons-client"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
-import { 
-  getAllGrades, 
-  getChaptersByGradeId, 
+import {
+  getAllGrades,
+  getChaptersByGradeId,
   getLessonSummariesByChapterId,
   Grade,
   Chapter,
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const grades = await getAllGrades()
   let targetLesson: LessonSummary | null = null
-  
+
   for (const grade of grades) {
     const chapters = await getChaptersByGradeId(grade.id)
     for (const chapter of chapters) {
@@ -75,7 +75,7 @@ export const revalidate = 600
 export async function generateStaticParams() {
   const grades = await getAllGrades()
   const allLessons: LessonSummary[] = []
-  
+
   for (const grade of grades) {
     const chapters = await getChaptersByGradeId(grade.id)
     for (const chapter of chapters) {
@@ -83,7 +83,7 @@ export async function generateStaticParams() {
       allLessons.push(...lessons)
     }
   }
-  
+
   return allLessons.map(lesson => ({
     slug: slugify(lesson.title)
   }))
@@ -122,12 +122,12 @@ export default async function PhysicsLessonsBySlugPage({ params }: { params: Pro
   ])
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-[#0d1117] text-white">
       <Navigation />
 
       <div className="pt-16">
         <StructuredData data={breadcrumbs} />
-        <PhysicsLessonsClient 
+        <PhysicsLessonsClient
           grades={grades}
           chapters={chaptersData}
           lessons={lessonsData}

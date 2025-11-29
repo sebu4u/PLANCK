@@ -70,7 +70,7 @@ export default async function PhysicsLessonsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-[#0d1117] text-white">
       <Navigation />
 
       <div className="pt-16 relative z-10">

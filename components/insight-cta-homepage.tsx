@@ -108,13 +108,7 @@ export default function InsightCTAHomepage() {
                 24/7 disponibil
               </div>
               <div className="text-base sm:text-lg text-gray-400">
-                Asistență continuă la fizică și informatică{' '}
-                <Link 
-                  href="/insight" 
-                  className="text-blue-400 underline hover:text-blue-300 transition-colors duration-200"
-                >
-                  oricând ai nevoie
-                </Link>
+                Asistență continuă la fizică și informatică oricând ai nevoie
               </div>
             </div>
 
@@ -124,13 +118,7 @@ export default function InsightCTAHomepage() {
                 răspunsuri în &lt;5s
               </div>
               <div className="text-base sm:text-lg text-gray-400">
-                Explicații rapide și clare pentru{' '}
-                <Link 
-                  href="/insight" 
-                  className="text-blue-400 underline hover:text-blue-300 transition-colors duration-200"
-                >
-                  orice problemă
-                </Link>
+                Explicații rapide și clare pentru orice problemă
               </div>
             </div>
 
@@ -140,13 +128,7 @@ export default function InsightCTAHomepage() {
                 95% acuratețe
               </div>
               <div className="text-base sm:text-lg text-gray-400">
-                Verificat de profesori la{' '}
-                <Link 
-                  href="/insight" 
-                  className="text-blue-400 underline hover:text-blue-300 transition-colors duration-200"
-                >
-                  toate materiile
-                </Link>
+                Verificat de profesori la toate materiile
               </div>
             </div>
           </div>

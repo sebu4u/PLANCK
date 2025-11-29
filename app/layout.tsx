@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Mona_Sans, VT323 } from "next/font/google"
+import { Analytics } from "@vercel/analytics/next"
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
 import { AnalyticsProvider } from "@/components/analytics-provider"
@@ -97,6 +98,7 @@ export default function RootLayout({
             </AnalyticsProvider>
           </AuthProvider>
         </ErrorBoundary>
+        <Analytics />
       </body>
     </html>
   )

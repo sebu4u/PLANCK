@@ -1,11 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { 
+import {
   BookOpen,
   Clock,
   ChevronLeft,
@@ -29,79 +27,15 @@ interface LessonViewerProps {
   onProgressChange?: (progress: number) => void
 }
 
-export function LessonViewer({ 
-  lesson, 
-  onPreviousLesson, 
-  onNextLesson, 
-  hasPrevious, 
+export function LessonViewer({
+  lesson,
+  onPreviousLesson,
+  onNextLesson,
+  hasPrevious,
   hasNext,
   currentGrade,
   onProgressChange
 }: LessonViewerProps) {
-  const [progress, setProgress] = useState(0)
-  const [showProgressBar, setShowProgressBar] = useState(false)
-
-  useEffect(() => {
-    if (lesson) {
-      // Reset progress when lesson changes
-      setProgress(0)
-      setShowProgressBar(false)
-      if (onProgressChange) {
-        onProgressChange(0)
-      }
-    }
-  }, [lesson])
-
-  // Urmărește scroll-ul pentru progres - separat de renderizarea LaTeX
-          useEffect(() => {
-            let ticking = false
-
-            const handleScroll = () => {
-              if (!ticking) {
-                requestAnimationFrame(() => {
-                  if (!lesson) return
-
-                  const windowHeight = window.innerHeight
-                  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-                  
-                  // Găsește elementul de conținut al lecției (fără footer)
-                  const lessonContent = document.querySelector('.lesson-content')
-                  if (!lessonContent) return
-                  
-                  const contentRect = lessonContent.getBoundingClientRect()
-                  const contentTop = contentRect.top + scrollTop
-                  const contentHeight = lessonContent.offsetHeight
-                  
-                  // Calculează progresul bazat pe scroll în conținutul lecției
-                  const scrollInContent = Math.max(0, scrollTop - contentTop)
-                  const maxScrollInContent = contentHeight - windowHeight
-                  
-                  if (maxScrollInContent <= 0) {
-                    setProgress(100)
-                    if (onProgressChange) onProgressChange(100)
-                  } else {
-                    const scrollProgress = Math.min(scrollInContent / maxScrollInContent, 1)
-                    const progressPercentage = Math.max(0, Math.min(100, scrollProgress * 100))
-                    setProgress(progressPercentage)
-                    if (onProgressChange) onProgressChange(progressPercentage)
-                  }
-                  
-                  // Afișează bara de progres doar când utilizatorul începe să dea scroll
-                  if (scrollTop > 50) {
-                    setShowProgressBar(true)
-                  } else {
-                    setShowProgressBar(false)
-                  }
-                  
-                  ticking = false
-                })
-                ticking = true
-              }
-            }
-
-            window.addEventListener('scroll', handleScroll, { passive: true })
-            return () => window.removeEventListener('scroll', handleScroll)
-          }, [lesson])
 
 
 
@@ -133,12 +67,12 @@ export function LessonViewer({
   const renderInlineMarkdownContent = (content: string) => {
     let processedContent = content
 
-    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
-    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-    
+    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em class="italic text-white">$1</em>')
+
     // Remove trailing newlines to prevent extra blank line at the end
     processedContent = processedContent.replace(/(?:\r?\n)+$/g, '')
-    
+
     // Procesează link-urile - transformă link-urile către probleme în butoane
     processedContent = processedContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
       // Detectează link-uri către probleme
@@ -146,9 +80,9 @@ export function LessonViewer({
         return `<a href="${url}" class="inline-block mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-center font-bold shadow-md hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-200">${text}</a>`
       }
       // Link-uri normale
-      return `<a href="${url}" class="text-blue-600 hover:underline">${text}</a>`
+      return `<a href="${url}" class="text-blue-400 hover:text-blue-300 hover:underline">${text}</a>`
     })
-    
+
     processedContent = processedContent.replace(/\r?\n/g, '<br />')
 
     return processedContent
@@ -159,19 +93,19 @@ export function LessonViewer({
 
     // Split by images first, then by math
     const imageParts = content.split(/(!\[([^\]]*)\]\(([^)]+)\))/g)
-    
+
     return imageParts.map((part, idx) => {
       if (!part) return null
-      
+
       // Check if this part is an image
       const imageMatch = part.match(/!\[([^\]]*)\]\(([^)]+)\)/)
       if (imageMatch) {
         const altText = imageMatch[1]
         const imageUrl = imageMatch[2]
         return (
-          <img 
+          <img
             key={`img-${keyPrefix}-${idx}`}
-            src={imageUrl} 
+            src={imageUrl}
             alt={altText}
             className="max-w-full h-auto rounded-lg shadow-md my-4 mx-auto block"
             onError={(e) => {
@@ -181,10 +115,10 @@ export function LessonViewer({
           />
         )
       }
-      
+
       // Process non-image parts with math
       const mathParts = part.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g)
-      
+
       return mathParts.map((mathPart, mathIdx) => {
         if (!mathPart) return null
 
@@ -269,7 +203,7 @@ export function LessonViewer({
         )
       } else {
         blocks.push(
-          <div key={`paragraph-${keyPrefix}-${key}`} className="mb-4 leading-relaxed">
+          <div key={`paragraph-${keyPrefix}-${key}`} className="mb-4 leading-relaxed text-white">
             {renderInlineWithImages(paragraphText, `${keyPrefix}-paragraph-${key}`)}
           </div>
         )
@@ -287,10 +221,10 @@ export function LessonViewer({
         const headingContent = headingMatch[2].trim()
         const HeadingTag = (`h${level}`) as keyof JSX.IntrinsicElements
         const headingClasses = {
-          1: 'text-3xl font-bold mb-6 text-gray-900 mt-8',
-          2: 'text-2xl font-bold mb-4 text-gray-800 mt-6',
-          3: 'text-xl font-semibold mb-3 text-gray-700 mt-5',
-          4: 'text-lg font-semibold mb-2 text-gray-600 mt-4'
+          1: 'text-3xl font-bold mb-6 text-white mt-8',
+          2: 'text-2xl font-bold mb-4 text-white mt-6',
+          3: 'text-xl font-semibold mb-3 text-white mt-5',
+          4: 'text-lg font-semibold mb-2 text-white mt-4'
         } as const
         blocks.push(
           <HeadingTag key={`heading-${keyPrefix}-${idx}`} className={headingClasses[level]}>
@@ -420,86 +354,62 @@ export function LessonViewer({
 
   if (!lesson) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <Card className="w-full max-w-2xl bg-card">
-          <CardContent className="p-12 text-center">
-            <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+      <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-4rem)] bg-[#0d1117]">
+        <div className="w-full max-w-2xl">
+          <div className="p-12 text-center">
+            <BookOpen className="w-16 h-16 text-white/40 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white/70 mb-2">
               Selectează o lecție
             </h3>
-            <p className="text-gray-500">
+            <p className="text-white/50">
               Alege o lecție din sidebar pentru a începe învățarea
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="w-full">
-      {/* Progress Bar - Fixed at top, only over lesson content */}
-      <div className={`fixed top-16 left-0 lg:left-80 right-0 z-50 lg:z-50 z-[85] bg-white border-b border-gray-200 shadow-sm transition-all duration-300 ease-in-out ${
-        showProgressBar 
-          ? 'translate-y-0 opacity-100' 
-          : '-translate-y-full opacity-0 pointer-events-none'
-      }`}>
-        <div className="max-w-4xl mx-auto px-4 lg:px-6 py-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-medium text-gray-700">Progres lecție</span>
-            <span className="text-sm text-gray-500">{Math.round(progress)}%</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-      </div>
-
       {/* Lesson Header */}
-      <div className={`${getGradeGradient(currentGrade || 9)} text-white p-4 lg:p-6`}>
+      <div className="bg-[#0d1117] text-white p-4 lg:p-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 gap-3">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Badge className="bg-white/20 text-white">
+              <Badge className="bg-white/10 text-white backdrop-blur-sm border-white/20">
                 Lecția {lesson.order_index}
               </Badge>
-              <div className="flex items-center gap-2 text-purple-100">
+              <div className="flex items-center gap-2 text-white/70">
                 <Clock className="w-4 h-4" />
                 <span>{formatDuration(lesson.estimated_duration)}</span>
               </div>
               {lesson.difficulty_level && (
-                <div className="flex items-center gap-2 text-purple-100">
+                <div className="flex items-center gap-2 text-white/70">
                   <Target className="w-4 h-4" />
                   <span>Nivel {lesson.difficulty_level}</span>
                 </div>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="border-white text-purple-600 hover:bg-white hover:text-pink-600 text-xs lg:text-sm">
+              <Button variant="outline" size="sm" className="bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white text-xs lg:text-sm">
                 <Share2 className="w-4 h-4 mr-1 lg:mr-2" />
                 <span className="hidden sm:inline">Partajează</span>
               </Button>
-              <Button variant="outline" size="sm" className="border-white text-purple-600 hover:bg-white hover:text-pink-600 text-xs lg:text-sm">
+              <Button variant="outline" size="sm" className="bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white text-xs lg:text-sm">
                 <Download className="w-4 h-4 mr-1 lg:mr-2" />
                 <span className="hidden sm:inline">Descarcă</span>
               </Button>
             </div>
           </div>
-          
-          <h1 className="text-2xl lg:text-3xl font-bold mb-4 break-words">{lesson.title}</h1>
-          
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-purple-100 text-sm">Progres lecție</span>
-              <span className="text-purple-100 text-sm">{Math.round(progress)}%</span>
-            </div>
-            <Progress value={progress} className="h-3 bg-purple-900/30" />
-          </div>
+
+          <h1 className="text-2xl lg:text-3xl font-bold mb-4 break-words text-white">{lesson.title}</h1>
 
           {/* Navigation */}
           <div className="flex flex-row justify-between gap-2">
             <Button
               variant="outline"
-              className="border-white text-purple-600 hover:bg-white hover:text-pink-600 text-sm flex-1"
+              className="bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white text-sm flex-1"
               onClick={onPreviousLesson}
               disabled={!hasPrevious}
             >
@@ -508,7 +418,8 @@ export function LessonViewer({
               <span className="sm:hidden">Anterioară</span>
             </Button>
             <Button
-              className="bg-white text-purple-600 hover:bg-purple-50 text-sm flex-1"
+              variant="outline"
+              className="bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white text-sm flex-1"
               onClick={onNextLesson}
               disabled={!hasNext}
             >
@@ -520,22 +431,20 @@ export function LessonViewer({
         </div>
       </div>
 
-              {/* Lesson Content */}
-              <div className="p-4 lg:p-6">
-                <div className="max-w-4xl mx-auto">
-                  <Card className="border-purple-200 bg-card">
-                            <CardContent className="p-4 lg:p-8 lesson-content">
-                              <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none prose-headings:break-words prose-p:break-words">
-                                {renderContentWithMath(lesson.content)}
-                              </div>
-                            </CardContent>
-                  </Card>
+      {/* Lesson Content */}
+      <div className="p-4 lg:p-6 bg-[#0d1117]">
+        <div className="max-w-4xl mx-auto">
+          <div className="lesson-content">
+            <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none prose-headings:break-words prose-p:break-words prose-invert">
+              {renderContentWithMath(lesson.content)}
+            </div>
+          </div>
 
           {/* Navigation Buttons - Bottom */}
           <div className="mt-6 lg:mt-8 flex flex-row justify-between gap-2">
             <Button
               variant="outline"
-              className="border-white text-purple-600 hover:bg-white hover:text-pink-600 text-sm flex-1"
+              className="bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white text-sm flex-1"
               onClick={() => {
                 onPreviousLesson?.()
                 // Scroll la vârful paginii
@@ -550,7 +459,8 @@ export function LessonViewer({
               <span className="sm:hidden">Anterioară</span>
             </Button>
             <Button
-              className="bg-white text-purple-600 hover:bg-purple-50 text-sm flex-1"
+              variant="outline"
+              className="bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white text-sm flex-1"
               onClick={() => {
                 onNextLesson?.()
                 // Scroll la vârful paginii

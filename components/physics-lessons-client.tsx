@@ -24,7 +24,6 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
   const [allLessons, setAllLessons] = useState<LessonSummary[]>([])
   const [currentGrade, setCurrentGrade] = useState<number>(9)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [showProgressBar, setShowProgressBar] = useState(false)
   const hasInitializedFromPersisted = useRef(false)
   const [isLessonLoading, setIsLessonLoading] = useState(false)
   const lessonCache = useRef<Map<string, Lesson>>(new Map())
@@ -40,7 +39,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
         if (num) {
           setCurrentGrade(num)
         }
-      } catch {}
+      } catch { }
     }
     applyPreselectedClass()
     const handler = () => applyPreselectedClass()
@@ -50,23 +49,23 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
 
   // Skeletons
   const SidebarSkeleton = () => (
-    <div className="w-full lg:w-80 bg-white border-r border-gray-200 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 shadow-lg lg:block">
+    <div className="w-full lg:w-80 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 lg:block">
       <div className="p-3 lg:p-4 space-y-3 lg:space-y-4">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-5 lg:h-6 w-32 lg:w-44" />
-          <Skeleton className="h-5 lg:h-6 w-5 lg:w-6 rounded" />
+          <Skeleton className="h-5 lg:h-6 w-32 lg:w-44 bg-gray-800" />
+          <Skeleton className="h-5 lg:h-6 w-5 lg:w-6 rounded bg-gray-800" />
         </div>
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="border rounded-lg p-2 lg:p-3 space-y-2 lg:space-y-3">
+          <div key={i} className="p-2 lg:p-3 space-y-2 lg:space-y-3">
             <div className="flex items-center gap-2 lg:gap-3">
-              <Skeleton className="h-4 lg:h-5 w-4 lg:w-5 rounded" />
-              <Skeleton className="h-4 lg:h-5 w-32 lg:w-48" />
+              <Skeleton className="h-4 lg:h-5 w-4 lg:w-5 rounded bg-gray-800" />
+              <Skeleton className="h-4 lg:h-5 w-32 lg:w-48 bg-gray-800" />
             </div>
             <div className="space-y-1 lg:space-y-2 pl-5 lg:pl-7">
               {[...Array(4)].map((_, j) => (
                 <div key={j} className="flex items-center gap-2 lg:gap-3">
-                  <Skeleton className="h-4 lg:h-5 w-4 lg:w-5 rounded-full" />
-                  <Skeleton className={`h-3 lg:h-4 ${j % 3 === 0 ? 'w-40 lg:w-56' : j % 3 === 1 ? 'w-32 lg:w-44' : 'w-48 lg:w-64'}`} />
+                  <Skeleton className="h-4 lg:h-5 w-4 lg:w-5 rounded-full bg-gray-800" />
+                  <Skeleton className={`h-3 lg:h-4 bg-gray-800 ${j % 3 === 0 ? 'w-40 lg:w-56' : j % 3 === 1 ? 'w-32 lg:w-44' : 'w-48 lg:w-64'}`} />
                 </div>
               ))}
             </div>
@@ -78,32 +77,25 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
 
   const LessonViewerSkeleton = () => (
     <div className="w-full">
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 lg:p-6">
+      <div className="bg-[#0d1117] text-white p-3 lg:p-6">
         <div className="max-w-4xl mx-auto">
           {/* Mobile skeleton header - mirrors real header exactly */}
           <div className="lg:hidden">
             <div className="flex flex-col justify-between mb-4 gap-3">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <Skeleton className="h-6 w-24 bg-white/30 rounded" />
-                <Skeleton className="h-5 w-20 bg-white/30 rounded" />
-                <Skeleton className="h-5 w-24 bg-white/30 rounded" />
+                <Skeleton className="h-6 w-24 bg-gray-800 rounded" />
+                <Skeleton className="h-5 w-20 bg-gray-800 rounded" />
+                <Skeleton className="h-5 w-24 bg-gray-800 rounded" />
               </div>
               <div className="flex items-center gap-2">
-                <Skeleton className="h-8 w-24 bg-white/30 rounded-md" />
-                <Skeleton className="h-8 w-28 bg-white/30 rounded-md" />
+                <Skeleton className="h-8 w-24 bg-gray-800 rounded-md" />
+                <Skeleton className="h-8 w-28 bg-gray-800 rounded-md" />
               </div>
             </div>
-            <Skeleton className="h-7 w-11/12 bg-white/40 mb-4" />
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <Skeleton className="h-3 w-28 bg-white/30 rounded" />
-                <Skeleton className="h-3 w-10 bg-white/30 rounded" />
-              </div>
-              <Skeleton className="h-3 w-full bg-white/40 rounded" />
-            </div>
+            <Skeleton className="h-7 w-11/12 bg-gray-800 mb-4" />
             <div className="flex flex-row justify-between gap-2">
-              <Skeleton className="h-10 w-full bg-white/30 rounded-md" />
-              <Skeleton className="h-10 w-full bg-white/30 rounded-md" />
+              <Skeleton className="h-10 w-full bg-gray-800 rounded-md" />
+              <Skeleton className="h-10 w-full bg-gray-800 rounded-md" />
             </div>
           </div>
 
@@ -112,85 +104,49 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
             {/* Meta row */}
             <div className="flex flex-row items-center justify-between mb-4 gap-3">
               <div className="flex flex-wrap items-center gap-3">
-                <Skeleton className="h-6 w-28 bg-white/30 rounded" />
-                <Skeleton className="h-6 w-24 bg-white/30 rounded" />
-                <Skeleton className="h-6 w-28 bg-white/30 rounded" />
+                <Skeleton className="h-6 w-28 bg-gray-800 rounded" />
+                <Skeleton className="h-6 w-24 bg-gray-800 rounded" />
+                <Skeleton className="h-6 w-28 bg-gray-800 rounded" />
               </div>
               <div className="flex items-center gap-2">
-                <Skeleton className="h-9 w-28 bg-white/30 rounded-md" />
-                <Skeleton className="h-9 w-32 bg-white/30 rounded-md" />
+                <Skeleton className="h-9 w-28 bg-gray-800 rounded-md" />
+                <Skeleton className="h-9 w-32 bg-gray-800 rounded-md" />
               </div>
             </div>
 
             {/* Title */}
-            <Skeleton className="h-10 w-4/5 bg-white/40 mb-4" />
-
-            {/* Progress area */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <Skeleton className="h-4 w-32 bg-white/30 rounded" />
-                <Skeleton className="h-4 w-12 bg-white/30 rounded" />
-              </div>
-              <Skeleton className="h-3 w-full bg-white/40 rounded" />
-            </div>
+            <Skeleton className="h-10 w-4/5 bg-gray-800 mb-4" />
 
             {/* Navigation buttons */}
             <div className="flex flex-row justify-between gap-2">
-              <Skeleton className="h-11 w-full bg-white/30 rounded-md" />
-              <Skeleton className="h-11 w-full bg-white/30 rounded-md" />
+              <Skeleton className="h-11 w-full bg-gray-800 rounded-md" />
+              <Skeleton className="h-11 w-full bg-gray-800 rounded-md" />
             </div>
           </div>
         </div>
       </div>
-      <div className="p-3 lg:p-6">
+      <div className="p-3 lg:p-6 bg-[#0d1117]">
         <div className="max-w-4xl mx-auto space-y-4 lg:space-y-6">
-          {/* Toolbar skeleton - responsive */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:gap-3">
-            <Skeleton className="h-8 lg:h-10 w-full sm:w-32 lg:w-36" />
-            <Skeleton className="h-8 lg:h-10 w-full sm:w-32 lg:w-36" />
-            <div className="hidden sm:block flex-1" />
-            <Skeleton className="h-8 lg:h-10 w-20 lg:w-24" />
-          </div>
+          {/* Section heading */}
+          <Skeleton className="h-5 lg:h-6 w-1/2 lg:w-2/3 bg-gray-800" />
 
-          {/* Content card skeleton */}
-          <div className="border rounded-lg lg:rounded-xl p-4 lg:p-6 space-y-3 lg:space-y-4">
-            {/* Section heading */}
-            <Skeleton className="h-5 lg:h-6 w-1/2 lg:w-2/3" />
-            
-            {/* Paragraph lines with varying widths - mobile optimized */}
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={`p1-${i}`} className={`h-3 lg:h-4 ${i % 4 === 0 ? 'w-[95%]' : i % 4 === 1 ? 'w-[88%]' : i % 4 === 2 ? 'w-[76%]' : 'w-[90%]'}`} />
-            ))}
+          {/* Paragraph lines with varying widths - mobile optimized */}
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={`p1-${i}`} className={`h-3 lg:h-4 bg-gray-800 ${i % 4 === 0 ? 'w-[95%]' : i % 4 === 1 ? 'w-[88%]' : i % 4 === 2 ? 'w-[76%]' : 'w-[90%]'}`} />
+          ))}
 
-            {/* Image/figure placeholder - responsive height */}
-            <Skeleton className="h-48 lg:h-64 w-full rounded-lg" />
+          {/* Image/figure placeholder - responsive height */}
+          <Skeleton className="h-48 lg:h-64 w-full rounded-lg bg-gray-800" />
 
-            {/* More text - mobile optimized */}
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={`p2-${i}`} className={`h-3 lg:h-4 ${i % 3 === 0 ? 'w-[90%]' : i % 3 === 1 ? 'w-[82%]' : 'w-[70%]'}`} />
-            ))}
-
-            {/* Formula/code block placeholder - mobile responsive */}
-            <div className="bg-muted/50 rounded-lg p-3 lg:p-4">
-              <Skeleton className="h-4 lg:h-5 w-1/3 lg:w-1/2 mb-2 lg:mb-3" />
-              <Skeleton className="h-16 lg:h-24 w-full" />
-            </div>
-
-            {/* List items - mobile optimized */}
-            <div className="space-y-1 lg:space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <div key={`li-${i}`} className="flex items-center gap-2 lg:gap-3">
-                  <Skeleton className="h-2 lg:h-3 w-2 lg:w-3 rounded-full" />
-                  <Skeleton className={`h-3 lg:h-4 ${i % 2 === 0 ? 'w-2/3 lg:w-3/4' : 'w-1/2 lg:w-2/3'}`} />
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* More text - mobile optimized */}
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={`p2-${i}`} className={`h-3 lg:h-4 bg-gray-800 ${i % 3 === 0 ? 'w-[90%]' : i % 3 === 1 ? 'w-[82%]' : 'w-[70%]'}`} />
+          ))}
 
           {/* Bottom navigation skeleton - mobile responsive */}
-          <div className="flex flex-col sm:flex-row gap-2 lg:gap-3">
-            <Skeleton className="h-10 lg:h-11 w-full" />
-            <Skeleton className="h-10 lg:h-11 w-full" />
+          <div className="flex flex-col sm:flex-row gap-2 lg:gap-3 mt-6 lg:mt-8">
+            <Skeleton className="h-10 lg:h-11 w-full bg-gray-800" />
+            <Skeleton className="h-10 lg:h-11 w-full bg-gray-800" />
           </div>
         </div>
       </div>
@@ -211,21 +167,11 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
     }
   }, [isMobileSidebarOpen])
 
-  // Detectează când bara de progres este vizibilă
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-      setShowProgressBar(scrollTop > 50)
-    }
-
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
   // Construim lista completă de lecții (rezumate) pentru navigare
   useEffect(() => {
     const lessonsList: LessonSummary[] = []
-    
+
     grades.forEach(grade => {
       const gradeChapters = chapters[grade.id] || []
       gradeChapters.forEach(chapter => {
@@ -326,7 +272,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
     fetchLessonById(lesson.id).then((detail) => {
       if (detail) setCurrentLesson(detail)
     })
-    
+
     // Găsim clasa pentru lecția curentă
     for (const grade of grades) {
       const gradeChapters = chapters[grade.id] || []
@@ -338,10 +284,10 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
         }
       }
     }
-    
+
     // Închide sidebar-ul pe mobil când se selectează o lecție
     setIsMobileSidebarOpen(false)
-    
+
     // Scroll la vârful paginii când se schimbă lecția
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -349,7 +295,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
   // Verifică dacă este prima lecție din capitol
   const isFirstLessonInChapter = () => {
     if (!currentLesson) return false
-    
+
     // Găsim capitolul curent
     for (const grade of grades) {
       const gradeChapters = chapters[grade.id] || []
@@ -368,7 +314,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
   // Verifică dacă este ultima lecție din capitol
   const isLastLessonInChapter = () => {
     if (!currentLesson) return false
-    
+
     // Găsim capitolul curent
     for (const grade of grades) {
       const gradeChapters = chapters[grade.id] || []
@@ -392,7 +338,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
       fetchLessonById(previousLesson.id).then((detail) => {
         if (detail) setCurrentLesson(detail)
       })
-      
+
       // Scroll la vârful paginii
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -406,7 +352,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
       fetchLessonById(nextLesson.id).then((detail) => {
         if (detail) setCurrentLesson(detail)
       })
-      
+
       // Scroll la vârful paginii
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -422,9 +368,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
         <Button
           variant="outline"
           size="sm"
-                  className={`fixed right-4 z-[90] lg:hidden bg-white shadow-lg border-gray-300 transition-all duration-300 ease-in-out hover:scale-105 ${
-            showProgressBar ? 'top-32' : 'top-20'
-          }`}
+          className="fixed right-4 top-20 z-[90] lg:hidden bg-[#0d1117] border-white/20 text-white shadow-lg transition-all duration-300 ease-in-out hover:scale-105 hover:bg-white/10"
           onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         >
           <Menu className="w-4 h-4 animate-in zoom-in duration-200" />
@@ -433,21 +377,21 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
 
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
-                <div 
-                  className="fixed inset-0 bg-black bg-opacity-50 z-[350] lg:hidden animate-in fade-in duration-300"
-                  onClick={() => setIsMobileSidebarOpen(false)}
-                />
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[350] lg:hidden animate-in fade-in duration-300"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
       )}
 
       {/* Sidebar - Desktop & Mobile */}
       <div className={`
-        ${isMobileSidebarOpen 
-          ? 'fixed inset-y-0 right-0 z-[360] w-4/5 block animate-in slide-in-from-right duration-300 ease-out' 
+        ${isMobileSidebarOpen
+          ? 'fixed inset-y-0 right-0 z-[360] w-4/5 block animate-in slide-in-from-right duration-300 ease-out bg-[#0d1117]'
           : 'hidden lg:block sticky top-16 self-start z-10'
         }
       `}>
         <Suspense fallback={<SidebarSkeleton />}>
-          <PhysicsSidebar 
+          <PhysicsSidebar
             grades={grades}
             chapters={chapters}
             lessons={lessons}
@@ -457,14 +401,14 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
           />
         </Suspense>
       </div>
-      
+
       {/* Main Content Area */}
       <div className="flex-1 lg:ml-0">
         <Suspense fallback={<LessonViewerSkeleton />}>
           {isLessonLoading ? (
             <LessonViewerSkeleton />
           ) : (
-            <LessonViewer 
+            <LessonViewer
               lesson={currentLesson}
               onPreviousLesson={handlePreviousLesson}
               onNextLesson={handleNextLesson}
@@ -487,3 +431,4 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
     </div>
   )
 }
+

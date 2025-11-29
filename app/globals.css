@@ -965,13 +965,14 @@
 
 /* Clase pentru evidențierea conținutului în lecții */
 .formula-highlight {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.25) 100%);
   border-left: 4px solid #f59e0b;
   padding: 12px 16px;
   margin: 16px 0;
   border-radius: 0 8px 8px 0;
-  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
   position: relative;
+  color: #ffffff;
 }
 
 .formula-highlight::before {
@@ -980,11 +981,12 @@
   top: 12px;
   left: 12px;
   font-size: 16px;
-  opacity: 0.7;
+  opacity: 0.9;
 }
 
 .formula-highlight .formula-content {
   margin-left: 28px;
+  color: #ffffff;
 }
 
 /* Normalize inner spacing for highlight cards: remove extra top/bottom margins */
@@ -992,13 +994,14 @@
 .formula-highlight .formula-content > :last-child { margin-bottom: 0 !important; }
 
 .enunt-highlight {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(96, 165, 250, 0.25) 100%);
   border-left: 4px solid #3b82f6;
   padding: 12px 16px;
   margin: 16px 0;
   border-radius: 0 8px 8px 0;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
   position: relative;
+  color: #ffffff;
 }
 
 .enunt-highlight::before {
@@ -1007,11 +1010,12 @@
   top: 12px;
   left: 12px;
   font-size: 16px;
-  opacity: 0.7;
+  opacity: 0.9;
 }
 
 .enunt-highlight .enunt-content {
   margin-left: 28px;
+  color: #ffffff;
 }
 
 /* Normalize inner spacing */
@@ -1019,13 +1023,14 @@
 .enunt-highlight .enunt-content > :last-child { margin-bottom: 0 !important; }
 
 .important-highlight {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(248, 113, 113, 0.25) 100%);
   border-left: 4px solid #ef4444;
   padding: 12px 16px;
   margin: 16px 0;
   border-radius: 0 8px 8px 0;
-  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
   position: relative;
+  color: #ffffff;
 }
 
 .important-highlight::before {
@@ -1034,11 +1039,12 @@
   top: 12px;
   left: 12px;
   font-size: 16px;
-  opacity: 0.7;
+  opacity: 0.9;
 }
 
 .important-highlight .important-content {
   margin-left: 28px;
+  color: #ffffff;
 }
 
 /* Normalize inner spacing */
@@ -1046,13 +1052,14 @@
 .important-highlight .important-content > :last-child { margin-bottom: 0 !important; }
 
 .definition-highlight {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.25) 100%);
   border-left: 4px solid #22c55e;
   padding: 12px 16px;
   margin: 16px 0;
   border-radius: 0 8px 8px 0;
-  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
   position: relative;
+  color: #ffffff;
 }
 
 .definition-highlight::before {
@@ -1061,11 +1068,12 @@
   top: 12px;
   left: 12px;
   font-size: 16px;
-  opacity: 0.7;
+  opacity: 0.9;
 }
 
 .definition-highlight .definition-content {
   margin-left: 28px;
+  color: #ffffff;
 }
 
 /* Normalize inner spacing */
@@ -1073,13 +1081,14 @@
 .definition-highlight .definition-content > :last-child { margin-bottom: 0 !important; }
 
 .example-highlight {
-  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(192, 132, 252, 0.25) 100%);
   border-left: 4px solid #a855f7;
   padding: 12px 16px;
   margin: 16px 0;
   border-radius: 0 8px 8px 0;
-  box-shadow: 0 2px 4px rgba(168, 85, 247, 0.1);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.3);
   position: relative;
+  color: #ffffff;
 }
 
 .example-highlight::before {
@@ -1088,11 +1097,12 @@
   top: 12px;
   left: 12px;
   font-size: 16px;
-  opacity: 0.7;
+  opacity: 0.9;
 }
 
 .example-highlight .example-content {
   margin-left: 28px;
+  color: #ffffff;
 }
 
 /* Normalize inner spacing */
@@ -1184,15 +1194,17 @@
 
 /* INDENT block - simple indented text area */
 .indent-highlight {
-  border-left: 4px solid #9ca3af; /* gray-400 */
+  border-left: 4px solid #6b7280; /* gray-500 */
   padding: 12px 16px;
   margin: 16px 0;
-  background: #f9fafb; /* gray-50 */
+  background: rgba(156, 163, 175, 0.1); /* gray-400 with opacity for dark background */
   border-radius: 0 8px 8px 0;
+  color: #ffffff;
 }
 
 .indent-highlight .indent-content {
   margin-left: 8px;
+  color: #ffffff;
 }
 
 /* Normalize inner spacing */
@@ -1205,10 +1217,12 @@
     padding: 8px 12px;
     margin: 12px 0;
     border-left-width: 3px;
-    background: #fafafa;
+    background: rgba(156, 163, 175, 0.1);
+    color: #ffffff;
   }
   .indent-highlight .indent-content {
     margin-left: 6px;
+    color: #ffffff;
   }
 }
 
