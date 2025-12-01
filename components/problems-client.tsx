@@ -32,6 +32,10 @@ const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 
+// TEMPORARY: Feature flag to allow all problems for free/non-logged users
+// Set to false to restore original access restrictions
+const ALLOW_ALL_PROBLEMS_TEMPORARILY = true
+
 const getCurrentMonthKey = () => {
   const now = new Date()
   const month = `${now.getUTCMonth() + 1}`.padStart(2, "0")
@@ -384,9 +388,13 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
             <>
               <div className="mb-8 grid gap-5 md:grid-cols-2">
                 {visibleProblems.map((problem) => {
-                  const canAccess =
-                    !isFree || isPaid || monthlyFreeSet.has(problem.id)
-                  const isLocked = isFree && !canAccess
+                  // TEMPORARY: Allow all problems when flag is enabled
+                  const canAccess = ALLOW_ALL_PROBLEMS_TEMPORARILY
+                    ? true
+                    : !isFree || isPaid || monthlyFreeSet.has(problem.id)
+                  const isLocked = ALLOW_ALL_PROBLEMS_TEMPORARILY
+                    ? false
+                    : isFree && !canAccess
                   return (
                     <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
                       <ProblemCard

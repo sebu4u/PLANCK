@@ -234,6 +234,138 @@ export const pageMetadata: Record<string, Metadata> = {
       description: "Cursuri noi de fizică în pregătire pentru clasele superioare.",
     },
   },
+  
+  insight: {
+    title: "Planck Insight - AI Assistant pentru Fizică | PLANCK",
+    description: "Planck Insight este asistentul tău AI inteligent pentru învățarea fizicii. Obține explicații detaliate, rezolvă probleme și înțelege concepte complexe cu ajutorul inteligenței artificiale.",
+    keywords: "AI fizică, asistent AI, învățare fizică, chat AI, explicatii fizică, Planck Insight, inteligență artificială educație",
+    alternates: {
+      canonical: '/insight',
+    },
+    openGraph: {
+      title: "Planck Insight - AI Assistant pentru Fizică",
+      description: "Asistentul tău AI inteligent pentru învățarea fizicii cu explicații detaliate și rezolvări de probleme.",
+      url: 'https://www.planck.academy/insight',
+      type: 'website',
+      images: [
+        {
+          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          width: 1200,
+          height: 630,
+          alt: 'Planck Insight - AI Assistant pentru Fizică',
+        },
+      ],
+    },
+    twitter: {
+      title: "Planck Insight - AI Assistant pentru Fizică",
+      description: "Asistentul tău AI inteligent pentru învățarea fizicii cu explicații detaliate.",
+      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  },
+  
+  sketch: {
+    title: "Planck Sketch - Whiteboard Interactiv pentru Matematică | PLANCK",
+    description: "Planck Sketch este un whiteboard interactiv pentru matematică și fizică. Desenează, scrie ecuații, vizualizează grafice și colaborează în timp real cu alții.",
+    keywords: "whiteboard matematică, sketch fizică, ecuații grafice, colaborare timp real, Planck Sketch, whiteboard online, desen matematică",
+    alternates: {
+      canonical: '/sketch',
+    },
+    openGraph: {
+      title: "Planck Sketch - Whiteboard Interactiv pentru Matematică",
+      description: "Whiteboard interactiv pentru matematică și fizică cu colaborare în timp real și vizualizare de grafice.",
+      url: 'https://www.planck.academy/sketch',
+      type: 'website',
+      images: [
+        {
+          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          width: 1200,
+          height: 630,
+          alt: 'Planck Sketch - Whiteboard Interactiv',
+        },
+      ],
+    },
+    twitter: {
+      title: "Planck Sketch - Whiteboard Interactiv pentru Matematică",
+      description: "Whiteboard interactiv pentru matematică și fizică cu colaborare în timp real.",
+      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  },
+  
+  planckcode: {
+    title: "Planck Code - IDE Online și Online Judge pentru C++ | PLANCK",
+    description: "Planck Code este un IDE online integrat cu Online Judge pentru programare competitivă. Învață C++, rezolvă probleme și concurează cu alți elevi. Perfect pentru olimpiade și hackathoane.",
+    keywords: "IDE online, online judge, programare competitivă, C++ liceu, olimpiade informatică, Planck Code, editor cod online, programare C++",
+    alternates: {
+      canonical: '/planckcode',
+    },
+    openGraph: {
+      title: "Planck Code - IDE Online și Online Judge pentru C++",
+      description: "IDE online integrat cu Online Judge pentru programare competitivă și învățare C++. Perfect pentru olimpiade.",
+      url: 'https://www.planck.academy/planckcode',
+      type: 'website',
+      images: [
+        {
+          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          width: 1200,
+          height: 630,
+          alt: 'Planck Code - IDE Online și Online Judge',
+        },
+      ],
+    },
+    twitter: {
+      title: "Planck Code - IDE Online și Online Judge pentru C++",
+      description: "IDE online integrat cu Online Judge pentru programare competitivă și învățare C++.",
+      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  },
+  
+  pricing: {
+    title: "Prețuri și Planuri - PLANCK",
+    description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi individuali și instituții educaționale. Începe gratuit sau alege Plus sau Pro pentru funcții avansate.",
+    keywords: "prețuri planck, planuri planck, abonament planck, preț planck, planuri educaționale, planuri școli, planuri elevi",
+    alternates: {
+      canonical: '/pricing',
+    },
+    openGraph: {
+      title: "Prețuri și Planuri - PLANCK",
+      description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții educaționale.",
+      url: 'https://www.planck.academy/pricing',
+      type: 'website',
+      images: [
+        {
+          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          width: 1200,
+          height: 630,
+          alt: 'PLANCK - Prețuri și Planuri',
+        },
+      ],
+    },
+    twitter: {
+      title: "Prețuri și Planuri - PLANCK",
+      description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții.",
+      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  },
 }
 
 // Helper function to generate metadata for a specific page

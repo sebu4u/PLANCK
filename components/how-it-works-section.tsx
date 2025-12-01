@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { Problem } from '@/data/problems'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { LazyYouTubePlayer, extractYouTubeVideoId } from '@/components/lazy-youtube-player'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -55,6 +54,7 @@ export default function HowItWorksSection() {
 
     const fetchProblems = async () => {
       try {
+        // Keep loading true during fetch to prevent flicker
         setLoading(true)
         const { data, error } = await supabase
           .from('problems')
@@ -63,6 +63,7 @@ export default function HowItWorksSection() {
 
         if (error) {
           console.error('Error fetching problems:', error)
+          setLoading(false)
           return
         }
 
@@ -71,9 +72,9 @@ export default function HowItWorksSection() {
           // Set first problem as selected by default
           setSelectedProblem(data[0] as Problem)
         }
+        setLoading(false)
       } catch (error) {
         console.error('Error fetching problems:', error)
-      } finally {
         setLoading(false)
       }
     }
@@ -134,16 +135,6 @@ export default function HowItWorksSection() {
     ? extractYouTubeVideoId(selectedProblem.youtube_url) 
     : null
 
-  if (!isVisible) {
-    return (
-      <section ref={sectionRef} className="relative w-full bg-[#0d1117] overflow-hidden pt-12 pb-24 sm:pt-16 sm:pb-32">
-        <div className="max-w-7xl mx-auto px-6">
-          <Skeleton className="h-96 w-full" />
-        </div>
-      </section>
-    )
-  }
-
   return (
     <section
       ref={sectionRef}
@@ -152,23 +143,25 @@ export default function HowItWorksSection() {
     >
       <div className="max-w-7xl mx-auto px-6">
         {/* Title and Description - Centered above */}
-        <div className="scroll-animate-fade-up text-center mb-10 lg:mb-12">
-          <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4">
-            Vezi cum <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]">functioneaza</span>
-          </h2>
-          <p className="text-lg sm:text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto">
-            Ai acces la sute de probleme explicate pas cu pas. Învață conceptele cheie prin exemple concrete și aplicări practice.
-          </p>
-        </div>
+        {isVisible && (
+          <div className="scroll-animate-fade-up text-center mb-10 lg:mb-12">
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4">
+              Vezi cum <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]">functioneaza</span>
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto">
+              Ai acces la sute de probleme explicate pas cu pas. Învață conceptele cheie prin exemple concrete și aplicări practice.
+            </p>
+          </div>
+        )}
 
         {/* Two columns with equal height */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-stretch">
           {/* Left Side - Problem Cards */}
           <div className="flex flex-col h-full scroll-animate-fade-left">
-            {loading ? (
+            {!isVisible || loading ? (
               <div className="space-y-4 flex-1">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-24 w-full" />
+                  <Skeleton key={i} className="h-24 w-full bg-white/10" />
                 ))}
               </div>
             ) : (
@@ -178,10 +171,10 @@ export default function HowItWorksSection() {
                   const difficultyColor = difficultyColors[problem.difficulty as keyof typeof difficultyColors] || "bg-gray-100 text-gray-700 border-gray-300"
                   
                   return (
-                    <Card
+                    <div
                       key={problem.id}
                       onClick={() => handleProblemClick(problem)}
-                      className={`cursor-pointer transition-all duration-200 border-2 ${
+                      className={`cursor-pointer transition-all duration-200 border-2 rounded-lg shadow-sm ${
                         isSelected
                           ? 'border-purple-500 bg-purple-500/10'
                           : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800/70'
@@ -208,7 +201,7 @@ export default function HowItWorksSection() {
                           {truncateStatement(problem.statement, 15)}
                         </p>
                       </div>
-                    </Card>
+                    </div>
                   )
                 })}
               </div>
@@ -217,8 +210,8 @@ export default function HowItWorksSection() {
 
           {/* Right Side - Video Player and Button */}
           <div className="flex flex-col h-full space-y-6 scroll-animate-fade-right">
-            {loading ? (
-              <Skeleton className="aspect-video w-full rounded-lg flex-1" />
+            {!isVisible || loading ? (
+              <Skeleton className="aspect-video w-full rounded-lg flex-1 bg-white/10" />
             ) : selectedProblem && selectedVideoId ? (
               <>
                 <div className="flex-1 flex flex-col">
