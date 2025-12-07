@@ -7,6 +7,8 @@ import { MathInput } from './MathInput';
 import { FunctionList } from './FunctionList';
 import { FunctionPersistence, type MathFunction } from '@/lib/sketch/function-persistence';
 import { FunctionRealtimeSync } from '@/lib/sketch/function-realtime-sync';
+import { FunctionPartyKitSync } from '@/lib/sketch/function-partykit-sync';
+import PartySocket from "partysocket";
 import { Plus, RotateCcw, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,6 +21,7 @@ interface MathGraphPanelProps {
   pageId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  socket?: PartySocket | null;
 }
 
 const DEFAULT_COLORS = [
@@ -32,7 +35,7 @@ const DEFAULT_COLORS = [
   '#f97316', // orange
 ];
 
-export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGraphPanelProps) {
+export function MathGraphPanel({ boardId, pageId, open, onOpenChange, socket }: MathGraphPanelProps) {
   const [functions, setFunctions] = useState<MathFunction[]>([]);
   const [currentEquation, setCurrentEquation] = useState('');
   const [selectedFunctionId, setSelectedFunctionId] = useState<string | undefined>();
@@ -53,6 +56,10 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
 
   const persistenceRef = useRef<FunctionPersistence | null>(null);
   const realtimeSyncRef = useRef<FunctionRealtimeSync | null>(null);
+  const partyKitSyncRef = useRef<FunctionPartyKitSync | null>(null);
+  
+  // Check if boardId is a UUID (Supabase board) or PartyKit room ID
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(boardId);
 
   const handleDialogInteractOutside = (event: Event) => {
     const target = event.target as HTMLElement | null;
@@ -91,32 +98,60 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       debounceMs: 300,
     });
 
-    realtimeSyncRef.current = new FunctionRealtimeSync({
-      boardId,
-      pageId,
-      onFunctionUpdate: (updatedFunctions) => {
-        console.log('[MathGraphPanel] Received function update:', updatedFunctions);
-        // Ensure we always set an array, never undefined
-        setFunctions(updatedFunctions || []);
-      },
-      onError: (err) => {
-        console.error('[MathGraphPanel] Realtime sync error:', err);
-      },
-    });
+    // Use PartyKit sync for non-UUID boards (PartyKit rooms), Supabase sync for UUID boards
+    if (!isUUID && socket) {
+      // PartyKit sync
+      partyKitSyncRef.current = new FunctionPartyKitSync({
+        socket,
+        boardId,
+        pageId,
+        onFunctionUpdate: (updatedFunctions) => {
+          console.log('[MathGraphPanel] Received function update from PartyKit:', updatedFunctions);
+          // Ensure we always set an array, never undefined
+          setFunctions(updatedFunctions || []);
+        },
+        onError: (err) => {
+          console.error('[MathGraphPanel] PartyKit sync error:', err);
+        },
+      });
 
-    // Load initial functions
-    loadFunctions();
+      // Subscribe to PartyKit updates
+      partyKitSyncRef.current.subscribe().catch((err) => {
+        console.error('[MathGraphPanel] Failed to subscribe to PartyKit:', err);
+      });
 
-    // Subscribe to realtime updates
-    realtimeSyncRef.current.subscribe().catch((err) => {
-      console.error('[MathGraphPanel] Failed to subscribe to realtime:', err);
-    });
+      // Load initial functions from PartyKit (via sync)
+      // The sync will request initial functions from server
+    } else if (isUUID) {
+      // Supabase sync
+      realtimeSyncRef.current = new FunctionRealtimeSync({
+        boardId,
+        pageId,
+        onFunctionUpdate: (updatedFunctions) => {
+          console.log('[MathGraphPanel] Received function update from Supabase:', updatedFunctions);
+          // Ensure we always set an array, never undefined
+          setFunctions(updatedFunctions || []);
+        },
+        onError: (err) => {
+          console.error('[MathGraphPanel] Realtime sync error:', err);
+        },
+      });
+
+      // Load initial functions
+      loadFunctions();
+
+      // Subscribe to realtime updates
+      realtimeSyncRef.current.subscribe().catch((err) => {
+        console.error('[MathGraphPanel] Failed to subscribe to realtime:', err);
+      });
+    }
 
     return () => {
       persistenceRef.current?.destroy();
       realtimeSyncRef.current?.destroy();
+      partyKitSyncRef.current?.destroy();
     };
-  }, [boardId, pageId]);
+  }, [boardId, pageId, isUUID, socket]);
 
   useEffect(() => {
     if (selectedFunctionId && functions && !functions.some((f) => f.function_id === selectedFunctionId)) {
@@ -244,7 +279,10 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       });
 
       // Broadcast update
-      if (realtimeSyncRef.current) {
+      if (!isUUID && partyKitSyncRef.current) {
+        const currentFunctions = functions || [];
+        await partyKitSyncRef.current.broadcastUpdate([...currentFunctions, fullFunction]);
+      } else if (isUUID && realtimeSyncRef.current) {
         const currentFunctions = functions || [];
         await realtimeSyncRef.current.broadcastUpdate([...currentFunctions, fullFunction]);
       }
@@ -345,7 +383,13 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       );
 
       // Broadcast update
-      if (realtimeSyncRef.current) {
+      if (!isUUID && partyKitSyncRef.current) {
+        const safeFunctions = functions || [];
+        const updatedFunctions = safeFunctions.map((f) =>
+          f.function_id === functionId ? updatedFunction : f
+        );
+        await partyKitSyncRef.current.broadcastUpdate(updatedFunctions);
+      } else if (isUUID && realtimeSyncRef.current) {
         const safeFunctions = functions || [];
         const updatedFunctions = safeFunctions.map((f) =>
           f.function_id === functionId ? updatedFunction : f
@@ -368,7 +412,11 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
       setFunctions((prev) => prev.filter((f) => f.function_id !== functionId));
 
       // Broadcast update
-      if (realtimeSyncRef.current) {
+      if (!isUUID && partyKitSyncRef.current) {
+        const safeFunctions = functions || [];
+        const updatedFunctions = safeFunctions.filter((f) => f.function_id !== functionId);
+        await partyKitSyncRef.current.broadcastUpdate(updatedFunctions);
+      } else if (isUUID && realtimeSyncRef.current) {
         const safeFunctions = functions || [];
         const updatedFunctions = safeFunctions.filter((f) => f.function_id !== functionId);
         await realtimeSyncRef.current.broadcastUpdate(updatedFunctions);
@@ -749,7 +797,7 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
   const safeFunctions = functions || [];
   const functionData: FunctionData[] = safeFunctions
     .filter((f) => f && f.is_visible && f.equation && f.equation.trim())
-    .map((f) => {
+    .map((f): FunctionData | null => {
       try {
         let convertedEquation = convertMathToJS(f.equation);
         
@@ -793,15 +841,16 @@ export function MathGraphPanel({ boardId, pageId, open, onOpenChange }: MathGrap
         const isSelected = selectedFunctionId === f.function_id;
         const isDimmed = !!selectedFunctionId && !isSelected;
 
-        return {
+        const result: FunctionData = {
           fn: finalEquation,
-          color: f.color,
+          color: f.color || '#3b82f6',
           graphType: 'polyline' as const,
           attr: {
             'stroke-width': isSelected ? 4 : 2.5,
-            'stroke-opacity': isDimmed ? 0.25 : 1,
-          },
+            ...(isDimmed ? { 'stroke-opacity': 0.25 } : {}),
+          } as any,
         };
+        return result;
       } catch (err) {
         console.warn(`Failed to convert equation: ${f.equation}`, err);
         return null;

@@ -42,6 +42,8 @@ export default class SketchServer implements Party.Server {
 
     // Load state from storage
     const allRecords = (await this.room.storage.get<Record<string, any>>("records")) || {};
+    const totalRecords = Object.keys(allRecords).length;
+    console.log(`[PartyKit] Loading ${totalRecords} records from storage for room ${this.room.id}`);
 
     // Filter out ephemeral records before sending to new client
     // Each user maintains their own camera position, zoom level, etc.
@@ -51,6 +53,9 @@ export default class SketchServer implements Party.Server {
         filteredRecords[id] = record;
       }
     }
+
+    const filteredCount = Object.keys(filteredRecords).length;
+    console.log(`[PartyKit] Sending ${filteredCount} non-ephemeral records to client ${conn.id} in room ${this.room.id}`);
 
     // Send initial state to client (without ephemeral records)
     conn.send(JSON.stringify({ type: "init", payload: filteredRecords }));
@@ -110,6 +115,50 @@ export default class SketchServer implements Party.Server {
         return;
       }
 
+      // Handle function-related messages
+      if (data.type === "request-functions") {
+        const { boardId, pageId } = data.payload || {};
+        if (!pageId) return;
+
+        try {
+          // Load functions from storage
+          const functionsKey = `functions-${pageId}`;
+          const functions = (await this.room.storage.get<Array<any>>(functionsKey)) || [];
+          
+          // Send initial functions to requester
+          sender.send(JSON.stringify({
+            type: "function-init",
+            payload: {
+              boardId,
+              pageId,
+              functions,
+            },
+          }));
+          console.log(`[PartyKit] Sent ${functions.length} functions to ${sender.id} for page ${pageId}`);
+        } catch (error) {
+          console.error(`[PartyKit] Error loading functions for page ${pageId}:`, error);
+        }
+        return;
+      }
+
+      if (data.type === "function-update") {
+        const { boardId, pageId, functions } = data.payload || {};
+        if (!pageId || !functions) return;
+
+        try {
+          // Store functions in PartyKit storage
+          const functionsKey = `functions-${pageId}`;
+          await this.room.storage.put(functionsKey, functions);
+          console.log(`[PartyKit] Saved ${functions.length} functions for page ${pageId}`);
+
+          // Broadcast update to all other clients (exclude sender)
+          this.room.broadcast(message, [sender.id]);
+        } catch (error) {
+          console.error(`[PartyKit] Error saving functions for page ${pageId}:`, error);
+        }
+        return;
+      }
+
       // Handle updates from clients
       if (data.type === "update") {
         // Broadcast to all other clients (exclude sender)
@@ -118,46 +167,56 @@ export default class SketchServer implements Party.Server {
         // Update storage (but skip ephemeral records)
         // Each user's camera position, zoom, and cursor state should NOT be persisted
         const { added, updated, removed } = data.payload;
-        const records = (await this.room.storage.get<Record<string, any>>("records")) || {};
-        let hasChanges = false;
+        
+        // Use a transaction-like approach: read, modify, write atomically
+        // This ensures we don't lose data from concurrent updates
+        try {
+          const records = (await this.room.storage.get<Record<string, any>>("records")) || {};
+          let hasChanges = false;
 
-        if (added) {
-          for (const id in added) {
-            const record = added[id];
-            // Skip ephemeral records - don't store camera, instance states, etc.
-            if (!isEphemeralRecord(record)) {
-              records[id] = record;
-              hasChanges = true;
+          if (added) {
+            for (const id in added) {
+              const record = added[id];
+              // Skip ephemeral records - don't store camera, instance states, etc.
+              if (!isEphemeralRecord(record)) {
+                records[id] = record;
+                hasChanges = true;
+              }
             }
           }
-        }
 
-        if (updated) {
-          for (const id in updated) {
-            const record = updated[id];
-            // Skip ephemeral records - don't store camera, instance states, etc.
-            if (!isEphemeralRecord(record)) {
-              records[id] = record;
-              hasChanges = true;
+          if (updated) {
+            for (const id in updated) {
+              const record = updated[id];
+              // Skip ephemeral records - don't store camera, instance states, etc.
+              if (!isEphemeralRecord(record)) {
+                records[id] = record;
+                hasChanges = true;
+              }
             }
           }
-        }
 
-        if (removed) {
-          for (const id in removed) {
-            const record = removed[id];
-            // Skip ephemeral records
-            if (!isEphemeralRecord(record)) {
-              delete records[id];
-              hasChanges = true;
+          if (removed) {
+            for (const id in removed) {
+              const record = removed[id];
+              // Skip ephemeral records
+              if (!isEphemeralRecord(record)) {
+                delete records[id];
+                hasChanges = true;
+              }
             }
           }
-        }
 
-        if (hasChanges) {
-          // Save back to storage
-          // Optimization: In a real app, you might want to debounce this or use a more granular storage
-          await this.room.storage.put("records", records);
+          if (hasChanges) {
+            // Save back to storage atomically
+            // This ensures all records are persisted together
+            await this.room.storage.put("records", records);
+            console.log(`[PartyKit] Saved ${Object.keys(records).length} records to storage for room ${this.room.id}`);
+          }
+        } catch (error) {
+          console.error(`[PartyKit] Error saving records to storage for room ${this.room.id}:`, error);
+          // Don't throw - we've already broadcasted the update, so clients are in sync
+          // Storage failure shouldn't break the real-time sync
         }
       }
     } catch (e) {

@@ -18,8 +18,9 @@ export async function generateStaticParams() {
   return Array.from({ length: PREGENERATED_PAGES }, (_, i) => ({ page: String(i + 1) }))
 }
 
-export async function generateMetadata({ params }: { params: { page: string } }): Promise<Metadata> {
-  const pageNum = Number(params.page) || 1
+export async function generateMetadata({ params }: { params: Promise<{ page: string }> }): Promise<Metadata> {
+  const { page } = await params
+  const pageNum = Number(page) || 1
   return generatePageMetadata('problems', {
     title: `Catalog probleme - Pagina ${pageNum}`,
     alternates: { canonical: `/probleme/pagina/${pageNum}` },
@@ -30,8 +31,9 @@ export async function generateMetadata({ params }: { params: { page: string } })
   })
 }
 
-export default async function ProblemsPaginatedPage({ params }: { params: { page: string } }) {
-  const pageNum = Math.max(1, Number(params.page) || 1)
+export default async function ProblemsPaginatedPage({ params }: { params: Promise<{ page: string }> }) {
+  const { page } = await params
+  const pageNum = Math.max(1, Number(page) || 1)
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string

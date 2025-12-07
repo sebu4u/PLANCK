@@ -153,9 +153,15 @@ export function Navigation() {
   }, [])
 
   // Open search modal with '/' when not typing in an input/textarea/contentEditable
+  // Disable on IDE page to allow typing '/' in code editor
   useEffect(() => {
     const onGlobalKey = (e: KeyboardEvent) => {
       if (e.key === '/') {
+        // Don't activate search on IDE page
+        const isOnIDEPage = pathname?.startsWith('/planckcode/ide') ?? false
+        if (isOnIDEPage) {
+          return
+        }
         const target = e.target as HTMLElement | null
         const isTyping = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target as any).isContentEditable)
         if (!isTyping) {
@@ -167,7 +173,7 @@ export function Navigation() {
     }
     window.addEventListener('keydown', onGlobalKey)
     return () => window.removeEventListener('keydown', onGlobalKey)
-  }, [])
+  }, [pathname])
 
   const performSearch = useCallback(async (searchQuery: string, options?: { offset?: number; append?: boolean }) => {
     const q = searchQuery.trim()
@@ -395,7 +401,9 @@ export function Navigation() {
   }
 
   const isHomepage = pathname === '/'
-  const isTransparentRoute = isHomepage || (pathname?.startsWith('/insight') ?? false) || pathname === '/sketch'
+  const isInsightRoute = pathname?.startsWith('/insight') ?? false
+  const isSketchRoute = pathname?.startsWith('/sketch') ?? false
+  const isTransparentRoute = isHomepage
   const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
   // On mobile, navbar should never be transparent when at the top of the screen
   const isTransparent = isTransparentRoute && !isScrolled && !isMobile
@@ -406,6 +414,13 @@ export function Navigation() {
         border: 'border-[#1a1a1a]',
         dropdownBackground: 'bg-[#080808]',
         dropdownBorder: 'border-[#1a1a1a]',
+      }
+    : isInsightRoute || isSketchRoute
+    ? {
+        background: 'bg-black',
+        border: 'border-gray-800',
+        dropdownBackground: 'bg-black',
+        dropdownBorder: 'border-gray-800',
       }
     : isTransparent
     ? {
@@ -493,7 +508,7 @@ export function Navigation() {
                 </Link>
                 <div className={`absolute left-0 top-full w-64 z-[400] transition-all duration-200 ${coursesOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
                 >
-                  <div className="rounded-lg border border-gray-700 bg-[#21262d] shadow-lg overflow-hidden">
+                  <div className={`rounded-lg border ${navTheme.dropdownBorder} ${navTheme.dropdownBackground} shadow-lg overflow-hidden`}>
                     <div className="py-2">
                       <button onClick={() => goToCoursesWith('Toate')} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
                         <BookOpen className="h-4 w-4 text-blue-400" />

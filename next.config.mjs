@@ -14,15 +14,18 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['i.ibb.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.ibb.co',
+      },
+    ],
   },
+  // Use webpack explicitly since we have custom webpack config
   webpack: (config, { isServer, dev }) => {
     // Handle ES modules that need to be transpiled
     if (!isServer) {
@@ -54,6 +57,10 @@ const nextConfig = {
     return config;
   },
   transpilePackages: ['function-plot', 'mathlive'],
+  // Explicitly use webpack to avoid Turbopack conflict
+  experimental: {
+    webpackBuildWorker: true,
+  },
 }
 
 export default nextConfig

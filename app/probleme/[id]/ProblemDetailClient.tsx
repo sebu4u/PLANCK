@@ -180,6 +180,33 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       solved_at: new Date().toISOString(),
     });
     
+    // Also manually update getting started progress as fallback
+    // The trigger should handle this, but we do it here as backup
+    if (!error) {
+      // Count actual solved problems and update
+      supabase
+        .from('solved_problems')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .then(({ count }) => {
+          if (count !== null) {
+            supabase
+              .from('getting_started_progress')
+              .upsert(
+                {
+                  user_id: user.id,
+                  problems_solved_count: count,
+                  updated_at: new Date().toISOString(),
+                },
+                {
+                  onConflict: 'user_id',
+                  ignoreDuplicates: false,
+                }
+              )
+          }
+        })
+    }
+    
     if (error) {
       console.error('Error marking problem as solved:', error);
       setLoadingSolved(false);

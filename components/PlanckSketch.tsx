@@ -761,6 +761,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
                   pageId={effectiveCurrentPageId}
                   open={isMathGraphOpen}
                   onOpenChange={setIsMathGraphOpen}
+                  socket={socketRef.current}
                 />
             </div>
           </div>
@@ -790,6 +791,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
                 pageId={effectiveCurrentPageId}
                 open={isMathGraphOpen}
                 onOpenChange={setIsMathGraphOpen}
+                socket={socketRef.current}
               />
             </div>
           </div>

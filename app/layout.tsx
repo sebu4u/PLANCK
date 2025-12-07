@@ -12,6 +12,7 @@ import { TopLoader } from "@/components/top-loader"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MobileViewportFix } from "@/components/mobile-viewport-fix"
 import { RealVHProvider } from "@/components/real-vh-provider"
+import { GettingStartedCard } from "@/components/getting-started-card"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
@@ -89,6 +90,7 @@ export default function RootLayout({
               </KatexProvider>
               <Toaster />
               <CookieConsentBanner />
+              <GettingStartedCard />
               <div
                 className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
                 aria-label="Versiunea site-ului"

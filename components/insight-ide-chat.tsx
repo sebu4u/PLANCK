@@ -243,6 +243,7 @@ export function InsightIdeChat({
   const [mode, setMode] = useState<"agent" | "ask">("agent")
   const [selectedModel, setSelectedModel] = useState("gpt-4o-mini")
   const [isGenerating, setIsGenerating] = useState(false)
+  const codeGeneratedRef = useRef(false)
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => message.role !== "system"),
@@ -578,6 +579,31 @@ export function InsightIdeChat({
           setIsGenerating(false)
           
           if (mode === "agent") {
+            // Track code generation for getting started when applying code_edit
+            if (user && !codeGeneratedRef.current) {
+              codeGeneratedRef.current = true
+              console.log("🤖 Tracking code generation (code_edit) for getting started...")
+              supabase
+                .from("getting_started_progress")
+                .upsert(
+                  {
+                    user_id: user.id,
+                    code_generated: true,
+                    updated_at: new Date().toISOString(),
+                  },
+                  {
+                    onConflict: "user_id",
+                    ignoreDuplicates: false,
+                  }
+                )
+                .then(({ data, error }) => {
+                  if (error) {
+                    console.error("❌ Error updating code_generated (code_edit):", error)
+                  } else {
+                    console.log("✅ Successfully tracked code generation (code_edit):", data)
+                  }
+                })
+            }
             // Apply the code changes
             const applied = onApplyCodeEdit(structured)
             console.log("Insight: Code edit applied:", applied)
@@ -715,6 +741,31 @@ export function InsightIdeChat({
           const segments = parseSegments(assistantBuffer)
           const codeSegments = segments.filter((s) => s.type === "code") as Array<{ type: "code"; content: string }>
           if (codeSegments.length > 0) {
+            // Track code generation for getting started
+            if (user && !codeGeneratedRef.current && mode === "agent") {
+              codeGeneratedRef.current = true
+              console.log("🤖 Tracking code generation for getting started...")
+              supabase
+                .from("getting_started_progress")
+                .upsert(
+                  {
+                    user_id: user.id,
+                    code_generated: true,
+                    updated_at: new Date().toISOString(),
+                  },
+                  {
+                    onConflict: "user_id",
+                    ignoreDuplicates: false,
+                  }
+                )
+                .then(({ data, error }) => {
+                  if (error) {
+                    console.error("❌ Error updating code_generated:", error)
+                  } else {
+                    console.log("✅ Successfully tracked code generation:", data)
+                  }
+                })
+            }
             // Insert the last code segment (or all sequentially)
             codeSegments.forEach((seg) => {
               if (seg.content && seg.content.trim().length > 0) {
@@ -838,13 +889,37 @@ export function InsightIdeChat({
         })
         return
       }
+      // Track code generation for getting started
+      if (user && !codeGeneratedRef.current && mode === "agent") {
+        codeGeneratedRef.current = true
+        supabase
+          .from("getting_started_progress")
+          .upsert(
+            {
+              user_id: user.id,
+              code_generated: true,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "user_id",
+              ignoreDuplicates: false,
+            }
+          )
+          .then(({ error }) => {
+            if (error) {
+              console.error("Error updating code_generated:", error)
+            } else {
+              console.log("Getting started: Code generation tracked")
+            }
+          })
+      }
       onInsertCode(code)
       toast({
         title: "Cod inserat în editor",
         description: "Ai introdus fragmentul direct în fișierul curent.",
       })
     },
-    [onInsertCode, toast, mode],
+    [onInsertCode, toast, mode, user],
   )
 
   const renderAssistantMessage = useCallback(
