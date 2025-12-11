@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
+import { motion } from 'framer-motion'
 
 // Lazy load Monaco Editor to reduce initial bundle size
 const Editor = dynamic(() => import('@monaco-editor/react').then((mod) => mod.default), {
@@ -17,7 +18,7 @@ const Editor = dynamic(() => import('@monaco-editor/react').then((mod) => mod.de
 import { Card, CardContent } from '@/components/ui/card'
 import { Navigation } from '@/components/navigation'
 import { PlanckCodeSidebar } from '@/components/planckcode-sidebar'
-import { Loader2, Play, Plus, X, File, FileCode, ChevronDown, ChevronUp, Bug, Sparkles } from 'lucide-react'
+import { Loader2, Play, Plus, X, File, FileCode, ChevronDown, ChevronUp, Bug, Sparkles, Check } from 'lucide-react'
 import axios from 'axios'
 import { InsightIdeChat } from '@/components/insight-ide-chat'
 import type { editor as MonacoEditor } from 'monaco-editor'
@@ -379,6 +380,37 @@ interface RunResponse {
 function IDEPageContent() {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
+  const [showUpgradeCard, setShowUpgradeCard] = useState<boolean>(true)
+  const [upgradeStarsMounted, setUpgradeStarsMounted] = useState(false)
+  const upgradeStars = useMemo(() => {
+    if (!upgradeStarsMounted) return []
+
+    const starAreaWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth, 960) : 960
+
+    return Array.from({ length: 18 }, (_, i) => {
+      const seed = i * 0.618033988749895
+      const random = (seed: number) => {
+        const x = Math.sin(seed) * 10000
+        return x - Math.floor(x)
+      }
+
+      return {
+        id: i,
+        x: random(seed) * starAreaWidth,
+        y: random(seed + 1) * 320,
+        opacity: random(seed + 2) * 0.5 + 0.25,
+        scale: random(seed + 3) * 0.6 + 0.4,
+        width: random(seed + 4) * 2 + 1,
+        height: random(seed + 5) * 2 + 1,
+        animateY: random(seed + 6) * -18,
+        animateOpacity: random(seed + 7) * 0.3 + 0.2,
+        duration: random(seed + 8) * 4 + 5,
+      }
+    })
+  }, [upgradeStarsMounted])
+  useEffect(() => {
+    setUpgradeStarsMounted(true)
+  }, [])
   
   // Load saved state from localStorage on mount
   const loadSavedState = (): { files: FileItem[], activeFileId: string } | null => {
@@ -1298,6 +1330,86 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
 
   return (
     <div className="h-screen-mobile bg-black text-white overflow-hidden">
+      {showUpgradeCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/15 bg-[#0c1017]/95 shadow-[0_30px_120px_-25px_rgba(0,0,0,0.95)]">
+            <button
+              onClick={() => setShowUpgradeCard(false)}
+              aria-label="Închide mesajul de upgrade"
+              className="absolute right-3 top-3 z-20 rounded-full p-2 text-gray-200 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="absolute inset-0 pointer-events-none opacity-75">
+              <div className="absolute -top-44 left-1/2 -translate-x-1/2 w-[900px] h-[420px] bg-white/10 blur-[120px]" />
+              <div className="absolute inset-0 overflow-hidden">
+                {upgradeStars.map((star) => (
+                  <motion.div
+                    key={star.id}
+                    className="absolute bg-white rounded-full"
+                    initial={{
+                      x: star.x,
+                      y: star.y,
+                      opacity: star.opacity,
+                      scale: star.scale,
+                    }}
+                    animate={{
+                      y: [null, star.animateY],
+                      opacity: [null, star.animateOpacity],
+                    }}
+                    transition={{
+                      duration: star.duration,
+                      repeat: Infinity,
+                      repeatType: 'reverse',
+                      ease: 'easeInOut',
+                    }}
+                    style={{
+                      width: `${star.width}px`,
+                      height: `${star.height}px`,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/30" />
+            </div>
+
+            <div className="relative z-10 p-7 sm:p-8 space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-xs font-semibold text-white/90 shadow-inner shadow-white/5">
+                Planck Code
+                <span className="text-white">Beta Update</span>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                  Planck Code se upgradează ⚡️
+                </h2>
+                <p className="text-gray-200 text-base leading-relaxed">
+                  Lucrezi azi. Continui mâine. Fără să pierzi nimic.
+                </p>
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  În curând vei putea să-ți salvezi proiectele odată cu lansarea planurilor Plus &amp; Pro.
+                </p>
+              </div>
+
+              <div className="grid gap-2 text-sm text-gray-100">
+                {['Mai multe limbaje', 'Probleme exclusive', 'Funcții avansate pentru developerii adevărați'].map((item) => (
+                  <div key={item} className="flex items-start gap-3 rounded-lg bg-white/5 px-3 py-2 border border-white/10">
+                    <Check className="mt-0.5 h-4 w-4 text-white" />
+                    <span className="leading-tight">{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 pt-2 text-center">
+                <p className="text-gray-200 font-semibold">Pregătește-te să treci pe next level.</p>
+                <p className="text-xs text-gray-400">
+                  👉 Soon: Upgrade &amp; Save
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <Navigation />
       <PlanckCodeSidebar />
 

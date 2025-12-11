@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { gsap } from "gsap"
+import { motion } from "framer-motion"
 
 // Confetti component for celebration
 const Confetti = () => {
@@ -81,6 +82,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState<"google" | "github" | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [containerPadding, setContainerPadding] = useState({ left: 32, right: 32 })
+  const [mounted, setMounted] = useState(false)
 
   const { toast } = useToast()
   const router = useRouter()
@@ -89,6 +91,37 @@ export default function RegisterPage() {
   // Refs for carousel
   const carouselContainerRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  // Generate stable star positions only on client (matching pricing page)
+  const stars = useMemo(() => {
+    if (!mounted) return []
+    const width = typeof window !== 'undefined' ? window.innerWidth : 1000
+    return Array.from({ length: 20 }, (_, i) => {
+      // Use a seeded random based on index for consistency
+      const seed = i * 0.618033988749895 // Golden ratio for better distribution
+      const random = (seed: number) => {
+        const x = Math.sin(seed) * 10000
+        return x - Math.floor(x)
+      }
+      
+      return {
+        id: i,
+        x: random(seed) * width,
+        y: random(seed + 1) * 400,
+        opacity: random(seed + 2) * 0.5 + 0.3,
+        scale: random(seed + 3) * 0.5 + 0.5,
+        width: random(seed + 4) * 2 + 1,
+        height: random(seed + 5) * 2 + 1,
+        animateY: random(seed + 6) * -20,
+        animateOpacity: random(seed + 7) * 0.3 + 0.2,
+        duration: random(seed + 8) * 5 + 5,
+      }
+    })
+  }, [mounted])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Class selection messages
   const classMessages = {
@@ -693,45 +726,50 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="h-screen bg-[#0d1117] text-white overflow-hidden flex flex-col">
+    <div className="relative min-h-screen w-full bg-[#101113] text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30">
       <Navigation />
       
       {showConfetti && <Confetti />}
 
+      {/* Top Glow Effect (matching pricing page) */}
+      <div className="absolute -top-[300px] left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/10 blur-[120px] rounded-[100%] pointer-events-none z-0" />
+      
+      {/* Stars Background (matching pricing page) */}
+      <div className="absolute top-0 left-0 right-0 h-[600px] overflow-hidden pointer-events-none z-0 opacity-60">
+        {stars.map((star) => (
+          <motion.div
+            key={star.id}
+            className="absolute bg-white rounded-full"
+            initial={{
+              x: star.x,
+              y: star.y,
+              opacity: star.opacity,
+              scale: star.scale,
+            }}
+            animate={{
+              y: [null, star.animateY],
+              opacity: [null, star.animateOpacity],
+            }}
+            transition={{
+              duration: star.duration,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "easeInOut",
+            }}
+            style={{
+              width: `${star.width}px`,
+              height: `${star.height}px`,
+            }}
+          />
+        ))}
+      </div>
+
       {/* Main Register Section */}
-      <section className="relative flex-1 flex items-center justify-center overflow-hidden bg-[#0d1117] pt-12 sm:pt-16">
-        {/* Background Effects */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Moving stars */}
-          <div className="absolute top-10 left-20 w-1 h-1 bg-gray-400 rounded-full opacity-40 animate-pulse"></div>
-          <div
-            className="absolute top-32 right-32 w-1.5 h-1.5 bg-gray-400 rounded-full opacity-30 animate-pulse"
-            style={{ animationDelay: "1s" }}
-          ></div>
-          <div
-            className="absolute bottom-40 left-40 w-1 h-1 bg-gray-400 rounded-full opacity-40 animate-pulse"
-            style={{ animationDelay: "2s" }}
-          ></div>
-          <div
-            className="absolute top-60 right-60 w-1.5 h-1.5 bg-gray-400 rounded-full opacity-25 animate-pulse"
-            style={{ animationDelay: "3s" }}
-          ></div>
+      <section className="relative flex-1 flex items-center justify-center overflow-hidden pt-12 sm:pt-16 z-10">
 
-          {/* Floating particles */}
-          <div className="absolute top-20 left-10 w-2 h-2 bg-gray-400 rounded-full opacity-20 animate-float"></div>
-          <div
-            className="absolute top-40 right-20 w-3 h-3 bg-gray-400 rounded-full opacity-15 animate-float"
-            style={{ animationDelay: "2s" }}
-          ></div>
-          <div
-            className="absolute bottom-32 left-1/4 w-1.5 h-1.5 bg-gray-400 rounded-full opacity-25 animate-float"
-            style={{ animationDelay: "4s" }}
-          ></div>
-        </div>
-
-        {/* Gradient fades on sides - outside carousel to avoid z-index issues */}
-        <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-r from-[#0d1117] via-[#0d1117]/80 to-transparent z-20 pointer-events-none"></div>
-        <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-l from-[#0d1117] via-[#0d1117]/80 to-transparent z-20 pointer-events-none"></div>
+        {/* Gradient fades on sides - outside carousel to avoid z-index issues (hidden on mobile) */}
+        <div className="hidden sm:block absolute left-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-r from-[#101113] via-[#101113]/80 to-transparent z-20 pointer-events-none"></div>
+        <div className="hidden sm:block absolute right-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-l from-[#101113] via-[#101113]/80 to-transparent z-20 pointer-events-none"></div>
 
         {/* Carousel Container */}
         <div 
@@ -774,11 +812,11 @@ export default function RegisterPage() {
                   }}
                 >
                   <Card 
-                    className="w-full h-full bg-[#1a1a1a] border-white/10 shadow-2xl relative overflow-hidden"
+                    className="w-full h-full bg-[#151619]/60 border-white/10 backdrop-blur-sm rounded-2xl shadow-2xl relative overflow-hidden hover:bg-[#1A1B1E]/80 hover:border-white/20 transition-all duration-300"
                     style={{
                       filter: isCurrentCard ? 'none' : 'grayscale(100%)',
                       opacity: isCurrentCard ? 1 : isAdjacent ? 0.5 : 0.3,
-                      transition: 'filter 500ms ease-out, opacity 500ms ease-out',
+                      transition: 'filter 500ms ease-out, opacity 500ms ease-out, background-color 300ms ease-out, border-color 300ms ease-out',
                     }}
                   >
                     {/* Dark overlay for non-current cards - simulates blur by hiding content */}
@@ -787,8 +825,8 @@ export default function RegisterPage() {
                         className="absolute inset-0 z-30 pointer-events-none"
                         style={{
                           backgroundColor: isAdjacent 
-                            ? 'rgba(13, 17, 23, 0.6)' 
-                            : 'rgba(13, 17, 23, 0.8)',
+                            ? 'rgba(16, 17, 19, 0.6)' 
+                            : 'rgba(16, 17, 19, 0.8)',
                         }}
                       />
                     )}
@@ -798,8 +836,8 @@ export default function RegisterPage() {
                         className="absolute inset-0 z-30 pointer-events-none"
                         style={{
                           background: isLeftCard
-                            ? 'linear-gradient(to right, rgba(13, 17, 23, 0.95) 0%, rgba(13, 17, 23, 0.7) 30%, rgba(13, 17, 23, 0.3) 60%, transparent 100%)'
-                            : 'linear-gradient(to left, rgba(13, 17, 23, 0.95) 0%, rgba(13, 17, 23, 0.7) 30%, rgba(13, 17, 23, 0.3) 60%, transparent 100%)'
+                            ? 'linear-gradient(to right, rgba(16, 17, 19, 0.95) 0%, rgba(16, 17, 19, 0.7) 30%, rgba(16, 17, 19, 0.3) 60%, transparent 100%)'
+                            : 'linear-gradient(to left, rgba(16, 17, 19, 0.95) 0%, rgba(16, 17, 19, 0.7) 30%, rgba(16, 17, 19, 0.3) 60%, transparent 100%)'
                         }}
                       />
                     )}

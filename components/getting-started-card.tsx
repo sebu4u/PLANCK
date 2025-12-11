@@ -35,13 +35,28 @@ export function GettingStartedCard() {
   const [isPageLoading, setIsPageLoading] = useState(false)
   const pathnameRef = useRef(pathname)
 
+  // Check localStorage for guest dismissal state
+  useEffect(() => {
+    if (!user && typeof window !== 'undefined') {
+      const guestDismissed = localStorage.getItem('getting_started_guest_dismissed')
+      if (guestDismissed === 'true') {
+        setIsDismissed(true)
+      }
+    }
+  }, [user])
+
   // Detect page navigation and hide card during loading
   useEffect(() => {
     // If pathname changed, we're navigating
     if (pathnameRef.current !== pathname) {
       setIsPageLoading(true)
       setLoading(true) // Reset loading state
-      setProgress(null) // Clear progress to force reload
+      
+      // Only clear progress for authenticated users (non-authenticated users keep their default progress)
+      if (user) {
+        setProgress(null) // Clear progress to force reload
+      }
+      
       pathnameRef.current = pathname
       
       // Wait for page to load using requestAnimationFrame for better timing
@@ -50,8 +65,13 @@ export function GettingStartedCard() {
           // Use a small delay to ensure page is fully rendered
           setTimeout(() => {
             setIsPageLoading(false)
-            // Force reload by resetting loading state
-            setLoading(true)
+            // Force reload by resetting loading state (only for authenticated users)
+            if (user) {
+              setLoading(true)
+            } else {
+              // For non-authenticated users, just set loading to false
+              setLoading(false)
+            }
           }, 100)
         })
         return () => cancelAnimationFrame(frame2)
@@ -61,14 +81,29 @@ export function GettingStartedCard() {
         cancelAnimationFrame(frame1)
       }
     }
-  }, [pathname])
+  }, [pathname, user])
 
   // Load progress from database - reload when page loading completes
   useEffect(() => {
+    // For non-authenticated users, set default progress and show card
+    if (!authLoading && !user) {
+      setProgress({
+        id: 'guest',
+        user_id: '',
+        problems_solved_count: 0,
+        board_created: false,
+        code_generated: false,
+        completed: false,
+        elo_awarded: false,
+        dismissed: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      setLoading(false)
+      return
+    }
+
     if (authLoading || !user) {
-      if (!authLoading && !user) {
-        setLoading(false)
-      }
       return
     }
 
@@ -351,45 +386,75 @@ export function GettingStartedCard() {
   }
 
   const handleDismiss = async () => {
-    if (!user) return
+    // For non-authenticated users, store dismissal in localStorage
+    if (!user) {
+      setIsDismissed(true)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('getting_started_guest_dismissed', 'true')
+      }
+      return
+    }
 
     // Only dismiss for this session (don't persist, so it reappears on next visit)
     setIsDismissed(true)
   }
 
-  // Don't show if loading, no user, completed, dismissed, or page is loading
+  // For non-authenticated users, always show the card (don't check for user, progress, completed, or dismissed)
+  const isGuest = !authLoading && !user
+  
+  // Don't show if loading or on homepage hash
+  // For authenticated users, also check for page loading
   if (
     loading ||
     authLoading ||
-    isPageLoading ||
-    !user ||
-    !progress ||
-    progress.completed ||
-    isDismissed ||
     pathname === "/#" // Don't show on homepage hash
   ) {
     return null
+  }
+
+  // For authenticated users, also check page loading
+  if (!isGuest && isPageLoading) {
+    return null
+  }
+
+  // For authenticated users, check additional conditions
+  if (!isGuest) {
+    if (
+      !user ||
+      !progress ||
+      progress.completed ||
+      isDismissed
+    ) {
+      return null
+    }
+  }
+
+  // For non-authenticated users, check if dismissed or if we don't have progress
+  if (isGuest) {
+    if (!progress || isDismissed) {
+      return null
+    }
   }
 
   const tasks = [
     {
       id: "problems",
       label: "Rezolvă 3 probleme",
-      completed: progress.problems_solved_count >= 3,
-      progress: progress.problems_solved_count,
+      completed: isGuest ? false : (progress.problems_solved_count >= 3),
+      progress: isGuest ? 0 : progress.problems_solved_count,
       target: 3,
       link: "/probleme",
     },
     {
       id: "board",
       label: "Creează o tablă pe Planck Sketch",
-      completed: progress.board_created,
-      link: "/sketch/boards",
+      completed: isGuest ? false : progress.board_created,
+      link: isGuest ? "/sketch" : "/sketch/boards",
     },
     {
       id: "code",
       label: "Generează cod cu AI Agent în IDE",
-      completed: progress.code_generated,
+      completed: isGuest ? false : progress.code_generated,
       link: "/planckcode/ide",
     },
   ]
@@ -509,12 +574,20 @@ export function GettingStartedCard() {
           {!allCompleted && (
             <div className="mt-4 pt-3 border-t border-white/10">
               <p className="text-xs text-gray-400 text-center">
-                Completează toate taskurile pentru <span className="text-yellow-400 font-semibold">+50 ELO</span>
+                {isGuest ? (
+                  <>
+                    Creează un cont pentru a începe <span className="text-yellow-400 font-semibold">+50 ELO</span>
+                  </>
+                ) : (
+                  <>
+                    Completează toate taskurile pentru <span className="text-yellow-400 font-semibold">+50 ELO</span>
+                  </>
+                )}
               </p>
             </div>
           )}
 
-          {allCompleted && (
+          {!isGuest && allCompleted && (
             <div className="mt-4 pt-3 border-t border-white/10">
               <p className="text-xs text-green-400 text-center font-semibold">
                 🎉 Felicitări! Ai primit +50 ELO!

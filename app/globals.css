@@ -909,6 +909,18 @@
   transition-delay: 0.4s;
 }
 
+/* Custom animation for feature showcase - only animates transform, not opacity */
+.scroll-animate-transform-up {
+  opacity: 1;
+  transform: translateY(50px);
+  transition: transform 0.8s ease-out;
+}
+
+.scroll-animate-transform-up.animate {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .title-font {

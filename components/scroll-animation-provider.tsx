@@ -9,7 +9,7 @@ export default function ScrollAnimationProvider({ children }: { children: React.
       rootMargin: '0px 0px -50px 0px'
     }
 
-    const scrollAnimationSelector = '.scroll-animate-fade-up, .scroll-animate-slide-up, .scroll-animate-fade-left, .scroll-animate-fade-right, .scroll-animate-scale'
+    const scrollAnimationSelector = '.scroll-animate-fade-up, .scroll-animate-slide-up, .scroll-animate-fade-left, .scroll-animate-fade-right, .scroll-animate-scale, .scroll-animate-transform-up'
 
     // Track observed elements to avoid duplicates
     const observedElements = new Set<Element>()

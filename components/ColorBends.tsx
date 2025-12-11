@@ -140,104 +140,226 @@ export default function ColorBends({
   const pointerSmoothRef = useRef<number>(8);
 
   useEffect(() => {
-    const container = containerRef.current!;
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const container = containerRef.current;
+    if (!container) return;
 
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    const uColorsArray = Array.from({ length: MAX_COLORS }, () => new THREE.Vector3(0, 0, 0));
-    const material = new THREE.ShaderMaterial({
-      vertexShader: vert,
-      fragmentShader: frag,
-      uniforms: {
-        uCanvas: { value: new THREE.Vector2(1, 1) },
-        uTime: { value: 0 },
-        uSpeed: { value: speed },
-        uRot: { value: new THREE.Vector2(1, 0) },
-        uColorCount: { value: 0 },
-        uColors: { value: uColorsArray },
-        uTransparent: { value: transparent ? 1 : 0 },
-        uScale: { value: scale },
-        uFrequency: { value: frequency },
-        uWarpStrength: { value: warpStrength },
-        uPointer: { value: new THREE.Vector2(0, 0) },
-        uMouseInfluence: { value: mouseInfluence },
-        uParallax: { value: parallax },
-        uNoise: { value: noise }
-      },
-      premultipliedAlpha: true,
-      transparent: true
-    });
-    materialRef.current = material;
-
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      powerPreference: 'high-performance',
-      alpha: true
-    });
-    rendererRef.current = renderer;
-    (renderer as any).outputColorSpace = (THREE as any).SRGBColorSpace;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0x000000, transparent ? 0 : 1);
-    renderer.domElement.style.width = '100%';
-    renderer.domElement.style.height = '100%';
-    renderer.domElement.style.display = 'block';
-    container.appendChild(renderer.domElement);
-
-    const clock = new THREE.Clock();
-
-    const handleResize = () => {
-      const w = container.clientWidth || 1;
-      const h = container.clientHeight || 1;
-      renderer.setSize(w, h, false);
-      (material.uniforms.uCanvas.value as THREE.Vector2).set(w, h);
-    };
-
-    handleResize();
-
-    if ('ResizeObserver' in window) {
-      const ro = new ResizeObserver(handleResize);
-      ro.observe(container);
-      resizeObserverRef.current = ro;
-    } else {
-      (window as Window).addEventListener('resize', handleResize);
+    // Check if WebGL is available
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+      console.warn('WebGL is not supported in this browser');
+      return;
     }
 
-    const loop = () => {
-      const dt = clock.getDelta();
-      const elapsed = clock.elapsedTime;
-      material.uniforms.uTime.value = elapsed;
+    let scene: THREE.Scene | null = null;
+    let camera: THREE.OrthographicCamera | null = null;
+    let geometry: THREE.PlaneGeometry | null = null;
+    let material: THREE.ShaderMaterial | null = null;
+    let renderer: THREE.WebGLRenderer | null = null;
+    let handleContextLost: ((event: Event) => void) | null = null;
+    let handleContextRestored: (() => void) | null = null;
+    let handleResize: (() => void) | null = null;
 
-      const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed;
-      const rad = (deg * Math.PI) / 180;
-      const c = Math.cos(rad);
-      const s = Math.sin(rad);
-      (material.uniforms.uRot.value as THREE.Vector2).set(c, s);
+    try {
+      scene = new THREE.Scene();
+      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-      const cur = pointerCurrentRef.current;
-      const tgt = pointerTargetRef.current;
-      const amt = Math.min(1, dt * pointerSmoothRef.current);
-      cur.lerp(tgt, amt);
-      (material.uniforms.uPointer.value as THREE.Vector2).copy(cur);
-      renderer.render(scene, camera);
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
+      geometry = new THREE.PlaneGeometry(2, 2);
+      const uColorsArray = Array.from({ length: MAX_COLORS }, () => new THREE.Vector3(0, 0, 0));
+      material = new THREE.ShaderMaterial({
+        vertexShader: vert,
+        fragmentShader: frag,
+        uniforms: {
+          uCanvas: { value: new THREE.Vector2(1, 1) },
+          uTime: { value: 0 },
+          uSpeed: { value: speed },
+          uRot: { value: new THREE.Vector2(1, 0) },
+          uColorCount: { value: 0 },
+          uColors: { value: uColorsArray },
+          uTransparent: { value: transparent ? 1 : 0 },
+          uScale: { value: scale },
+          uFrequency: { value: frequency },
+          uWarpStrength: { value: warpStrength },
+          uPointer: { value: new THREE.Vector2(0, 0) },
+          uMouseInfluence: { value: mouseInfluence },
+          uParallax: { value: parallax },
+          uNoise: { value: noise }
+        },
+        premultipliedAlpha: true,
+        transparent: true
+      });
+      materialRef.current = material;
 
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      if (resizeObserverRef.current) resizeObserverRef.current.disconnect();
-      else (window as Window).removeEventListener('resize', handleResize);
-      geometry.dispose();
-      material.dispose();
-      renderer.dispose();
-      if (renderer.domElement && renderer.domElement.parentElement === container) {
-        container.removeChild(renderer.domElement);
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      try {
+        renderer = new THREE.WebGLRenderer({
+          antialias: false,
+          powerPreference: 'high-performance',
+          alpha: true,
+          failIfMajorPerformanceCaveat: false
+        });
+      } catch (error) {
+        console.warn('Failed to create WebGL renderer with high-performance preference, trying default:', error);
+        try {
+          renderer = new THREE.WebGLRenderer({
+            antialias: false,
+            alpha: true,
+            failIfMajorPerformanceCaveat: false
+          });
+        } catch (fallbackError) {
+          console.error('Failed to create WebGL renderer:', fallbackError);
+          // Clean up what we've created so far
+          if (geometry) geometry.dispose();
+          if (material) {
+            material.dispose();
+            materialRef.current = null;
+          }
+          return;
+        }
       }
-    };
+
+      if (!renderer) {
+        console.error('WebGL renderer could not be created');
+        // Clean up what we've created so far
+        if (geometry) geometry.dispose();
+        if (material) {
+          material.dispose();
+          materialRef.current = null;
+        }
+        return;
+      }
+
+      rendererRef.current = renderer;
+      (renderer as any).outputColorSpace = (THREE as any).SRGBColorSpace;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0x000000, transparent ? 0 : 1);
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
+      renderer.domElement.style.display = 'block';
+      container.appendChild(renderer.domElement);
+
+      // Handle WebGL context loss
+      handleContextLost = (event: Event) => {
+        event.preventDefault();
+        console.warn('WebGL context lost');
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+      };
+
+      handleContextRestored = () => {
+        console.warn('WebGL context restored - reinitializing');
+        // The component will reinitialize on next render
+      };
+
+      renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
+      renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
+
+      const clock = new THREE.Clock();
+
+      handleResize = () => {
+        if (!renderer || !material) return;
+        const w = container.clientWidth || 1;
+        const h = container.clientHeight || 1;
+        renderer.setSize(w, h, false);
+        (material.uniforms.uCanvas.value as THREE.Vector2).set(w, h);
+      };
+
+      handleResize();
+
+      if ('ResizeObserver' in window) {
+        const ro = new ResizeObserver(handleResize);
+        ro.observe(container);
+        resizeObserverRef.current = ro;
+      } else {
+        (window as Window).addEventListener('resize', handleResize);
+      }
+
+      const loop = () => {
+        if (!renderer || !material) return;
+        try {
+          const dt = clock.getDelta();
+          const elapsed = clock.elapsedTime;
+          material.uniforms.uTime.value = elapsed;
+
+          const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed;
+          const rad = (deg * Math.PI) / 180;
+          const c = Math.cos(rad);
+          const s = Math.sin(rad);
+          (material.uniforms.uRot.value as THREE.Vector2).set(c, s);
+
+          const cur = pointerCurrentRef.current;
+          const tgt = pointerTargetRef.current;
+          const amt = Math.min(1, dt * pointerSmoothRef.current);
+          cur.lerp(tgt, amt);
+          (material.uniforms.uPointer.value as THREE.Vector2).copy(cur);
+          renderer.render(scene, camera);
+          rafRef.current = requestAnimationFrame(loop);
+        } catch (error) {
+          console.error('Error in render loop:', error);
+          // Stop the loop on error
+          if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+          }
+        }
+      };
+      rafRef.current = requestAnimationFrame(loop);
+
+      return () => {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        if (resizeObserverRef.current) {
+          resizeObserverRef.current.disconnect();
+          resizeObserverRef.current = null;
+        } else if (handleResize) {
+          (window as Window).removeEventListener('resize', handleResize);
+        }
+        if (renderer) {
+          if (handleContextLost) {
+            renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
+          }
+          if (handleContextRestored) {
+            renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
+          }
+          if (renderer.domElement && renderer.domElement.parentElement === container) {
+            container.removeChild(renderer.domElement);
+          }
+          renderer.dispose();
+          rendererRef.current = null;
+        }
+        if (geometry) {
+          geometry.dispose();
+        }
+        if (material) {
+          material.dispose();
+          materialRef.current = null;
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing ColorBends WebGL:', error);
+      // Clean up any partially created resources
+      if (geometry) geometry.dispose();
+      if (material) {
+        material.dispose();
+        materialRef.current = null;
+      }
+      if (renderer) {
+        renderer.dispose();
+        rendererRef.current = null;
+      }
+      return () => {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+      };
+    }
   }, []);
 
   useEffect(() => {

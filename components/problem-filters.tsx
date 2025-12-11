@@ -287,7 +287,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
   }, [onFilterChange])
 
   return (
-    <div className="space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
+    <div id="guide-filters-panel-body" className="space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.32em] text-white/35">
@@ -313,6 +313,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
           <Input
+            id="guide-search-input"
             placeholder="Caută după enunț, cod (ex: M003) sau tag-uri..."
             value={filters.search}
             onChange={(e) => updateFilters({ search: e.target.value })}
@@ -321,7 +322,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
         </div>
 
         <div className="grid gap-4">
-          <div className="space-y-2">
+          <div className="space-y-2" id="guide-class-select">
             <label className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
               Clasa
             </label>
@@ -350,7 +351,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
             </Select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2" id="guide-chapter-select">
             <label className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
               Capitol
             </label>
@@ -381,7 +382,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2" id="guide-difficulty">
           <span className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
             Dificultate
           </span>

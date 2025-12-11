@@ -39,7 +39,7 @@ export default function InsightCTAHomepage() {
           </div>
 
           {/* Large outer card with glass effect */}
-          <div className="relative scroll-animate-fade-up -mx-4 sm:-mx-6 lg:mx-0">
+          <div className="relative scroll-animate-transform-up -mx-4 sm:-mx-6 lg:mx-0">
             {/* Outer card - flexible height on mobile, fixed on desktop */}
             <div className="relative w-full h-auto md:h-[490px] rounded-t-[1.5rem] sm:rounded-t-[2rem] border-x-0 lg:border-x-2 border-t-2 border-white/20 overflow-hidden md:overflow-visible after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-[-1px] after:w-screen after:border-b after:border-white/10 after:pointer-events-none">
               {/* Glass background - transparent with blur */}
@@ -48,7 +48,7 @@ export default function InsightCTAHomepage() {
               {/* Additional glass layer for depth */}
               <div className="absolute inset-0 bg-white/3 rounded-t-[1.5rem] sm:rounded-t-[2rem] backdrop-blur-lg"></div>
               
-              {/* Subtle blue gradient glow at bottom */}
+              {/* Subtle blue gradient glow at bottom - constant opacity, not affected by transform animation */}
               <div className="absolute inset-0 rounded-t-[1.5rem] sm:rounded-t-[2rem]" style={{background: 'linear-gradient(to top, rgba(59, 130, 246, 0.3) 0%, rgba(147, 197, 253, 0.2) 15%, rgba(147, 197, 253, 0.1) 25%, rgba(147, 197, 253, 0.05) 35%, transparent 50%)'}}></div>
               
               {/* Content container - relative on mobile with padding, absolute inset on desktop */}
@@ -103,7 +103,7 @@ export default function InsightCTAHomepage() {
         <div className="relative w-screen lg:w-full lg:max-w-[90rem] left-1/2 lg:left-auto -translate-x-1/2 lg:translate-x-0 mx-0 px-0 -mt-4 sm:-mt-6 md:-mt-8 lg:-mt-3 xl:-mt-2">
           <div className="border-b border-x-0 lg:border-x border-white/10 bg-white/[0.02] backdrop-blur-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 px-4 sm:px-6 lg:px-0">
             {/* Panel 1 - 24/7 disponibil */}
-            <div className="p-6 sm:p-8 lg:p-12 border-r-0 md:border-r border-white/10 lg:border-r text-center lg:text-left">
+            <div className="p-6 sm:p-8 lg:p-12 border-r-0 md:border-r border-white/10 lg:border-r text-center lg:text-left scroll-animate-fade-up animate-delay-100">
               <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                 24/7 disponibil
               </div>
@@ -113,7 +113,7 @@ export default function InsightCTAHomepage() {
             </div>
 
             {/* Panel 2 - răspunsuri în <5s */}
-            <div className="p-6 sm:p-8 lg:p-12 border-r-0 md:border-r lg:border-r border-white/10 border-t md:border-t-0 text-center lg:text-left">
+            <div className="p-6 sm:p-8 lg:p-12 border-r-0 md:border-r lg:border-r border-white/10 border-t md:border-t-0 text-center lg:text-left scroll-animate-fade-up animate-delay-200">
               <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                 răspunsuri în &lt;5s
               </div>
@@ -123,7 +123,7 @@ export default function InsightCTAHomepage() {
             </div>
 
             {/* Panel 3 - 95% acuratețe */}
-            <div className="p-6 sm:p-8 lg:p-12 border-t md:border-t-0 text-center lg:text-left">
+            <div className="p-6 sm:p-8 lg:p-12 border-t md:border-t-0 text-center lg:text-left scroll-animate-fade-up animate-delay-300">
               <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                 95% acuratețe
               </div>

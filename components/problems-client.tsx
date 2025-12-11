@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { ProblemCardSkeleton } from "@/components/problems/problem-card-skeleton"
+import { ProblemsGuestGuide } from "@/components/problems-guest-guide"
 
 // Lazy load ProblemCard component
 const ProblemCard = lazy(() => import("@/components/problem-card").then(module => ({ default: module.ProblemCard })))
@@ -63,6 +64,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
   const { isFree, isPaid } = useSubscriptionPlan()
   const didMountRef = useRef(false)
   const isMobile = useIsMobile()
+  const [isLargeScreen, setIsLargeScreen] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -77,6 +79,34 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
   const [loading, setLoading] = useState(!initialProblems || initialProblems.length === 0)
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
   const [visibleProblems, setVisibleProblems] = useState<Problem[]>([])
+  const focusFilters = useCallback(() => {
+    if (isMobile || !isLargeScreen) {
+      setMobileFiltersOpen(true)
+    }
+    if (typeof document === "undefined") return
+    const targetId = (isMobile || !isLargeScreen) ? "catalog-filters-mobile" : "catalog-filters-panel"
+    const element = document.getElementById(targetId)
+    if (!element) return
+
+    try {
+      element.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" })
+    } catch {
+      // ignore scroll errors
+    }
+
+    try {
+      element.animate(
+        [
+          { boxShadow: "0 0 0 0 rgba(94, 234, 212, 0.0)" },
+          { boxShadow: "0 0 0 12px rgba(94, 234, 212, 0.18)" },
+          { boxShadow: "0 0 0 0 rgba(94, 234, 212, 0.0)" },
+        ],
+        { duration: 800, easing: "ease-out" }
+      )
+    } catch {
+      // ignore animation errors in unsupported browsers
+    }
+  }, [isMobile, isLargeScreen])
 
   // Memoized fetch function with caching
   const fetchProblems = useCallback(async () => {
@@ -155,6 +185,16 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
   useEffect(() => {
     fetchSolvedProblems()
   }, [fetchSolvedProblems])
+
+  // Check if screen is large enough to show the left panel (>= 1024px)
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024)
+    }
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   // Memoized filtered problems
   const filteredProblems = useMemo(() => {
@@ -326,34 +366,42 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
   }, [currentPage])
 
   return (
-    <div className="space-y-8 -mx-6 px-6 sm:-mx-8 sm:px-8 lg:-mx-16 lg:px-16 xl:-mx-20 xl:px-20 overflow-x-hidden">
+    <>
+      <ProblemsGuestGuide
+        isMobile={isMobile}
+        onOpenFilters={focusFilters}
+      />
+      <div className="space-y-8 -mx-6 px-6 sm:-mx-8 sm:px-8 lg:-mx-16 lg:px-16 xl:-mx-20 xl:px-20 overflow-x-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
         <p>
           Se afișează {filteredProblems.length} din {problems.length} probleme
         </p>
-        {isMobile && (
+        {(isMobile || !isLargeScreen) && (
           <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
             <SheetContent
               side="right"
               className="w-full border-l border-white/10 bg-[#141414] text-white sm:max-w-md"
             >
-              <SheetHeader className="mb-4 text-left">
-                <SheetTitle className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">
-                  Filtre
-                </SheetTitle>
-              </SheetHeader>
-              <ProblemFilters
-              onFilterChange={(newFilters) => {
-                handleFilterChange(newFilters)
-              }}
-                totalProblems={problems.length}
-                filteredCount={filteredProblems.length}
-                onClosePanel={() => setMobileFiltersOpen(false)}
-              />
+                <div id="catalog-filters-mobile" className="h-full overflow-y-auto">
+                  <SheetHeader className="mb-4 text-left">
+                    <SheetTitle className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">
+                      Filtre
+                    </SheetTitle>
+                  </SheetHeader>
+                  <ProblemFilters
+                    onFilterChange={(newFilters) => {
+                      handleFilterChange(newFilters)
+                    }}
+                    totalProblems={problems.length}
+                    filteredCount={filteredProblems.length}
+                    onClosePanel={() => setMobileFiltersOpen(false)}
+                  />
+                </div>
             </SheetContent>
             <Button
               variant="outline"
               size="sm"
+              id="guide-mobile-filters-button"
               className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-white/80 transition hover:bg-white/15 hover:text-white"
               onClick={() => setMobileFiltersOpen(true)}
             >
@@ -367,7 +415,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
       <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] lg:items-start">
         {!isMobile && (
           <div className="hidden lg:block">
-            <div className="sticky top-28">
+            <div id="catalog-filters-panel" className="sticky top-28">
               <ProblemFilters
                 onFilterChange={handleFilterChange}
                 totalProblems={problems.length}
@@ -386,7 +434,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
             </div>
           ) : visibleProblems.length > 0 ? (
             <>
-              <div className="mb-8 grid gap-5 md:grid-cols-2">
+              <div id="guide-problems-grid" className="mb-8 grid gap-5 md:grid-cols-2">
                 {visibleProblems.map((problem) => {
                   // TEMPORARY: Allow all problems when flag is enabled
                   const canAccess = ALLOW_ALL_PROBLEMS_TEMPORARILY
@@ -572,7 +620,8 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

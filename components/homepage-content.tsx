@@ -59,17 +59,17 @@ export function HomePageContent() {
                 <span className="block">meets intelligent learning.</span>
               </h1>
               <p className="scroll-animate-fade-up animate-delay-200 text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed">
-                The next-generation educational platform powered by AI and human curiosity.
+                Înveți fizică și informatică cu AI, exerciții interactive și progres salvat.
               </p>
               
               {/* Action buttons */}
               <div className="scroll-animate-fade-up animate-delay-400 flex flex-row gap-4 justify-center items-center lg:justify-start lg:items-start">
-                <Link href="/cursuri" className="flex justify-center">
+                <Link href="/probleme" className="flex justify-center">
                   <Button 
                     size="lg" 
                     className="bg-white text-black hover:bg-gray-200 transition-all duration-300 flex items-center gap-2"
                   >
-                    Start Learning
+                    Rezolvă o problemă
                   </Button>
                 </Link>
                 <Link href="/insight/chat" className="group relative inline-flex">
@@ -87,7 +87,7 @@ export function HomePageContent() {
                   >
                     {/* Gradient text on hover */}
                     <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300">
-                      Try Insight
+                      Învață cu AI
                     </span>
                   </Button>
                 </Link>

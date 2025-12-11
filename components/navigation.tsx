@@ -403,7 +403,8 @@ export function Navigation() {
   const isHomepage = pathname === '/'
   const isInsightRoute = pathname?.startsWith('/insight') ?? false
   const isSketchRoute = pathname?.startsWith('/sketch') ?? false
-  const isTransparentRoute = isHomepage
+  const isRegisterRoute = pathname === '/register'
+  const isTransparentRoute = isHomepage || isRegisterRoute
   const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
   // On mobile, navbar should never be transparent when at the top of the screen
   const isTransparent = isTransparentRoute && !isScrolled && !isMobile
@@ -510,15 +511,8 @@ export function Navigation() {
                 >
                   <div className={`rounded-lg border ${navTheme.dropdownBorder} ${navTheme.dropdownBackground} shadow-lg overflow-hidden`}>
                     <div className="py-2">
-                      <button onClick={() => goToCoursesWith('Toate')} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
-                        <BookOpen className="h-4 w-4 text-blue-400" />
-                        Toate cursurile
-                      </button>
-                      <div className="h-px bg-gray-700" />
                       <button onClick={() => goToCoursesWith('a 9-a')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">{classEmoji['a 9-a']} Clasa a 9-a</button>
-                      <button disabled aria-disabled="true" className="block w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed">{classEmoji['a 10-a']} Clasa a 10-a (în curând)</button>
-                      <button disabled aria-disabled="true" className="block w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed">{classEmoji['a 11-a']} Clasa a 11-a (în curând)</button>
-                      <button disabled aria-disabled="true" className="block w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed">{classEmoji['a 12-a']} Clasa a 12-a (în curând)</button>
+                      <button onClick={() => goToCoursesWith('a 10-a')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">{classEmoji['a 10-a']} Clasa a 10-a</button>
                     </div>
                   </div>
                 </div>
