@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter } from "next/navigation";
 
-const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST || "localhost:1999";
+const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST || "127.0.0.1:1999";
 
 interface UserInfo {
   connectionId: string;
@@ -30,7 +30,7 @@ interface UserInfo {
 // These include camera position, zoom, cursor state, etc.
 const EPHEMERAL_TYPES = new Set([
   'instance',
-  'instance_page_state', 
+  'instance_page_state',
   'instance_presence',
   'camera',
 ]);
@@ -58,7 +58,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
   const connectionStatusRef = useRef<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [showGuestWelcome, setShowGuestWelcome] = useState(false);
   const [welcomeSlide, setWelcomeSlide] = useState(0);
-  
+
   // Compute effective current page ID - ensures graph button appears even when currentPageId isn't set yet
   // Using useMemo to recalculate when editor, currentPageId, or store changes
   const effectiveCurrentPageId = useMemo(() => {
@@ -149,7 +149,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       room: roomId,
       party: "main",
     });
-    
+
     socketRef.current = socket;
 
     const onOpen = () => {
@@ -162,7 +162,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       setConnectionStatus('connected');
       connectionStatusRef.current = 'connected';
       setConnectionError(null);
-      
+
       // Send user info to server if user is logged in
       if (user && socket) {
         const userInfo = {
@@ -185,7 +185,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = null;
       }
-      
+
       // Silently handle disconnection - don't show errors to user
       setConnectionStatus('disconnected');
       connectionStatusRef.current = 'disconnected';
@@ -194,12 +194,15 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
     const onError = (error: Event | Error) => {
       // Silently log errors - don't show them to user
       console.error("[PlanckSketch] PartySocket error:", error);
+      if ('message' in (error as any)) {
+        console.error("Details:", (error as any).message);
+      }
       // Clear timeout
       if (connectionTimeoutRef.current) {
         clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = null;
       }
-      
+
       // Silently handle errors - don't set error status
       setConnectionStatus('disconnected');
       connectionStatusRef.current = 'disconnected';
@@ -219,12 +222,46 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           store.mergeRemoteChanges(() => {
             store.put(filteredPayload);
           });
+
+          // Hack/Fix: If the server init payload didn't contain any pages (e.g. this is a fresh room),
+          // we must sync our local default pages/document to the server.
+          // Otherwise, shapes we draw might be associated with a page not known to the server.
+          // This happens because the initial page creation is a 'system' change, not 'user', so it's not broadcasted by the change listener.
+          const hasPages = filteredPayload.some(r => r.typeName === 'page');
+
+          if (!hasPages) {
+            console.log("[PlanckSketch] No pages in server init, syncing local state...");
+            // We need to send our current page and document records
+            const records = store.allRecords();
+            const recordsToSync: Record<string, any> = {};
+            let hasSyncData = false;
+
+            for (const record of records) {
+              if ((record.typeName === 'page' || record.typeName === 'document') && !isEphemeralRecord(record)) {
+                recordsToSync[record.id] = record;
+                hasSyncData = true;
+              }
+            }
+
+            if (hasSyncData) {
+              const updateMsg = {
+                type: "update",
+                payload: {
+                  added: recordsToSync,
+                  updated: {},
+                  removed: {}
+                }
+              };
+              socket.send(JSON.stringify(updateMsg));
+              console.log("[PlanckSketch] Uploaded initial page structure to server");
+            }
+          }
         } else if (msg.type === "update") {
           const { added, updated, removed } = msg.payload;
-          
+
           // Filter out ephemeral records from updates
           // Each user maintains their own camera position, zoom level, etc.
-          const filteredAdded = added 
+          const filteredAdded = added
             ? Object.values(added).filter((record: any) => !isEphemeralRecord(record)) as TLRecord[]
             : [];
           const filteredUpdated = updated
@@ -233,7 +270,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           const filteredRemoved = removed
             ? Object.keys(removed).filter((id: string) => !isEphemeralRecord(removed[id]))
             : [];
-          
+
           const count = filteredAdded.length + filteredUpdated.length;
           setLastEvent(`Recv: ${count} changes`);
 
@@ -414,7 +451,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
 
       const handlePointerDown = (event: PointerEvent) => {
         const isTouch = event.pointerType === 'touch' || event.pointerType === 'pen';
-        
+
         if (isTouch && isDrawingToolActive()) {
           return;
         }
@@ -541,7 +578,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
   // Check if user is not authenticated and show guest welcome card
   useEffect(() => {
     if (!roomId) return;
-    
+
     // If user is authenticated, don't show the card
     if (user) {
       setShowGuestWelcome(false);
@@ -591,19 +628,19 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       {/* Navbar */}
       <WhiteboardNavbar roomId={roomId} connectedUsers={connectedUsers} />
-      
+
       {/* Main Editor Area - Flex Grow to fill available space */}
       <div className="flex-1 relative min-w-0 flex overflow-hidden">
         <div className="flex-1 relative h-full min-w-0">
-        <div ref={containerRef} className="absolute inset-0">
-          <Tldraw 
-            store={store}
-            licenseKey="tldraw-2026-02-28/WyJmWVRrODVnNSIsWyIqIl0sMTYsIjIwMjYtMDItMjgiXQ.LfYobRlq42wKRiuYggl0DPR+eDYcMWDlRyU0d1RmYpLmMclP+vlJhHz4AGYtmcuQT39nYGP0ywhBwliKp3f4pg"
-            onMount={(editor) => {
+          <div ref={containerRef} className="absolute inset-0">
+            <Tldraw
+              store={store}
+              licenseKey="tldraw-2026-02-28/WyJmWVRrODVnNSIsWyIqIl0sMTYsIjIwMjYtMDItMjgiXQ.LfYobRlq42wKRiuYggl0DPR+eDYcMWDlRyU0d1RmYpLmMclP+vlJhHz4AGYtmcuQT39nYGP0ywhBwliKp3f4pg"
+              onMount={(editor) => {
                 setEditor(editor);
                 setCurrentPageId(editor.getCurrentPageId());
                 setEditorReadyVersion((version) => version + 1);
-                
+
                 // Set default pen size to smallest ('s')
                 try {
                   const currentSize = editor.getStyleForNextShape(DefaultSizeStyle);
@@ -613,138 +650,138 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
                 } catch (err) {
                   console.warn('[PlanckSketch] Failed to set default pen size:', err);
                 }
+              }}
+            />
+          </div>
+
+          {/* Page Navigator */}
+          <PageNavigator
+            editor={editor}
+            store={store}
+            currentPageId={currentPageId}
+            onPageChange={(pageId) => {
+              if (editor) {
+                editor.setCurrentPage(pageId as any);
+                setCurrentPageId(pageId);
+              }
             }}
           />
-        </div>
-        
-        {/* Page Navigator */}
-        <PageNavigator
-          editor={editor}
-          store={store}
-          currentPageId={currentPageId}
-          onPageChange={(pageId) => {
-            if (editor) {
-               editor.setCurrentPage(pageId);
-               setCurrentPageId(pageId);
-            }
-          }}
-        />
 
-        {/* Mobile Graph Toggle */}
-        {effectiveCurrentPageId && (
-          <div className="sm:hidden absolute top-4 right-4 z-40">
-            <Button
-              size="icon"
-              variant="secondary"
-              onClick={() => setIsMathGraphOpen(true)}
-              className="rounded-full bg-white/90 text-gray-900 shadow-lg border border-gray-200 hover:bg-white"
-              aria-label={isMathGraphOpen ? "Deschide graficul matematic" : "Deschide graficul matematic"}
-            >
-              <Calculator className="h-5 w-5" />
-            </Button>
+          {/* Mobile Graph Toggle */}
+          {effectiveCurrentPageId && (
+            <div className="sm:hidden absolute top-4 right-4 z-40">
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={() => setIsMathGraphOpen(true)}
+                className="rounded-full bg-white/90 text-gray-900 shadow-lg border border-gray-200 hover:bg-white"
+                aria-label={isMathGraphOpen ? "Deschide graficul matematic" : "Deschide graficul matematic"}
+              >
+                <Calculator className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {/* Math Graph Button */}
+          {effectiveCurrentPageId && (
+            <div className="hidden sm:block absolute bottom-16 right-4 z-50">
+              <Button
+                onClick={() => setIsMathGraphOpen(!isMathGraphOpen)}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                size="lg"
+                title={isMathGraphOpen ? "Închide graficare matematică" : "Deschide graficare matematică"}
+              >
+                <Calculator className="h-5 w-5 mr-2" />
+                graph
+              </Button>
+            </div>
+          )}
+
+          {/* Share Button - Bottom Right, below Math Graph Button */}
+          <div className="hidden sm:block absolute bottom-4 right-4 z-50">
+            <ShareButton
+              boardId={roomId}
+              shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/sketch/${roomId}` : `/sketch/${roomId}`}
+            />
           </div>
-        )}
 
-        {/* Math Graph Button */}
-        {effectiveCurrentPageId && (
-          <div className="hidden sm:block absolute bottom-16 right-4 z-50">
-            <Button
-              onClick={() => setIsMathGraphOpen(!isMathGraphOpen)}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-              size="lg"
-              title={isMathGraphOpen ? "Închide graficare matematică" : "Deschide graficare matematică"}
-            >
-              <Calculator className="h-5 w-5 mr-2" />
-              graph
-            </Button>
-          </div>
-        )}
-
-        {/* Share Button - Bottom Right, below Math Graph Button */}
-        <div className="hidden sm:block absolute bottom-4 right-4 z-50">
-          <ShareButton 
-            boardId={roomId} 
-            shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/sketch/${roomId}` : `/sketch/${roomId}`} 
-          />
-        </div>
-
-        {/* Guest Welcome Card */}
-        {showGuestWelcome && (
-          <div className="absolute inset-0 z-40 flex items-start justify-center sm:items-center pointer-events-none px-4 pt-6 sm:pt-0">
-            <div className="w-full max-w-lg bg-white text-gray-900 border border-gray-300 rounded-2xl shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] pointer-events-auto overflow-hidden h-[380px] flex flex-col">
-              <div className="w-full h-28 sm:h-32 bg-gradient-to-r from-gray-200 via-gray-100 to-white relative">
-                <div className="absolute inset-0 bg-[url('/sketch-welcome-placeholder.jpg')] bg-cover bg-center opacity-10" />
-                <div className="absolute inset-0 backdrop-blur-[2px]" />
-                <button
-                  onClick={handleDismissWelcome}
-                  className="absolute top-3 right-3 p-2 rounded-full bg-white/80 text-gray-600 hover:text-gray-900 hover:bg-white"
-                  aria-label="Închide"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex-1 p-6 space-y-4 flex flex-col">
-                <div className="mb-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-[0.3em]">
-                    {guestWelcomeSlides[welcomeSlide].badge}
-                  </p>
-                  <h2 className="text-2xl font-semibold mt-1">{guestWelcomeSlides[welcomeSlide].title}</h2>
-                </div>
-
-                <div className="flex-1">
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {guestWelcomeSlides[welcomeSlide].description}
-                  </p>
-                </div>
-
-                <div className="mt-auto flex items-center justify-between">
+          {/* Guest Welcome Card */}
+          {showGuestWelcome && (
+            <div className="absolute inset-0 z-40 flex items-start justify-center sm:items-center pointer-events-none px-4 pt-6 sm:pt-0">
+              <div className="w-full max-w-lg bg-white text-gray-900 border border-gray-300 rounded-2xl shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] pointer-events-auto overflow-hidden h-[380px] flex flex-col">
+                <div className="w-full h-28 sm:h-32 bg-gradient-to-r from-gray-200 via-gray-100 to-white relative">
+                  <div className="absolute inset-0 bg-[url('/sketch-welcome-placeholder.jpg')] bg-cover bg-center opacity-10" />
+                  <div className="absolute inset-0 backdrop-blur-[2px]" />
                   <button
-                    className="p-2 text-gray-400 hover:text-gray-900 disabled:opacity-30"
-                    disabled={welcomeSlide === 0}
-                    onClick={() => setWelcomeSlide((prev) => Math.max(0, prev - 1))}
-                    aria-label="Slide anterior"
+                    onClick={handleDismissWelcome}
+                    className="absolute top-3 right-3 p-2 rounded-full bg-white/80 text-gray-600 hover:text-gray-900 hover:bg-white"
+                    aria-label="Închide"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <X className="h-4 w-4" />
                   </button>
-                  <div className="flex items-center gap-3">
-                    {guestWelcomeSlides.map((_, index) => (
-                      <button
-                        key={index}
-                        className={cn(
-                          'h-2.5 w-2.5 rounded-full bg-gray-300 transition-transform',
-                          index === welcomeSlide ? 'bg-gray-900 scale-125' : ''
-                        )}
-                        onClick={() => setWelcomeSlide(index)}
-                        aria-label={`Slide ${index + 1}`}
-                      />
-                    ))}
+                </div>
+                <div className="flex-1 p-6 space-y-4 flex flex-col">
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-[0.3em]">
+                      {guestWelcomeSlides[welcomeSlide].badge}
+                    </p>
+                    <h2 className="text-2xl font-semibold mt-1">{guestWelcomeSlides[welcomeSlide].title}</h2>
                   </div>
-                  {welcomeSlide === guestWelcomeSlides.length - 1 ? (
-                    <Button
-                      className="bg-gray-900 text-white hover:bg-gray-800"
-                      onClick={() => {
-                        handleDismissWelcome();
-                        router.push('/register?redirect=/sketch/boards');
-                      }}
-                    >
-                      Creează cont
-                    </Button>
-                  ) : (
+
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {guestWelcomeSlides[welcomeSlide].description}
+                    </p>
+                  </div>
+
+                  <div className="mt-auto flex items-center justify-between">
                     <button
-                      className="p-2 text-gray-400 hover:text-gray-900"
-                      onClick={() =>
-                        setWelcomeSlide((prev) => Math.min(guestWelcomeSlides.length - 1, prev + 1))
-                      }
-                      aria-label="Slide următor"
+                      className="p-2 text-gray-400 hover:text-gray-900 disabled:opacity-30"
+                      disabled={welcomeSlide === 0}
+                      onClick={() => setWelcomeSlide((prev) => Math.max(0, prev - 1))}
+                      aria-label="Slide anterior"
                     >
-                      <ArrowRight className="h-5 w-5" />
+                      <ArrowLeft className="h-5 w-5" />
                     </button>
-                  )}
+                    <div className="flex items-center gap-3">
+                      {guestWelcomeSlides.map((_, index) => (
+                        <button
+                          key={index}
+                          className={cn(
+                            'h-2.5 w-2.5 rounded-full bg-gray-300 transition-transform',
+                            index === welcomeSlide ? 'bg-gray-900 scale-125' : ''
+                          )}
+                          onClick={() => setWelcomeSlide(index)}
+                          aria-label={`Slide ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                    {welcomeSlide === guestWelcomeSlides.length - 1 ? (
+                      <Button
+                        className="bg-gray-900 text-white hover:bg-gray-800"
+                        onClick={() => {
+                          handleDismissWelcome();
+                          router.push('/register?redirect=/sketch/boards');
+                        }}
+                      >
+                        Creează cont
+                      </Button>
+                    ) : (
+                      <button
+                        className="p-2 text-gray-400 hover:text-gray-900"
+                        onClick={() =>
+                          setWelcomeSlide((prev) => Math.min(guestWelcomeSlides.length - 1, prev + 1))
+                        }
+                        aria-label="Slide următor"
+                      >
+                        <ArrowRight className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
 
         {/* Math Graph Panel - Sits alongside editor in flex container (Desktop) */}
@@ -756,13 +793,13 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
             )}
           >
             <div className="w-[620px] lg:w-[720px] h-full flex flex-col">
-               <MathGraphPanel
-                  boardId={roomId}
-                  pageId={effectiveCurrentPageId}
-                  open={isMathGraphOpen}
-                  onOpenChange={setIsMathGraphOpen}
-                  socket={socketRef.current}
-                />
+              <MathGraphPanel
+                boardId={roomId}
+                pageId={effectiveCurrentPageId}
+                open={isMathGraphOpen}
+                onOpenChange={setIsMathGraphOpen}
+                socket={socketRef.current}
+              />
             </div>
           </div>
         )}

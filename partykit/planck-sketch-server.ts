@@ -26,42 +26,50 @@ interface UserInfo {
 export default class SketchServer implements Party.Server {
   connections: Map<string, Party.Connection> = new Map();
   userInfo: Map<string, UserInfo> = new Map(); // connectionId -> UserInfo
+  records: Record<string, any> | null = null; // In-memory cache of records
 
   constructor(readonly room: Party.Room) { }
 
   async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
-    console.log(`[PartyKit] Connection established: ${conn.id} in room ${this.room.id}`);
+    try {
+      console.log(`[PartyKit] Connection established: ${conn.id} in room ${this.room.id}`);
 
-    // Add connection to map
-    this.connections.set(conn.id, conn);
+      // Add connection to map
+      this.connections.set(conn.id, conn);
 
-    // Initialize user info with connection ID (will be updated when user sends their info)
-    this.userInfo.set(conn.id, {
-      connectionId: conn.id,
-    });
+      // Initialize user info with connection ID (will be updated when user sends their info)
+      this.userInfo.set(conn.id, {
+        connectionId: conn.id,
+      });
 
-    // Load state from storage
-    const allRecords = (await this.room.storage.get<Record<string, any>>("records")) || {};
-    const totalRecords = Object.keys(allRecords).length;
-    console.log(`[PartyKit] Loading ${totalRecords} records from storage for room ${this.room.id}`);
-
-    // Filter out ephemeral records before sending to new client
-    // Each user maintains their own camera position, zoom level, etc.
-    const filteredRecords: Record<string, any> = {};
-    for (const [id, record] of Object.entries(allRecords)) {
-      if (!isEphemeralRecord(record)) {
-        filteredRecords[id] = record;
+      // Load state from storage if not in memory
+      if (!this.records) {
+        this.records = (await this.room.storage.get<Record<string, any>>("records")) || {};
+        console.log(`[PartyKit] Loaded ${Object.keys(this.records).length} records from storage`);
       }
+
+      const allRecords = this.records!;
+      const totalRecords = Object.keys(allRecords).length;
+
+      // Filter out ephemeral records before sending to new client
+      const filteredRecords: Record<string, any> = {};
+      for (const [id, record] of Object.entries(allRecords)) {
+        if (!isEphemeralRecord(record)) {
+          filteredRecords[id] = record;
+        }
+      }
+
+      const filteredCount = Object.keys(filteredRecords).length;
+      console.log(`[PartyKit] Sending ${filteredCount} non-ephemeral records to client ${conn.id} in room ${this.room.id}`);
+
+      // Send initial state to client (without ephemeral records)
+      conn.send(JSON.stringify({ type: "init", payload: filteredRecords }));
+
+      // Broadcast updated user list to all clients
+      this.broadcastPresence();
+    } catch (error) {
+      console.error(`[PartyKit] Error in onConnect for ${conn.id}:`, error);
     }
-
-    const filteredCount = Object.keys(filteredRecords).length;
-    console.log(`[PartyKit] Sending ${filteredCount} non-ephemeral records to client ${conn.id} in room ${this.room.id}`);
-
-    // Send initial state to client (without ephemeral records)
-    conn.send(JSON.stringify({ type: "init", payload: filteredRecords }));
-
-    // Broadcast updated user list to all clients
-    this.broadcastPresence();
   }
 
   async onClose(conn: Party.Connection) {
@@ -124,7 +132,7 @@ export default class SketchServer implements Party.Server {
           // Load functions from storage
           const functionsKey = `functions-${pageId}`;
           const functions = (await this.room.storage.get<Array<any>>(functionsKey)) || [];
-          
+
           // Send initial functions to requester
           sender.send(JSON.stringify({
             type: "function-init",
@@ -164,59 +172,53 @@ export default class SketchServer implements Party.Server {
         // Broadcast to all other clients (exclude sender)
         this.room.broadcast(message, [sender.id]);
 
-        // Update storage (but skip ephemeral records)
-        // Each user's camera position, zoom, and cursor state should NOT be persisted
+        // Updates records in memory and persist
         const { added, updated, removed } = data.payload;
-        
-        // Use a transaction-like approach: read, modify, write atomically
-        // This ensures we don't lose data from concurrent updates
-        try {
-          const records = (await this.room.storage.get<Record<string, any>>("records")) || {};
-          let hasChanges = false;
 
-          if (added) {
-            for (const id in added) {
-              const record = added[id];
-              // Skip ephemeral records - don't store camera, instance states, etc.
-              if (!isEphemeralRecord(record)) {
-                records[id] = record;
-                hasChanges = true;
-              }
+        // Ensure records are loaded
+        if (!this.records) {
+          this.records = (await this.room.storage.get<Record<string, any>>("records")) || {};
+        }
+
+        let hasChanges = false;
+        const records = this.records!;
+
+        if (added) {
+          for (const id in added) {
+            const record = added[id];
+            if (!isEphemeralRecord(record)) {
+              records[id] = record;
+              hasChanges = true;
             }
           }
+        }
 
-          if (updated) {
-            for (const id in updated) {
-              const record = updated[id];
-              // Skip ephemeral records - don't store camera, instance states, etc.
-              if (!isEphemeralRecord(record)) {
-                records[id] = record;
-                hasChanges = true;
-              }
+        if (updated) {
+          for (const id in updated) {
+            const record = updated[id];
+            if (!isEphemeralRecord(record)) {
+              records[id] = record;
+              hasChanges = true;
             }
           }
+        }
 
-          if (removed) {
-            for (const id in removed) {
-              const record = removed[id];
-              // Skip ephemeral records
-              if (!isEphemeralRecord(record)) {
-                delete records[id];
-                hasChanges = true;
-              }
+        if (removed) {
+          for (const id in removed) {
+            const record = removed[id];
+            if (!isEphemeralRecord(record)) {
+              delete records[id];
+              hasChanges = true;
             }
           }
+        }
 
-          if (hasChanges) {
-            // Save back to storage atomically
-            // This ensures all records are persisted together
-            await this.room.storage.put("records", records);
-            console.log(`[PartyKit] Saved ${Object.keys(records).length} records to storage for room ${this.room.id}`);
-          }
-        } catch (error) {
-          console.error(`[PartyKit] Error saving records to storage for room ${this.room.id}:`, error);
-          // Don't throw - we've already broadcasted the update, so clients are in sync
-          // Storage failure shouldn't break the real-time sync
+        if (hasChanges) {
+          // Save back to storage
+          // Since we are single-threaded per room, this is safe from race conditions within this room
+          // (assuming no await expressions between reading 'records' and updating it, which we handled by using in-memory reference)
+          await this.room.storage.put("records", records);
+          // console.log(`[PartyKit] Serialized ${Object.keys(records).length} records to storage`);
         }
       }
     } catch (e) {

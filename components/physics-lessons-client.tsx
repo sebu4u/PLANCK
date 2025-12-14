@@ -10,6 +10,7 @@ import { slugify } from '@/lib/slug'
 // Lazy load heavy components
 const PhysicsSidebar = lazy(() => import('@/components/physics-sidebar').then(m => ({ default: m.PhysicsSidebar })))
 const LessonViewer = lazy(() => import('@/components/lesson-viewer').then(m => ({ default: m.LessonViewer })))
+import { WorkInProgressCard } from '@/components/work-in-progress-card'
 
 interface PhysicsLessonsClientProps {
   grades: Grade[]
@@ -404,6 +405,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
 
       {/* Main Content Area */}
       <div className="flex-1 lg:ml-0">
+        <WorkInProgressCard />
         <Suspense fallback={<LessonViewerSkeleton />}>
           {isLessonLoading ? (
             <LessonViewerSkeleton />

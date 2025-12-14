@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { ProblemCardSkeleton } from "@/components/problems/problem-card-skeleton"
-import { ProblemsGuestGuide } from "@/components/problems-guest-guide"
+
 
 // Lazy load ProblemCard component
 const ProblemCard = lazy(() => import("@/components/problem-card").then(module => ({ default: module.ProblemCard })))
@@ -79,40 +79,13 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
   const [loading, setLoading] = useState(!initialProblems || initialProblems.length === 0)
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
   const [visibleProblems, setVisibleProblems] = useState<Problem[]>([])
-  const focusFilters = useCallback(() => {
-    if (isMobile || !isLargeScreen) {
-      setMobileFiltersOpen(true)
-    }
-    if (typeof document === "undefined") return
-    const targetId = (isMobile || !isLargeScreen) ? "catalog-filters-mobile" : "catalog-filters-panel"
-    const element = document.getElementById(targetId)
-    if (!element) return
 
-    try {
-      element.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" })
-    } catch {
-      // ignore scroll errors
-    }
-
-    try {
-      element.animate(
-        [
-          { boxShadow: "0 0 0 0 rgba(94, 234, 212, 0.0)" },
-          { boxShadow: "0 0 0 12px rgba(94, 234, 212, 0.18)" },
-          { boxShadow: "0 0 0 0 rgba(94, 234, 212, 0.0)" },
-        ],
-        { duration: 800, easing: "ease-out" }
-      )
-    } catch {
-      // ignore animation errors in unsupported browsers
-    }
-  }, [isMobile, isLargeScreen])
 
   // Memoized fetch function with caching
   const fetchProblems = useCallback(async () => {
     const cacheKey = 'all-problems'
     const cached = problemsCache.get(cacheKey)
-    
+
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       setProblems(cached.data)
       setLoading(false)
@@ -125,14 +98,14 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
         .from("problems")
         .select("*")
         .order("created_at", { ascending: false })
-      
+
       if (!error && data) {
         // Map numeric class to string for filtering
         const mapped = data.map((problem: any) => ({
           ...problem,
           classString: CLASS_MAP[problem.class] || "Toate"
         }))
-        
+
         // Cache the data
         problemsCache.set(cacheKey, { data: mapped, timestamp: Date.now() })
         setProblems(mapped)
@@ -174,7 +147,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
         .from('solved_problems')
         .select('problem_id')
         .eq('user_id', user.id)
-      
+
       setSolvedProblems(data ? data.map((row: any) => row.problem_id) : [])
     } catch (error) {
       console.error('Error fetching solved problems:', error)
@@ -259,12 +232,12 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
 
   // Memoized sorted problems
   const sortedProblems = useMemo(() => {
-    const noFiltersApplied = 
-      !filters.search && 
-      filters.category === "Toate" && 
-      filters.difficulty === "Toate" && 
-      filters.progress === "Toate" && 
-      filters.class === "Toate" && 
+    const noFiltersApplied =
+      !filters.search &&
+      filters.category === "Toate" &&
+      filters.difficulty === "Toate" &&
+      filters.progress === "Toate" &&
+      filters.class === "Toate" &&
       filters.chapter === "Toate"
 
     const isFreeOnly = isFree && !isPaid
@@ -294,7 +267,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
 
     const difficultyOrder: Record<string, number> = { "Ușor": 1, "Mediu": 2, "Avansat": 3 }
     const hasAnyYoutube = filteredProblems.some((p) => typeof p.youtube_url === 'string' && p.youtube_url.trim() !== '')
-    
+
     return [...filteredProblems].sort((a, b) => {
       // 1) Pentru utilizatorii Free: problemele din rotația lunară ies primele
       if (isFreeOnly) {
@@ -334,7 +307,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
     const totalPages = Math.ceil(sortedProblems.length / PROBLEMS_PER_PAGE)
     const startIndex = (currentPage - 1) * PROBLEMS_PER_PAGE
     const paginatedProblems = sortedProblems.slice(startIndex, startIndex + PROBLEMS_PER_PAGE)
-    
+
     return {
       totalPages,
       paginatedProblems,
@@ -367,22 +340,19 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
 
   return (
     <>
-      <ProblemsGuestGuide
-        isMobile={isMobile}
-        onOpenFilters={focusFilters}
-      />
+
       <div className="space-y-8 -mx-6 px-6 sm:-mx-8 sm:px-8 lg:-mx-16 lg:px-16 xl:-mx-20 xl:px-20 overflow-x-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-        <p>
-          Se afișează {filteredProblems.length} din {problems.length} probleme
-        </p>
-        {(isMobile || !isLargeScreen) && (
-          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-            <SheetContent
-              side="right"
-              className="w-full border-l border-white/10 bg-[#141414] text-white sm:max-w-md"
-            >
-                <div id="catalog-filters-mobile" className="h-full overflow-y-auto">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
+          <p>
+            Se afișează {filteredProblems.length} din {problems.length} probleme
+          </p>
+          {(isMobile || !isLargeScreen) && (
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetContent
+                side="right"
+                className="w-full border-l border-white/10 bg-[#141414] text-white sm:max-w-md"
+              >
+                <div className="h-full overflow-y-auto">
                   <SheetHeader className="mb-4 text-left">
                     <SheetTitle className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">
                       Filtre
@@ -397,229 +367,228 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
                     onClosePanel={() => setMobileFiltersOpen(false)}
                   />
                 </div>
-            </SheetContent>
-            <Button
-              variant="outline"
-              size="sm"
-              id="guide-mobile-filters-button"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-white/80 transition hover:bg-white/15 hover:text-white"
-              onClick={() => setMobileFiltersOpen(true)}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtre
-            </Button>
-          </Sheet>
-        )}
-      </div>
-
-      <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] lg:items-start">
-        {!isMobile && (
-          <div className="hidden lg:block">
-            <div id="catalog-filters-panel" className="sticky top-28">
-              <ProblemFilters
-                onFilterChange={handleFilterChange}
-                totalProblems={problems.length}
-                filteredCount={filteredProblems.length}
-              />
-            </div>
-          </div>
-        )}
-
-        <div>
-          {loading ? (
-            <div className="mb-8 grid gap-5 md:grid-cols-2">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <ProblemCardSkeleton key={index} />
-              ))}
-            </div>
-          ) : visibleProblems.length > 0 ? (
-            <>
-              <div id="guide-problems-grid" className="mb-8 grid gap-5 md:grid-cols-2">
-                {visibleProblems.map((problem) => {
-                  // TEMPORARY: Allow all problems when flag is enabled
-                  const canAccess = ALLOW_ALL_PROBLEMS_TEMPORARILY
-                    ? true
-                    : !isFree || isPaid || monthlyFreeSet.has(problem.id)
-                  const isLocked = ALLOW_ALL_PROBLEMS_TEMPORARILY
-                    ? false
-                    : isFree && !canAccess
-                  return (
-                    <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
-                      <ProblemCard
-                        problem={problem}
-                        solved={solvedProblems.includes(problem.id)}
-                        isLocked={isLocked}
-                      />
-                    </Suspense>
-                  )
-                })}
-              </div>
-              <div className="mt-8 flex justify-center gap-4">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                    {(() => {
-                      const pages = [] as JSX.Element[]
-                      const neighbor = 1
-                      const { totalPages } = paginationData
-
-                      if (totalPages <= 3) {
-                        for (let i = 1; i <= totalPages; i++) {
-                          pages.push(
-                            <PaginationItem key={i}>
-                              <Button
-                                variant={i === currentPage ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(i)}
-                                className={cn(
-                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
-                                  i === currentPage && "border-white bg-white text-black hover:bg-white"
-                                )}
-                              >
-                                {i}
-                              </Button>
-                            </PaginationItem>
-                          )
-                        }
-                      } else {
-                        if (currentPage > 1 + neighbor + 1) {
-                          pages.push(
-                            <PaginationItem key={1}>
-                              <Button
-                                variant={1 === currentPage ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(1)}
-                                className={cn(
-                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
-                                  1 === currentPage && "border-white bg-white text-black hover:bg-white"
-                                )}
-                              >
-                                1
-                              </Button>
-                            </PaginationItem>
-                          )
-                          pages.push(<PaginationEllipsis key="start-ellipsis" />)
-                        } else {
-                          for (let i = 1; i < Math.max(2, currentPage - neighbor); i++) {
-                            pages.push(
-                              <PaginationItem key={i}>
-                                <Button
-                                  variant={i === currentPage ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setCurrentPage(i)}
-                                  className={cn(
-                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
-                                    i === currentPage && "border-white bg-white text-black hover:bg-white"
-                                  )}
-                                >
-                                  {i}
-                                </Button>
-                              </PaginationItem>
-                            )
-                          }
-                        }
-                        for (let i = Math.max(1, currentPage - neighbor); i <= Math.min(totalPages, currentPage + neighbor); i++) {
-                          if (i === 1 || i === totalPages) continue
-                          pages.push(
-                            <PaginationItem key={i}>
-                              <Button
-                                variant={i === currentPage ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(i)}
-                                className={cn(
-                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
-                                  i === currentPage && "border-white bg-white text-black hover:bg-white"
-                                )}
-                              >
-                                {i}
-                              </Button>
-                            </PaginationItem>
-                          )
-                        }
-                        if (currentPage < totalPages - neighbor - 1) {
-                          pages.push(<PaginationEllipsis key="end-ellipsis" />)
-                          pages.push(
-                            <PaginationItem key={totalPages}>
-                              <Button
-                                variant={totalPages === currentPage ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(totalPages)}
-                                className={cn(
-                                  "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
-                                  totalPages === currentPage && "border-white bg-white text-black hover:bg-white"
-                                )}
-                              >
-                                {totalPages}
-                              </Button>
-                            </PaginationItem>
-                          )
-                        } else {
-                          for (let i = currentPage + neighbor + 1; i <= totalPages; i++) {
-                            pages.push(
-                              <PaginationItem key={i}>
-                                <Button
-                                  variant={i === currentPage ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setCurrentPage(i)}
-                                  className={cn(
-                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
-                                    i === currentPage && "border-white bg-white text-black hover:bg-white"
-                                  )}
-                                >
-                                  {i}
-                                </Button>
-                              </PaginationItem>
-                            )
-                          }
-                        }
-                      }
-                      return pages
-                    })()}
-                    <PaginationItem>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => Math.min(paginationData.totalPages, p + 1))}
-                        disabled={currentPage === paginationData.totalPages}
-                        className="rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-8 py-12 text-center text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-              <p className="text-lg text-white">Nu s-au găsit probleme care să corespundă filtrelor selectate.</p>
+              </SheetContent>
               <Button
-                onClick={() => setFilters({
-                  search: "",
-                  category: "Toate",
-                  difficulty: "Toate",
-                  progress: "Toate",
-                  class: "Toate",
-                  chapter: "Toate",
-                })}
-                className="mt-6 rounded-full border border-white/15 bg-white/[0.1] px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                variant="outline"
+                size="sm"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-white/80 transition hover:bg-white/15 hover:text-white"
+                onClick={() => setMobileFiltersOpen(true)}
               >
-                Resetează filtrele
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtre
               </Button>
-            </div>
+            </Sheet>
           )}
         </div>
-      </div>
+
+        <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] lg:items-start">
+          {!isMobile && (
+            <div className="hidden lg:block">
+              <div className="sticky top-28">
+                <ProblemFilters
+                  onFilterChange={handleFilterChange}
+                  totalProblems={problems.length}
+                  filteredCount={filteredProblems.length}
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            {loading ? (
+              <div className="mb-8 grid gap-5 md:grid-cols-2">
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <ProblemCardSkeleton key={index} />
+                ))}
+              </div>
+            ) : visibleProblems.length > 0 ? (
+              <>
+                <div className="mb-8 grid gap-5 md:grid-cols-2">
+                  {visibleProblems.map((problem) => {
+                    // TEMPORARY: Allow all problems when flag is enabled
+                    const canAccess = ALLOW_ALL_PROBLEMS_TEMPORARILY
+                      ? true
+                      : !isFree || isPaid || monthlyFreeSet.has(problem.id)
+                    const isLocked = ALLOW_ALL_PROBLEMS_TEMPORARILY
+                      ? false
+                      : isFree && !canAccess
+                    return (
+                      <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
+                        <ProblemCard
+                          problem={problem}
+                          solved={solvedProblems.includes(problem.id)}
+                          isLocked={isLocked}
+                        />
+                      </Suspense>
+                    )
+                  })}
+                </div>
+                <div className="mt-8 flex justify-center gap-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      </PaginationItem>
+                      {(() => {
+                        const pages = [] as JSX.Element[]
+                        const neighbor = 1
+                        const { totalPages } = paginationData
+
+                        if (totalPages <= 3) {
+                          for (let i = 1; i <= totalPages; i++) {
+                            pages.push(
+                              <PaginationItem key={i}>
+                                <Button
+                                  variant={i === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(i)}
+                                  className={cn(
+                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                    i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                  )}
+                                >
+                                  {i}
+                                </Button>
+                              </PaginationItem>
+                            )
+                          }
+                        } else {
+                          if (currentPage > 1 + neighbor + 1) {
+                            pages.push(
+                              <PaginationItem key={1}>
+                                <Button
+                                  variant={1 === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(1)}
+                                  className={cn(
+                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                    1 === currentPage && "border-white bg-white text-black hover:bg-white"
+                                  )}
+                                >
+                                  1
+                                </Button>
+                              </PaginationItem>
+                            )
+                            pages.push(<PaginationEllipsis key="start-ellipsis" />)
+                          } else {
+                            for (let i = 1; i < Math.max(2, currentPage - neighbor); i++) {
+                              pages.push(
+                                <PaginationItem key={i}>
+                                  <Button
+                                    variant={i === currentPage ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(i)}
+                                    className={cn(
+                                      "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                      i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                    )}
+                                  >
+                                    {i}
+                                  </Button>
+                                </PaginationItem>
+                              )
+                            }
+                          }
+                          for (let i = Math.max(1, currentPage - neighbor); i <= Math.min(totalPages, currentPage + neighbor); i++) {
+                            if (i === 1 || i === totalPages) continue
+                            pages.push(
+                              <PaginationItem key={i}>
+                                <Button
+                                  variant={i === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(i)}
+                                  className={cn(
+                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                    i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                  )}
+                                >
+                                  {i}
+                                </Button>
+                              </PaginationItem>
+                            )
+                          }
+                          if (currentPage < totalPages - neighbor - 1) {
+                            pages.push(<PaginationEllipsis key="end-ellipsis" />)
+                            pages.push(
+                              <PaginationItem key={totalPages}>
+                                <Button
+                                  variant={totalPages === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(totalPages)}
+                                  className={cn(
+                                    "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                    totalPages === currentPage && "border-white bg-white text-black hover:bg-white"
+                                  )}
+                                >
+                                  {totalPages}
+                                </Button>
+                              </PaginationItem>
+                            )
+                          } else {
+                            for (let i = currentPage + neighbor + 1; i <= totalPages; i++) {
+                              pages.push(
+                                <PaginationItem key={i}>
+                                  <Button
+                                    variant={i === currentPage ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(i)}
+                                    className={cn(
+                                      "rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white",
+                                      i === currentPage && "border-white bg-white text-black hover:bg-white"
+                                    )}
+                                  >
+                                    {i}
+                                  </Button>
+                                </PaginationItem>
+                              )
+                            }
+                          }
+                        }
+                        return pages
+                      })()}
+                      <PaginationItem>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => Math.min(paginationData.totalPages, p + 1))}
+                          disabled={currentPage === paginationData.totalPages}
+                          className="rounded-full border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-8 py-12 text-center text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
+                <p className="text-lg text-white">Nu s-au găsit probleme care să corespundă filtrelor selectate.</p>
+                <Button
+                  onClick={() => setFilters({
+                    search: "",
+                    category: "Toate",
+                    difficulty: "Toate",
+                    progress: "Toate",
+                    class: "Toate",
+                    chapter: "Toate",
+                  })}
+                  className="mt-6 rounded-full border border-white/15 bg-white/[0.1] px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                >
+                  Resetează filtrele
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </>
   )
