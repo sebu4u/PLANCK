@@ -30,10 +30,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate token with Supabase
+    // Validate token with Supabase - pass JWT explicitly for server-side validation
+    // getUser() without params looks for session in storage, which doesn't exist on server
+    // getUser(jwt) validates the JWT directly against Supabase Auth
     const supabase = createServerClientWithToken(accessToken);
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    console.log('[Boards API] Validating token, length:', accessToken?.length);
+    const { data: userData, error: userErr } = await supabase.auth.getUser(accessToken);
+    console.log('[Boards API] getUser result:', {
+      hasUser: !!userData?.user,
+      userId: userData?.user?.id,
+      error: userErr?.message || userErr,
+      errorStatus: (userErr as any)?.status
+    });
     if (userErr || !userData?.user) {
+      logger.error('[Boards API] Auth validation failed:', { error: userErr, hasUserData: !!userData });
       return NextResponse.json(
         { error: 'Sesiune invalidă.' },
         { status: 401 }
@@ -138,9 +148,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ boards: [] });
     }
 
-    // Validate token with Supabase
+    // Validate token with Supabase - pass JWT explicitly for server-side validation
     const supabase = createServerClientWithToken(accessToken);
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    const { data: userData, error: userErr } = await supabase.auth.getUser(accessToken);
     if (userErr || !userData?.user) {
       return NextResponse.json({ boards: [] });
     }

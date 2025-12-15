@@ -75,12 +75,51 @@ export default class SketchServer implements Party.Server {
   async onClose(conn: Party.Connection) {
     console.log(`[PartyKit] Connection closed: ${conn.id} in room ${this.room.id}`);
 
+    // Flush storage on disconnect to ensure persistence
+    if (this.records && Object.keys(this.records).length > 0) {
+      try {
+        await this.room.storage.put("records", this.records);
+        console.log(`[PartyKit] Flushed ${Object.keys(this.records).length} records on disconnect`);
+      } catch (e) {
+        console.error(`[PartyKit] Error flushing on disconnect:`, e);
+      }
+    }
+
     // Remove connection from map
     this.connections.delete(conn.id);
     this.userInfo.delete(conn.id);
 
     // Broadcast updated user list to all clients
     this.broadcastPresence();
+  }
+
+  // Edge-safe periodic persistence via alarm
+  async onStart() {
+    // Set up periodic alarm for persistence backup (edge workers may suspend)
+    try {
+      await this.room.storage.setAlarm(Date.now() + 60000); // 1 minute
+      console.log(`[PartyKit] Initialized persistence alarm for room ${this.room.id}`);
+    } catch (e) {
+      console.warn(`[PartyKit] Failed to set alarm:`, e);
+    }
+  }
+
+  async onAlarm() {
+    // Periodic persistence backup - runs even if no active connections
+    if (this.records && Object.keys(this.records).length > 0) {
+      try {
+        await this.room.storage.put("records", this.records);
+        console.log(`[PartyKit] Alarm: persisted ${Object.keys(this.records).length} records`);
+      } catch (e) {
+        console.error(`[PartyKit] Alarm persistence failed:`, e);
+      }
+    }
+    // Reschedule alarm
+    try {
+      await this.room.storage.setAlarm(Date.now() + 60000);
+    } catch (e) {
+      console.warn(`[PartyKit] Failed to reschedule alarm:`, e);
+    }
   }
 
   private broadcastPresence() {
@@ -113,6 +152,44 @@ export default class SketchServer implements Party.Server {
         this.userInfo.set(sender.id, userInfo);
         // Broadcast updated user list to all clients
         this.broadcastPresence();
+        return;
+      }
+
+      // Handle full snapshot sync (more reliable than incremental updates)
+      if (data.type === "snapshot") {
+        const snapshotRecords = data.payload;
+        if (!snapshotRecords || typeof snapshotRecords !== 'object') {
+          console.warn(`[PartyKit] Invalid snapshot payload from ${sender.id}`);
+          return;
+        }
+
+        // Ensure records are loaded
+        if (!this.records) {
+          this.records = (await this.room.storage.get<Record<string, any>>("records")) || {};
+        }
+
+        let mergedCount = 0;
+        for (const [id, record] of Object.entries(snapshotRecords)) {
+          if (!isEphemeralRecord(record)) {
+            this.records[id] = record;
+            mergedCount++;
+          }
+        }
+
+        // Persist immediately for snapshots (they're often sent before disconnect)
+        await this.room.storage.put("records", this.records);
+        console.log(`[PartyKit] Snapshot sync: merged ${mergedCount} records, total ${Object.keys(this.records).length}`);
+
+        // Broadcast snapshot update to other clients
+        const syncMessage = JSON.stringify({
+          type: "update",
+          payload: {
+            added: snapshotRecords,
+            updated: {},
+            removed: {}
+          }
+        });
+        this.room.broadcast(syncMessage, [sender.id]);
         return;
       }
 

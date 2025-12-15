@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Tldraw, createTLStore, defaultShapeUtils, Editor, TLRecord } from "@tldraw/tldraw";
 import { DefaultSizeStyle } from "@tldraw/tlschema";
 import "@tldraw/tldraw/tldraw.css";
 import PartySocket from "partysocket";
 import { PageNavigator } from "@/components/sketch/PageNavigator";
-import { ShareButton } from "@/components/sketch/ShareButton";
+
 import { Calculator, X, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MathGraphPanel } from "@/components/sketch/MathGraphPanel";
@@ -14,6 +14,7 @@ import { WhiteboardNavbar } from "@/components/sketch/WhiteboardNavbar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST || "127.0.0.1:1999";
 
@@ -40,6 +41,10 @@ const isEphemeralRecord = (record: any): boolean => {
   return EPHEMERAL_TYPES.has(record?.typeName);
 };
 
+const ShareButton = dynamic(() => import("@/components/sketch/ShareButton").then((mod) => mod.ShareButton), {
+  ssr: false,
+});
+
 export default function PlanckSketch({ roomId }: { roomId: string }) {
   const store = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), []);
   const { user, profile } = useAuth();
@@ -58,6 +63,52 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
   const connectionStatusRef = useRef<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [showGuestWelcome, setShowGuestWelcome] = useState(false);
   const [welcomeSlide, setWelcomeSlide] = useState(0);
+
+  // Refs for robust persistence on navigation/close
+  const pendingChangesRef = useRef<{ added: any; updated: any; removed: any } | null>(null);
+  const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSnapshotTimeRef = useRef<number>(0);
+
+  // Helper: Build a non-ephemeral snapshot payload from all store records
+  const buildSnapshotPayload = useCallback(() => {
+    const allRecords = store.allRecords();
+    const payload: Record<string, any> = {};
+    for (const record of allRecords) {
+      if (!isEphemeralRecord(record)) {
+        payload[record.id] = record;
+      }
+    }
+    return payload;
+  }, [store]);
+
+  // Helper: Flush pending changes + send full snapshot
+  const flushAndSyncSnapshot = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+    // 1. Flush any pending incremental changes
+    if (pendingChangesRef.current) {
+      try {
+        socket.send(JSON.stringify({ type: "update", payload: pendingChangesRef.current }));
+        console.log("[PlanckSketch] Flushed pending changes");
+      } catch (e) {
+        console.warn("[PlanckSketch] Failed to flush pending changes:", e);
+      }
+      pendingChangesRef.current = null;
+    }
+
+    // 2. Send full snapshot for reliable persistence
+    try {
+      const snapshot = buildSnapshotPayload();
+      if (Object.keys(snapshot).length > 0) {
+        socket.send(JSON.stringify({ type: "snapshot", payload: snapshot }));
+        console.log(`[PlanckSketch] Sent snapshot sync: ${Object.keys(snapshot).length} records`);
+        lastSnapshotTimeRef.current = Date.now();
+      }
+    } catch (e) {
+      console.warn("[PlanckSketch] Failed to send snapshot:", e);
+    }
+  }, [buildSnapshotPayload]);
 
   // Compute effective current page ID - ensures graph button appears even when currentPageId isn't set yet
   // Using useMemo to recalculate when editor, currentPageId, or store changes
@@ -326,7 +377,11 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         }
 
         if (hasChanges) {
+          // Track pending changes for beforeunload flush
+          pendingChangesRef.current = payload;
           socket.send(JSON.stringify({ type: "update", payload }));
+          // Clear after successful send
+          pendingChangesRef.current = null;
           setLastEvent("Sent update");
         }
       }
@@ -338,6 +393,32 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
         clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = null;
       }
+
+      // Flush pending changes and send final snapshot before closing
+      if (socket.readyState === WebSocket.OPEN) {
+        try {
+          // Flush any pending incremental changes
+          if (pendingChangesRef.current) {
+            socket.send(JSON.stringify({ type: "update", payload: pendingChangesRef.current }));
+            pendingChangesRef.current = null;
+          }
+          // Send final snapshot
+          const allRecords = store.allRecords();
+          const snapshot: Record<string, any> = {};
+          for (const record of allRecords) {
+            if (!isEphemeralRecord(record)) {
+              snapshot[record.id] = record;
+            }
+          }
+          if (Object.keys(snapshot).length > 0) {
+            socket.send(JSON.stringify({ type: "snapshot", payload: snapshot }));
+            console.log(`[PlanckSketch] Sent final snapshot on cleanup: ${Object.keys(snapshot).length} records`);
+          }
+        } catch (e) {
+          console.warn("[PlanckSketch] Error flushing on cleanup:", e);
+        }
+      }
+
       socket.close();
       cleanupListener();
       setConnectionStatus('disconnected');
@@ -361,6 +442,63 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
       console.log("[PlanckSketch] Sent updated user info to server");
     }
   }, [user, profile, connectionStatus]);
+
+  // Robust persistence: beforeunload handler for browser close/navigation
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      console.log("[PlanckSketch] beforeunload triggered - flushing changes");
+      flushAndSyncSnapshot();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [flushAndSyncSnapshot]);
+
+  // Robust persistence: visibilitychange handler for mobile backgrounding
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        console.log("[PlanckSketch] Page hidden - flushing changes");
+        flushAndSyncSnapshot();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [flushAndSyncSnapshot]);
+
+  // Robust persistence: periodic snapshot sync every 30 seconds
+  useEffect(() => {
+    if (connectionStatus !== 'connected') return;
+
+    const intervalId = setInterval(() => {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+      // Only send if there's been activity since last snapshot
+      const timeSinceLastSnapshot = Date.now() - lastSnapshotTimeRef.current;
+      if (timeSinceLastSnapshot < 25000) return; // Skip if recently synced
+
+      const snapshot = buildSnapshotPayload();
+      if (Object.keys(snapshot).length > 0) {
+        try {
+          socket.send(JSON.stringify({ type: "snapshot", payload: snapshot }));
+          lastSnapshotTimeRef.current = Date.now();
+          console.log(`[PlanckSketch] Periodic snapshot sync: ${Object.keys(snapshot).length} records`);
+        } catch (e) {
+          console.warn("[PlanckSketch] Periodic snapshot failed:", e);
+        }
+      }
+    }, 30000);
+
+    snapshotIntervalRef.current = intervalId;
+    return () => {
+      if (snapshotIntervalRef.current) {
+        clearInterval(snapshotIntervalRef.current);
+        snapshotIntervalRef.current = null;
+      }
+    };
+  }, [connectionStatus, buildSnapshotPayload]);
 
   // Listen for page changes via store listener
   useEffect(() => {
