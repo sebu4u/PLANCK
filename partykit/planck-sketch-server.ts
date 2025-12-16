@@ -1,7 +1,6 @@
 import type * as Party from "partykit/server";
 
 // Record types that are ephemeral (per-user, NOT shared between users)
-// These include camera position, zoom, cursor state, etc.
 const EPHEMERAL_TYPES = new Set([
   'instance',
   'instance_page_state',
@@ -44,13 +43,11 @@ export default class SketchServer implements Party.Server {
 
       // Load state from storage if not in memory
       if (!this.records) {
-        this.records = (await this.room.storage.get<Record<string, any>>("records")) || {};
-        console.log(`[PartyKit] Loaded ${Object.keys(this.records).length} records from storage`);
+        await this.loadFromStorage();
       }
 
       const allRecords = this.records!;
-      const totalRecords = Object.keys(allRecords).length;
-
+      
       // Filter out ephemeral records before sending to new client
       const filteredRecords: Record<string, any> = {};
       for (const [id, record] of Object.entries(allRecords)) {
@@ -72,18 +69,51 @@ export default class SketchServer implements Party.Server {
     }
   }
 
+  // Helper to load records from storage with migration support
+  async loadFromStorage() {
+    this.records = {};
+    
+    try {
+      // 1. Try to load simplified format (individual keys)
+      const stored = await this.room.storage.list<any>();
+      
+      // Check for legacy "records" blob
+      if (stored.has("records")) {
+        console.log(`[PartyKit] Migrating legacy monolithic storage for room ${this.room.id}`);
+        const legacyRecords = stored.get("records");
+        
+        // Copy to in-memory
+        if (legacyRecords && typeof legacyRecords === 'object') {
+          Object.assign(this.records, legacyRecords);
+        }
+
+        // Write as individual keys
+        if (Object.keys(this.records).length > 0) {
+          await this.room.storage.put(this.records);
+        }
+        // Delete legacy key
+        await this.room.storage.delete("records");
+        console.log(`[PartyKit] Migration complete. ${Object.keys(this.records).length} records migrated.`);
+      } else {
+        // Normal load
+        for (const [key, value] of stored) {
+           // Skip non-record keys if any (like functions-*)
+           if (!key.startsWith('functions-')) {
+             this.records[key] = value;
+           }
+        }
+      }
+      
+      console.log(`[PartyKit] Loaded ${Object.keys(this.records).length} records from storage`);
+    } catch (e) {
+      console.error(`[PartyKit] Failed to load from storage:`, e);
+      // Fallback
+      this.records = {};
+    }
+  }
+
   async onClose(conn: Party.Connection) {
     console.log(`[PartyKit] Connection closed: ${conn.id} in room ${this.room.id}`);
-
-    // Flush storage on disconnect to ensure persistence
-    if (this.records && Object.keys(this.records).length > 0) {
-      try {
-        await this.room.storage.put("records", this.records);
-        console.log(`[PartyKit] Flushed ${Object.keys(this.records).length} records on disconnect`);
-      } catch (e) {
-        console.error(`[PartyKit] Error flushing on disconnect:`, e);
-      }
-    }
 
     // Remove connection from map
     this.connections.delete(conn.id);
@@ -95,31 +125,9 @@ export default class SketchServer implements Party.Server {
 
   // Edge-safe periodic persistence via alarm
   async onStart() {
-    // Set up periodic alarm for persistence backup (edge workers may suspend)
-    try {
-      await this.room.storage.setAlarm(Date.now() + 60000); // 1 minute
-      console.log(`[PartyKit] Initialized persistence alarm for room ${this.room.id}`);
-    } catch (e) {
-      console.warn(`[PartyKit] Failed to set alarm:`, e);
-    }
-  }
-
-  async onAlarm() {
-    // Periodic persistence backup - runs even if no active connections
-    if (this.records && Object.keys(this.records).length > 0) {
-      try {
-        await this.room.storage.put("records", this.records);
-        console.log(`[PartyKit] Alarm: persisted ${Object.keys(this.records).length} records`);
-      } catch (e) {
-        console.error(`[PartyKit] Alarm persistence failed:`, e);
-      }
-    }
-    // Reschedule alarm
-    try {
-      await this.room.storage.setAlarm(Date.now() + 60000);
-    } catch (e) {
-      console.warn(`[PartyKit] Failed to reschedule alarm:`, e);
-    }
+    // We now save incrementally, but can keep alarm for cleanup or specialized tasks if needed.
+    // Assuming implicit persistence is strong enough with storage.put on updates.
+    // We'll keep a basic alarm just in case we add batched saves later.
   }
 
   private broadcastPresence() {
@@ -134,12 +142,10 @@ export default class SketchServer implements Party.Server {
   }
 
   async onMessage(message: string, sender: Party.Connection) {
-    // console.log(`[PartyKit] Message from ${sender.id}: ${message.slice(0, 50)}...`);
-
     try {
       const data = JSON.parse(message);
 
-      // Handle user info updates (when user connects with account info)
+      // Handle user info updates
       if (data.type === "user-info") {
         const userInfo: UserInfo = {
           connectionId: sender.id,
@@ -150,37 +156,32 @@ export default class SketchServer implements Party.Server {
           email: data.email,
         };
         this.userInfo.set(sender.id, userInfo);
-        // Broadcast updated user list to all clients
         this.broadcastPresence();
         return;
       }
 
-      // Handle full snapshot sync (more reliable than incremental updates)
+      // Handle full snapshot sync
       if (data.type === "snapshot") {
         const snapshotRecords = data.payload;
         if (!snapshotRecords || typeof snapshotRecords !== 'object') {
-          console.warn(`[PartyKit] Invalid snapshot payload from ${sender.id}`);
           return;
         }
 
-        // Ensure records are loaded
-        if (!this.records) {
-          this.records = (await this.room.storage.get<Record<string, any>>("records")) || {};
-        }
+        if (!this.records) await this.loadFromStorage();
 
-        let mergedCount = 0;
+        // Update in-memory
         for (const [id, record] of Object.entries(snapshotRecords)) {
           if (!isEphemeralRecord(record)) {
-            this.records[id] = record;
-            mergedCount++;
+            this.records![id] = record;
           }
         }
 
-        // Persist immediately for snapshots (they're often sent before disconnect)
-        await this.room.storage.put("records", this.records);
-        console.log(`[PartyKit] Snapshot sync: merged ${mergedCount} records, total ${Object.keys(this.records).length}`);
+        // Persist all records individually
+        // Warning: snapshot might be large, but put(entries) handles batching better than put(key, giant_value)
+        await this.room.storage.put(snapshotRecords);
+        console.log(`[PartyKit] Snapshot sync: stored ${Object.keys(snapshotRecords).length} records`);
 
-        // Broadcast snapshot update to other clients
+        // Broadcast snapshot update
         const syncMessage = JSON.stringify({
           type: "update",
           payload: {
@@ -195,48 +196,34 @@ export default class SketchServer implements Party.Server {
 
       // Handle explicit presence requests
       if (data.type === "request-presence") {
-        // Send presence update to all clients (including the requester)
         this.broadcastPresence();
         return;
       }
 
       // Handle function-related messages
       if (data.type === "request-functions") {
-        const { boardId, pageId } = data.payload || {};
-        if (!pageId) return;
-
-        try {
-          // Load functions from storage
-          const functionsKey = `functions-${pageId}`;
-          const functions = (await this.room.storage.get<Array<any>>(functionsKey)) || [];
-
-          // Send initial functions to requester
-          sender.send(JSON.stringify({
-            type: "function-init",
-            payload: {
-              boardId,
-              pageId,
-              functions,
-            },
-          }));
-          console.log(`[PartyKit] Sent ${functions.length} functions to ${sender.id} for page ${pageId}`);
-        } catch (error) {
-          console.error(`[PartyKit] Error loading functions for page ${pageId}:`, error);
-        }
-        return;
+         const { boardId, pageId } = data.payload || {};
+         if (!pageId) return;
+         try {
+           const functionsKey = `functions-${pageId}`;
+           const functions = (await this.room.storage.get<Array<any>>(functionsKey)) || [];
+           sender.send(JSON.stringify({
+             type: "function-init",
+             payload: { boardId, pageId, functions },
+           }));
+         } catch (error) {
+           console.error(`[PartyKit] Error loading functions for page ${pageId}:`, error);
+         }
+         return;
       }
 
       if (data.type === "function-update") {
         const { boardId, pageId, functions } = data.payload || {};
         if (!pageId || !functions) return;
-
         try {
-          // Store functions in PartyKit storage
           const functionsKey = `functions-${pageId}`;
           await this.room.storage.put(functionsKey, functions);
-          console.log(`[PartyKit] Saved ${functions.length} functions for page ${pageId}`);
-
-          // Broadcast update to all other clients (exclude sender)
+          // Broadcast
           this.room.broadcast(message, [sender.id]);
         } catch (error) {
           console.error(`[PartyKit] Error saving functions for page ${pageId}:`, error);
@@ -244,27 +231,27 @@ export default class SketchServer implements Party.Server {
         return;
       }
 
-      // Handle updates from clients
+      // Handle updates from clients (Incremental)
       if (data.type === "update") {
-        // Broadcast to all other clients (exclude sender)
+        // Broadcast immediately to reduce latency
         this.room.broadcast(message, [sender.id]);
 
-        // Updates records in memory and persist
-        const { added, updated, removed } = data.payload;
-
-        // Ensure records are loaded
-        if (!this.records) {
-          this.records = (await this.room.storage.get<Record<string, any>>("records")) || {};
-        }
-
-        let hasChanges = false;
+        if (!this.records) await this.loadFromStorage();
         const records = this.records!;
+
+        const { added, updated, removed } = data.payload;
+        
+        // Prepare storage operations
+        const putEntries: Record<string, any> = {};
+        const deleteKeys: string[] = [];
+        let hasChanges = false;
 
         if (added) {
           for (const id in added) {
             const record = added[id];
             if (!isEphemeralRecord(record)) {
               records[id] = record;
+              putEntries[id] = record;
               hasChanges = true;
             }
           }
@@ -275,6 +262,7 @@ export default class SketchServer implements Party.Server {
             const record = updated[id];
             if (!isEphemeralRecord(record)) {
               records[id] = record;
+              putEntries[id] = record;
               hasChanges = true;
             }
           }
@@ -282,20 +270,22 @@ export default class SketchServer implements Party.Server {
 
         if (removed) {
           for (const id in removed) {
-            const record = removed[id];
-            if (!isEphemeralRecord(record)) {
+            if (records[id] && !isEphemeralRecord(records[id])) {
               delete records[id];
+              deleteKeys.push(id);
               hasChanges = true;
             }
           }
         }
 
+        // Apply persistence incrementally
         if (hasChanges) {
-          // Save back to storage
-          // Since we are single-threaded per room, this is safe from race conditions within this room
-          // (assuming no await expressions between reading 'records' and updating it, which we handled by using in-memory reference)
-          await this.room.storage.put("records", records);
-          // console.log(`[PartyKit] Serialized ${Object.keys(records).length} records to storage`);
+          if (Object.keys(putEntries).length > 0) {
+            await this.room.storage.put(putEntries);
+          }
+          if (deleteKeys.length > 0) {
+            await this.room.storage.delete(deleteKeys);
+          }
         }
       }
     } catch (e) {
