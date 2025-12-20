@@ -1,0 +1,11 @@
+# Planck Academy
+
+Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.
+
+Main products:
+- Planck Academy – AI-powered physics and computer science learning platform for high school
+- Planck Sketch – collaborative online whiteboard, free and no account required
+- Planck Code – online programming environment with AI-assisted IDE and judge
+
+Primary audience: high school students
+Topics: physics, computer science, AI-assisted learning

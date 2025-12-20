@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next'
-import { 
-  getAllGrades, 
+import {
+  getAllGrades,
   getChaptersByGradeId
 } from '@/lib/supabase-physics'
 import { slugify } from '@/lib/slug'
@@ -8,11 +8,11 @@ import { supabase } from '@/lib/supabaseClient'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://www.planck.academy'
-  
+
   // Get all lessons for dynamic sitemap with updated_at
   const grades = await getAllGrades()
   const allLessons: Array<{ title: string; id: string; updated_at: string }> = []
-  
+
   for (const grade of grades) {
     const chapters = await getChaptersByGradeId(grade.id)
     for (const chapter of chapters) {
@@ -23,7 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .eq('chapter_id', chapter.id)
         .eq('is_active', true)
         .order('order_index')
-      
+
       if (!error && lessons) {
         allLessons.push(...lessons.map(l => ({
           title: l.title,
@@ -33,7 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
   }
-  
+
   return [
     {
       url: baseUrl,
@@ -64,7 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${baseUrl}/sketch`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
-      priority: 0.8,
+      priority: 0.9,
     },
     {
       url: `${baseUrl}/insight`,
@@ -76,7 +76,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${baseUrl}/planckcode`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
-      priority: 0.8,
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/planckcode/ide`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
     },
     {
       url: `${baseUrl}/pricing`,

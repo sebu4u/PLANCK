@@ -9,6 +9,8 @@ import PlanckCodeIDEShowcase from "@/components/planckcode-ide-showcase"
 import { PlanckCodeContentWrapper } from "@/components/planckcode-content-wrapper"
 import SplitText from "@/components/SplitText"
 import { LearningPathSection } from "@/components/planckcode/LearningPath"
+import { StructuredData } from "@/components/structured-data"
+import { planckCodeResourceStructuredData, breadcrumbStructuredData } from "@/lib/structured-data"
 
 export const metadata: Metadata = generateMetadata('planckcode')
 
@@ -17,11 +19,34 @@ export default function PlanckCodePage() {
     { title: 'Fluxul Neutronului', difficulty: 'Medie', description: 'Calculează traseul optim pentru particule într-o rețea cubică.' },
     { title: 'Compresorul de Date', difficulty: 'Ușoară', description: 'Optimizează fluxul de mesaje printr-un algoritm greedy.' },
     { title: 'Labirintul cu Teleportare', difficulty: 'Greu', description: 'Determină costul minim pe o hartă cu portaluri bidirecționale.' },
-    { title: 'Scheduler Cuantic', difficulty: 'Medie', description: 'Planifică procese paralele folosind ferestre dinamice de timp.' },
+    { title: 'Scheduler Cuantic', difficulty: 'Medie', description: 'Planifică procese paralelele folosind ferestre dinamice de timp.' },
   ]
+
+  const softwareSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "PlanckCode",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Web Browser",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "RON"
+    },
+    "description": "IDE online integrat pentru C++ și platformă de probleme pentru liceeni."
+  }
 
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white overflow-hidden">
+      <StructuredData data={softwareSchema} id="software-app-planckcode" />
+      <StructuredData data={planckCodeResourceStructuredData} id="learning-resource-planckcode" />
+      <StructuredData
+        data={breadcrumbStructuredData([
+          { name: 'Acasă', url: 'https://www.planck.academy/' },
+          { name: 'Planck Code', url: 'https://www.planck.academy/planckcode' },
+        ])}
+        id="breadcrumbs-planckcode"
+      />
       <Navigation />
       <PlanckCodeSidebar />
 
@@ -46,7 +71,7 @@ export default function PlanckCodePage() {
               <span className="block">Code smarter. Learn faster.</span>
               <span className="block">That's PlanckCode.</span>
             </h1>
-            
+
             <p className="scroll-animate-fade-up animate-delay-200 font-vt323 text-lg sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-8 leading-relaxed drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]">
               IDE online integrat + Online Judge care evaluează automat soluțiile + cursuri clare de C++ pentru liceeni. Totul într-un singur loc, proiectat pentru învățare rapidă și competiții.
             </p>
@@ -153,9 +178,9 @@ export default function PlanckCodePage() {
               Nu doar răspunde — predă, corectează și optimizează, la nivelul tău.
             </div>
             <div className="scroll-animate-fade-right border border-white/15 rounded-3xl p-4 bg-white/5 backdrop-blur-md flex items-center justify-center overflow-hidden">
-              <img 
-                src="/images/planckcode-ai-agent-1.jpg" 
-                alt="PlanckCode AI Agent" 
+              <img
+                src="/images/planckcode-ai-agent-1.jpg"
+                alt="PlanckCode AI Agent"
                 className="w-full h-[260px] object-cover rounded-2xl"
               />
             </div>
@@ -191,9 +216,9 @@ export default function PlanckCodePage() {
             <div className="relative scroll-animate-fade-left">
               <div className="absolute inset-x-0 bottom-[-60px] h-48 bg-gradient-radial from-orange-500/40 via-orange-400/15 to-transparent blur-3xl pointer-events-none"></div>
               <div className="border border-white/15 rounded-3xl p-4 bg-white/5 backdrop-blur-md flex items-center justify-center relative z-[1] overflow-hidden">
-                <img 
-                  src="/images/planckcode-ai-agent-2.jpg" 
-                  alt="PlanckCode AI Agent Training" 
+                <img
+                  src="/images/planckcode-ai-agent-2.jpg"
+                  alt="PlanckCode AI Agent Training"
                   className="w-full h-[260px] object-cover rounded-2xl"
                 />
               </div>
@@ -233,9 +258,9 @@ export default function PlanckCodePage() {
           <div className="grid gap-10 lg:grid-cols-2 items-center">
             <div className="flex items-center justify-center scroll-animate-fade-left animate-delay-200">
               <div className="w-48 h-48 sm:w-56 sm:h-56 lg:w-64 lg:h-64 rounded-full border-2 border-white/20 bg-white/5 backdrop-blur-md overflow-hidden shadow-lg">
-                <img 
-                  src="/images/planckcode-testimonial-1.jpg" 
-                  alt="Lucian C. - Olimpic Național la Informatică" 
+                <img
+                  src="/images/planckcode-testimonial-1.jpg"
+                  alt="Lucian C. - Olimpic Național la Informatică"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -262,9 +287,9 @@ export default function PlanckCodePage() {
             </div>
             <div className="flex items-center justify-center order-1 lg:order-2 scroll-animate-fade-right animate-delay-400">
               <div className="w-48 h-48 sm:w-56 sm:h-56 lg:w-64 lg:h-64 rounded-full border-2 border-white/20 bg-white/5 backdrop-blur-md overflow-hidden shadow-lg">
-                <img 
-                  src="/images/planckcode-testimonial-2.jpg" 
-                  alt="Bianca P. - elevă de liceu" 
+                <img
+                  src="/images/planckcode-testimonial-2.jpg"
+                  alt="Bianca P. - elevă de liceu"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -292,12 +317,11 @@ export default function PlanckCodePage() {
                     className={`flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 transition-all duration-300 scroll-animate-scale ${index === 0 ? '' : index === 1 ? 'animate-delay-100' : index === 2 ? 'animate-delay-200' : index === 3 ? 'animate-delay-300' : 'animate-delay-400'}`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                        entry.rank === 1 ? 'bg-yellow-500/20 text-yellow-400' :
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${entry.rank === 1 ? 'bg-yellow-500/20 text-yellow-400' :
                         entry.rank === 2 ? 'bg-gray-400/20 text-gray-300' :
-                        entry.rank === 3 ? 'bg-amber-600/20 text-amber-400' :
-                        'bg-white/10 text-white/70'
-                      }`}>
+                          entry.rank === 3 ? 'bg-amber-600/20 text-amber-400' :
+                            'bg-white/10 text-white/70'
+                        }`}>
                         {entry.rank}
                       </div>
                       <div>
@@ -367,9 +391,9 @@ export default function PlanckCodePage() {
           {/* Circular Rank Images with Arrow */}
           <div className="flex items-center justify-center gap-8 sm:gap-12 lg:gap-16 scroll-animate-fade-up animate-delay-400">
             <div className="scroll-animate-scale w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 rounded-full border-2 border-white/30 bg-white/5 flex items-center justify-center overflow-hidden">
-              <img 
-                src="/ranks/bronze.png" 
-                alt="Bronze Rank" 
+              <img
+                src="/ranks/bronze.png"
+                alt="Bronze Rank"
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
@@ -377,9 +401,9 @@ export default function PlanckCodePage() {
             <div className="relative scroll-animate-scale animate-delay-200">
               <div className="absolute inset-0 bg-gradient-radial from-blue-500/40 via-purple-500/30 to-transparent blur-2xl rounded-full pointer-events-none"></div>
               <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 rounded-full border-2 border-white/30 bg-white/5 flex items-center justify-center relative z-[1] overflow-hidden">
-                <img 
-                  src="/ranks/singularity.png" 
-                  alt="Singularity Rank" 
+                <img
+                  src="/ranks/singularity.png"
+                  alt="Singularity Rank"
                   className="w-full h-full object-cover rounded-full"
                 />
               </div>
@@ -399,7 +423,7 @@ export default function PlanckCodePage() {
       <PlanckCodeContentWrapper className="pt-0" innerClassName="max-w-none" flush>
         <section className="relative flex items-center justify-center overflow-hidden min-h-screen">
           {/* Background Image */}
-          <div 
+          <div
             className="absolute inset-0 h-full w-full bg-cover bg-center bg-no-repeat"
             style={{ backgroundImage: 'url(/images/planckcode-cta-background.jpg)' }}
           >
@@ -415,18 +439,18 @@ export default function PlanckCodePage() {
               Join thousands of students already mastering competitive programming on PlanckCode. Start coding, start competing, start winning.
             </p>
             <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button 
+              <Button
                 asChild
-                size="lg" 
+                size="lg"
                 className="bg-white text-black hover:bg-gray-200 transition-all duration-300 font-vt323 text-xl sm:text-2xl px-10 py-7"
               >
                 <Link href="/planckcode/ide">
                   Începe acum gratuit
                 </Link>
               </Button>
-              <Button 
+              <Button
                 variant="outline"
-                size="lg" 
+                size="lg"
                 className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-300 font-vt323 text-xl sm:text-2xl px-10 py-7"
               >
                 Explorează problemele

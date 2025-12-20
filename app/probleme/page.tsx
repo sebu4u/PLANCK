@@ -50,27 +50,33 @@ export default async function ProblemsPage() {
             <div className="px-6 sm:px-8 lg:px-16 xl:px-20 pt-20 pb-12">
               <section className="w-full space-y-10">
                 <div>
-                  <PhysicsProblemsHeader 
+                  <PhysicsProblemsHeader
                     totalProblems={totalProblems}
                     freeProblems={freeProblems}
                   />
-                  <StructuredData data={breadcrumbStructuredData([
-                    { name: 'Acasă', url: 'https://www.planck.academy/' },
-                    { name: 'Probleme', url: 'https://www.planck.academy/probleme' },
-                  ])} />
+                  <StructuredData
+                    id="structured-data-breadcrumbs"
+                    data={breadcrumbStructuredData([
+                      { name: 'Acasă', url: 'https://www.planck.academy/' },
+                      { name: 'Probleme', url: 'https://www.planck.academy/probleme' },
+                    ])}
+                  />
                 </div>
 
                 <div className="space-y-8">
-                  <StructuredData data={{
-                    "@context": "https://schema.org",
-                    "@type": "ItemList",
-                    itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
-                      "@type": "ListItem",
-                      position: idx + 1,
-                      name: p.title,
-                    }))
-                  }} />
-                  <ProblemsClient 
+                  <StructuredData
+                    id="structured-data-problems-list"
+                    data={{
+                      "@context": "https://schema.org",
+                      "@type": "ItemList",
+                      itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
+                        "@type": "ListItem",
+                        position: idx + 1,
+                        name: p.title,
+                      }))
+                    }}
+                  />
+                  <ProblemsClient
                     initialProblems={initialProblems as any}
                     initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
                   />

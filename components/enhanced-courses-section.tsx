@@ -71,9 +71,8 @@ export function EnhancedCoursesSection() {
         {courses.map((course, index) => (
           <Card
             key={course.id}
-            className={`overflow-hidden border-purple-200 hover:border-purple-400 transition-all duration-500 space-card ${
-              index === 1 ? "lg:flex-row-reverse" : ""
-            }`}
+            className={`overflow-hidden border-purple-200 hover:border-purple-400 transition-all duration-500 space-card ${index === 1 ? "lg:flex-row-reverse" : ""
+              }`}
           >
             <div className="lg:flex">
               {/* Course Image */}
@@ -160,7 +159,7 @@ export function EnhancedCoursesSection() {
                   <div className="border-t border-gray-100 pt-6">
 
                     <div className="flex gap-3">
-                      <Link href={`/cursuri/curand`} className="flex-1">
+                      <Link href={`/cursuri/${course.id}`} className="flex-1">
                         <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-300 cosmic-glow h-12">
                           <PlayCircle className="w-4 h-4 mr-2" />
                           Începe cursul

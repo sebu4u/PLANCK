@@ -15,10 +15,24 @@ export const generateStructuredData = (type: string, data: any) => {
 export const organizationStructuredData = {
   "@context": "https://schema.org",
   "@type": "EducationalOrganization",
-  "name": "PLANCK",
-  "url": "https://planck.ro",
+  "name": "Planck Academy",
+  "url": "https://www.planck.academy",
   "logo": "https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png",
-  "description": "Platforma educațională de fizică pentru liceu cu cursuri video interactive și probleme captivante.",
+  "description": "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
+  "educationalLevel": "High school",
+  "teaches": ["Physics", "Computer Science"],
+  "hasPart": [
+    {
+      "@type": "LearningResource",
+      "name": "Planck Sketch",
+      "description": "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale, accesibil printr-un singur click."
+    },
+    {
+      "@type": "LearningResource",
+      "name": "Planck Code",
+      "description": "Planck Code este un mediu online de programare pentru liceu, cu IDE și online judge integrate, unde un AI Agent generează, corectează și explică codul direct în editor."
+    }
+  ],
   "address": {
     "@type": "PostalAddress",
     "addressCountry": "RO"
@@ -43,8 +57,8 @@ export const courseStructuredData = (courseData: any) => ({
   "description": courseData.description,
   "provider": {
     "@type": "EducationalOrganization",
-    "name": "PLANCK",
-    "url": "https://planck.ro"
+    "name": "Planck Academy",
+    "url": "https://www.planck.academy"
   },
   "educationalLevel": courseData.level,
   "timeRequired": courseData.totalDuration,
@@ -62,18 +76,18 @@ export const courseStructuredData = (courseData: any) => ({
 export const websiteStructuredData = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  "name": "PLANCK - Platforma Educațională de Fizică",
-  "url": "https://planck.ro",
-  "description": "Învață fizica prin cursuri video interactive și probleme captivante. Cursuri pentru clasa a 9-a și a 10-a.",
+  "name": "Planck Academy",
+  "url": "https://www.planck.academy",
+  "description": "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
   "potentialAction": {
     "@type": "SearchAction",
-    "target": "https://planck.ro/probleme?search={search_term_string}",
+    "target": "https://www.planck.academy/probleme?search={search_term_string}",
     "query-input": "required name=search_term_string"
   }
 }
 
 // BreadcrumbList structured data
-export const breadcrumbStructuredData = (breadcrumbs: Array<{name: string, url: string}>) => ({
+export const breadcrumbStructuredData = (breadcrumbs: Array<{ name: string, url: string }>) => ({
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": breadcrumbs.map((breadcrumb, index) => ({
@@ -85,7 +99,7 @@ export const breadcrumbStructuredData = (breadcrumbs: Array<{name: string, url: 
 })
 
 // FAQ structured data
-export const faqStructuredData = (faqs: Array<{question: string, answer: string}>) => ({
+export const faqStructuredData = (faqs: Array<{ question: string, answer: string }>) => ({
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": faqs.map(faq => ({
@@ -111,7 +125,7 @@ export const articleStructuredData = (articleData: any) => ({
   },
   "publisher": {
     "@type": "EducationalOrganization",
-    "name": "PLANCK",
+    "name": "Planck Academy",
     "logo": {
       "@type": "ImageObject",
       "url": "https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png"
@@ -120,3 +134,35 @@ export const articleStructuredData = (articleData: any) => ({
   "datePublished": articleData.publishedDate,
   "dateModified": articleData.modifiedDate
 })
+
+// Learning Resource Structured Data for Planck Sketch
+export const sketchResourceStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "LearningResource",
+  "name": "Planck Sketch",
+  "description": "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale, accesibil printr-un singur click.",
+  "learningResourceType": "Interactive Resource",
+  "educationalLevel": "High school",
+  "isAccessibleForFree": true,
+  "url": "https://www.planck.academy/sketch",
+  "author": {
+    "@type": "EducationalOrganization",
+    "name": "Planck Academy"
+  }
+}
+
+// Learning Resource Structured Data for Planck Code
+export const planckCodeResourceStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "LearningResource",
+  "name": "Planck Code",
+  "description": "Planck Code este un mediu online de programare pentru liceu, cu IDE și online judge integrate, unde un AI Agent generează, corectează și explică codul direct în editor.",
+  "learningResourceType": "Programming Environment",
+  "educationalLevel": "High school",
+  "isAccessibleForFree": true,
+  "url": "https://www.planck.academy/planckcode",
+  "author": {
+    "@type": "EducationalOrganization",
+    "name": "Planck Academy"
+  }
+}

@@ -49,6 +49,8 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable"
+import { StructuredData } from "@/components/structured-data"
+import { breadcrumbStructuredData } from "@/lib/structured-data"
 
 const defaultCode = `#include <iostream>
 using namespace std;
@@ -1327,6 +1329,14 @@ function IDEPageContent() {
 
   return (
     <div className="h-screen-mobile bg-black text-white overflow-hidden">
+      <StructuredData
+        data={breadcrumbStructuredData([
+          { name: 'Acasă', url: 'https://www.planck.academy/' },
+          { name: 'Planck Code', url: 'https://www.planck.academy/planckcode' },
+          { name: 'IDE', url: 'https://www.planck.academy/planckcode/ide' },
+        ])}
+        id="breadcrumbs-planckcode-ide"
+      />
       {showUpgradeCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/15 bg-[#0c1017]/95 shadow-[0_30px_120px_-25px_rgba(0,0,0,0.95)]">
@@ -1546,8 +1556,8 @@ function IDEPageContent() {
             <ResizablePanel defaultSize={isTerminalOpen ? 70 : 100} minSize={30}>
               <div
                 className={`h-full overflow-hidden transition-all duration-500 relative ${isStreamingCode
-                    ? 'after:absolute after:inset-0 after:z-50 after:pointer-events-none after:shadow-[inset_0_0_80px_rgba(168,85,247,0.15)] after:animate-pulse'
-                    : ''
+                  ? 'after:absolute after:inset-0 after:z-50 after:pointer-events-none after:shadow-[inset_0_0_80px_rgba(168,85,247,0.15)] after:animate-pulse'
+                  : ''
                   }`}
               >
                 <Editor

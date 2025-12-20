@@ -11,6 +11,7 @@ import { GlassImageCard } from "@/components/glass-image-card"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { useToast } from "@/hooks/use-toast"
+import { sketchResourceStructuredData, breadcrumbStructuredData } from "@/lib/structured-data"
 import { motion } from "framer-motion"
 
 // Animation variants
@@ -150,8 +151,23 @@ export default function SketchPage() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(sketchResourceStructuredData)
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbStructuredData([
+            { name: 'Acasă', url: 'https://www.planck.academy/' },
+            { name: 'Sketch', url: 'https://www.planck.academy/sketch' },
+          ]))
+        }}
+      />
       <Navigation />
-      
+
       {/* Hero Section with ColorBends Background */}
       <section className="relative h-screen-mobile w-full overflow-hidden bg-black flex items-center justify-center">
         {/* ColorBends Background */}
@@ -172,14 +188,14 @@ export default function SketchPage() {
         </div>
 
         {/* Content Overlay */}
-        <motion.div 
+        <motion.div
           className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center"
           variants={containerVariants}
           initial="initial"
           animate="animate"
         >
           {/* Label Badge */}
-          <motion.div 
+          <motion.div
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-700/60 backdrop-blur-sm border border-gray-500/30 mb-4 sm:mb-6"
             variants={fadeInUp}
           >
@@ -188,7 +204,7 @@ export default function SketchPage() {
           </motion.div>
 
           {/* Main Title */}
-          <motion.h1 
+          <motion.h1
             className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-6 sm:mb-8 leading-tight px-2 sm:px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] max-w-4xl mx-auto"
             variants={fadeInUp}
           >
@@ -197,7 +213,7 @@ export default function SketchPage() {
           </motion.h1>
 
           {/* Action Buttons */}
-          <motion.div 
+          <motion.div
             className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center px-4"
             variants={fadeInUp}
           >
@@ -226,7 +242,7 @@ export default function SketchPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-start pt-8 sm:pt-[4vh] md:pt-[6vh] lg:pt-[8vh] xl:pt-[10vh] pb-12 sm:pb-16 md:pb-20">
           <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center gap-10 sm:gap-14 md:gap-16">
-            <div 
+            <div
               className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 w-[60vw] max-w-3xl h-[120%]"
               style={{
                 background: "radial-gradient(circle, rgba(239,68,68,0.45) 0%, rgba(239,68,68,0.18) 40%, rgba(239,68,68,0.05) 65%, transparent 85%)"
@@ -234,20 +250,20 @@ export default function SketchPage() {
             />
 
             {/* GlassImageCard */}
-            <motion.div 
+            <motion.div
               className="relative z-10 w-full"
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <GlassImageCard 
+              <GlassImageCard
                 imageUrl="/sketch-image.jpg"
                 alt="Sketch Demo"
               />
             </motion.div>
 
-            <motion.div 
+            <motion.div
               id="infinite-canvas-section"
               className="relative z-10 w-full max-w-4xl text-center space-y-3 sm:space-y-4 px-2 sm:px-0"
               initial={{ opacity: 0, y: 30 }}
@@ -265,14 +281,14 @@ export default function SketchPage() {
 
           </div>
 
-          <motion.div 
+          <motion.div
             className="relative z-10 w-full max-w-5xl mx-auto mt-12 sm:mt-16 md:mt-20 grid gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-center"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <motion.div 
+            <motion.div
               className="group relative bg-white/10 backdrop-blur-md border border-white/15 rounded-xl sm:rounded-lg p-4 sm:p-3.5 md:p-4.5 shadow-xl overflow-hidden w-full max-w-sm mx-auto lg:max-w-none lg:mx-0"
               initial={{ opacity: 0, y: 30, x: 0 }}
               whileInView={{ opacity: 1, y: 0, x: 0 }}
@@ -283,9 +299,9 @@ export default function SketchPage() {
               <div className="relative z-10 flex flex-col gap-3 sm:gap-2.5">
                 <div className="bg-white/10 border border-white/15 rounded-lg sm:rounded-md overflow-hidden shadow-inner">
                   <div className="aspect-[4/3] sm:aspect-[4/3] w-full relative">
-                    <Image 
-                      src="/sketch-board-snapshots.png" 
-                      alt="Board snapshots at a glance" 
+                    <Image
+                      src="/sketch-board-snapshots.png"
+                      alt="Board snapshots at a glance"
                       fill
                       className="object-cover"
                       priority
@@ -302,7 +318,7 @@ export default function SketchPage() {
               </div>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               className="relative z-10 flex flex-col items-center text-center gap-4 sm:gap-5 md:gap-6 px-4 sm:px-2 md:px-8"
               initial={{ opacity: 0, y: 30, x: 0 }}
               whileInView={{ opacity: 1, y: 0, x: 0 }}
@@ -310,28 +326,28 @@ export default function SketchPage() {
               transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
             >
               <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white uppercase tracking-[0.2em] sm:tracking-[0.32em] text-white/70">What you can do</h3>
-              <motion.ul 
+              <motion.ul
                 className="space-y-3 sm:space-y-4 text-sm sm:text-base text-white/85 max-w-lg w-full"
                 variants={containerVariants}
                 initial="initial"
                 whileInView="animate"
                 viewport={{ once: true, margin: "-100px" }}
               >
-                <motion.li 
+                <motion.li
                   className="flex items-start gap-3 sm:gap-4 text-left sm:text-center"
                   variants={fadeInUp}
                 >
                   <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-400 flex-shrink-0"></span>
                   <span>Create or personalize boards with one click</span>
                 </motion.li>
-                <motion.li 
+                <motion.li
                   className="flex items-start gap-3 sm:gap-4 text-left sm:text-center"
                   variants={fadeInUp}
                 >
                   <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-400 flex-shrink-0"></span>
                   <span>Load and display uploaded files directly on your board</span>
                 </motion.li>
-                <motion.li 
+                <motion.li
                   className="flex items-start gap-3 sm:gap-4 text-left sm:text-center"
                   variants={fadeInUp}
                 >
@@ -346,7 +362,7 @@ export default function SketchPage() {
 
       <section className="relative w-full bg-black py-12 sm:py-16 md:py-24">
         <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 grid gap-8 sm:gap-12 lg:gap-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] items-center">
-          <motion.div 
+          <motion.div
             className="space-y-4 sm:space-y-6 text-center lg:text-left"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -366,7 +382,7 @@ export default function SketchPage() {
             </div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             className="relative w-full max-w-sm mx-auto lg:max-w-md lg:ml-auto"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -392,7 +408,7 @@ export default function SketchPage() {
 
       <section className="relative w-full bg-black py-12 sm:py-16 md:py-24">
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 space-y-6 sm:space-y-8">
-          <motion.div 
+          <motion.div
             className="space-y-3 sm:space-y-4 text-center px-2 sm:px-0"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -409,7 +425,7 @@ export default function SketchPage() {
             </p>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             className="relative w-full max-w-4xl mx-auto grid gap-3 sm:gap-4 md:gap-6"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -417,7 +433,7 @@ export default function SketchPage() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
           >
             <div className="pointer-events-none absolute left-1/2 top-[55%] -translate-x-1/2 w-[80%] max-w-2xl h-[130%] bg-gradient-to-b from-emerald-400/15 via-emerald-500/08 to-transparent blur-[100px]"></div>
-            <motion.div 
+            <motion.div
               className="flex items-start gap-3 sm:gap-4 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl px-4 sm:px-6 py-3 sm:py-4 backdrop-blur"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -427,7 +443,7 @@ export default function SketchPage() {
               <span className="mt-0.5 sm:mt-1 h-2.5 w-2.5 rounded-full bg-red-400 flex-shrink-0"></span>
               <span className="text-sm sm:text-base text-white/85 leading-relaxed">Real-time updates for multiple users</span>
             </motion.div>
-            <motion.div 
+            <motion.div
               className="flex items-start gap-3 sm:gap-4 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl px-4 sm:px-6 py-3 sm:py-4 backdrop-blur"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -437,7 +453,7 @@ export default function SketchPage() {
               <span className="mt-0.5 sm:mt-1 h-2.5 w-2.5 rounded-full bg-red-400 flex-shrink-0"></span>
               <span className="text-sm sm:text-base text-white/85 leading-relaxed">Share via link — no sign-up needed</span>
             </motion.div>
-            <motion.div 
+            <motion.div
               className="flex items-start gap-3 sm:gap-4 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl px-4 sm:px-6 py-3 sm:py-4 backdrop-blur"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -453,7 +469,7 @@ export default function SketchPage() {
 
       <section className="relative w-full bg-black py-12 sm:py-16 md:py-24">
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 grid gap-8 sm:gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-center">
-          <motion.div 
+          <motion.div
             className="space-y-4 sm:space-y-6 text-center lg:text-left"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -475,7 +491,7 @@ export default function SketchPage() {
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
             >
-              <Button 
+              <Button
                 className="px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg rounded-full bg-white text-black hover:bg-gray-200 transition w-full sm:w-auto"
                 onClick={handleTryFree}
                 disabled={isCreatingBoard}
@@ -485,14 +501,14 @@ export default function SketchPage() {
             </motion.div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             className="relative w-full max-w-md mx-auto lg:max-w-3xl lg:ml-auto"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
           >
-            <div 
+            <div
               className="relative z-10 w-full aspect-[3/2] rounded-xl sm:rounded-2xl overflow-hidden backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl"
               style={{
                 boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
@@ -501,7 +517,7 @@ export default function SketchPage() {
               {/* Glass effect layers */}
               <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-white/10 to-transparent pointer-events-none" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
-              
+
               {/* Image */}
               <div className="relative w-full h-full">
                 <Image
@@ -518,20 +534,20 @@ export default function SketchPage() {
       </section>
 
       <section className="relative w-full h-auto min-h-[500px] sm:h-80vh-mobile md:h-100vh-mobile md:min-h-[640px] overflow-hidden py-12 sm:py-0">
-        <div 
+        <div
           className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url(/sketch-ai-placeholder.jpg)' }}
         />
         <div className="absolute inset-0 bg-black/30" />
         <div className="relative z-10 w-full h-full flex items-center justify-center py-12 sm:py-0">
-          <motion.div 
+          <motion.div
             className="w-full max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-4 sm:space-y-6"
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "-50px" }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <motion.div 
+            <motion.div
               className="relative backdrop-blur-xl bg-white/80 border border-white/30 rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-10 lg:p-12 shadow-2xl"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -546,14 +562,14 @@ export default function SketchPage() {
                 <br className="hidden sm:block" />
                 It scans your drawings, equations, or notes — then helps you solve, explain, or visualize them in real time. Perfect for students, teachers, and creators who want more than just a whiteboard.
               </p>
-              <motion.div 
+              <motion.div
                 className="mt-5 sm:mt-6 flex justify-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.5, ease: "easeOut", delay: 0.4 }}
               >
-                <Button 
+                <Button
                   className="px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg rounded-full bg-gray-900 text-white hover:bg-gray-800 transition shadow-lg w-full sm:w-auto"
                   onClick={handleSeePlans}
                 >

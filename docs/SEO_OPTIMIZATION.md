@@ -27,7 +27,6 @@
 #### Pagini de Cursuri
 - ✅ **Clasa 9** (`/cursuri/clasa-9`) - Metadata specific pentru cursul de clasa 9
 - ✅ **Clasa 10** (`/cursuri/clasa-10`) - Metadata specific pentru cursul de clasa 10
-- ✅ **În Curând** (`/cursuri/curand`) - Metadata pentru cursurile viitoare
 
 #### Pagini Informative
 - ✅ **Ajutor** (`/ajutor`) - Metadata pentru centrul de ajutor

@@ -61,12 +61,12 @@ export function HomePageContent() {
               <p className="scroll-animate-fade-up animate-delay-200 text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed">
                 Înveți fizică și informatică cu AI, exerciții interactive și progres salvat.
               </p>
-              
+
               {/* Action buttons */}
               <div className="scroll-animate-fade-up animate-delay-400 flex flex-row gap-4 justify-center items-center lg:justify-start lg:items-start">
                 <Link href="/probleme" className="flex justify-center">
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     className="bg-white text-black hover:bg-gray-200 transition-all duration-300 flex items-center gap-2"
                   >
                     Rezolvă o problemă
@@ -75,14 +75,14 @@ export function HomePageContent() {
                 <Link href="/insight/chat" className="group relative inline-flex">
                   {/* Glow effect on hover - behind everything */}
                   <span className="absolute -inset-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
-                  
+
                   {/* Gradient border wrapper - creates the border effect */}
                   <span className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
                   <span className="absolute inset-[1px] rounded-md bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
-                  
-                  <Button 
+
+                  <Button
                     variant="outline"
-                    size="lg" 
+                    size="lg"
                     className="border-white text-white hover:border-transparent transition-all duration-300 flex items-center gap-2 bg-transparent relative z-10"
                   >
                     {/* Gradient text on hover */}
@@ -93,7 +93,7 @@ export function HomePageContent() {
                 </Link>
               </div>
             </div>
-            
+
             {/* Animated cards - hidden on mobile, visible on desktop */}
             <div className="hidden lg:flex justify-center items-center lg:mt-0">
               <div className="relative lg:static w-full flex justify-center">
@@ -166,10 +166,10 @@ export function HomePageContent() {
       </section>
 
       {/* Scrolling Marquee Section */}
-      <ScrollingMarquee 
+      <ScrollingMarquee
         items={[
           "500+ Video Lessons",
-          "AI-Powered Learning", 
+          "AI-Powered Learning",
           "24/7 Instant Help",
           "Master Physics & Computer Science",
           "Interactive Problem Solving",
@@ -230,7 +230,7 @@ export function HomePageContent() {
           />
         </div>
         {/* Fade overlay at the bottom for seamless transition to black - positioned at end of ColorBends */}
-        <div 
+        <div
           className="absolute left-0 right-0 z-10 pointer-events-none"
           style={{
             top: 'calc(100vh - 8rem)',
@@ -238,7 +238,7 @@ export function HomePageContent() {
             background: 'linear-gradient(to top, #000000 0%, rgba(0, 0, 0, 0.95) 35%, rgba(0, 0, 0, 0.7) 60%, rgba(0, 0, 0, 0.4) 80%, rgba(0, 0, 0, 0.1) 95%, transparent 100%)'
           }}
         />
-        <div 
+        <div
           className="absolute left-0 right-0 z-10 pointer-events-none hidden sm:block"
           style={{
             top: 'calc(100vh - 12rem)',
@@ -246,7 +246,7 @@ export function HomePageContent() {
             background: 'linear-gradient(to top, #000000 0%, rgba(0, 0, 0, 0.95) 35%, rgba(0, 0, 0, 0.7) 60%, rgba(0, 0, 0, 0.4) 80%, rgba(0, 0, 0, 0.1) 95%, transparent 100%)'
           }}
         />
-        <div 
+        <div
           className="absolute left-0 right-0 z-10 pointer-events-none hidden md:block"
           style={{
             top: 'calc(100vh - 16rem)',
@@ -254,7 +254,7 @@ export function HomePageContent() {
             background: 'linear-gradient(to top, #000000 0%, rgba(0, 0, 0, 0.95) 35%, rgba(0, 0, 0, 0.7) 60%, rgba(0, 0, 0, 0.4) 80%, rgba(0, 0, 0, 0.1) 95%, transparent 100%)'
           }}
         />
-        <div 
+        <div
           className="absolute left-0 right-0 z-10 pointer-events-none hidden lg:block"
           style={{
             top: 'calc(100vh - 20rem)',
@@ -276,7 +276,7 @@ export function HomePageContent() {
           </p>
           {/* Image Card */}
           <div className="scroll-animate-fade-up animate-delay-400 mt-8 sm:mt-12">
-            <GlassImageCard 
+            <GlassImageCard
               imageUrl="/sketch-image.jpg"
               alt="Sketch Demo"
             />
@@ -297,25 +297,25 @@ export function HomePageContent() {
           alt="PlanckCode background"
           className="absolute inset-0 h-full w-full object-cover z-0"
         />
-        
+
         {/* Gradient overlay for glass effect */}
-        <div 
+        <div
           className="absolute inset-0 z-5 pointer-events-none"
           style={{
             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.05) 50%, rgba(59, 130, 246, 0.08) 100%)'
           }}
         />
-        
+
         {/* Gradient transition overlay at the top */}
-        <div 
+        <div
           className="absolute top-0 left-0 right-0 h-32 sm:h-48 md:h-64 lg:h-80 z-10 pointer-events-none"
           style={{
             background: 'linear-gradient(to bottom, #000000 0%, rgba(0, 0, 0, 0.8) 30%, rgba(0, 0, 0, 0.4) 60%, transparent 100%)'
           }}
         />
-        
+
         {/* Gradient transition overlay at the bottom - to pricing section */}
-        <div 
+        <div
           className="absolute bottom-0 left-0 right-0 h-32 sm:h-48 md:h-64 lg:h-80 z-10 pointer-events-none"
           style={{
             background: 'linear-gradient(to top, #000000 0%, rgba(0, 0, 0, 0.8) 30%, rgba(0, 0, 0, 0.4) 60%, transparent 100%)'
@@ -328,26 +328,26 @@ export function HomePageContent() {
             <span className="block">Code smarter. Learn faster.</span>
             <span className="block">That's PlanckCode.</span>
           </h1>
-          
+
           <p className="scroll-animate-fade-up animate-delay-200 font-vt323 text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl text-gray-300 mb-6 sm:mb-8 leading-relaxed max-w-2xl sm:max-w-none mx-auto sm:mx-0">
             IDE online integrat + Online Judge care evaluează automat soluțiile + cursuri clare de C++ pentru liceeni. Totul într-un singur loc, proiectat pentru învățare rapidă și competiții.
           </p>
 
           {/* CTA Buttons */}
           <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:justify-start">
-            <Button 
+            <Button
               asChild
-              size="lg" 
+              size="lg"
               className="bg-white text-black hover:bg-gray-200 transition-all duration-300 font-vt323 text-base sm:text-lg md:text-xl px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
             >
               <Link href="/planckcode/ide">
                 Începe gratuit
               </Link>
             </Button>
-            <Button 
+            <Button
               asChild
               variant="outline"
-              size="lg" 
+              size="lg"
               className="bg-transparent border-white text-white hover:bg-white hover:text-black transition-all duration-300 font-vt323 text-base sm:text-lg md:text-xl px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
             >
               <Link href="/planckcode/learn">
