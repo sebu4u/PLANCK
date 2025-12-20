@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Editor, TLPage, TLShapeId } from '@tldraw/tldraw';
+import { Editor, TLPage, TLPageId, TLShapeId } from '@tldraw/tldraw';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,7 +19,8 @@ interface PageThumbnail {
   isLoading: boolean;
 }
 
-const MAX_VISIBLE_PAGES = 4;
+const MAX_VISIBLE_PAGES_DESKTOP = 4;
+const MAX_VISIBLE_PAGES_MOBILE = 2;
 
 export function PageNavigator({ editor, store, currentPageId, onPageChange }: PageNavigatorProps) {
   const [pages, setPages] = useState<TLPage[]>([]);
@@ -29,8 +30,24 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [hoveredPageId, setHoveredPageId] = useState<string | null>(null);
   const [showDeleteButton, setShowDeleteButton] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const hoverTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const thumbnailsRef = useRef<Map<string, PageThumbnail>>(new Map());
+
+  // Determine max visible pages based on screen size
+  const MAX_VISIBLE_PAGES = isMobile ? MAX_VISIBLE_PAGES_MOBILE : MAX_VISIBLE_PAGES_DESKTOP;
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640); // sm breakpoint
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Get pages from store and detect theme
   useEffect(() => {
@@ -60,12 +77,12 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
           // Ignore
         }
       }
-      
+
       // Fallback: check CSS class or default to dark
       try {
         const root = document.documentElement;
-        const isDark = root.classList.contains('dark') || 
-                      (!root.classList.contains('light') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = root.classList.contains('dark') ||
+          (!root.classList.contains('light') && window.matchMedia('(prefers-color-scheme: dark)').matches);
         setIsDarkMode(isDark);
       } catch (e2) {
         setIsDarkMode(true); // Default to dark
@@ -75,10 +92,10 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
     updatePages();
     updateTheme();
 
-    // Listen to store changes for pages
+    // Listen to store changes for pages (all sources including remote via PartyKit)
     const unsubscribeStore = store.listen(() => {
       updatePages();
-    }, { source: 'user', scope: 'document' });
+    }, { scope: 'document' });
 
     // Listen to theme changes - check periodically and on user preference changes
     const themeInterval = setInterval(() => {
@@ -104,7 +121,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   // Compute effective current page id
   const effectiveCurrentPageId = useMemo(() => {
     if (currentPageId) return currentPageId;
-    if (editor?.currentPageId) return editor.currentPageId;
+    if (editor) return editor.getCurrentPageId();
     return pages.length > 0 ? pages[0].id : null;
   }, [currentPageId, editor, pages]);
 
@@ -214,7 +231,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
     if (!editor || pages.length === 0) return;
 
     const visiblePages = pages.slice(viewportStartIndex, viewportStartIndex + MAX_VISIBLE_PAGES);
-    
+
     visiblePages.forEach(page => {
       // Check current state before generating using ref
       const thumbnail = thumbnailsRef.current.get(page.id);
@@ -237,7 +254,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
         });
         return new Map();
       });
-      
+
       // Cleanup all hover timeouts
       hoverTimeoutRef.current.forEach(timeout => {
         clearTimeout(timeout);
@@ -249,7 +266,13 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   // Handle page click
   const handlePageClick = useCallback((pageId: string) => {
     if (editor) {
-      editor.setCurrentPage(pageId);
+      // Verify the page exists in the store before trying to set it
+      const page = editor.getPage(pageId as TLPageId);
+      if (!page) {
+        console.warn('Page no longer exists:', pageId);
+        return;
+      }
+      editor.setCurrentPage(pageId as TLPageId);
     }
     if (onPageChange) {
       onPageChange(pageId);
@@ -259,7 +282,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   // Handle page hover start
   const handlePageHoverStart = useCallback((pageId: string) => {
     setHoveredPageId(pageId);
-    
+
     // Clear any existing timeout for this page
     const existingTimeout = hoverTimeoutRef.current.get(pageId);
     if (existingTimeout) {
@@ -277,7 +300,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   // Handle page hover end
   const handlePageHoverEnd = useCallback((pageId: string) => {
     setHoveredPageId(null);
-    
+
     // Clear timeout
     const timeout = hoverTimeoutRef.current.get(pageId);
     if (timeout) {
@@ -294,7 +317,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   // Handle page delete
   const handleDeletePage = useCallback((pageId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent page click
-    
+
     if (!editor) return;
 
     // Don't allow deleting if it's the only page
@@ -309,7 +332,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
       if (pageId === effectiveCurrentPageId) {
         const otherPage = allPages.find(p => p.id !== pageId);
         if (otherPage) {
-          editor.setCurrentPage(otherPage.id);
+          editor.setCurrentPage(otherPage.id as TLPageId);
           if (onPageChange) {
             onPageChange(otherPage.id);
           }
@@ -317,8 +340,8 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
       }
 
       // Delete the page
-      editor.deletePage(pageId);
-      
+      editor.deletePage(pageId as TLPageId);
+
       // Clean up thumbnails
       setThumbnails(prev => {
         const newMap = new Map(prev);
@@ -345,7 +368,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
     setIsCreatingPage(true);
     try {
       const pageCount = pages.length;
-      
+
       // Create the page
       editor.createPage({
         name: `Pagina ${pageCount + 1}`,
@@ -353,14 +376,14 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
 
       // Wait a bit for the page to be added to the store
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Get all pages after creation - the new page should be the last one
       const allPages = editor.getPages();
-      
+
       if (allPages.length > pageCount) {
         // New page was created - it should be the last one
         const newPage = allPages[allPages.length - 1];
-        
+
         // Verify the page exists in store before setting it
         if (editor.store.has(newPage.id)) {
           // Set as current page
@@ -415,59 +438,59 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
   const showArrows = pages.length > MAX_VISIBLE_PAGES;
 
   // Theme-based colors
-  const bgColor = isDarkMode 
-    ? 'bg-gray-900/90' 
+  const bgColor = isDarkMode
+    ? 'bg-gray-900/90'
     : 'bg-white/90';
-  const borderColor = isDarkMode 
-    ? 'border-gray-700' 
+  const borderColor = isDarkMode
+    ? 'border-gray-700'
     : 'border-gray-300';
-  const pageBg = isDarkMode 
-    ? 'bg-gray-700/60' 
+  const pageBg = isDarkMode
+    ? 'bg-gray-700/60'
     : 'bg-gray-200/60';
-  const pageBorder = isDarkMode 
-    ? 'border-gray-600/70' 
+  const pageBorder = isDarkMode
+    ? 'border-gray-600/70'
     : 'border-gray-400/70';
-  const pageBorderHover = isDarkMode 
-    ? 'hover:border-gray-500/80' 
+  const pageBorderHover = isDarkMode
+    ? 'hover:border-gray-500/80'
     : 'hover:border-gray-500/80';
-  const activeBorder = isDarkMode 
-    ? 'border-blue-500' 
+  const activeBorder = isDarkMode
+    ? 'border-blue-500'
     : 'border-blue-600';
-  const activeBg = isDarkMode 
-    ? 'bg-blue-500/10' 
+  const activeBg = isDarkMode
+    ? 'bg-blue-500/10'
     : 'bg-blue-500/20';
-  const textColor = isDarkMode 
-    ? 'text-gray-400' 
+  const textColor = isDarkMode
+    ? 'text-gray-400'
     : 'text-gray-500';
-  const arrowColor = isDarkMode 
-    ? 'text-gray-400 hover:text-white hover:bg-gray-800' 
+  const arrowColor = isDarkMode
+    ? 'text-gray-400 hover:text-white hover:bg-gray-800'
     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200';
-  const loadingColor = isDarkMode 
-    ? 'border-gray-500' 
+  const loadingColor = isDarkMode
+    ? 'border-gray-500'
     : 'border-gray-400';
 
   return (
     <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40">
-      <div className="flex items-center px-2 py-2">
-        {/* Left arrow - only show if more than 4 pages */}
+      <div className={`flex items-center ${isMobile ? 'px-1 py-1' : 'px-2 py-2'}`}>
+        {/* Left arrow - only show if more than MAX_VISIBLE_PAGES pages */}
         {showArrows && (
           <Button
             variant="ghost"
             size="icon"
             onClick={handleArrowLeft}
             disabled={!canScrollLeft}
-            className={`h-8 w-8 ${arrowColor} disabled:opacity-30`}
+            className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} ${arrowColor} disabled:opacity-30`}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
           </Button>
         )}
 
         {/* Page thumbnails - with spacing */}
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-3'}`}>
           {visiblePages.map((page) => {
             const thumbnail = thumbnails.get(page.id);
             const isActive = page.id === effectiveCurrentPageId;
-            
+
             return (
               <div
                 key={page.id}
@@ -483,13 +506,13 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
                   }
                 }}
                 className={`
-                  relative w-20 h-12 rounded border-2 transition-all duration-300 ease-in-out
-                  ${isActive 
-                    ? `${activeBorder} ${activeBg}` 
+                  relative ${isMobile ? 'w-14 h-9' : 'w-20 h-12'} rounded border-2 transition-all duration-300 ease-in-out
+                  ${isActive
+                    ? `${activeBorder} ${activeBg}`
                     : `${pageBorder} ${pageBg} ${pageBorderHover}`
                   }
                   flex items-center justify-center overflow-hidden
-                  shadow-md hover:scale-110 hover:z-50
+                  shadow-md ${isMobile ? 'active:scale-95' : 'hover:scale-110 hover:z-50'}
                   cursor-pointer
                 `}
                 title={page.name || `Pagina ${pages.indexOf(page) + 1}`}
@@ -497,8 +520,8 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
                 {/* Always show page index badge (high-contrast) */}
                 <div
                   className={`
-                    absolute top-0 left-0 m-1 px-2 py-0.5 rounded-sm font-semibold
-                    text-[11px] leading-none
+                    absolute top-0 left-0 ${isMobile ? 'm-0.5 px-1.5 py-0.5' : 'm-1 px-2 py-0.5'} rounded-sm font-semibold
+                    ${isMobile ? 'text-[9px]' : 'text-[11px]'} leading-none
                     ${isDarkMode
                       ? 'bg-blue-600 text-white ring-1 ring-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.6)]'
                       : 'bg-blue-600 text-white ring-1 ring-black/40 shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
@@ -510,7 +533,7 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
 
                 {thumbnail?.isLoading ? (
                   <div className="w-full h-full flex items-center justify-center">
-                    <div className={`w-4 h-4 border-2 ${loadingColor} border-t-transparent rounded-full animate-spin`} />
+                    <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} border-2 ${loadingColor} border-t-transparent rounded-full animate-spin`} />
                   </div>
                 ) : thumbnail?.thumbnail ? (
                   <img
@@ -522,17 +545,17 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
                   <div className={`text-xs ${textColor}`} />
                 )}
                 {isActive && (
-                  <div className={`absolute bottom-0 left-0 right-0 h-1 ${isDarkMode ? 'bg-blue-500' : 'bg-blue-600'}`} />
+                  <div className={`absolute bottom-0 left-0 right-0 ${isMobile ? 'h-0.5' : 'h-1'} ${isDarkMode ? 'bg-blue-500' : 'bg-blue-600'}`} />
                 )}
-                
-                {/* Delete button - appears on hover after 0.5s */}
-                {showDeleteButton === page.id && pages.length > 1 && (
+
+                {/* Delete button - appears on hover after 0.5s (desktop only) */}
+                {!isMobile && showDeleteButton === page.id && pages.length > 1 && (
                   <button
                     onClick={(e) => handleDeletePage(page.id, e)}
                     className={`
                       absolute top-0 right-0 w-5 h-5 rounded-full
-                      ${isDarkMode 
-                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                      ${isDarkMode
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
                         : 'bg-red-500 hover:bg-red-600 text-white'
                       }
                       flex items-center justify-center
@@ -547,40 +570,40 @@ export function PageNavigator({ editor, store, currentPageId, onPageChange }: Pa
               </div>
             );
           })}
-          
+
           {/* Add page button - styled as a page */}
           <button
             onClick={handleCreatePage}
             disabled={isCreatingPage}
             className={`
-              relative w-20 h-12 rounded border-2 transition-all duration-300 ease-in-out
+              relative ${isMobile ? 'w-14 h-9' : 'w-20 h-12'} rounded border-2 transition-all duration-300 ease-in-out
               ${pageBorder} ${pageBg} ${pageBorderHover}
               flex items-center justify-center overflow-hidden
               disabled:opacity-50 disabled:cursor-not-allowed
-              shadow-md hover:scale-110 hover:z-50
+              shadow-md ${isMobile ? 'active:scale-95' : 'hover:scale-110 hover:z-50'}
             `}
             title="Adaugă pagină nouă"
           >
             {isCreatingPage ? (
               <div className="w-full h-full flex items-center justify-center">
-                <div className={`w-4 h-4 border-2 ${loadingColor} border-t-transparent rounded-full animate-spin`} />
+                <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} border-2 ${loadingColor} border-t-transparent rounded-full animate-spin`} />
               </div>
             ) : (
-              <Plus className={`h-5 w-5 ${textColor}`} />
+              <Plus className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} ${textColor}`} />
             )}
           </button>
         </div>
 
-        {/* Right arrow - only show if more than 4 pages */}
+        {/* Right arrow - only show if more than MAX_VISIBLE_PAGES pages */}
         {showArrows && (
           <Button
             variant="ghost"
             size="icon"
             onClick={handleArrowRight}
             disabled={!canScrollRight}
-            className={`h-8 w-8 ${arrowColor} disabled:opacity-30`}
+            className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} ${arrowColor} disabled:opacity-30`}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
           </Button>
         )}
       </div>

@@ -152,6 +152,14 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       ? `Clasa a ${problem.class}-a`
       : null
 
+  // Add custom scrollbar class to body
+  React.useEffect(() => {
+    document.body.classList.add('problem-page-scrollbar')
+    return () => {
+      document.body.classList.remove('problem-page-scrollbar')
+    }
+  }, [])
+
   React.useEffect(() => {
     const checkSolved = async () => {
       if (!user) return setLoadingSolved(false);
@@ -171,7 +179,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
     if (!user) return;
     if (isSolved) return; // Prevent duplicate submissions
     setLoadingSolved(true);
-    
+
     // Marchează problema ca rezolvată
     // ELO-ul se acordă automat prin trigger on_problem_solved
     const { error } = await supabase.from('solved_problems').insert({
@@ -179,7 +187,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       problem_id: problem.id,
       solved_at: new Date().toISOString(),
     });
-    
+
     // Also manually update getting started progress as fallback
     // The trigger should handle this, but we do it here as backup
     if (!error) {
@@ -206,13 +214,13 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           }
         })
     }
-    
+
     if (error) {
       console.error('Error marking problem as solved:', error);
       setLoadingSolved(false);
       return;
     }
-    
+
     // Verifică dacă utilizatorul a câștigat un badge nou (în ultimele 5 secunde)
     const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
     const { data: newBadges } = await supabase
@@ -240,18 +248,18 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
     setIsSolved(true);
     setLoadingSolved(false);
-    
+
     // Afișează mesajul de felicitare
     const randomMessage = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
     setCongratulationMessage(randomMessage);
-    
+
     // Confetti effect
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 }
     });
-    
+
     // Ascunde mesajul după 3 secunde
     setTimeout(() => {
       setCongratulationMessage(null);
@@ -311,7 +319,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-8 shadow-[0px_24px_70px_-40px_rgba(0,0,0,0.9)]">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap items-start gap-4">
-                      <span className="text-4xl lg:text-5xl">{problemIcon}</span>
                       <div className="flex flex-wrap gap-2">
                         <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
                           {problem.difficulty}
@@ -564,8 +571,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         </DialogContent>
       </Dialog>
 
-      <Drawer 
-        open={mobileBoardVisible} 
+      <Drawer
+        open={mobileBoardVisible}
         onOpenChange={(open) => {
           // Prevent automatic closing from swipe/scroll gestures
           // Only allow closing via the button
@@ -575,7 +582,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         }}
         dismissible={false}
       >
-        <DrawerContent 
+        <DrawerContent
           className="bg-[#141414] text-white border-t border-white/10"
           onPointerDownOutside={(e) => {
             // Prevent closing on outside click
@@ -595,7 +602,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             <div className="h-[70vh] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
               <ProblemBoard problemId={problem.id} />
             </div>
-            <Button 
+            <Button
               className="mt-4 w-full rounded-full border border-white/15 bg-white/10 py-3 text-sm font-semibold text-white hover:bg-white/20"
               onClick={() => setMobileBoardVisible(false)}
             >

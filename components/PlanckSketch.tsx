@@ -322,6 +322,16 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
             ? Object.keys(removed).filter((id: string) => !isEphemeralRecord(removed[id]))
             : [];
 
+          // Log page changes
+          const addedPages = filteredAdded.filter((r: any) => r.typeName === 'page');
+          const removedPages = filteredRemoved.filter((id: string) => removed[id]?.typeName === 'page' || id.startsWith('page:'));
+          if (addedPages.length > 0 || removedPages.length > 0) {
+            console.log("[PlanckSketch] Received page changes from server:", {
+              addedPages: addedPages.map((p: any) => p.id),
+              removedPages,
+            });
+          }
+
           const count = filteredAdded.length + filteredUpdated.length;
           setLastEvent(`Recv: ${count} changes`);
 
@@ -352,6 +362,7 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
 
         const payload: any = { added: {}, updated: {}, removed: {} };
         let hasChanges = false;
+        let hasPageChanges = false;
 
         // Filter out ephemeral records when sending updates
         // This ensures camera position, zoom, and cursor state stay local to each user
@@ -359,6 +370,10 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           if (!isEphemeralRecord(record)) {
             payload.added[id] = record;
             hasChanges = true;
+            if ((record as any).typeName === 'page') {
+              hasPageChanges = true;
+              console.log("[PlanckSketch] Page added:", id, record);
+            }
           }
         }
 
@@ -373,10 +388,17 @@ export default function PlanckSketch({ roomId }: { roomId: string }) {
           if (!isEphemeralRecord(record)) {
             payload.removed[id] = { id };
             hasChanges = true;
+            if ((record as any).typeName === 'page') {
+              hasPageChanges = true;
+              console.log("[PlanckSketch] Page removed:", id);
+            }
           }
         }
 
         if (hasChanges) {
+          if (hasPageChanges) {
+            console.log("[PlanckSketch] Broadcasting page changes to server");
+          }
           // Track pending changes for beforeunload flush
           pendingChangesRef.current = payload;
           socket.send(JSON.stringify({ type: "update", payload }));

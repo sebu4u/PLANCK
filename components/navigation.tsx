@@ -34,10 +34,10 @@ export function Navigation() {
   const router = useRouter()
   const pathname = usePathname()
   const dashboardSidebar = useDashboardSidebar()
-  
+
   // Check if we're on dashboard
   const isDashboard = pathname === "/dashboard"
-  
+
   // Reset mobile menu when navigating to/from dashboard
   useEffect(() => {
     if (isDashboard) {
@@ -57,7 +57,7 @@ export function Navigation() {
   const resultsRef = useRef<HTMLDivElement | null>(null)
   const cacheRef = useRef<Map<string, { results: SearchResultItem[]; hasMore: boolean }>>(new Map())
   const [, startTransition] = useTransition()
-  
+
 
   const problemShortcuts: { chapter: string; classLabel: string }[] = [
     { chapter: "Principiile mecanicii", classLabel: "a 9-a" },
@@ -96,13 +96,13 @@ export function Navigation() {
         chapter,
       }
       sessionStorage.setItem("problemFilters", JSON.stringify(payload))
-    } catch {}
+    } catch { }
     if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/probleme')) {
       try {
         window.dispatchEvent(new Event('problemFiltersUpdated'))
-      } catch {}
+      } catch { }
       // Trigger a soft refresh for visual feedback
-      try { router.refresh() } catch {}
+      try { router.refresh() } catch { }
     } else {
       router.push("/probleme")
     }
@@ -111,10 +111,10 @@ export function Navigation() {
   const goToCoursesWith = (classLabel: string) => {
     try {
       sessionStorage.setItem('physicsSelectedClass', classLabel)
-    } catch {}
+    } catch { }
     if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/cursuri')) {
-      try { window.dispatchEvent(new Event('physicsClassSelected')) } catch {}
-      try { router.refresh() } catch {}
+      try { window.dispatchEvent(new Event('physicsClassSelected')) } catch { }
+      try { router.refresh() } catch { }
     } else {
       router.push('/cursuri')
     }
@@ -125,7 +125,7 @@ export function Navigation() {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10)
     }
-    
+
     handleScroll() // Check initial scroll position
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
@@ -136,7 +136,7 @@ export function Navigation() {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 948)
     }
-    
+
     checkMobile() // Check initial size
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
@@ -147,7 +147,7 @@ export function Navigation() {
     const handleOpenLoginModal = () => {
       setIsLoginModalOpen(true)
     }
-    
+
     window.addEventListener('openLoginModal', handleOpenLoginModal)
     return () => window.removeEventListener('openLoginModal', handleOpenLoginModal)
   }, [])
@@ -342,7 +342,7 @@ export function Navigation() {
     setLoginLoading("google")
     const { error } = await loginWithGoogle()
     setLoginLoading(null)
-    
+
     if (error) {
       toast({
         title: "Eroare la autentificare cu Google",
@@ -358,7 +358,7 @@ export function Navigation() {
     setLoginLoading("github")
     const { error } = await loginWithGitHub()
     setLoginLoading(null)
-    
+
     if (error) {
       toast({
         title: "Eroare la autentificare cu GitHub",
@@ -406,49 +406,57 @@ export function Navigation() {
   const isRegisterRoute = pathname === '/register'
   const isTransparentRoute = isHomepage || isRegisterRoute
   const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
+  const isProblemsCatalog = pathname === '/probleme'
+  const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
   // On mobile, navbar should never be transparent when at the top of the screen
   const isTransparent = isTransparentRoute && !isScrolled && !isMobile
 
   const navTheme = isDashboard
     ? {
-        background: 'bg-[#080808]',
-        border: 'border-[#1a1a1a]',
-        dropdownBackground: 'bg-[#080808]',
-        dropdownBorder: 'border-[#1a1a1a]',
+      background: 'bg-[#080808]',
+      border: 'border-[#1a1a1a]',
+      dropdownBackground: 'bg-[#080808]',
+      dropdownBorder: 'border-[#1a1a1a]',
+    }
+    : isProblemPage
+      ? {
+        background: 'bg-[#101010]',
+        border: 'border-white/10',
+        dropdownBackground: 'bg-[#101010]',
+        dropdownBorder: 'border-white/10',
       }
-    : isInsightRoute || isSketchRoute
-    ? {
-        background: 'bg-black',
-        border: 'border-gray-800',
-        dropdownBackground: 'bg-black',
-        dropdownBorder: 'border-gray-800',
-      }
-    : isTransparent
-    ? {
-        background: 'bg-transparent',
-        border: 'border-transparent',
-        dropdownBackground: 'bg-[#0d1117]/95',
-        dropdownBorder: 'border-gray-800/80',
-      }
-    : isPlanckCodeRoute
-    ? {
-        background: 'bg-[#181818]',
-        border: 'border-gray-600',
-        dropdownBackground: 'bg-[#181818]',
-        dropdownBorder: 'border-gray-600',
-      }
-    : {
-        background: 'bg-[#0d1117]',
-        border: 'border-gray-800',
-        dropdownBackground: 'bg-[#0d1117]',
-        dropdownBorder: 'border-gray-800',
-      }
+      : isInsightRoute || isSketchRoute
+        ? {
+          background: 'bg-black',
+          border: 'border-gray-800',
+          dropdownBackground: 'bg-black',
+          dropdownBorder: 'border-gray-800',
+        }
+        : isTransparent
+          ? {
+            background: 'bg-transparent',
+            border: 'border-transparent',
+            dropdownBackground: 'bg-[#0d1117]/95',
+            dropdownBorder: 'border-gray-800/80',
+          }
+          : isPlanckCodeRoute
+            ? {
+              background: 'bg-[#181818]',
+              border: 'border-gray-600',
+              dropdownBackground: 'bg-[#181818]',
+              dropdownBorder: 'border-gray-600',
+            }
+            : {
+              background: 'bg-[#0d1117]',
+              border: 'border-gray-800',
+              dropdownBackground: 'bg-[#0d1117]',
+              dropdownBorder: 'border-gray-800',
+            }
   const mobileCtaLabel = user ? 'Dashboard' : 'Sign up'
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-[300] backdrop-blur-md animate-slide-down transition-all duration-300 ${
-      `${navTheme.background} ${navTheme.border}`
-    }`}>
+    <nav className={`fixed top-0 left-0 right-0 z-[300] backdrop-blur-md animate-slide-down transition-all duration-300 ${`${navTheme.background} ${navTheme.border}`
+      }`}>
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="relative h-16 flex items-center justify-between gap-6">
           {isMobile && (
@@ -471,9 +479,8 @@ export function Navigation() {
           {isMobile && (
             <Link
               href="/"
-              className={`burger:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex items-center justify-center text-white title-font animate-fade-in hover:text-gray-300 transition-colors ${
-                isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-              }`}
+              className={`burger:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex items-center justify-center text-white title-font animate-fade-in hover:text-gray-300 transition-colors ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
+                }`}
             >
               <Rocket className="w-6 h-6" />
             </Link>
@@ -482,18 +489,16 @@ export function Navigation() {
           <div className={`flex items-center h-full gap-6 flex-1 min-w-0`}>
             <Link
               href="/"
-              className={`hidden burger:flex text-2xl font-bold text-white title-font animate-fade-in flex-shrink-0 items-center gap-2 hover:text-gray-300 transition-colors ${
-                isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-              }`}
+              className={`hidden burger:flex text-2xl font-bold text-white title-font animate-fade-in flex-shrink-0 items-center gap-2 hover:text-gray-300 transition-colors ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
+                }`}
             >
               <Rocket className="w-6 h-6 text-white" />
               <span className="hidden logo:block">PLANCK</span>
             </Link>
 
             {/* Keep links visible on md and up, even when search is hidden */}
-            <div className={`hidden burger:flex items-center gap-1 animate-fade-in-delay-1 ${
-              isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-            }`}>
+            <div className={`hidden burger:flex items-center gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
+              }`}>
               <div
                 className="relative"
                 onMouseEnter={() => setCoursesOpen(true)}
@@ -604,9 +609,8 @@ export function Navigation() {
           </div>
 
           {/* Search bar + Desktop Login/Profile Button - dreapta */}
-          <div className={`hidden burger:flex items-center animate-fade-in-delay-2 justify-end gap-3 ${
-            isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-          }`}>
+          <div className={`hidden burger:flex items-center animate-fade-in-delay-2 justify-end gap-3 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
+            }`}>
             {/* Search triggers: 2xl full button, xl icon, hidden <=xl */}
             <button
               onClick={() => setIsSearchDialogOpen(true)}
@@ -682,9 +686,8 @@ export function Navigation() {
           </div>
 
           {/* Mobile menu button */}
-          <div className={`burger:hidden absolute right-0 top-0 h-full flex items-center ${
-            isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-          }`}>
+          <div className={`burger:hidden absolute right-0 top-0 h-full flex items-center ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
+            }`}>
             <button
               onClick={() => {
                 // On dashboard, open sidebar if context is available
@@ -697,7 +700,7 @@ export function Navigation() {
               }}
               className="inline-flex items-center justify-center w-10 h-10 text-gray-300 hover:text-white focus:outline-none transition-all duration-300"
             >
-              {isDashboard && dashboardSidebar 
+              {isDashboard && dashboardSidebar
                 ? (dashboardSidebar.isOpen ? <X size={24} /> : <Menu size={24} />)
                 : (isOpen ? <X size={24} /> : <Menu size={24} />)
               }
@@ -713,7 +716,7 @@ export function Navigation() {
           <div className="p-6">
             <h2 className="text-2xl font-bold text-white mb-2">Conectează-te</h2>
             <p className="text-gray-400 text-sm mb-6">Continuă cu unul dintre conturile tale</p>
-            
+
             <div className="space-y-3">
               <Button
                 onClick={handleGoogleLogin}
@@ -751,11 +754,11 @@ export function Navigation() {
 
       {/* Search Modal */}
       <Dialog open={isSearchDialogOpen} onOpenChange={(v) => setIsSearchDialogOpen(v)}>
-        <DialogContent className="bg-[#161b22] border border-gray-700 text-white w-[min(640px,95vw)] p-0">
+        <DialogContent overlayClassName="bg-black/40 backdrop-blur-[2px]" className="overflow-hidden p-0 shadow-2xl bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/10 sm:rounded-2xl w-[min(640px,95vw)] gap-0">
           <DialogTitle className="sr-only">Search</DialogTitle>
-          <div className="p-3">
-            <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="flex flex-col">
+            <div className="relative border-b border-white/5">
+              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
                 ref={inputRef}
                 value={query}
@@ -766,43 +769,99 @@ export function Navigation() {
                   performSearch(value)
                 }}
                 onKeyDown={onKeyDown}
-                placeholder="Search or jump to..."
-                className="pl-9 pr-3 bg-[#21262d] border-gray-600 text-white placeholder:text-gray-400"
+                placeholder="Caută lecții sau probleme..."
+                className="pl-12 pr-4 h-14 border-none bg-transparent text-lg text-white placeholder:text-gray-500 focus-visible:ring-0 shadow-none focus-visible:ring-offset-0 rounded-none"
                 autoFocus
               />
+              {isSearching && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                </div>
+              )}
             </div>
-          </div>
-          <div ref={resultsRef} className="max-h-80 overflow-auto">
-            {query.trim().length >= 2 && results.length === 0 && (
-              <div className="px-3 py-3 text-sm text-gray-400">Nu s-au găsit rezultate</div>
-            )}
-            {results.map((r, idx) => (
-              <button
-                key={`${r.type}-${r.id}-${idx}`}
-                onClick={() => handleSelect(r.url)}
-                className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition ${highlightIndex === idx ? 'bg-gray-700' : 'hover:bg-gray-700'} ${idx !== results.length - 1 ? 'border-b border-gray-700' : ''}`}
-              >
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${r.type === 'lesson' ? 'bg-blue-900/50 text-blue-400' : 'bg-green-900/50 text-green-400'}`}>
-                  {r.type === 'lesson' ? <BookOpen className="w-3.5 h-3.5" /> : <Calculator className="w-3.5 h-3.5" />}
+
+            <div ref={resultsRef} className="max-h-[60vh] overflow-y-auto custom-scrollbar p-2">
+              {query.trim().length >= 2 && results.length === 0 && !isSearching && (
+                <div className="py-12 text-center text-gray-500">
+                  <p className="text-sm">Nu am găsit rezultate pentru "{query}"</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{r.title}</p>
-                  <p className="text-[11px] text-gray-400">{r.type === 'lesson' ? 'Lecție' : 'Problemă'}</p>
+              )}
+
+              {query.trim().length < 2 && results.length === 0 && (
+                <div className="py-12 text-center text-gray-500">
+                  <p className="text-sm">Începe să scrii pentru a căuta...</p>
                 </div>
-                <ArrowUpRight className="w-3.5 h-3.5 text-gray-400" />
-              </button>
-            ))}
-            {isLoadingMore && (
-              <div className="px-3 py-3 text-xs text-gray-400 flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Se încarcă mai multe...
+              )}
+
+              {results.length > 0 && (
+                <div className="space-y-1">
+                  {/* Optional: Add a label if we had sections. For now just flat list */}
+                  {results.map((r, idx) => (
+                    <button
+                      key={`${r.type}-${r.id}-${idx}`}
+                      onClick={() => handleSelect(r.url)}
+                      onMouseEnter={() => setHighlightIndex(idx)}
+                      className={`w-full group text-left px-3 py-3 flex items-center gap-3 rounded-lg transition-all duration-200 ${highlightIndex === idx
+                        ? 'bg-white/10'
+                        : 'hover:bg-white/5'
+                        }`}
+                    >
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors ${r.type === 'lesson'
+                        ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        }`}>
+                        {r.type === 'lesson' ? <BookOpen className="w-4 h-4" /> : <Calculator className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate transition-colors ${highlightIndex === idx ? 'text-white' : 'text-gray-300'
+                          }`}>
+                          {r.title}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {r.type === 'lesson' ? 'Lecție' : 'Problemă'}
+                        </p>
+                      </div>
+                      <ArrowUpRight className={`w-4 h-4 text-gray-500 transition-all duration-200 ${highlightIndex === idx ? 'opacity-100 translate-x-0 text-white' : 'opacity-0 -translate-x-2'
+                        }`} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {isLoadingMore && (
+                <div className="px-4 py-4 text-sm text-gray-400 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  <span>Se încarcă mai multe...</span>
+                </div>
+              )}
+
+              {!isLoadingMore && hasMore && results.length > 0 && (
+                <div className="px-4 py-3 text-[10px] uppercase tracking-wider text-gray-600 text-center font-medium">
+                  Derulează pentru mai multe
+                </div>
+              )}
+            </div>
+
+            {/* Footer with shortcuts */}
+            <div className="hidden sm:flex border-t border-white/5 px-4 py-2.5 bg-white/[0.02] items-center justify-between">
+              <div className="flex items-center gap-4 text-[10px] text-gray-500 font-medium">
+                <div className="flex items-center gap-1.5">
+                  <div className="flex gap-1">
+                    <kbd className="min-w-[20px] h-5 flex items-center justify-center rounded bg-white/5 border border-white/10 font-sans">↑</kbd>
+                    <kbd className="min-w-[20px] h-5 flex items-center justify-center rounded bg-white/5 border border-white/10 font-sans">↓</kbd>
+                  </div>
+                  <span className="opacity-70">navigare</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <kbd className="h-5 px-1.5 flex items-center justify-center rounded bg-white/5 border border-white/10 font-sans">enter</kbd>
+                  <span className="opacity-70">selectare</span>
+                </div>
               </div>
-            )}
-            {!isLoadingMore && hasMore && results.length > 0 && (
-              <div className="px-3 py-3 text-[11px] text-gray-400 text-center">
-                Derulează pentru a vedea mai multe rezultate
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
+                <kbd className="h-5 px-1.5 flex items-center justify-center rounded bg-white/5 border border-white/10 font-sans">esc</kbd>
+                <span className="opacity-70">închidere</span>
               </div>
-            )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -10,7 +10,7 @@ import { Navigation } from '@/components/navigation';
 // Lazy load TldrawEditor to reduce initial bundle size
 const TldrawEditor = dynamic(
   () => import('@/components/sketch/TldrawEditor').then((mod) => ({ default: mod.TldrawEditor })),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="h-full flex items-center justify-center bg-black">
@@ -52,7 +52,7 @@ export default function BoardPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [isMathGraphOpen, setIsMathGraphOpen] = useState(false);
-  
+
   // Compute effective current page ID - similar to PageNavigator logic
   // This ensures the graph button appears even when currentPageId isn't set yet
   // Using useMemo to recalculate when editor or currentPageId changes
@@ -148,14 +148,14 @@ export default function BoardPage() {
           setCurrentPageId(editor.currentPageId);
           return;
         }
-        
+
         // Try to get first page from editor's pages
         const pages = editor.getPages();
         if (pages.length > 0) {
           setCurrentPageId(pages[0].id);
           return;
         }
-        
+
         // Try to get first page from store
         const storePages = editor.store.allRecords().filter((r: any) => r.typeName === 'page');
         if (storePages.length > 0) {
@@ -171,7 +171,7 @@ export default function BoardPage() {
 
     // Also try after a short delay in case pages are still loading
     const timeout = setTimeout(trySetPageId, 100);
-    
+
     return () => clearTimeout(timeout);
   }, [editor, currentPageId]);
 
@@ -267,7 +267,7 @@ export default function BoardPage() {
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col overflow-hidden">
       <Navigation />
-      
+
       {/* Header with board title */}
       <div className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
@@ -305,7 +305,7 @@ export default function BoardPage() {
               setCurrentPageId(pageId);
             }}
           />
-          
+
           {/* Page Navigator */}
           <PageNavigator
             editor={editor}
@@ -315,7 +315,7 @@ export default function BoardPage() {
               setCurrentPageId(pageId);
             }}
           />
-          
+
           {/* Share Button - Bottom Right */}
           <div className="hidden sm:block absolute bottom-4 right-4 z-50">
             <ShareButton boardId={boardId} shareUrl={shareUrl} />

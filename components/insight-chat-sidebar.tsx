@@ -25,6 +25,22 @@ interface InsightChatSidebarProps {
   problemStatement: string
 }
 
+// Loading messages shown while AI is thinking
+const loadingMessages = [
+  'Mă gândesc la soluție…',
+  'Analizez problema…',
+  'Calculez răspunsul…',
+  'Un moment, conectez toate ideile…',
+  'Procesez informațiile… logic, desigur.',
+  'Să vedem ce spune fizica despre asta…',
+  'Conectez teoria cu practica…',
+  'Să vedem dacă pot face fizica să sune simplu.',
+]
+
+const getRandomLoadingMessage = () => {
+  return loadingMessages[Math.floor(Math.random() * loadingMessages.length)]
+}
+
 export default function InsightChatSidebar({
   isOpen,
   onClose,
@@ -48,9 +64,13 @@ export default function InsightChatSidebar({
   const endRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [textareaHeight, setTextareaHeight] = useState(24)
   const abortControllerRef = useRef<AbortController | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
+  const [problemContext, setProblemContext] = useState<string | null>(null)
 
   const markdownComponents = useMemo(
     () => ({
@@ -152,9 +172,23 @@ export default function InsightChatSidebar({
     }
   }
 
+  // Check if chat has messages (excluding system message)
+  const hasMessages = messages.filter((m) => m.role !== 'system').length > 0
+
   // Initialize session when sidebar opens
   useEffect(() => {
     if (!isOpen || !user) return
+
+    // If we already have messages or a session active, don't re-initialize
+    if (hasMessages || sessionId) {
+      // Just focus if needed
+      setTimeout(() => {
+        if (window.innerWidth >= 1024) {
+          textareaRef.current?.focus()
+        }
+      }, 100)
+      return
+    }
 
     const initializeSession = async () => {
       try {
@@ -173,13 +207,17 @@ export default function InsightChatSidebar({
         // Always start with a fresh session for problem pages
         // Don't load existing sessions - they remain in history but not shown here
         await loadProblemSession(accessToken)
-        
-        // Auto-fill problem statement for fresh chat
-        const problemText = `Rezolva problema asta:\n\n${problemStatement}`
-        setInput(problemText)
-        // Focus textarea after a short delay
+
+        // Auto-fill problem statement for fresh chat as context
+        if (problemStatement) {
+          setProblemContext(`Rezolva problema asta:\n\n${problemStatement}`)
+        }
+
+        // Focus textarea after a short delay only on desktop
         setTimeout(() => {
-          textareaRef.current?.focus()
+          if (window.innerWidth >= 1024) {
+            textareaRef.current?.focus()
+          }
         }, 100)
       } catch (e: any) {
         console.error('Failed to initialize session:', e)
@@ -189,24 +227,33 @@ export default function InsightChatSidebar({
     }
 
     initializeSession()
-  }, [isOpen, user, problemId])
+  }, [isOpen, user, problemId]) // Dependencies kept, but logic guards against re-run
 
-  // Clear session state when sidebar closes or component unmounts
+  // Reset state when problem changes
   useEffect(() => {
-    if (!isOpen) {
-      // Reset to fresh state when sidebar closes
-      setSessionId(null)
-      setMessages([
-        {
-          role: 'system',
-          content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
-        },
-      ])
-      setInput('')
-      setError(null)
+    setSessionId(null)
+    setMessages([
+      {
+        role: 'system',
+        content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+      },
+    ])
+    setInput('')
+    setError(null)
+    // We don't necessarily set context here because the main effect will do it if isOpen is true
+    // or we can set it here if we want it ready before opening.
+    // But typically isOpen drives the flow.
+    if (problemStatement) {
+      // If the sidebar is open, this might conflict with the other effect, 
+      // but since we reset messages above, `hasMessages` becomes false, so the other effect will run and setup everything.
+      // So this reset is sufficient to trigger re-initialization in the main effect.
+      setProblemContext(null)
     }
+  }, [problemId])
 
-    // Cleanup on unmount (when user leaves the problem page)
+
+  // Cleanup only on unmount
+  useEffect(() => {
     return () => {
       // Reset state when component unmounts
       setSessionId(null)
@@ -218,18 +265,35 @@ export default function InsightChatSidebar({
       ])
       setInput('')
       setError(null)
+      setProblemContext(null)
     }
-  }, [isOpen])
+  }, [])
 
-  // Check if chat has messages (excluding system message)
-  const hasMessages = messages.filter((m) => m.role !== 'system').length > 0
 
-  // Auto-scroll to bottom when new messages arrive
+  // Check if user is at bottom of messages container
+  const checkIfAtBottom = useCallback(() => {
+    if (!messagesContainerRef.current) return true
+
+    const container = messagesContainerRef.current
+    const threshold = 100 // pixels from bottom to consider "at bottom"
+    const isAtBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < threshold
+
+    return isAtBottom
+  }, [])
+
+  // Handle scroll events to track if user is at bottom
+  const handleScroll = useCallback(() => {
+    const isAtBottom = checkIfAtBottom()
+    setShouldAutoScroll(isAtBottom)
+  }, [checkIfAtBottom])
+
+  // Auto-scroll to bottom only when user is already at bottom
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && shouldAutoScroll) {
       endRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages, busy, isOpen])
+  }, [messages, busy, isOpen, shouldAutoScroll])
 
   // Function to adjust textarea height
   const adjustTextareaHeight = useCallback(() => {
@@ -309,6 +373,7 @@ export default function InsightChatSidebar({
 
     setIsStreaming(false)
     setBusy(false)
+    setLoadingMessage(null)
 
     if (!user) return
 
@@ -331,7 +396,7 @@ export default function InsightChatSidebar({
   }, [isStreaming, supabase, user])
 
   const send = async () => {
-    if (!user || !input.trim() || busy) return
+    if (!user || (!input.trim() && !problemContext) || busy) return
 
     setBusy(true)
     setError(null)
@@ -354,13 +419,21 @@ export default function InsightChatSidebar({
         return
       }
 
+      // Combine context and input if context exists
+      let finalContent = input.trim()
+      if (problemContext) {
+        finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
+      }
+
       const newUserMsg: ChatMessage = {
         role: 'user',
-        content: input.trim(),
+        content: finalContent,
       }
 
       setMessages((prev) => [...prev, newUserMsg])
       setInput('')
+      setProblemContext(null) // Clear context after it's sent
+      setShouldAutoScroll(true) // Ensure we auto-scroll for the new response
 
       // If no session, create one with problem title
       let currentSessionId = sessionId
@@ -388,6 +461,9 @@ export default function InsightChatSidebar({
 
       // Add empty assistant message that will be updated incrementally
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+
+      // Set random loading message
+      setLoadingMessage(getRandomLoadingMessage())
 
       const res = await fetch('/api/insight/chat', {
         method: 'POST',
@@ -450,10 +526,13 @@ export default function InsightChatSidebar({
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6))
-                
+
                 if (data.type === 'session' && data.sessionId) {
                   setSessionId(data.sessionId)
                 } else if (data.type === 'text' && data.content) {
+                  // Clear loading message when first content arrives
+                  setLoadingMessage(null)
+
                   // Update assistant message incrementally (always the last assistant message)
                   setMessages((prev) => {
                     const newMessages = [...prev]
@@ -554,28 +633,31 @@ export default function InsightChatSidebar({
           onClick={onClose}
         />
       )}
-      
+
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`fixed top-16 right-0 h-[calc(100vh-4rem)] w-[90vw] lg:w-[33vw] bg-[#0d1117] border-l border-gray-800 z-50 flex flex-col transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-16 right-0 h-[calc(100dvh-4rem)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-50 flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
         style={{ maxWidth: '90vw' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-800">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-white font-semibold">Insight Chat</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded hover:bg-gray-800 transition-colors"
+            className="p-2 rounded hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 py-6"
+        >
           {!user ? (
             <div className="flex flex-col items-center justify-center h-full">
               <div className="text-center max-w-sm">
@@ -586,7 +668,7 @@ export default function InsightChatSidebar({
                   <Button
                     onClick={handleGoogleLogin}
                     disabled={loginLoading !== null}
-                    className="flex-1 h-11 bg-transparent hover:bg-gray-800/50 text-white border border-gray-600 hover:border-gray-500 transition-all duration-200"
+                    className="flex-1 h-11 bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20 transition-all duration-200"
                   >
                     {loginLoading === 'google' ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -600,7 +682,7 @@ export default function InsightChatSidebar({
                   <Button
                     onClick={handleGitHubLogin}
                     disabled={loginLoading !== null}
-                    className="flex-1 h-11 bg-transparent hover:bg-gray-800/50 text-white border border-gray-600 hover:border-gray-500 transition-all duration-200"
+                    className="flex-1 h-11 bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20 transition-all duration-200"
                   >
                     {loginLoading === 'github' ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -635,16 +717,29 @@ export default function InsightChatSidebar({
                       {isAssistant ? (
                         <div className="w-full py-2">
                           <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">
-                            Insight
+                            {m.content === '' && loadingMessage ? (
+                              <span className="flex items-center gap-2">
+                                <span className="shimmer-text">{loadingMessage}</span>
+                                <span className="flex gap-1">
+                                  <span className="animate-pulse">●</span>
+                                  <span className="animate-pulse delay-75">●</span>
+                                  <span className="animate-pulse delay-150">●</span>
+                                </span>
+                              </span>
+                            ) : (
+                              'Insight'
+                            )}
                           </div>
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm, remarkMath]}
-                            rehypePlugins={[rehypeKatex]}
-                            components={markdownComponents}
-                            className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
-                          >
-                            {m.content}
-                          </ReactMarkdown>
+                          {m.content && (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm, remarkMath]}
+                              rehypePlugins={[rehypeKatex]}
+                              components={markdownComponents}
+                              className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
+                            >
+                              {m.content}
+                            </ReactMarkdown>
+                          )}
                         </div>
                       ) : (
                         <div className="max-w-[70%] rounded-2xl bg-[#212121] text-white px-4 py-3 shadow-sm">
@@ -664,18 +759,6 @@ export default function InsightChatSidebar({
                     </div>
                   )
                 })}
-              {busy && (
-                <div className="flex justify-start">
-                  <div className="w-full py-2 text-gray-400 flex items-center gap-2 text-sm">
-                    <span className="text-xs uppercase tracking-wide text-gray-500">Insight</span>
-                    <span className="flex gap-1">
-                      <span className="animate-pulse">●</span>
-                      <span className="animate-pulse delay-75">●</span>
-                      <span className="animate-pulse delay-150">●</span>
-                    </span>
-                  </div>
-                </div>
-              )}
               <div ref={endRef} />
             </div>
           ) : (
@@ -699,52 +782,75 @@ export default function InsightChatSidebar({
           </div>
         )}
 
-        {/* Chatbox */}
+        {/* Chatbox Area */}
         <div className="p-4">
-          <div className="relative flex items-end gap-2 bg-[#212121] border border-gray-600 rounded-2xl p-3 shadow-lg">
-            <button
-              className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
-              disabled
-              title="Atașează fișier (în curând)"
-            >
-              <Paperclip className="w-4 h-4 text-gray-400" />
-            </button>
-            <Textarea
-              ref={textareaRef}
-              placeholder="What do you want to know?"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              rows={1}
-              className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
-              disabled={busy}
-              style={{
-                minHeight: '24px',
-                height: `${textareaHeight}px`,
-                overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
-              }}
-            />
-            {busy && isStreaming ? (
-              <button
-                onClick={stopGeneration}
-                className="p-2 rounded transition-colors flex-shrink-0 self-end mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Oprește răspunsul"
-              >
-                <span className="flex items-center justify-center w-5 h-5">
-                  <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
-                    <span className="w-2 h-2 bg-black" />
-                  </span>
-                </span>
-              </button>
-            ) : (
-              <button
-                onClick={send}
-                disabled={busy || !input.trim()}
-                className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
-              >
-                <Send className="w-4 h-4 text-gray-400" />
-              </button>
+          <div className="flex flex-col relative w-full">
+            {/* Context Card */}
+            {problemContext && !busy && (
+              <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <span className="text-xs font-medium uppercase text-blue-400 flex-shrink-0">Context:</span>
+                  <p className="truncate opacity-80 text-xs">
+                    {problemContext.slice(0, 50)}...
+                  </p>
+                </div>
+                <button
+                  onClick={() => setProblemContext(null)}
+                  className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0"
+                  title="Șterge contextul"
+                >
+                  <X className="w-3 h-3 text-gray-400" />
+                </button>
+              </div>
             )}
+
+            {/* Input Area */}
+            <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-3 shadow-lg transition-all duration-200 ${problemContext ? 'rounded-b-2xl rounded-t-none border-t-0' : 'rounded-2xl'
+              }`}>
+              <button
+                className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
+                disabled
+                title="Atașează fișier (în curând)"
+              >
+                <Paperclip className="w-4 h-4 text-gray-400" />
+              </button>
+              <Textarea
+                ref={textareaRef}
+                placeholder={problemContext ? "Adaugă detalii sau întreabă..." : "Scrie un mesaj..."}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                rows={1}
+                className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                disabled={busy}
+                style={{
+                  minHeight: '24px',
+                  height: `${textareaHeight}px`,
+                  overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
+                }}
+              />
+              {busy && isStreaming ? (
+                <button
+                  onClick={stopGeneration}
+                  className="p-2 rounded transition-colors flex-shrink-0 self-end mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Oprește răspunsul"
+                >
+                  <span className="flex items-center justify-center w-5 h-5">
+                    <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
+                      <span className="w-2 h-2 bg-black" />
+                    </span>
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={send}
+                  disabled={busy || (!input.trim() && !problemContext)}
+                  className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
+                >
+                  <Send className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

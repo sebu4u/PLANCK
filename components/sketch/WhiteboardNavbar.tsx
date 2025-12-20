@@ -64,9 +64,18 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // On mobile, show max 3 users, on desktop show max 5
+  const MAX_VISIBLE_USERS_MOBILE = 3;
+  const MAX_VISIBLE_USERS_DESKTOP = 5;
+
+  const visibleUsersMobile = connectedUsers.slice(0, MAX_VISIBLE_USERS_MOBILE);
+  const remainingCountMobile = connectedUsers.length - MAX_VISIBLE_USERS_MOBILE;
+  const visibleUsersDesktop = connectedUsers.slice(0, MAX_VISIBLE_USERS_DESKTOP);
+  const remainingCountDesktop = connectedUsers.length - MAX_VISIBLE_USERS_DESKTOP;
+
   return (
     <nav className="bg-black border-b border-gray-800 w-full h-16 flex items-center justify-between px-4 sm:px-6 z-50 relative">
-      {/* Left side: Logo + Back button */}
+      {/* Left side: Logo + Back button (desktop only) */}
       <div className="flex items-center gap-4">
         <Link
           href="/"
@@ -75,11 +84,12 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
           <Rocket className="w-6 h-6 text-white" />
           <span className="text-xl font-bold">PLANCK</span>
         </Link>
+        {/* Back button - hidden on mobile, shown on desktop */}
         <Button
           onClick={() => router.push(user ? "/sketch/boards" : "/sketch")}
           variant="ghost"
           size="sm"
-          className="text-gray-400 hover:text-white hover:bg-gray-800"
+          className="hidden sm:flex text-gray-400 hover:text-white hover:bg-gray-800"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Înapoi
@@ -106,34 +116,84 @@ export function WhiteboardNavbar({ roomId, connectedUsers }: WhiteboardNavbarPro
         </div>
       </div>
 
-      {/* Right side: Connected users */}
+      {/* Right side: Connected users + Back button on mobile */}
       <div className="flex items-center gap-2">
+        {/* User count - hidden on mobile */}
         <span className="text-sm text-gray-400 mr-2 hidden sm:inline">
           {connectedUsers.length} {connectedUsers.length === 1 ? "utilizator" : "utilizatori"}
         </span>
-        <div className="flex items-center gap-2">
+
+        {/* Connected users avatars - Mobile view (compact, max 3) */}
+        <div className="flex items-center sm:hidden">
           {connectedUsers.length > 0 ? (
-            connectedUsers.map((userInfo) => (
-              <Avatar
-                key={userInfo.connectionId}
-                className={`h-8 w-8 border-2 border-gray-700 ${getUserColor(userInfo)}`}
-                title={getUserDisplayName(userInfo)}
-              >
-                {userInfo.userIcon ? (
-                  <AvatarImage
-                    src={userInfo.userIcon}
-                    alt={getUserDisplayName(userInfo)}
-                  />
-                ) : null}
-                <AvatarFallback className="text-xs font-semibold text-white bg-transparent">
-                  {getUserInitials(userInfo)}
-                </AvatarFallback>
-              </Avatar>
-            ))
+            <div className="flex items-center -space-x-2">
+              {visibleUsersMobile.map((userInfo) => (
+                <Avatar
+                  key={userInfo.connectionId}
+                  className={`h-7 w-7 border-2 border-gray-800 ${getUserColor(userInfo)} ring-1 ring-black`}
+                  title={getUserDisplayName(userInfo)}
+                >
+                  {userInfo.userIcon ? (
+                    <AvatarImage
+                      src={userInfo.userIcon}
+                      alt={getUserDisplayName(userInfo)}
+                    />
+                  ) : null}
+                  <AvatarFallback className="text-[10px] font-semibold text-white bg-transparent">
+                    {getUserInitials(userInfo)}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+              {remainingCountMobile > 0 && (
+                <div className="h-7 w-7 rounded-full bg-gray-700 border-2 border-gray-800 ring-1 ring-black flex items-center justify-center">
+                  <span className="text-[10px] font-semibold text-white">+{remainingCountMobile}</span>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Connected users avatars - Desktop view */}
+        <div className="hidden sm:flex items-center gap-2">
+          {connectedUsers.length > 0 ? (
+            <div className="flex items-center -space-x-1">
+              {visibleUsersDesktop.map((userInfo) => (
+                <Avatar
+                  key={userInfo.connectionId}
+                  className={`h-8 w-8 border-2 border-gray-700 ${getUserColor(userInfo)}`}
+                  title={getUserDisplayName(userInfo)}
+                >
+                  {userInfo.userIcon ? (
+                    <AvatarImage
+                      src={userInfo.userIcon}
+                      alt={getUserDisplayName(userInfo)}
+                    />
+                  ) : null}
+                  <AvatarFallback className="text-xs font-semibold text-white bg-transparent">
+                    {getUserInitials(userInfo)}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+              {remainingCountDesktop > 0 && (
+                <div className="h-8 w-8 rounded-full bg-gray-700 border-2 border-gray-700 flex items-center justify-center">
+                  <span className="text-xs font-semibold text-white">+{remainingCountDesktop}</span>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-sm text-gray-500">Niciun utilizator conectat</div>
           )}
         </div>
+
+        {/* Back button - Mobile only, on the right */}
+        <Button
+          onClick={() => router.push(user ? "/sketch/boards" : "/sketch")}
+          variant="ghost"
+          size="sm"
+          className="sm:hidden text-gray-400 hover:text-white hover:bg-gray-800 ml-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
       </div>
     </nav>
   );

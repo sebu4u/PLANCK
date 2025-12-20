@@ -20,14 +20,13 @@ export function PlanckCodeSidebar() {
     { label: 'Leaderboards', icon: BarChart3, href: '/planckcode/leaderboards' },
   ]
 
-  const baseButtonClassName =
-    'w-full flex items-center px-4 py-3 text-white hover:bg-gray-700 transition-colors duration-200 relative font-vt323 text-lg'
+  const baseButtonClassName = `w-full flex items-center py-3 text-white hover:bg-[#262626] transition-colors duration-200 relative font-vt323 text-lg ${isHovered ? 'justify-start px-4' : 'justify-center'
+    }`
 
   return (
     <aside
-      className={`hidden md:block fixed left-0 top-16 z-[299] bg-[#181818] border-r border-[#3b3b3b] transition-all duration-300 ease-in-out h-screen-minus-64 ${
-        isHovered ? 'w-[200px]' : 'w-16'
-      }`}
+      className={`hidden md:block fixed left-0 top-16 z-[299] bg-[#181818] border-r border-[#3b3b3b] transition-all duration-300 ease-in-out h-screen-minus-64 ${isHovered ? 'w-[200px]' : 'w-16'
+        }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -46,11 +45,10 @@ export function PlanckCodeSidebar() {
             priority
           />
           <span
-            className={`text-sm font-semibold text-white transition-all duration-300 ${
-              isHovered
-                ? 'ml-3 opacity-100 translate-x-0'
-                : 'ml-0 opacity-0 -translate-x-2 w-0 overflow-hidden'
-            }`}
+            className={`text-sm font-semibold text-white transition-all duration-300 ${isHovered
+              ? 'ml-3 opacity-100 translate-x-0'
+              : 'ml-0 opacity-0 -translate-x-2 w-0 overflow-hidden'
+              }`}
           >
             PlanckCode
           </span>
@@ -64,8 +62,8 @@ export function PlanckCodeSidebar() {
               const isLink = item.href !== '#' && !item.disabled
               const isDisabled = item.disabled
               const isActive = pathname === item.href
-              const className = `${baseButtonClassName} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${isActive ? 'bg-gray-700 border-l-2 border-white' : ''}`
-              
+              const className = `${baseButtonClassName} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${isActive ? 'bg-[#262626] border-l-2 border-white' : ''}`
+
               return (
                 <li key={item.label}>
                   {isLink ? (
@@ -75,12 +73,11 @@ export function PlanckCodeSidebar() {
                         <Icon className="w-5 h-5 text-white" />
                       </div>
                       {/* Text with animation */}
-                      <span 
-                        className={`font-medium whitespace-nowrap ml-3 mt-0.5 transition-all duration-300 ${
-                          isHovered 
-                            ? 'opacity-100 translate-x-0' 
-                            : 'opacity-0 -translate-x-2 w-0 overflow-hidden'
-                        }`}
+                      <span
+                        className={`font-medium whitespace-nowrap mt-0.5 transition-all duration-300 ${isHovered
+                          ? 'ml-3 opacity-100 translate-x-0'
+                          : 'ml-0 opacity-0 -translate-x-2 w-0 overflow-hidden'
+                          }`}
                       >
                         {item.label}
                       </span>
@@ -92,12 +89,11 @@ export function PlanckCodeSidebar() {
                         <Icon className="w-5 h-5 text-white" />
                       </div>
                       {/* Text with animation */}
-                      <span 
-                        className={`font-medium whitespace-nowrap ml-3 mt-0.5 transition-all duration-300 ${
-                          isHovered 
-                            ? 'opacity-100 translate-x-0' 
-                            : 'opacity-0 -translate-x-2 w-0 overflow-hidden'
-                        }`}
+                      <span
+                        className={`font-medium whitespace-nowrap mt-0.5 transition-all duration-300 ${isHovered
+                          ? 'ml-3 opacity-100 translate-x-0'
+                          : 'ml-0 opacity-0 -translate-x-2 w-0 overflow-hidden'
+                          }`}
                       >
                         {item.label}
                       </span>
@@ -120,9 +116,8 @@ export function PlanckCodeSidebar() {
               <Settings className="w-5 h-5 text-white" />
             </div>
             <span
-              className={`text-sm font-medium whitespace-nowrap ml-3 transition-all duration-300 ${
-                isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0 overflow-hidden'
-              }`}
+              className={`text-sm font-medium whitespace-nowrap transition-all duration-300 ${isHovered ? 'ml-3 opacity-100 translate-x-0' : 'ml-0 opacity-0 -translate-x-2 w-0 overflow-hidden'
+                }`}
             >
               Setări IDE
             </span>

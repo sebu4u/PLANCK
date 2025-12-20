@@ -154,21 +154,21 @@ interface FileItem {
 
 type InsightCodeEditChange =
   | {
-      type: 'insert'
-      line?: number
-      content?: string
-    }
+    type: 'insert'
+    line?: number
+    content?: string
+  }
   | {
-      type: 'delete'
-      start?: number
-      end?: number
-    }
+    type: 'delete'
+    start?: number
+    end?: number
+  }
   | {
-      type: 'replace'
-      start?: number
-      end?: number
-      content?: string
-    }
+    type: 'replace'
+    start?: number
+    end?: number
+    content?: string
+  }
 
 interface InsightCodeEditResponse {
   type: 'code_edit'
@@ -278,7 +278,7 @@ const applyInsightChangesToContent = (
 
   sortedChanges.forEach((change, index) => {
     console.log(`IDE: Processing change ${index} (offset: ${lineOffset}):`, change)
-    
+
     if (change.type === 'insert') {
       const rawLine = change.line ?? workingLines.length + 1
       // Apply offset to get actual position in modified content
@@ -411,11 +411,11 @@ function IDEPageContent() {
   useEffect(() => {
     setUpgradeStarsMounted(true)
   }, [])
-  
+
   // Load saved state from localStorage on mount
   const loadSavedState = (): { files: FileItem[], activeFileId: string } | null => {
     if (typeof window === 'undefined') return null
-    
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
@@ -429,10 +429,10 @@ function IDEPageContent() {
         ) {
           // Ensure all required fields exist
           const validFiles = parsed.files.every((f: any) =>
-            f && typeof f.id === 'string' && typeof f.name === 'string' && 
+            f && typeof f.id === 'string' && typeof f.name === 'string' &&
             typeof f.content === 'string' && (f.type === 'cpp' || f.type === 'txt')
           )
-          
+
           if (validFiles) {
             // Ensure activeFileId exists in files, otherwise use first file
             const activeFileExists = parsed.files.find((f: FileItem) => f.id === parsed.activeFileId)
@@ -456,6 +456,8 @@ function IDEPageContent() {
   const [activeFileId, setActiveFileId] = useState<string>(() => {
     return savedState?.activeFileId || '1'
   })
+  // Streaming state for glow effect
+  const [isStreamingCode, setIsStreamingCode] = useState(false)
   const [output, setOutput] = useState<RunResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -463,7 +465,7 @@ function IDEPageContent() {
   const [stdin, setStdin] = useState<string>('')
   const [isInsightOpen, setIsInsightOpen] = useState<boolean>(false)
   const searchParams = useSearchParams()
-  
+
   // Interactive execution state
   const [isInteractiveMode, setIsInteractiveMode] = useState<boolean>(true)
   const [interactiveOutput, setInteractiveOutput] = useState<string>('')
@@ -473,11 +475,11 @@ function IDEPageContent() {
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [compilerAvailable, setCompilerAvailable] = useState<boolean | null>(null)
   const [pendingInsightEdit, setPendingInsightEdit] = useState<PendingInsightEdit | null>(null)
-  
+
   // Save state to localStorage whenever files or activeFileId changes
   useEffect(() => {
     if (typeof window === 'undefined') return
-    
+
     try {
       const stateToSave = {
         files,
@@ -501,15 +503,15 @@ function IDEPageContent() {
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState<boolean>(false)
   const [newFileName, setNewFileName] = useState<string>('')
   const [newFileType, setNewFileType] = useState<'cpp' | 'txt'>('txt')
-  
+
   // Editor references
   const editorRef = useRef<import('monaco-editor').editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
   const insightDecorationsRef = useRef<string[]>([])
   const skipModelSyncRef = useRef<Set<string>>(new Set())
-const streamingEditRef = useRef<{ fileId: string; content: string } | null>(null)
-const streamingCancelRef = useRef<(() => void) | null>(null)
-const streamingActiveRef = useRef<Set<string>>(new Set())
+  const streamingEditRef = useRef<{ fileId: string; content: string } | null>(null)
+  const streamingCancelRef = useRef<(() => void) | null>(null)
+  const streamingActiveRef = useRef<Set<string>>(new Set())
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0]
 
@@ -588,7 +590,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
 
   const parseFileUpdates = (stdout: string) => {
     if (!stdout) return
-    
+
     // Parse sections like: "=== Content of filename ===\n...content...\n"
     const lines = stdout.split('\n')
     let i = 0
@@ -605,7 +607,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
           contentLines.push(lines[j])
           j++
         }
-        updates[fileName] = contentLines.join('\n').replace(/\s+$/,'')
+        updates[fileName] = contentLines.join('\n').replace(/\s+$/, '')
         i = j
       } else {
         i++
@@ -660,15 +662,15 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
 
     if (newFileType === 'cpp') {
       // For C++ files, always ensure .cpp extension
-      fileName = trimmedName.endsWith('.cpp') 
-        ? trimmedName 
+      fileName = trimmedName.endsWith('.cpp')
+        ? trimmedName
         : trimmedName + '.cpp'
     } else {
       // For text files, check if filename already has an extension
       // If it contains a dot (not at the start), assume it has an extension
       const hasExtension = trimmedName.includes('.') && trimmedName.indexOf('.') > 0
-      fileName = hasExtension 
-        ? trimmedName 
+      fileName = hasExtension
+        ? trimmedName
         : trimmedName + '.txt'
     }
 
@@ -681,8 +683,8 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
     const newFile: FileItem = {
       id: Date.now().toString(),
       name: fileName,
-      content: newFileType === 'cpp' 
-        ? '// Write your C++ code here\n' 
+      content: newFileType === 'cpp'
+        ? '// Write your C++ code here\n'
         : '',
       type: newFileType
     }
@@ -747,31 +749,22 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
   }
 
   const handleInsertCodeFromInsight = useCallback((code: string) => {
-    const editor = editorRef.current
-    if (!editor) return
+    if (!activeFileId) return
 
-    const model = editor.getModel()
-    if (!model) return
+    // Update file content state
+    setFiles((prevFiles) =>
+      prevFiles.map((file) =>
+        file.id === activeFileId ? { ...file, content: code } : file
+      )
+    )
 
-    editor.focus()
-
-    const fullRange = model.getFullModelRange()
-
-    editor.pushUndoStop()
-    editor.executeEdits('insight-insert', [
-      {
-        range: fullRange,
-        text: code,
-        forceMoveMarkers: true
-      }
-    ])
-    editor.pushUndoStop()
-
-    const lastLine = model.getLineCount()
-    const lastColumn = model.getLineMaxColumn(lastLine)
-    editor.setPosition({ lineNumber: lastLine, column: lastColumn })
-    editor.revealLineInCenter(lastLine)
-  }, [editorRef])
+    // Trigger streaming animation
+    skipModelSyncRef.current.add(activeFileId)
+    streamingEditRef.current = {
+      fileId: activeFileId,
+      content: code
+    }
+  }, [activeFileId])
 
   const clearInsightDecorations = useCallback(() => {
     const editor = editorRef.current
@@ -1017,6 +1010,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
     const chunkDelay = 20
 
     streamingActiveRef.current.add(task.fileId)
+    setIsStreamingCode(true) // Start glow effect
     editor.pushUndoStop()
     model.setValue('')
     editor.pushUndoStop()
@@ -1040,6 +1034,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
       editor.revealLineInCenter(lastLine)
       skipModelSyncRef.current.delete(task.fileId)
       streamingActiveRef.current.delete(task.fileId)
+      setIsStreamingCode(false) // Stop glow effect
     }
 
     const tick = () => {
@@ -1066,6 +1061,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
         window.clearTimeout(timer)
         timer = null
       }
+      setIsStreamingCode(false) // Stop glow effect
     }
 
     streamingCancelRef.current = () => {
@@ -1078,6 +1074,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
       complete()
       streamingCancelRef.current = null
       streamingActiveRef.current.delete(task.fileId)
+      setIsStreamingCode(false) // Ensure glow effect is stopped
     }
   }, [files, activeFileId])
 
@@ -1126,7 +1123,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
     if (!isTerminalOpen) {
       setIsTerminalOpen(true)
     }
-    
+
     // Cancel any existing execution
     if (abortController) {
       abortController.abort()
@@ -1189,7 +1186,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
-              
+
               if (data.type === 'session' && data.sessionId) {
                 setCurrentSessionId(data.sessionId)
               } else if (data.type === 'stdout' && data.content) {
@@ -1257,7 +1254,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
   const handleStandardRun = async () => {
     try {
       // Send all files and stdin to the API
-      const response = await axios.post<RunResponse>('/api/run', { 
+      const response = await axios.post<RunResponse>('/api/run', {
         files: files.map(f => ({ name: f.name, content: f.content })),
         stdin: stdin || undefined
       })
@@ -1284,7 +1281,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
         // Server responded with error status
         const errorData = err.response.data
         let errorMessage = 'Failed to run code'
-        
+
         if (errorData) {
           if (typeof errorData === 'string') {
             errorMessage = errorData
@@ -1303,7 +1300,7 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
         }
 
         setError(errorMessage)
-        
+
         // Only log if there's meaningful data to log
         if (process.env.NODE_ENV === 'development') {
           const logData: Record<string, any> = {
@@ -1435,324 +1432,327 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
               </Button>
             </div>
           )}
-        {/* File Tabs */}
-        <div className="flex items-center justify-between gap-1 px-4 py-2 bg-[#1e1e1e] border-b border-[#3b3b3b] overflow-x-auto">
-          <div className="flex items-center gap-1 flex-1 min-w-0">
-            {files.map((file) => (
-              <div
-                key={file.id}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-t text-sm cursor-pointer transition-colors ${
-                  activeFileId === file.id
+          {/* File Tabs */}
+          <div className="flex items-center justify-between gap-1 px-4 py-2 bg-[#1e1e1e] border-b border-[#3b3b3b] overflow-x-auto">
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              {files.map((file) => (
+                <div
+                  key={file.id}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-t text-sm cursor-pointer transition-colors ${activeFileId === file.id
                     ? 'bg-[#1e1e1e] text-white border-t border-l border-r border-[#3b3b3b]'
                     : 'bg-[#2d2d2d] text-gray-400 hover:text-white hover:bg-[#3d3d3d]'
-                }`}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', file.id)
-                  e.dataTransfer.effectAllowed = 'move'
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  const draggedId = e.dataTransfer.getData('text/plain')
-                  handleMoveFile(draggedId, file.id)
-                }}
-                onClick={() => setActiveFileId(file.id)}
-                onMouseDown={(e) => {
-                  if (e.button === 1) {
+                    }`}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', file.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragOver={(e) => {
                     e.preventDefault()
-                    handleDeleteFile(file.id)
-                  }
-                }}
-              >
-                {file.type === 'cpp' ? (
-                  <FileCode className="w-4 h-4" />
-                ) : (
-                  <File className="w-4 h-4" />
-                )}
-                <span>{file.name}</span>
-                {files.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    e.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const draggedId = e.dataTransfer.getData('text/plain')
+                    handleMoveFile(draggedId, file.id)
+                  }}
+                  onClick={() => setActiveFileId(file.id)}
+                  onMouseDown={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault()
                       handleDeleteFile(file.id)
-                    }}
-                    className="ml-1 hover:text-red-400 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
+                    }
+                  }}
+                >
+                  {file.type === 'cpp' ? (
+                    <FileCode className="w-4 h-4" />
+                  ) : (
+                    <File className="w-4 h-4" />
+                  )}
+                  <span>{file.name}</span>
+                  {files.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteFile(file.id)
+                      }}
+                      className="ml-1 hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => setIsNewFileDialogOpen(true)}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-[#3d3d3d] rounded transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New File</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 ml-4">
+              <div className="group relative inline-flex">
+                {/* Glow effect on hover - behind everything */}
+                <span className="absolute -inset-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
+
+                {/* Gradient border wrapper - creates the border effect */}
+                <span className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
+                <span className="absolute inset-[1px] rounded-md bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
+
+                <Button
+                  variant="outline"
+                  className={`bg-transparent border-white text-white hover:border-transparent transition-all duration-300 font-medium px-4 h-8 flex items-center gap-2 text-sm relative z-10 ${isInsightOpen ? 'bg-white/10 text-white' : ''}`}
+                  onClick={() => setIsInsightOpen((prev) => !prev)}
+                  aria-pressed={isInsightOpen}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {/* Gradient text on hover */}
+                  <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300">
+                    {isInsightOpen ? 'Close Insight' : 'AI Agent'}
+                  </span>
+                </Button>
               </div>
-            ))}
-            <button
-              onClick={() => setIsNewFileDialogOpen(true)}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-[#3d3d3d] rounded transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New File</span>
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-2 ml-4">
-            <div className="group relative inline-flex">
-              {/* Glow effect on hover - behind everything */}
-              <span className="absolute -inset-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
-              
-              {/* Gradient border wrapper - creates the border effect */}
-              <span className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
-              <span className="absolute inset-[1px] rounded-md bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
-              
               <Button
                 variant="outline"
-                className={`bg-transparent border-white text-white hover:border-transparent transition-all duration-300 font-medium px-4 h-8 flex items-center gap-2 text-sm relative z-10 ${isInsightOpen ? 'bg-white/10 text-white' : ''}`}
-                onClick={() => setIsInsightOpen((prev) => !prev)}
-                aria-pressed={isInsightOpen}
+                className="bg-transparent border-white text-white hover:bg-white/10 font-medium px-4 h-8 flex items-center gap-2 text-sm"
               >
-                <Sparkles className="w-4 h-4" />
-                {/* Gradient text on hover */}
-                <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300">
-                  {isInsightOpen ? 'Close Insight' : 'AI Agent'}
-                </span>
+                <Bug className="w-4 h-4" />
+                Debug
+              </Button>
+              <Button
+                onClick={handleRunCode}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 h-8 flex items-center gap-2 text-sm"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    Run Code
+                  </>
+                )}
               </Button>
             </div>
-            <Button
-              variant="outline"
-              className="bg-transparent border-white text-white hover:bg-white/10 font-medium px-4 h-8 flex items-center gap-2 text-sm"
-            >
-              <Bug className="w-4 h-4" />
-              Debug
-            </Button>
-            <Button
-              onClick={handleRunCode}
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 h-8 flex items-center gap-2 text-sm"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  Run Code
-                </>
-              )}
-            </Button>
           </div>
-        </div>
 
-        {/* Editor and Terminal Section */}
-        <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-          <ResizablePanel defaultSize={isTerminalOpen ? 70 : 100} minSize={30}>
-            <div className="h-full overflow-hidden">
-              <Editor
-                height="100%"
-                language={activeFile?.type === 'cpp' ? 'cpp' : 'plaintext'}
-                theme={settings.theme}
-                defaultValue={activeFile?.content || ''}
-                path={activeFile ? `${activeFile.id}/${activeFile.name}` : undefined}
-                keepCurrentModel
-                beforeMount={handleEditorBeforeMount}
-                onMount={handleEditorMount}
-                onChange={handleEditorChange}
-                options={{
-                  minimap: { enabled: true },
-                  fontSize: settings.fontSize,
-                  fontFamily: editorFontFamily,
-                  mouseWheelZoom: true,
-                  lineNumbers: 'on',
-                  roundedSelection: false,
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  tabSize: 2,
-                  wordWrap: 'on',
-                }}
-              />
-            </div>
-          </ResizablePanel>
-          
-          {isTerminalOpen && (
-            <>
-              <ResizableHandle withHandle className="bg-[#3b3b3b] hover:bg-[#4b4b4b] transition-colors" />
-              <ResizablePanel defaultSize={30} minSize={10}>
-                <div className="h-full flex flex-col bg-[#181818] border-t border-[#3b3b3b]">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b3b3b]">
-                    <div className="text-sm font-semibold text-gray-300">Console</div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-gray-500">
-                        💡 Files created with ofstream are automatically displayed
-                      </div>
-                      <button
-                        onClick={() => setIsTerminalOpen(false)}
-                        className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
-                        title="Close Terminal"
-                      >
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Split layout: Output (left) and Input (right) */}
-                  <div className="flex-1 flex min-h-0">
-                    {/* Left side - Output */}
-                    <div className="flex-1 flex flex-col border-r border-[#3b3b3b]">
-                      <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
-                        <div className="text-xs font-semibold text-gray-400">Output:</div>
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-4">
-                    {loading && (
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Compiling and running your code...</span>
-                      </div>
-                    )}
-                    
-                    {error && (
-                      <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                        Error: {error}
-                      </div>
-                    )}
+          {/* Editor and Terminal Section */}
+          <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
+            <ResizablePanel defaultSize={isTerminalOpen ? 70 : 100} minSize={30}>
+              <div
+                className={`h-full overflow-hidden transition-all duration-500 relative ${isStreamingCode
+                    ? 'after:absolute after:inset-0 after:z-50 after:pointer-events-none after:shadow-[inset_0_0_80px_rgba(168,85,247,0.15)] after:animate-pulse'
+                    : ''
+                  }`}
+              >
+                <Editor
+                  height="100%"
+                  language={activeFile?.type === 'cpp' ? 'cpp' : 'plaintext'}
+                  theme={settings.theme}
+                  defaultValue={activeFile?.content || ''}
+                  path={activeFile ? `${activeFile.id}/${activeFile.name}` : undefined}
+                  keepCurrentModel
+                  beforeMount={handleEditorBeforeMount}
+                  onMount={handleEditorMount}
+                  onChange={handleEditorChange}
+                  options={{
+                    minimap: { enabled: true },
+                    fontSize: settings.fontSize,
+                    fontFamily: editorFontFamily,
+                    mouseWheelZoom: true,
+                    lineNumbers: 'on',
+                    roundedSelection: false,
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: 2,
+                    wordWrap: 'on',
+                  }}
+                />
+              </div>
+            </ResizablePanel>
 
-                    {/* Interactive output or info message */}
-                    {isInteractiveMode && interactiveOutput && (
-                      <div className={`font-mono text-sm whitespace-pre-wrap ${
-                        compilerAvailable === false ? 'text-yellow-400' : 'text-green-400'
-                      }`}>
-                        {interactiveOutput}
-                      </div>
-                    )}
-
-                    {/* Standard output */}
-                    {(!isInteractiveMode || compilerAvailable === false) && !loading && !error && output && (
-                      <div className="space-y-2">
-                        {output.compile_output && (
-                          <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                            <span className="font-semibold">Compilation Error:</span>
-                            {'\n'}
-                            {output.compile_output}
-                          </div>
-                        )}
-                        
-                        {output.stderr && (
-                          <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                            <span className="font-semibold">Runtime Error:</span>
-                            {'\n'}
-                            {output.stderr}
-                          </div>
-                        )}
-                        
-                        {output.stdout && (
-                          <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">
-                            {output.stdout}
-                          </div>
-                        )}
-
-                        {!output.stdout && !output.stderr && !output.compile_output && (
-                          <div className="text-gray-400 font-mono text-sm">
-                            Status: {output.status.description}
-                            {output.time && ` (Time: ${output.time}s)`}
-                            {output.memory && ` (Memory: ${output.memory} KB)`}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {!loading && !error && !output && !interactiveOutput && (
-                      <div className="text-gray-500 text-sm italic">
-                        Click "Run Code" to execute your program
-                      </div>
-                    )}
+            {isTerminalOpen && (
+              <>
+                <ResizableHandle withHandle className="bg-[#3b3b3b] hover:bg-[#4b4b4b] transition-colors" />
+                <ResizablePanel defaultSize={30} minSize={10}>
+                  <div className="h-full flex flex-col bg-[#181818] border-t border-[#3b3b3b]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b3b3b]">
+                      <div className="text-sm font-semibold text-gray-300">Console</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-gray-500">
+                          💡 Files created with ofstream are automatically displayed
+                        </div>
+                        <button
+                          onClick={() => setIsTerminalOpen(false)}
+                          className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
+                          title="Close Terminal"
+                        >
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Right side - Input */}
-                    <div className="w-[480px] flex flex-col bg-[#1a1a1a]">
-                      <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
-                        <div className="text-xs font-semibold text-gray-400">
-                          Input (stdin):
-                          {compilerAvailable === false && (
-                            <span className="ml-2 text-yellow-400 text-xs">
-                              (Judge0 - provide all inputs upfront)
-                            </span>
+                    {/* Split layout: Output (left) and Input (right) */}
+                    <div className="flex-1 flex min-h-0">
+                      {/* Left side - Output */}
+                      <div className="flex-1 flex flex-col border-r border-[#3b3b3b]">
+                        <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
+                          <div className="text-xs font-semibold text-gray-400">Output:</div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4">
+                          {loading && (
+                            <div className="flex items-center gap-2 text-gray-400">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Compiling and running your code...</span>
+                            </div>
+                          )}
+
+                          {error && (
+                            <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                              Error: {error}
+                            </div>
+                          )}
+
+                          {/* Interactive output or info message */}
+                          {isInteractiveMode && interactiveOutput && (
+                            <div className={`font-mono text-sm whitespace-pre-wrap ${compilerAvailable === false ? 'text-yellow-400' : 'text-green-400'
+                              }`}>
+                              {interactiveOutput}
+                            </div>
+                          )}
+
+                          {/* Standard output */}
+                          {(!isInteractiveMode || compilerAvailable === false) && !loading && !error && output && (
+                            <div className="space-y-2">
+                              {output.compile_output && (
+                                <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                                  <span className="font-semibold">Compilation Error:</span>
+                                  {'\n'}
+                                  {output.compile_output}
+                                </div>
+                              )}
+
+                              {output.stderr && (
+                                <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                                  <span className="font-semibold">Runtime Error:</span>
+                                  {'\n'}
+                                  {output.stderr}
+                                </div>
+                              )}
+
+                              {output.stdout && (
+                                <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">
+                                  {output.stdout}
+                                </div>
+                              )}
+
+                              {!output.stdout && !output.stderr && !output.compile_output && (
+                                <div className="text-gray-400 font-mono text-sm">
+                                  Status: {output.status.description}
+                                  {output.time && ` (Time: ${output.time}s)`}
+                                  {output.memory && ` (Memory: ${output.memory} KB)`}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {!loading && !error && !output && !interactiveOutput && (
+                            <div className="text-gray-500 text-sm italic">
+                              Click "Run Code" to execute your program
+                            </div>
                           )}
                         </div>
                       </div>
-                      
-                      <div className="flex-1 flex flex-col p-4 gap-3">
-                        {/* Interactive Input Section - shown when waiting for input */}
-                        {waitingForInput && (
-                          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-3">
-                            <label className="text-xs font-semibold text-yellow-400 mb-2 block">
-                              ⏳ Program is waiting for input:
-                            </label>
-                            <div className="flex gap-2">
-                              <Input
-                                value={currentStdinInput}
-                                onChange={(e) => setCurrentStdinInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    handleSendStdin()
-                                  }
-                                }}
-                                placeholder="Enter value and press Enter..."
-                                className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
-                                autoFocus
-                              />
-                              <Button
-                                onClick={handleSendStdin}
-                                disabled={!currentStdinInput.trim()}
-                                className="bg-green-600 hover:bg-green-700 text-white px-4"
-                              >
-                                Send
-                              </Button>
-                            </div>
-                          </div>
-                        )}
 
-                        {/* Standard Input textarea */}
-                        <div className="flex-1 flex flex-col">
-                          <label className="text-xs text-gray-400 mb-2">
-                            {waitingForInput 
-                              ? 'Pre-prepared inputs (for next run):'
-                              : 'Enter program inputs (one per line):'}
-                          </label>
-                          <textarea
-                            value={stdin}
-                            onChange={(e) => setStdin(e.target.value)}
-                            placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
-                            className="flex-1 px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
-                            disabled={waitingForInput}
-                          />
+                      {/* Right side - Input */}
+                      <div className="w-[480px] flex flex-col bg-[#1a1a1a]">
+                        <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
+                          <div className="text-xs font-semibold text-gray-400">
+                            Input (stdin):
+                            {compilerAvailable === false && (
+                              <span className="ml-2 text-yellow-400 text-xs">
+                                (Judge0 - provide all inputs upfront)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col p-4 gap-3">
+                          {/* Interactive Input Section - shown when waiting for input */}
+                          {waitingForInput && (
+                            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-3">
+                              <label className="text-xs font-semibold text-yellow-400 mb-2 block">
+                                ⏳ Program is waiting for input:
+                              </label>
+                              <div className="flex gap-2">
+                                <Input
+                                  value={currentStdinInput}
+                                  onChange={(e) => setCurrentStdinInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault()
+                                      handleSendStdin()
+                                    }
+                                  }}
+                                  placeholder="Enter value and press Enter..."
+                                  className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
+                                  autoFocus
+                                />
+                                <Button
+                                  onClick={handleSendStdin}
+                                  disabled={!currentStdinInput.trim()}
+                                  className="bg-green-600 hover:bg-green-700 text-white px-4"
+                                >
+                                  Send
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Standard Input textarea */}
+                          <div className="flex-1 flex flex-col">
+                            <label className="text-xs text-gray-400 mb-2">
+                              {waitingForInput
+                                ? 'Pre-prepared inputs (for next run):'
+                                : 'Enter program inputs (one per line):'}
+                            </label>
+                            <textarea
+                              value={stdin}
+                              onChange={(e) => setStdin(e.target.value)}
+                              placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
+                              className="flex-1 px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
+                              disabled={waitingForInput}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </ResizablePanel>
-            </>
-          )}
-        </ResizablePanelGroup>
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
 
-        {/* Collapsed Terminal Bar */}
-        {!isTerminalOpen && (
-          <div className="border-t border-[#3b3b3b] bg-[#181818] px-4 py-2 flex items-center justify-between">
-            <div className="text-sm font-semibold text-gray-300">Terminal</div>
-            <button
-              onClick={() => setIsTerminalOpen(true)}
-              className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
-              title="Open Terminal"
-            >
-              <ChevronUp className="w-4 h-4 text-gray-400" />
-            </button>
-          </div>
-        )}
-      </div>
+          {/* Collapsed Terminal Bar */}
+          {!isTerminalOpen && (
+            <div className="border-t border-[#3b3b3b] bg-[#181818] px-4 py-2 flex items-center justify-between">
+              <div className="text-sm font-semibold text-gray-300">Terminal</div>
+              <button
+                onClick={() => setIsTerminalOpen(true)}
+                className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
+                title="Open Terminal"
+              >
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Mobile backdrop for Insight */}
@@ -1766,9 +1766,8 @@ const streamingActiveRef = useRef<Set<string>>(new Set())
 
       {/* Insight Sidebar */}
       <aside
-        className={`fixed top-16 right-0 h-screen-minus-4rem w-full max-w-[420px] bg-[#181818] border-l border-[#3b3b3b] transition-transform duration-300 ease-in-out z-40 lg:z-auto ${
-          isInsightOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-16 right-0 h-screen-minus-4rem w-full max-w-[420px] bg-[#181818] border-l border-[#3b3b3b] transition-transform duration-300 ease-in-out z-40 lg:z-auto ${isInsightOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
         aria-hidden={!isInsightOpen}
       >
         <InsightIdeChat
