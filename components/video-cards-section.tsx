@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useEffect, useState, memo } from "react"
 import { FadeInUp } from "@/components/scroll-animations"
 
 interface VideoCardProps {
@@ -10,14 +10,54 @@ interface VideoCardProps {
     className?: string
 }
 
-function VideoCard({ videoSrc, title, description, className = "" }: VideoCardProps) {
+const VideoCard = memo(function VideoCard({ videoSrc, title, description, className = "" }: VideoCardProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
+    const [shouldLoad, setShouldLoad] = useState(false)
+
+    useEffect(() => {
+        const videoElement = videoRef.current
+        if (!videoElement) return
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setShouldLoad(true)
+                    } else {
+                        // Pause video if it plays and goes out of view
+                        if (videoElement && !videoElement.paused) {
+                            videoElement.pause()
+                        }
+                    }
+                })
+            },
+            {
+                threshold: 0.2, // Trigger earlier to have it ready slightly before
+                rootMargin: "100px 0px" // Load shortly before it enters viewport
+            }
+        )
+
+        observer.observe(videoElement)
+
+        return () => {
+            if (videoElement) {
+                observer.unobserve(videoElement)
+            }
+        }
+    }, [])
 
     const handleMouseEnter = () => {
         if (videoRef.current) {
-            videoRef.current.play().catch((error) => {
-                console.log("Video play failed:", error);
-            })
+            // Ensure it is loaded if somehow interaction happens before intersection (unlikely with observer)
+            if (!shouldLoad) setShouldLoad(true)
+
+            const playPromise = videoRef.current.play()
+            if (playPromise !== undefined) {
+                playPromise.catch((error) => {
+                    // Auto-play was prevented
+                    // console.log("Video play failed:", error);
+                })
+            }
         }
     }
 
@@ -36,14 +76,13 @@ function VideoCard({ videoSrc, title, description, className = "" }: VideoCardPr
             {/* Video */}
             <video
                 ref={videoRef}
+                src={videoSrc}
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload={shouldLoad ? "metadata" : "none"}
                 className="w-full h-full object-cover"
-            >
-                <source src={videoSrc} type="video/mp4" />
-            </video>
+            />
 
             {/* Bottom fade gradient overlay */}
             <div
@@ -64,32 +103,32 @@ function VideoCard({ videoSrc, title, description, className = "" }: VideoCardPr
             </div>
         </div>
     )
-}
+})
+
+const cards = [
+    {
+        videoSrc: "/videos/AIo.mp4",
+        title: "Catalog de probleme cu AI",
+        description: "Sute de probleme rezolvate pas cu pas, cu ajutorul inteligenței artificiale."
+    },
+    {
+        videoSrc: "/videos/grilev.mp4",
+        title: "Grile pentru admitere",
+        description: "Teste grile interactive pentru pregătirea examenelor de admitere."
+    },
+    {
+        videoSrc: "/videos/cod.mp4",
+        title: "Planck Code",
+        description: "Scrie și rulează cod Python pentru probleme de fizică și simulări."
+    },
+    {
+        videoSrc: "/videos/sketcho.mp4",
+        title: "Tabla colaborativă",
+        description: "Tablă interactivă pentru sesiuni de studiu și rezolvări în echipă."
+    }
+]
 
 export function VideoCardsSection() {
-    const cards = [
-        {
-            videoSrc: "/videos/AIo.mp4",
-            title: "Catalog de probleme cu AI",
-            description: "Sute de probleme rezolvate pas cu pas, cu ajutorul inteligenței artificiale."
-        },
-        {
-            videoSrc: "/videos/grilev.mp4",
-            title: "Grile pentru admitere",
-            description: "Teste grile interactive pentru pregătirea examenelor de admitere."
-        },
-        {
-            videoSrc: "/videos/cod.mp4",
-            title: "Planck Code",
-            description: "Scrie și rulează cod Python pentru probleme de fizică și simulări."
-        },
-        {
-            videoSrc: "/videos/sketcho.mp4",
-            title: "Tabla colaborativă",
-            description: "Tablă interactivă pentru sesiuni de studiu și rezolvări în echipă."
-        }
-    ]
-
     return (
         <section
             className="relative w-full py-20 lg:py-28"
