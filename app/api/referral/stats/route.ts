@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-// Initialize Supabase client with service role for admin operations
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+
 
 // Generate a unique 8-character referral code
 function generateReferralCode(): string {
@@ -18,6 +14,12 @@ function generateReferralCode(): string {
 }
 
 export async function GET(request: NextRequest) {
+    // Initialize Supabase client with service role for admin operations
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
     try {
         // Get the authorization header
         const authHeader = request.headers.get("authorization")
