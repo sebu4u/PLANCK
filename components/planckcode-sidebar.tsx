@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Code, FileText, BookOpen, Trophy, BarChart3, Settings } from 'lucide-react'
+import { Code, FileText, FolderOpen, Settings } from 'lucide-react'
 import { usePlanckCodeSettings } from './planckcode-settings-provider'
 
 export function PlanckCodeSidebar() {
@@ -14,10 +14,8 @@ export function PlanckCodeSidebar() {
 
   const menuItems = [
     { label: 'IDE', icon: Code, href: '/planckcode/ide' },
+    { label: 'Proiecte', icon: FolderOpen, href: '/planckcode/projects' },
     { label: 'Probleme', icon: FileText, href: '/informatica/probleme', disabled: true },
-    { label: 'Learn', icon: BookOpen, href: '/planckcode/learn' },
-    { label: 'Competitions', icon: Trophy, href: '/planckcode/competitions' },
-    { label: 'Leaderboards', icon: BarChart3, href: '/planckcode/leaderboards' },
   ]
 
   const baseButtonClassName = `w-full flex items-center py-3 text-white hover:bg-[#262626] transition-colors duration-200 relative font-vt323 text-lg ${isHovered ? 'justify-start px-4' : 'justify-center'
@@ -25,7 +23,7 @@ export function PlanckCodeSidebar() {
 
   return (
     <aside
-      className={`hidden md:block fixed left-0 top-16 z-[299] bg-[#181818] border-r border-[#3b3b3b] transition-all duration-300 ease-in-out h-screen-minus-64 ${isHovered ? 'w-[200px]' : 'w-16'
+      className={`hidden md:block fixed left-0 top-[64px] lg:top-[100px] z-[299] bg-[#181818] border-r border-[#3b3b3b] transition-all duration-300 ease-in-out h-[calc(100vh-64px)] lg:h-[calc(100vh-100px)] ${isHovered ? 'w-[200px]' : 'w-16'
         }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

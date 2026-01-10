@@ -20,7 +20,7 @@ export function DailyActivityCard({
 }: DailyActivityCardProps) {
   const today = new Date()
   const todayString = today.toISOString().split("T")[0]
-  
+
   // Get today's time from activities array (more accurate than total_time_minutes)
   const todayActivity = activities.find(a => a.activity_date === todayString)
   const timeTodayActual = todayActivity?.time_minutes || 0
@@ -48,8 +48,8 @@ export function DailyActivityCard({
       const dateString = date.toISOString().split("T")[0]
       // Normalize activity_date to ensure proper comparison (handle both date strings and Date objects)
       const activity = activities.find(a => {
-        const activityDate = typeof a.activity_date === 'string' 
-          ? a.activity_date 
+        const activityDate = typeof a.activity_date === 'string'
+          ? a.activity_date
           : new Date(a.activity_date).toISOString().split('T')[0]
         return activityDate === dateString
       })
@@ -99,57 +99,49 @@ export function DailyActivityCard({
   }
 
   return (
-    <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-all hover:scale-105 transform origin-center">
-      <h3 className="text-lg font-semibold text-white/90 mb-4">Activitate Zilnică</h3>
+    <div className="rounded-xl bg-[#131316] border border-white/10 p-4 hover:border-white/20 transition-all hover:scale-105 transform origin-center">
+      <h3 className="text-base font-semibold text-white/90 mb-3">Activitate Zilnică</h3>
 
-      {/* Streak + Today stats (în stânga sus) */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-6">
+      {/* Streak + Today stats */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-4">
           <div>
             <p className="text-xs text-white/60">Streak Curent</p>
-            <p className="text-2xl font-bold text-white/90 flex items-center gap-1">
-              {currentStreak ?? 0} <span className="text-lg">🔥</span>
+            <p className="text-xl font-bold text-white/90 flex items-center gap-1">
+              {currentStreak ?? 0} <span className="text-base">🔥</span>
             </p>
           </div>
           <div>
             <p className="text-xs text-white/60">Best Streak</p>
-            <p className="text-2xl font-bold text-white/70">{bestStreak ?? 0}</p>
+            <p className="text-xl font-bold text-white/70">{bestStreak ?? 0}</p>
           </div>
         </div>
         <div className="text-right">
           <p className="text-xs text-white/60">Astăzi</p>
-          <p className={`text-sm ${
-            Math.min(problemsToday ?? 0, 3) === 3 
-              ? 'text-green-500 font-semibold' 
+          <p className={`text-xs ${Math.min(problemsToday ?? 0, 3) === 3
+              ? 'text-green-500 font-semibold'
               : 'text-white/85'
-          }`}>
-            {Math.min(problemsToday ?? 0, 3)}/3 probleme
+            }`}>
+            {Math.min(problemsToday ?? 0, 3)}/3 probleme • {timeTodayActual} min
           </p>
-          <p className="text-sm text-white/85">{timeTodayActual} min</p>
         </div>
       </div>
 
-      {/* Data de azi deasupra heatmap-ului */}
-      <div className="mb-3">
-        <p className="text-xs text-white/60">Data de azi</p>
-        <p className="text-sm font-medium text-white/85">{todayFullLabel}</p>
-      </div>
+
 
       {/* Heatmap Grid */}
-      <div className="overflow-x-auto pb-2">
-        <div className="flex gap-[6px] min-w-max">
+      <div className="overflow-x-auto pb-1">
+        <div className="flex gap-[5px] min-w-max">
           {grid.map((column, colIndex) => (
-            <div key={colIndex} className="flex flex-col gap-[6px]">
+            <div key={colIndex} className="flex flex-col gap-[5px]">
               {column.map((day, rowIndex) => (
                 <TooltipProvider key={`${colIndex}-${rowIndex}`}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
-                        className={`w-[18px] h-[18px] rounded-md ${
-                          day.level === -1 ? 'bg-transparent' : getLevelColor(day.level)
-                        } ${
-                          day.isToday ? 'ring-2 ring-white/80' : 'hover:ring-1 hover:ring-white/30'
-                        } transition-all cursor-pointer`}
+                        className={`w-[16px] h-[16px] rounded-sm ${day.level === -1 ? 'bg-transparent' : getLevelColor(day.level)
+                          } ${day.isToday ? 'ring-2 ring-white/80' : 'hover:ring-1 hover:ring-white/30'
+                          } transition-all cursor-pointer`}
                       />
                     </TooltipTrigger>
                     {day.date && (
@@ -175,26 +167,17 @@ export function DailyActivityCard({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-2 mt-4 text-xs text-white/60">
+      <div className="flex items-center gap-1.5 mt-2 text-xs text-white/60">
         <span>Mai puțin</span>
-        <div className="flex gap-1">
+        <div className="flex gap-0.5">
           {[0, 1, 2, 3, 4].map(level => (
-            <div key={level} className={`w-3 h-3 rounded-sm ${getLevelColor(level)}`} />
+            <div key={level} className={`w-2.5 h-2.5 rounded-sm ${getLevelColor(level)}`} />
           ))}
         </div>
         <span>Mai mult</span>
       </div>
 
-      {/* Motivational Message */}
-      {(currentStreak ?? 0) > 0 && (
-        <div className="mt-4 p-3 bg-white/[0.03] rounded-lg border border-white/5">
-          <p className="text-sm text-white/70">
-            {(problemsToday ?? 0) === 0
-              ? `🔥 Complete 1 more problem to save your ${currentStreak ?? 0}-day streak!`
-              : `✨ Great work! Your streak is ${currentStreak ?? 0} days and counting!`}
-          </p>
-        </div>
-      )}
+
     </div>
   )
 }

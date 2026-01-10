@@ -143,7 +143,8 @@
 
   body {
     @apply bg-background text-foreground;
-    scrollbar-color: #4b5563 #111827;
+    scrollbar-color: #3d3d3d #1a1a1a;
+    scrollbar-width: thin;
   }
 }
 
@@ -410,18 +411,18 @@
   background: radial-gradient(circle, var(--tw-gradient-stops));
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - minimalist style */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #111827;
+  background: #1a1a1a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
+  background: #3d3d3d;
+  border-radius: 3px;
 }
 
 /* Animații pentru badge-uri și gamification */
@@ -504,7 +505,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #4d4d4d;
 }
 
 /* Desktop-only: thin gray scrollbar for the lessons sidebar only */
@@ -1053,7 +1054,7 @@
 
 /* Clase pentru evidențierea conținutului în lecții */
 .formula-highlight {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(251, 191, 36, 0.35) 100%);
   border-left: 4px solid #f59e0b;
   padding: 12px 16px;
   margin: 16px 0;
@@ -1087,7 +1088,7 @@
 }
 
 .enunt-highlight {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(96, 165, 250, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(96, 165, 250, 0.35) 100%);
   border-left: 4px solid #3b82f6;
   padding: 12px 16px;
   margin: 16px 0;
@@ -1121,7 +1122,7 @@
 }
 
 .important-highlight {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(248, 113, 113, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(248, 113, 113, 0.35) 100%);
   border-left: 4px solid #ef4444;
   padding: 12px 16px;
   margin: 16px 0;
@@ -1155,7 +1156,7 @@
 }
 
 .definition-highlight {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(74, 222, 128, 0.35) 100%);
   border-left: 4px solid #22c55e;
   padding: 12px 16px;
   margin: 16px 0;
@@ -1189,7 +1190,7 @@
 }
 
 .example-highlight {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(192, 132, 252, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(192, 132, 252, 0.35) 100%);
   border-left: 4px solid #a855f7;
   padding: 12px 16px;
   margin: 16px 0;
@@ -1730,4 +1731,46 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Rotating gradient border animation for AI Code Analysis section */
+@keyframes border-glow {
+  0% {
+    background: linear-gradient(90deg, #f97316, #3b82f6, #f97316);
+    background-size: 200% 100%;
+    background-position: 0% 0%;
+  }
+
+  50% {
+    background-position: 100% 0%;
+  }
+
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.animate-border-glow {
+  animation: border-glow 4s linear infinite;
+  background: linear-gradient(90deg, #f97316, #3b82f6, #f97316);
+  background-size: 200% 100%;
+}
+
+/* Animated glow shadow that matches the border colors */
+@keyframes border-glow-shadow {
+  0% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.6), 0 0 40px rgba(249, 115, 22, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.6), 0 0 40px rgba(249, 115, 22, 0.3);
+  }
+}
+
+.animate-border-glow-shadow {
+  animation: border-glow-shadow 4s ease-in-out infinite;
 }

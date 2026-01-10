@@ -16,12 +16,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import Editor from "@monaco-editor/react"
 
 type ChatRole = "user" | "assistant" | "system"
 
 interface ChatMessage {
   role: ChatRole
   content: string
+  model?: string
 }
 
 type MessageSegment =
@@ -51,6 +53,9 @@ interface InsightIdeChatProps {
   onClose: () => void
   onInsertCode: (code: string) => void
   onApplyCodeEdit: (edit: CodeEditResponse) => boolean
+  onAcceptCodeChanges?: () => void
+  onRejectCodeChanges?: () => void
+  onMessageSent?: () => void
   activeFileName?: string
   activeFileContent?: string
   activeFileLanguage?: string
@@ -58,9 +63,9 @@ interface InsightIdeChatProps {
 
 const INSIGHT_SESSION_TITLE = "PlanckCode IDE"
 const MODEL_OPTIONS = [
-  { id: "gpt-4o-mini", label: "gpt-4o-mini", selectable: true },
-  { id: "gpt-4o", label: "gpt-4o", selectable: false },
-  { id: "gpt-4.1-mini", label: "gpt-4.1-mini", selectable: false },
+  { id: "gpt-4o-mini", label: "Raptor1 (fast)", selectable: true },
+  { id: "gpt-4o", label: "Raptor1", selectable: true },
+  { id: "deep-thinking", label: "Raptor1 heavy", selectable: true },
 ]
 
 function findJsonCandidate(text: string): string | null {
@@ -212,16 +217,198 @@ function parseSegments(content: string): MessageSegment[] {
   return segments
 }
 
+function unescapePartialJsonString(str: string): string {
+  // Simple unescape for partial JSON strings
+  return str
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\r/g, "\r")
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, "\\")
+}
+
+function extractDisplayContentFromPartialJson(partialJson: string, activeFileLanguage?: string): string {
+  // 1. Extract explanation
+  let explanation = ""
+  const explanationMatch = partialJson.match(/"explanation":\s*"((?:[^"\\]|\\.)*)/)
+  if (explanationMatch) {
+    explanation = unescapePartialJsonString(explanationMatch[1])
+  } else {
+    // If no explanation field yet, but we have text before the first brace, maybe use that?
+    // Or if the JSON hasn't started yet (unlikely if we are here)
+    // For now, assume explanation comes early or we fallback to emptiness
+    const jsonStart = partialJson.indexOf("{")
+    if (jsonStart > 0) {
+      explanation = partialJson.slice(0, jsonStart).trim()
+    }
+  }
+
+  // 2. Extract code
+  // Try to find "content" or "replacement" fields
+  let code = ""
+
+  // Strategy: Find all "content": "..." or "replacement": "..." and concatenate them
+  // This handles multiple changes or full_content
+  const contentRegex = /"(?:full_content|content|replacement)":\s*"((?:[^"\\]|\\.)*)/g
+  let match
+  while ((match = contentRegex.exec(partialJson)) !== null) {
+    const rawCode = match[1]
+    code += unescapePartialJsonString(rawCode) + "\n"
+  }
+
+  // If we found code, wrap it
+  if (code.trim()) {
+    const lang = activeFileLanguage || "cpp" // Default to cpp or active
+    return [
+      explanation,
+      "",
+      "```" + lang,
+      code.trimEnd(), // Don't trim start to preserve indentation
+      "```",
+      "",
+      ":::status:generating:::" // Marker to show it's active
+    ].join("\n")
+  }
+
+  return explanation || (partialJson.includes("{") ? "Se generează..." : partialJson)
+}
+
+function ChatCodeBlock({
+  code,
+  language = "cpp",
+  onCopy,
+  onInsert,
+  mode,
+  copiedSnippet,
+  isPending,
+  onAccept,
+  onReject,
+}: {
+  code: string
+  language?: string
+  onCopy: () => void
+  onInsert: () => void
+  mode: "agent" | "ask"
+  copiedSnippet: string | null
+  isPending?: boolean
+  onAccept?: () => void
+  onReject?: () => void
+}) {
+  // Fixed height for consistent card sizes - code will be clipped if larger
+  const FIXED_HEIGHT = 200
+
+  // Show Accept/Reject if pending, otherwise show Copy
+  const showPendingControls = isPending
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-[#3b3b3b] bg-[#1e1e1e]">
+      <div className="flex items-center justify-between border-b border-[#3b3b3b] bg-[#252526] px-3 py-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+          {language || "plaintext"}
+        </span>
+        <div className="flex items-center gap-2">
+          {showPendingControls ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                onClick={onReject}
+              >
+                <X className="mr-1 w-3 h-3" />
+                Reject
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                onClick={onAccept}
+              >
+                <Check className="mr-1 w-3 h-3" />
+                Accept
+              </Button>
+            </>
+          ) : (
+            <>
+              {mode === "ask" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[10px] text-gray-400 hover:text-white hover:bg-white/10"
+                  onClick={onInsert}
+                >
+                  <Sparkles className="mr-1 w-3 h-3" />
+                  Insert
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] text-gray-400 hover:text-white hover:bg-white/10"
+                onClick={onCopy}
+              >
+                {copiedSnippet === code ? (
+                  <>
+                    <Check className="mr-1 w-3 h-3 text-green-400" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-1 w-3 h-3" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      <div style={{ height: FIXED_HEIGHT, overflow: "hidden" }}>
+        <Editor
+          height="100%"
+          language={language === "cpp" || language === "c++" ? "cpp" : "plaintext"}
+          value={code}
+          theme="vs-dark"
+          options={{
+            readOnly: true,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            fontSize: 13,
+            lineNumbers: "off",
+            folding: false,
+            overviewRulerBorder: false,
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            renderLineHighlight: "none",
+            contextmenu: false,
+            fontFamily: "Geist Mono, monospace",
+            padding: { top: 10, bottom: 10 },
+            scrollbar: {
+              vertical: "hidden",
+              horizontal: "hidden",
+              handleMouseWheel: false,
+            }
+          }}
+          loading={<div className="p-4 text-xs text-gray-500">Loading editor...</div>}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function InsightIdeChat({
   isOpen,
   onClose,
   onInsertCode,
   onApplyCodeEdit,
+  onAcceptCodeChanges,
+  onRejectCodeChanges,
+  onMessageSent,
   activeFileName,
   activeFileContent,
   activeFileLanguage,
 }: InsightIdeChatProps) {
-  const { user, loginWithGoogle, loginWithGitHub } = useAuth()
+  const { user, loginWithGoogle, loginWithGitHub, subscriptionPlan } = useAuth()
   const { toast } = useToast()
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -243,7 +430,18 @@ export function InsightIdeChat({
   const [mode, setMode] = useState<"agent" | "ask">("agent")
   const [selectedModel, setSelectedModel] = useState("gpt-4o-mini")
   const [isGenerating, setIsGenerating] = useState(false)
+  const [hasPendingCodeChange, setHasPendingCodeChange] = useState(false)
   const codeGeneratedRef = useRef(false)
+
+  const handleAcceptChanges = useCallback(() => {
+    setHasPendingCodeChange(false)
+    onAcceptCodeChanges?.()
+  }, [onAcceptCodeChanges])
+
+  const handleRejectChanges = useCallback(() => {
+    setHasPendingCodeChange(false)
+    onRejectCodeChanges?.()
+  }, [onRejectCodeChanges])
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => message.role !== "system"),
@@ -252,17 +450,17 @@ export function InsightIdeChat({
 
   const markdownComponents = useMemo<ReactMarkdownComponents>(
     () => ({
-      p: ({ node, ...props }) => (
+      p: ({ node, ...props }: any) => (
         <p
           className="whitespace-pre-wrap break-words leading-relaxed text-gray-200"
           {...props}
         />
       ),
-      strong: ({ node, ...props }) => (
+      strong: ({ node, ...props }: any) => (
         <strong className="font-semibold text-white" {...props} />
       ),
-      em: ({ node, ...props }) => <em className="text-gray-300" {...props} />,
-      a: ({ node, ...props }) => (
+      em: ({ node, ...props }: any) => <em className="text-gray-300" {...props} />,
+      a: ({ node, ...props }: any) => (
         <a
           className="text-green-400 underline decoration-dotted underline-offset-4 hover:text-green-300"
           target="_blank"
@@ -270,29 +468,29 @@ export function InsightIdeChat({
           {...props}
         />
       ),
-      ul: ({ node, ordered, ...props }) => (
+      ul: ({ node, ordered, ...props }: any) => (
         <ul className="list-disc pl-5 space-y-1 text-gray-200" {...props} />
       ),
-      ol: ({ node, ordered, ...props }) => (
+      ol: ({ node, ordered, ...props }: any) => (
         <ol className="list-decimal pl-5 space-y-1 text-gray-200" {...props} />
       ),
-      li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />,
-      h1: ({ node, ...props }) => (
+      li: ({ node, ...props }: any) => <li className="leading-relaxed" {...props} />,
+      h1: ({ node, ...props }: any) => (
         <h1 className="text-xl font-semibold text-white" {...props} />
       ),
-      h2: ({ node, ...props }) => (
+      h2: ({ node, ...props }: any) => (
         <h2 className="text-lg font-semibold text-white" {...props} />
       ),
-      h3: ({ node, ...props }) => (
+      h3: ({ node, ...props }: any) => (
         <h3 className="text-base font-semibold text-white" {...props} />
       ),
-      blockquote: ({ node, ...props }) => (
+      blockquote: ({ node, ...props }: any) => (
         <blockquote
           className="border-l-2 border-white/20 pl-4 italic text-gray-300"
           {...props}
         />
       ),
-      code: ({ node, inline, className, children, ...props }) => (
+      code: ({ node, inline, className, children, ...props }: any) => (
         <code
           className={`rounded bg-white/5 px-1.5 py-0.5 font-mono text-[13px] text-gray-100 ${className ?? ""}`}
           {...props}
@@ -362,6 +560,7 @@ export function InsightIdeChat({
 
       setMessages((prev) => [...prev, newUserMessage])
       setInput("")
+      onMessageSent?.()
 
       let currentSessionId = sessionId
 
@@ -384,27 +583,28 @@ export function InsightIdeChat({
         setSessionId(currentSessionId)
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+      const activeModelId = mode === "ask" ? "gpt-4o-mini" : selectedModel
+      setMessages((prev) => [...prev, { role: "assistant", content: "", model: activeModelId }])
 
       const contextMessages =
         shouldSendContext && activeFileContent
           ? [
-              {
-                role: "user",
-                content: [
-                  "Context: codul curent din fișierul activ din IDE.",
-                  activeFileName ? `Fișier: ${activeFileName}` : null,
-                  "",
-                  "```" +
-                    (activeFileLanguage || "plaintext") +
-                    "\n" +
-                    activeFileContent +
-                    "\n```",
-                ]
-                  .filter(Boolean)
-                  .join("\n"),
-              } as ChatMessage,
-            ]
+            {
+              role: "user",
+              content: [
+                "Context: codul curent din fișierul activ din IDE.",
+                activeFileName ? `Fișier: ${activeFileName}` : null,
+                "",
+                "```" +
+                (activeFileLanguage || "plaintext") +
+                "\n" +
+                activeFileContent +
+                "\n```",
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            } as ChatMessage,
+          ]
           : undefined
 
       const response = await fetch("/api/insight/chat", {
@@ -418,6 +618,7 @@ export function InsightIdeChat({
           input: newUserMessage.content,
           persona: "ide",
           mode, // hint server to avoid JSON in Ask mode
+          model: mode === "ask" ? "gpt-4o-mini" : selectedModel,
           contextMessages,
         }),
         signal: controller.signal,
@@ -501,46 +702,50 @@ export function InsightIdeChat({
             const data = JSON.parse(payload)
             if (data.type === "text" && data.content) {
               assistantBuffer += data.content
-              
+
               // Detect if content looks like JSON (code_edit type) - check early
               // Check for JSON patterns: opening brace, "type" field, or "code_edit"
               const hasOpeningBrace = assistantBuffer.includes('{')
               const hasTypeField = assistantBuffer.includes('"type"') || assistantBuffer.includes("'type'")
               const hasCodeEdit = assistantBuffer.includes('code_edit') || assistantBuffer.includes('codeEdit')
-              
+
               // Early detection: if we see opening brace and type field, likely JSON
               // Or if we see code_edit pattern
               // Also check the new content chunk itself for JSON patterns
-              const newContentHasJson = data.content.includes('{') || 
-                                       data.content.includes('"type"') ||
-                                       data.content.includes('code_edit')
-              
-              const looksLikeJson = (hasOpeningBrace && hasTypeField) || 
-                                   (hasOpeningBrace && hasCodeEdit) ||
-                                   (hasTypeField && hasCodeEdit) ||
-                                   (hasOpeningBrace && newContentHasJson)
-              
+              const newContentHasJson = data.content.includes('{') ||
+                data.content.includes('"type"') ||
+                data.content.includes('code_edit')
+
+              const looksLikeJson = (hasOpeningBrace && hasTypeField) ||
+                (hasOpeningBrace && hasCodeEdit) ||
+                (hasTypeField && hasCodeEdit) ||
+                (hasOpeningBrace && newContentHasJson)
+
               if (looksLikeJson && mode === "agent") {
-                // JSON detected - set generating flag and don't show content
+                // JSON detected - set generating flag
                 if (!isGenerating) {
                   console.log("Insight: JSON detected, setting isGenerating to true")
                   setIsGenerating(true)
-                  // Clear any existing content from the message to show only "Generating..."
-                  setMessages((prev) => {
-                    const updated = [...prev]
-                    for (let i = updated.length - 1; i >= 0; i--) {
-                      if (updated[i].role === "assistant") {
-                        updated[i] = {
-                          ...updated[i],
-                          content: "",
-                        }
-                        break
-                      }
-                    }
-                    return updated
-                  })
                 }
-                // Don't update message content when generating JSON
+
+                // Extract and show partial content
+                const displayContent = extractDisplayContentFromPartialJson(assistantBuffer, activeFileLanguage)
+
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === "assistant") {
+                      updated[i] = {
+                        ...updated[i],
+                        content: displayContent,
+                      }
+                      break
+                    }
+                  }
+                  return updated
+                })
+
+                // Don't update message content with raw JSON
               } else if (!isGenerating) {
                 // Normal text - show as it streams (only if not generating)
                 setMessages((prev) => {
@@ -577,7 +782,7 @@ export function InsightIdeChat({
           console.log("Insight: Found code_edit JSON:", structured)
           // Reset generating flag
           setIsGenerating(false)
-          
+
           if (mode === "agent") {
             // Track code generation for getting started when applying code_edit
             if (user && !codeGeneratedRef.current) {
@@ -607,7 +812,7 @@ export function InsightIdeChat({
             // Apply the code changes
             const applied = onApplyCodeEdit(structured)
             console.log("Insight: Code edit applied:", applied)
-            
+
             // Remove JSON from the displayed message, keep only explanatory text
             let displayText = assistantBuffer
             const jsonCandidate = findJsonCandidate(assistantBuffer)
@@ -616,12 +821,12 @@ export function InsightIdeChat({
               // Strategy 1: Remove markdown code block containing JSON
               const codeBlockPattern = /```(?:json|JSON)?\s*\{[\s\S]*?\}\s*```/g
               displayText = displayText.replace(codeBlockPattern, "").trim()
-              
+
               // Strategy 2: Remove standalone JSON object
               if (displayText.includes(jsonCandidate)) {
                 displayText = displayText.replace(jsonCandidate, "").trim()
               }
-              
+
               // Strategy 3: Remove lines that look like JSON (containing "type": "code_edit")
               const lines = displayText.split("\n")
               displayText = lines
@@ -640,7 +845,7 @@ export function InsightIdeChat({
                 })
                 .join("\n")
                 .trim()
-              
+
               // Remove common JSON markers and cleanup
               displayText = displayText
                 .replace(
@@ -650,10 +855,23 @@ export function InsightIdeChat({
                 .replace(/\n{3,}/g, "\n\n")
                 .trim()
             }
-            
-            // Use explanation from JSON if available, otherwise use cleaned text
+
+            // Construct final message: Explanation + Code + Status Marker
+            let finalMessage = displayText || structured.explanation || "Am actualizat codul și am evidențiat modificările propuse."
+
+            // Re-attach the code block if we have content
+            // We use the full content if available, or reconstruct from changes
+            const codeContent = structured.full_content ||
+              (structured.changes && structured.changes.map(c => c.content || "").join("\n")) ||
+              ""
+
+            if (codeContent.trim()) {
+              const lang = activeFileLanguage || "cpp"
+              finalMessage += `\n\n\`\`\`${lang}\n${codeContent.trim()}\n\`\`\``
+            }
+
             const confirmationMessage = applied
-              ? structured.explanation || displayText || "Am actualizat codul și am evidențiat modificările propuse."
+              ? finalMessage + "\n\n:::status:code_inserted:::"
               : "Nu am putut aplica modificările în editor. Verifică manual rezultatul."
 
             setMessages((prev) => {
@@ -669,6 +887,11 @@ export function InsightIdeChat({
               }
               return updated
             })
+
+            // Mark as pending for Accept/Reject
+            if (applied) {
+              setHasPendingCodeChange(true)
+            }
           } else {
             // In Ask mode, do not apply edits to IDE; remove JSON and show plain code if available
             let displayText = assistantBuffer
@@ -709,10 +932,10 @@ export function InsightIdeChat({
             const codeFromJson =
               structured.full_content && structured.full_content.trim().length > 0
                 ? "```" +
-                  (activeFileLanguage || "plaintext") +
-                  "\n" +
-                  structured.full_content +
-                  "\n```"
+                (activeFileLanguage || "plaintext") +
+                "\n" +
+                structured.full_content +
+                "\n```"
                 : ""
 
             const finalAssistantMessage =
@@ -772,20 +995,26 @@ export function InsightIdeChat({
                 onInsertCode(seg.content)
               }
             })
+            // Preserve existing message content and append the success marker
             setMessages((prev) => {
               const updated = [...prev]
               for (let i = updated.length - 1; i >= 0; i--) {
                 if (updated[i].role === "assistant") {
+                  // Remove generating marker and add inserted marker
+                  let newContent = updated[i].content || assistantBuffer
+                  newContent = newContent.replace(":::status:generating:::", "")
                   updated[i] = {
                     ...updated[i],
-                    content:
-                      "Am inserat codul generat direct în editor. Spune-mi dacă vrei să ajustez ceva.",
+                    content: newContent + "\n\n:::status:code_inserted:::",
                   }
                   break
                 }
               }
               return updated
             })
+
+            // Mark as pending for Accept/Reject
+            setHasPendingCodeChange(true)
           }
         } else {
           // Ask mode without code_edit - reset generating flag
@@ -924,108 +1153,90 @@ export function InsightIdeChat({
 
   const renderAssistantMessage = useCallback(
     (content: string, index: number, isLastMessage: boolean = false) => {
-      // Show generating message if this is the last message and we're generating
-      // Show it even if content exists (it will be replaced after JSON processing)
-      if (isLastMessage && isGenerating) {
+      // Check for markers
+      const isGeneratingMarker = content.includes(":::status:generating:::")
+      const parts = content.split(":::status:code_inserted:::")
+
+      let mainContent = parts[0]
+      if (isGeneratingMarker) {
+        mainContent = mainContent.replace(":::status:generating:::", "")
+      }
+
+      const hasInsertedMarker = parts.length > 1
+
+      // Common renderer for a block of text
+      const renderBlock = (text: string, keyPrefix: string) => {
+        if (!text.trim()) return null
+        const segments = parseSegments(text)
+        if (segments.length === 0) return null
+
         return (
-          <div className="flex items-center justify-center py-8">
-            <span className="text-shimmer text-lg font-medium">Generating...</span>
+          <div key={keyPrefix} className="space-y-4">
+            {segments.map((segment, segmentIndex) => {
+              if (segment.type === "text") {
+                if (!segment.content.trim()) return null
+                return (
+                  <ReactMarkdown
+                    key={`${keyPrefix}-text-${segmentIndex}`}
+                    remarkPlugins={[remarkGfm]}
+                    components={markdownComponents}
+                    className="space-y-3"
+                  >
+                    {segment.content}
+                  </ReactMarkdown>
+                )
+              }
+
+              return (
+                <ChatCodeBlock
+                  key={`${keyPrefix}-code-${segmentIndex}`}
+                  code={segment.content}
+                  language={segment.language}
+                  mode={mode}
+                  onCopy={() => handleCopySnippet(segment.content)}
+                  onInsert={() => handleInsertSnippet(segment.content)}
+                  copiedSnippet={copiedSnippet}
+                  isPending={hasInsertedMarker && hasPendingCodeChange}
+                  onAccept={handleAcceptChanges}
+                  onReject={handleRejectChanges}
+                />
+              )
+            })}
           </div>
-        )
-      }
-      
-      // If content is empty and this is the last message, don't render anything
-      if (!content.trim() && isLastMessage) {
-        return null
-      }
-      
-      const segments = parseSegments(content)
-      if (segments.length === 0) {
-        if (!content.trim()) {
-          return null
-        }
-        return (
-          <ReactMarkdown
-            key={index}
-            remarkPlugins={[remarkGfm]}
-            components={markdownComponents}
-            className="space-y-3"
-          >
-            {content}
-          </ReactMarkdown>
         )
       }
 
       return (
-        <div key={index} className="space-y-4">
-          {segments.map((segment, segmentIndex) => {
-            if (segment.type === "text") {
-              if (!segment.content.trim()) return null
-              return (
-                <ReactMarkdown
-                  key={`${index}-text-${segmentIndex}`}
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents}
-                  className="space-y-3"
-                >
-                  {segment.content}
-                </ReactMarkdown>
-              )
-            }
+        <div key={index} className="space-y-3">
+          {/* Main content (explanation + streamed code) */}
+          {renderBlock(mainContent, `msg-${index}-main`)}
 
-            return (
-              <div
-                key={`${index}-code-${segmentIndex}`}
-                className="relative bg-[#202020] border border-[#3b3b3b] rounded-lg p-4 font-mono text-sm text-gray-100"
-              >
-                {mode !== "agent" && (
-                  <div className="absolute top-2 right-2 flex gap-2">
-                    {mode === "agent" ? null : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-xs gap-1 bg-[#2a2a2a] border-[#3b3b3b] text-white hover:bg-[#333333]"
-                        onClick={() => handleInsertSnippet(segment.content)}
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Insert
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2 text-xs gap-1 bg-[#2a2a2a] border-[#3b3b3b] text-white hover:bg-[#333333]"
-                      onClick={() => handleCopySnippet(segment.content)}
-                    >
-                      {copiedSnippet === segment.content ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-                {segment.language && (
-                  <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">
-                    {segment.language}
-                  </div>
-                )}
-                <pre className="overflow-x-auto whitespace-pre leading-relaxed">
-                  <code>{segment.content}</code>
-                </pre>
+          {/* Generating Indicator - Show if marker exists OR (last message + isGenerating state) */}
+          {(isGeneratingMarker || (isLastMessage && isGenerating)) && (
+            <div className="flex items-center gap-3 p-4 bg-[#202020] border border-[#3b3b3b] rounded-lg animate-pulse">
+              <div className="w-5 h-5 border-2 border-t-transparent border-green-500 rounded-full animate-spin" />
+              <span className="text-gray-300 font-medium">Writing code...</span>
+            </div>
+          )}
+
+          {/* Code Inserted Card */}
+          {hasInsertedMarker && (
+            <div className="mt-3">
+              <div className="flex items-center gap-3 p-3 bg-[#1e2e25] border border-green-800/50 rounded-lg text-green-100">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-900/50 text-green-400">
+                  <Check className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-100">Cod inserat în IDE</p>
+                  <p className="text-xs text-green-300/70">Modificările au fost aplicate cu succes.</p>
+                </div>
               </div>
-            )
-          })}
+            </div>
+          )}
         </div>
       )
     },
-    [copiedSnippet, handleCopySnippet, handleInsertSnippet, markdownComponents, mode, isGenerating],
+    [copiedSnippet, handleCopySnippet, handleInsertSnippet, markdownComponents, mode, isGenerating, hasPendingCodeChange, handleAcceptChanges, handleRejectChanges],
   )
 
   return (
@@ -1114,7 +1325,9 @@ export function InsightIdeChat({
                   >
                     {isAssistant ? (
                       <div className="w-full lg:max-w-none space-y-3">
-                        <div className="text-xs uppercase tracking-wide text-gray-500">Insight</div>
+                        <div className="text-xs uppercase tracking-wide text-gray-500">
+                          {MODEL_OPTIONS.find((m) => m.id === message.model)?.label || "Insight"}
+                        </div>
                         {renderAssistantMessage(message.content, index, isLastMessage)}
                       </div>
                     ) : (
@@ -1176,11 +1389,10 @@ export function InsightIdeChat({
                     type="button"
                     variant="ghost"
                     onClick={() => setMode("agent")}
-                    className={`relative z-10 flex-1 h-full px-0 rounded-none border border-transparent transition-colors focus-visible:ring-0 ${
-                      mode === "agent"
-                        ? "text-white text-[10px] hover:text-white hover:bg-transparent"
-                        : "text-gray-400 text-[10px] hover:text-gray-400 hover:bg-transparent"
-                    }`}
+                    className={`relative z-10 flex-1 h-full px-0 rounded-none border border-transparent transition-colors focus-visible:ring-0 ${mode === "agent"
+                      ? "text-white text-[10px] hover:text-white hover:bg-transparent"
+                      : "text-gray-400 text-[10px] hover:text-gray-400 hover:bg-transparent"
+                      }`}
                   >
                     Agent
                   </Button>
@@ -1188,11 +1400,10 @@ export function InsightIdeChat({
                     type="button"
                     variant="ghost"
                     onClick={() => setMode("ask")}
-                    className={`relative z-10 flex-1 h-full px-0 rounded-none border border-transparent transition-colors focus-visible:ring-0 ${
-                      mode === "ask"
-                        ? "text-white text-[10px] hover:text-white hover:bg-transparent"
-                        : "text-gray-400 text-[10px] hover:text-gray-400 hover:bg-transparent"
-                    }`}
+                    className={`relative z-10 flex-1 h-full px-0 rounded-none border border-transparent transition-colors focus-visible:ring-0 ${mode === "ask"
+                      ? "text-white text-[10px] hover:text-white hover:bg-transparent"
+                      : "text-gray-400 text-[10px] hover:text-gray-400 hover:bg-transparent"
+                      }`}
                   >
                     Ask
                   </Button>
@@ -1205,38 +1416,40 @@ export function InsightIdeChat({
                         variant="ghost"
                         className="h-7 px-3 text-[11px] font-medium text-gray-300 hover:text-white bg-transparent hover:bg-transparent flex items-center gap-1"
                       >
-                        {selectedModel}
+                        {MODEL_OPTIONS.find((m) => m.id === selectedModel)?.label || selectedModel}
                         <ChevronDown className="w-3 h-3" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-[#202020] border border-[#3b3b3b] text-gray-200">
-                      {MODEL_OPTIONS.map((model) => (
-                        <DropdownMenuItem
-                          key={model.id}
-                          disabled={!model.selectable}
-                          className={`text-sm ${
-                            model.selectable ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-                          }`}
-                          onSelect={(event) => {
-                            event.preventDefault()
-                            if (model.selectable) {
-                              setSelectedModel(model.id)
-                            }
-                          }}
-                        >
-                          {model.label}
-                          {!model.selectable ? " (în curând)" : ""}
-                        </DropdownMenuItem>
-                      ))}
+                      {MODEL_OPTIONS.map((model) => {
+                        const isLocked = model.id === "deep-thinking" && subscriptionPlan === "free"
+                        const isSelectable = model.selectable && !isLocked
+
+                        return (
+                          <DropdownMenuItem
+                            key={model.id}
+                            disabled={!isSelectable}
+                            className={`text-sm ${isSelectable ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                              }`}
+                            onSelect={() => {
+                              if (isSelectable) {
+                                setSelectedModel(model.id)
+                              }
+                            }}
+                          >
+                            {model.label}
+                            {!model.selectable ? " (în curând)" : (isLocked ? " (Plus)" : "")}
+                          </DropdownMenuItem>
+                        )
+                      })}
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Button
                     type="button"
                     onClick={isStreaming ? stopStreaming : sendMessage}
                     disabled={!input.trim() && !isStreaming}
-                    className={`h-7 w-7 p-0 bg-transparent ${
-                      input.trim() || isStreaming ? "text-white hover:text-gray-200" : "text-gray-500"
-                    }`}
+                    className={`h-7 w-7 p-0 bg-transparent ${input.trim() || isStreaming ? "text-white hover:text-gray-200" : "text-gray-500"
+                      }`}
                   >
                     {isStreaming ? <X className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                   </Button>

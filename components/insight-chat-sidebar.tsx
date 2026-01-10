@@ -12,6 +12,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
+import { LimitReachedBanner } from './limit-reached-banner'
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'system'
@@ -23,6 +24,45 @@ interface InsightChatSidebarProps {
   onClose: () => void
   problemId: string
   problemStatement: string
+  persona?: string
+  onFreePlanMessage?: () => void
+}
+
+interface SuggestedQuestionsProps {
+  questions: string[]
+  onSelect: (question: string) => void
+}
+
+function SuggestedQuestions({ questions, onSelect }: SuggestedQuestionsProps) {
+  if (!questions || questions.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2 mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <p className="text-xs font-semibold uppercase tracking-wider text-white/40 ml-1 mb-1">
+        Sugestii de întrebări
+      </p>
+      {questions.map((q, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(q)}
+          className="text-left text-sm bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/90 p-3 rounded-xl transition-all duration-200 shadow-sm active:scale-[0.98]"
+        >
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              p: ({ node, ...props }: any) => <span {...props} />,
+              code: ({ node, inline, className, children, ...props }: any) => (
+                <code className={`bg-white/10 rounded px-1 ${className || ''}`} {...props}>{children}</code>
+              )
+            }}
+          >
+            {q}
+          </ReactMarkdown>
+        </button>
+      ))}
+    </div>
+  )
 }
 
 // Loading messages shown while AI is thinking
@@ -46,6 +86,8 @@ export default function InsightChatSidebar({
   onClose,
   problemId,
   problemStatement,
+  persona = 'problem_tutor',
+  onFreePlanMessage,
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -53,7 +95,9 @@ export default function InsightChatSidebar({
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'system',
-      content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+      content: persona === 'problem_tutor'
+        ? 'Ești Insight, un profesor de fizică răbdător.'
+        : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
     },
   ])
   const [input, setInput] = useState('')
@@ -71,34 +115,37 @@ export default function InsightChatSidebar({
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
   const [problemContext, setProblemContext] = useState<string | null>(null)
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
+  const [limitResetTime, setLimitResetTime] = useState<string | null>(null)
+
 
   const markdownComponents = useMemo(
     () => ({
-      p: ({ node, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
+      p: ({ node, ...props }: any) => (
         <p className="whitespace-pre-wrap break-words text-gray-200 leading-relaxed" {...props} />
       ),
-      strong: ({ node, ...props }: React.HTMLAttributes<HTMLElement>) => (
+      strong: ({ node, ...props }: any) => (
         <strong className="text-white" {...props} />
       ),
-      em: ({ node, ...props }: React.HTMLAttributes<HTMLElement>) => (
+      em: ({ node, ...props }: any) => (
         <em className="text-gray-300" {...props} />
       ),
-      h1: ({ node, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
+      h1: ({ node, ...props }: any) => (
         <h1 className="text-xl font-semibold text-white" {...props} />
       ),
-      h2: ({ node, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
+      h2: ({ node, ...props }: any) => (
         <h2 className="text-lg font-semibold text-white" {...props} />
       ),
-      h3: ({ node, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
+      h3: ({ node, ...props }: any) => (
         <h3 className="text-base font-semibold text-white" {...props} />
       ),
-      ul: ({ node, ordered, ...props }: React.HTMLAttributes<HTMLUListElement> & { ordered?: boolean }) => (
+      ul: ({ node, ordered, ...props }: any) => (
         <ul className="list-disc pl-5 space-y-1 text-gray-200" {...props} />
       ),
-      ol: ({ node, ordered, ...props }: React.HTMLAttributes<HTMLOListElement> & { ordered?: boolean }) => (
+      ol: ({ node, ordered, ...props }: any) => (
         <ol className="list-decimal pl-5 space-y-1 text-gray-200" {...props} />
       ),
-      li: ({ node, ...props }: React.HTMLAttributes<HTMLLIElement>) => (
+      li: ({ node, ...props }: any) => (
         <li className="leading-relaxed" {...props} />
       ),
       code: ({
@@ -107,7 +154,7 @@ export default function InsightChatSidebar({
         className,
         children,
         ...props
-      }: React.HTMLAttributes<HTMLElement> & { inline?: boolean }) => (
+      }: any) => (
         <code
           className={`rounded bg-white/5 px-1.5 py-0.5 font-mono text-[13px] text-gray-100 ${className ?? ''}`}
           {...props}
@@ -131,9 +178,13 @@ export default function InsightChatSidebar({
       setMessages([
         {
           role: 'system',
-          content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+          content: persona === 'problem_tutor'
+            ? 'Ești Insight, un profesor de fizică răbdător.'
+            : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
         },
       ])
+      // Also clear suggestions on session reset if any
+      setSuggestedQuestions([])
       return null
     } catch (e: any) {
       console.error('Failed to load problem session:', e)
@@ -163,10 +214,17 @@ export default function InsightChatSidebar({
       setMessages([
         {
           role: 'system',
-          content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+          content: persona === 'problem_tutor'
+            ? 'Ești Insight, un profesor de fizică răbdător.'
+            : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
         },
         ...loadedMessages,
       ])
+
+      // If the last message is from assistant, we might want to check for suggestions
+      // But usually history doesn't persist the raw suggestions format if we strip it?
+      // For now we assume history is just content.
+      setSuggestedQuestions([])
     } catch (e: any) {
       console.error('Failed to load session messages:', e)
     }
@@ -235,7 +293,9 @@ export default function InsightChatSidebar({
     setMessages([
       {
         role: 'system',
-        content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+        content: persona === 'problem_tutor'
+          ? 'Ești Insight, un profesor de fizică răbdător.'
+          : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
       },
     ])
     setInput('')
@@ -260,7 +320,9 @@ export default function InsightChatSidebar({
       setMessages([
         {
           role: 'system',
-          content: 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+          content: persona === 'problem_tutor'
+            ? 'Ești Insight, un profesor de fizică răbdător.'
+            : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
         },
       ])
       setInput('')
@@ -326,10 +388,260 @@ export default function InsightChatSidebar({
     adjustTextareaHeight()
   }, [input, adjustTextareaHeight])
 
+  // Handle suggested question selection
+  const handleSuggestionSelect = (question: string) => {
+    submitMessage(question)
+  }
+
+  const submitMessage = async (textOverride?: string) => {
+    const textToSend = textOverride || input
+    if (!user || (!textToSend.trim() && !problemContext) || busy) return
+
+    setBusy(true)
+    setError(null)
+    setLimitResetTime(null) // Reset limit banner on new attempt
+    setIsStreaming(true)
+    setSuggestedQuestions([]) // Clear suggestions when new message starts
+
+    // Show upgrade banner for free users on their first message
+    const isFreePlan = !profile?.plan || profile.plan === 'free'
+    const isFirstMessage = messages.filter(m => m.role === 'user').length === 0
+    if (isFreePlan && isFirstMessage && onFreePlanMessage) {
+      onFreePlanMessage()
+    }
+
+    try {
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+
+      if (!accessToken) {
+        toast({
+          title: 'Eroare',
+          description: 'Necesită autentificare.',
+          variant: 'destructive',
+        })
+        setBusy(false)
+        setIsStreaming(false)
+        return
+      }
+
+      // Combine context and input if context exists
+      let finalContent = textToSend.trim()
+      if (problemContext) {
+        finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
+      }
+
+      const newUserMsg: ChatMessage = {
+        role: 'user',
+        content: finalContent,
+      }
+
+      setMessages((prev) => [...prev, newUserMsg])
+      if (!textOverride) setInput('')
+      setProblemContext(null) // Clear context after it's sent
+      setShouldAutoScroll(true) // Ensure we auto-scroll for the new response
+
+      // If no session, create one with problem title
+      let currentSessionId = sessionId
+      if (!currentSessionId) {
+        const problemSessionTitle = `Problem: ${problemId}`
+        const res = await fetch('/api/insight/sessions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: problemSessionTitle,
+          }),
+        })
+
+        if (!res.ok) {
+          throw new Error('Nu am putut crea sesiunea.')
+        }
+
+        const data = await res.json()
+        currentSessionId = data.sessionId
+        setSessionId(currentSessionId)
+      }
+
+      // Add empty assistant message that will be updated incrementally
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+
+      // Set random loading message
+      setLoadingMessage(getRandomLoadingMessage())
+
+      const res = await fetch('/api/insight/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          sessionId: currentSessionId,
+          input: newUserMsg.content,
+          persona // Pass the persona
+        }),
+        signal: controller.signal,
+      })
+
+      // Check for non-streaming errors (429, etc.)
+      if (res.status === 429) {
+        const data = await res.json()
+        if (data.resetTime) {
+          setLimitResetTime(data.resetTime)
+        } else {
+          setError(data.error || 'Limită zilnică atinsă.')
+        }
+
+        // Remove the empty assistant message we added tentatively
+        setMessages((prev) => prev.slice(0, -1))
+
+        setBusy(false)
+        setIsStreaming(false)
+        return
+      }
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Eroare la Insight.')
+      }
+
+      // Check if response is streaming (text/event-stream)
+      const contentType = res.headers.get('content-type')
+      if (contentType?.includes('text/event-stream')) {
+        // Process streaming response
+        const reader = res.body?.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let fullAssistantContent = ''
+
+        if (!reader) {
+          throw new Error('Nu s-a putut citi răspunsul.')
+        }
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+
+                if (data.type === 'session' && data.sessionId) {
+                  setSessionId(data.sessionId)
+                } else if (data.type === 'text' && data.content) {
+                  // Clear loading message when first content arrives
+                  setLoadingMessage(null)
+                  fullAssistantContent += data.content
+
+                  // Parsing for suggestions
+                  let displayContent = fullAssistantContent
+                  const suggestionsMarker = '---SUGGESTIONS---'
+
+                  if (fullAssistantContent.includes(suggestionsMarker)) {
+                    const parts = fullAssistantContent.split(suggestionsMarker)
+                    displayContent = parts[0].trim()
+
+                    // Robust JSON extraction
+                    const rawSuggestions = parts[1].trim()
+                    const jsonStartIndex = rawSuggestions.indexOf('[')
+                    const jsonEndIndex = rawSuggestions.lastIndexOf(']')
+
+                    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+                      const potentialJson = rawSuggestions.substring(jsonStartIndex, jsonEndIndex + 1)
+                      try {
+                        const parsedSuggestions = JSON.parse(potentialJson)
+                        if (Array.isArray(parsedSuggestions)) {
+                          setSuggestedQuestions(parsedSuggestions)
+                        }
+                      } catch (e) {
+                        // Incomplete JSON, ignore for now
+                      }
+                    }
+                  }
+
+                  // Update assistant message incrementally
+                  setMessages((prev) => {
+                    const newMessages = [...prev]
+                    // Find the last assistant message
+                    for (let i = newMessages.length - 1; i >= 0; i--) {
+                      if (newMessages[i]?.role === 'assistant') {
+                        newMessages[i] = {
+                          role: 'assistant',
+                          content: displayContent,
+                        }
+                        break
+                      }
+                    }
+                    return newMessages
+                  })
+                } else if (data.type === 'done') {
+                  // Handle final metadata if needed
+                  if (!currentSessionId && data.sessionId) {
+                    setSessionId(data.sessionId)
+                  }
+                } else if (data.type === 'error') {
+                  throw new Error(data.error || 'Eroare la procesarea răspunsului.')
+                }
+              } catch (parseError) {
+                console.error('Error parsing stream data:', parseError)
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback for non-streaming responses (shouldn't happen, but handle gracefully)
+        const data = await res.json()
+        setMessages((prev) => {
+          const newMessages = [...prev]
+          const lastIndex = newMessages.length - 1
+          if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
+            newMessages[lastIndex] = {
+              role: 'assistant',
+              content: data.output || 'Nu am primit răspuns.',
+            }
+          }
+          return newMessages
+        })
+      }
+    } catch (e: any) {
+      if (abortControllerRef.current?.signal?.aborted) {
+        // Abort has already been handled by stopGeneration
+        return
+      }
+
+      if (e?.name === 'AbortError') {
+        return
+      }
+
+      const errorMsg = e.message || 'Eroare la comunicarea cu Insight.'
+      setError(errorMsg)
+      toast({
+        title: 'Eroare',
+        description: errorMsg,
+        variant: 'destructive',
+      })
+    } finally {
+      abortControllerRef.current = null
+      setBusy(false)
+      setIsStreaming(false)
+    }
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      send()
+      submitMessage()
     }
   }
 
@@ -395,211 +707,7 @@ export default function InsightChatSidebar({
     }
   }, [isStreaming, supabase, user])
 
-  const send = async () => {
-    if (!user || (!input.trim() && !problemContext) || busy) return
-
-    setBusy(true)
-    setError(null)
-    setIsStreaming(true)
-
-    try {
-      abortControllerRef.current?.abort()
-      const controller = new AbortController()
-      abortControllerRef.current = controller
-
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token
-
-      if (!accessToken) {
-        toast({
-          title: 'Eroare',
-          description: 'Necesită autentificare.',
-          variant: 'destructive',
-        })
-        return
-      }
-
-      // Combine context and input if context exists
-      let finalContent = input.trim()
-      if (problemContext) {
-        finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
-      }
-
-      const newUserMsg: ChatMessage = {
-        role: 'user',
-        content: finalContent,
-      }
-
-      setMessages((prev) => [...prev, newUserMsg])
-      setInput('')
-      setProblemContext(null) // Clear context after it's sent
-      setShouldAutoScroll(true) // Ensure we auto-scroll for the new response
-
-      // If no session, create one with problem title
-      let currentSessionId = sessionId
-      if (!currentSessionId) {
-        const problemSessionTitle = `Problem: ${problemId}`
-        const res = await fetch('/api/insight/sessions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            title: problemSessionTitle,
-          }),
-        })
-
-        if (!res.ok) {
-          throw new Error('Nu am putut crea sesiunea.')
-        }
-
-        const data = await res.json()
-        currentSessionId = data.sessionId
-        setSessionId(currentSessionId)
-      }
-
-      // Add empty assistant message that will be updated incrementally
-      setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
-
-      // Set random loading message
-      setLoadingMessage(getRandomLoadingMessage())
-
-      const res = await fetch('/api/insight/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          sessionId: currentSessionId,
-          input: newUserMsg.content,
-        }),
-        signal: controller.signal,
-      })
-
-      // Check for non-streaming errors (429, etc.)
-      if (res.status === 429) {
-        const data = await res.json()
-        setError(data.error || 'Limită zilnică atinsă.')
-        setMessages((prev) => {
-          const newMessages = [...prev]
-          const lastIndex = newMessages.length - 1
-          if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
-            newMessages[lastIndex] = {
-              role: 'assistant',
-              content: data.error || 'Ai atins limita zilnică pentru planul Free (3 solicitări/zi).',
-            }
-          }
-          return newMessages
-        })
-        setBusy(false)
-        return
-      }
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Eroare la Insight.')
-      }
-
-      // Check if response is streaming (text/event-stream)
-      const contentType = res.headers.get('content-type')
-      if (contentType?.includes('text/event-stream')) {
-        // Process streaming response
-        const reader = res.body?.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        if (!reader) {
-          throw new Error('Nu s-a putut citi răspunsul.')
-        }
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6))
-
-                if (data.type === 'session' && data.sessionId) {
-                  setSessionId(data.sessionId)
-                } else if (data.type === 'text' && data.content) {
-                  // Clear loading message when first content arrives
-                  setLoadingMessage(null)
-
-                  // Update assistant message incrementally (always the last assistant message)
-                  setMessages((prev) => {
-                    const newMessages = [...prev]
-                    // Find the last assistant message
-                    for (let i = newMessages.length - 1; i >= 0; i--) {
-                      if (newMessages[i]?.role === 'assistant') {
-                        newMessages[i] = {
-                          role: 'assistant',
-                          content: (newMessages[i].content || '') + data.content,
-                        }
-                        break
-                      }
-                    }
-                    return newMessages
-                  })
-                } else if (data.type === 'done') {
-                  // Handle final metadata if needed
-                  if (!currentSessionId && data.sessionId) {
-                    setSessionId(data.sessionId)
-                  }
-                } else if (data.type === 'error') {
-                  throw new Error(data.error || 'Eroare la procesarea răspunsului.')
-                }
-              } catch (parseError) {
-                console.error('Error parsing stream data:', parseError)
-              }
-            }
-          }
-        }
-      } else {
-        // Fallback for non-streaming responses (shouldn't happen, but handle gracefully)
-        const data = await res.json()
-        setMessages((prev) => {
-          const newMessages = [...prev]
-          const lastIndex = newMessages.length - 1
-          if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
-            newMessages[lastIndex] = {
-              role: 'assistant',
-              content: data.output || 'Nu am primit răspuns.',
-            }
-          }
-          return newMessages
-        })
-      }
-    } catch (e: any) {
-      if (abortControllerRef.current?.signal?.aborted) {
-        // Abort has already been handled by stopGeneration
-        return
-      }
-
-      if (e?.name === 'AbortError') {
-        return
-      }
-
-      const errorMsg = e.message || 'Eroare la comunicarea cu Insight.'
-      setError(errorMsg)
-      toast({
-        title: 'Eroare',
-        description: errorMsg,
-        variant: 'destructive',
-      })
-    } finally {
-      abortControllerRef.current = null
-      setBusy(false)
-      setIsStreaming(false)
-    }
-  }
+  const send = () => submitMessage()
 
   // Prevent page scroll when hovering over sidebar
   useEffect(() => {
@@ -637,7 +745,7 @@ export default function InsightChatSidebar({
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`fixed top-16 right-0 h-[calc(100dvh-4rem)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-50 flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-[100px] right-0 h-[calc(100dvh-100px)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-50 flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         style={{ maxWidth: '90vw' }}
       >
@@ -760,6 +868,18 @@ export default function InsightChatSidebar({
                   )
                 })}
               <div ref={endRef} />
+
+              {/* Show suggestions if available and not busy */}
+              {!busy &&
+                suggestedQuestions.length > 0 &&
+                messages.filter(m => m.role !== 'system').length > 0 &&
+                messages.filter(m => m.role !== 'system')[messages.filter(m => m.role !== 'system').length - 1]?.role === 'assistant' &&
+                !messages.some(m => m.role === 'user' && m.content === "Vreau să văd soluția completă.") && (
+                  <SuggestedQuestions
+                    questions={suggestedQuestions}
+                    onSelect={handleSuggestionSelect}
+                  />
+                )}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">
@@ -785,72 +905,97 @@ export default function InsightChatSidebar({
         {/* Chatbox Area */}
         <div className="p-4">
           <div className="flex flex-col relative w-full">
-            {/* Context Card */}
-            {problemContext && !busy && (
-              <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <span className="text-xs font-medium uppercase text-blue-400 flex-shrink-0">Context:</span>
-                  <p className="truncate opacity-80 text-xs">
-                    {problemContext.slice(0, 50)}...
-                  </p>
-                </div>
-                <button
-                  onClick={() => setProblemContext(null)}
-                  className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0"
-                  title="Șterge contextul"
-                >
-                  <X className="w-3 h-3 text-gray-400" />
-                </button>
-              </div>
-            )}
+            {limitResetTime ? (
+              <LimitReachedBanner resetTime={limitResetTime} />
+            ) : (
+              <>
+                {/* Context Card */}
+                {problemContext && !busy && (
+                  <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="text-xs font-medium uppercase text-blue-400 flex-shrink-0">Context:</span>
+                      <p className="truncate opacity-80 text-xs">
+                        {problemContext.slice(0, 50)}...
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setProblemContext(null)}
+                      className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0"
+                      title="Șterge contextul"
+                    >
+                      <X className="w-3 h-3 text-white/50" />
+                    </button>
+                  </div>
+                )}
 
-            {/* Input Area */}
-            <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-3 shadow-lg transition-all duration-200 ${problemContext ? 'rounded-b-2xl rounded-t-none border-t-0' : 'rounded-2xl'
-              }`}>
-              <button
-                className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
-                disabled
-                title="Atașează fișier (în curând)"
-              >
-                <Paperclip className="w-4 h-4 text-gray-400" />
-              </button>
-              <Textarea
-                ref={textareaRef}
-                placeholder={problemContext ? "Adaugă detalii sau întreabă..." : "Scrie un mesaj..."}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                rows={1}
-                className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                disabled={busy}
-                style={{
-                  minHeight: '24px',
-                  height: `${textareaHeight}px`,
-                  overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
-                }}
-              />
-              {busy && isStreaming ? (
-                <button
-                  onClick={stopGeneration}
-                  className="p-2 rounded transition-colors flex-shrink-0 self-end mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Oprește răspunsul"
-                >
-                  <span className="flex items-center justify-center w-5 h-5">
-                    <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
-                      <span className="w-2 h-2 bg-black" />
-                    </span>
-                  </span>
-                </button>
-              ) : (
-                <button
-                  onClick={send}
-                  disabled={busy || (!input.trim() && !problemContext)}
-                  className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
-                >
-                  <Send className="w-4 h-4 text-gray-400" />
-                </button>
-              )}
-            </div>
+                {/* Solution Request Button */}
+                {persona === 'problem_tutor' &&
+                  messages.filter(m => m.role === 'user').length >= 3 &&
+                  !messages.some(m => m.role === 'user' && m.content === "Vreau să văd soluția completă.") &&
+                  !busy && (
+                    <div className="flex justify-end mb-0">
+                      <button
+                        onClick={() => submitMessage("Vreau să văd soluția completă.")}
+                        className="bg-[#212121] border border-white/10 border-b-0 rounded-t-xl px-4 py-1.5 text-xs font-semibold text-orange-500 hover:text-orange-400 hover:bg-[#2a2a2a] transition-all ml-auto mr-0 shadow-lg translate-y-[1px] z-10"
+                      >
+                        Vezi soluția
+                      </button>
+                    </div>
+                  )}
+
+                {/* Input Area */}
+                <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-3 shadow-lg transition-all duration-200 ${problemContext
+                  ? 'rounded-b-2xl rounded-t-none border-t-0'
+                  : (persona === 'problem_tutor' && messages.filter(m => m.role === 'user').length >= 3 && !messages.some(m => m.role === 'user' && m.content === "Vreau să văd soluția completă.") && !busy)
+                    ? 'rounded-b-2xl rounded-tr-none rounded-tl-2xl border-t-0'
+                    : 'rounded-2xl'
+                  }`}>
+                  <button
+                    className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
+                    disabled
+                    title="Atașează fișier (în curând)"
+                  >
+                    <Paperclip className="w-4 h-4 text-gray-400" />
+                  </button>
+                  <Textarea
+                    ref={textareaRef}
+                    placeholder={problemContext ? "Adaugă detalii sau întreabă..." : "Scrie un mesaj..."}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    rows={1}
+                    className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    disabled={busy}
+                    style={{
+                      minHeight: '24px',
+                      height: `${textareaHeight}px`,
+                      overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
+                    }}
+                  />
+                  {busy && isStreaming ? (
+                    <button
+                      onClick={stopGeneration}
+                      className="p-2 rounded transition-colors flex-shrink-0 self-end mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Oprește răspunsul"
+                    >
+                      <span className="flex items-center justify-center w-5 h-5">
+                        <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
+                          <span className="w-2 h-2 bg-black" />
+                        </span>
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={send}
+                      disabled={busy || (!input.trim() && !problemContext)}
+                      className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
+                    >
+                      <Send className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

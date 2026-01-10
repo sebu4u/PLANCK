@@ -10,7 +10,9 @@ import {
     Calculator,
     Lightbulb,
     Target,
-    X
+    X,
+    Lock,
+    CheckCircle2
 } from 'lucide-react'
 import { Grade, Chapter, LessonSummary } from '@/lib/supabase-physics'
 import { slugify } from '@/lib/slug'
@@ -20,6 +22,7 @@ interface PhysicsSidebarProps {
     chapters: { [gradeId: string]: Chapter[] }
     lessons: { [chapterId: string]: LessonSummary[] }
     currentLessonId?: string
+    completedLessonIds?: Set<string>
     onLessonSelect: (lesson: LessonSummary) => void
     onClose?: () => void
 }
@@ -43,6 +46,7 @@ export function PhysicsSidebar({
     chapters,
     lessons,
     currentLessonId,
+    completedLessonIds = new Set(),
     onLessonSelect,
     onClose
 }: PhysicsSidebarProps) {
@@ -101,7 +105,7 @@ export function PhysicsSidebar({
                     ...chapter,
                     lessons: chapterLessons,
                     totalLessons: chapterLessons.length,
-                    completedLessons: 0, // Va fi implementat când adăugăm progresul utilizatorului
+                    completedLessons: chapterLessons.filter(l => completedLessonIds.has(l.id)).length,
                     totalDuration
                 }
             })
@@ -120,7 +124,7 @@ export function PhysicsSidebar({
         })
 
         setGradesData(processedGrades)
-    }, [grades, chapters, lessons])
+    }, [grades, chapters, lessons, completedLessonIds])
 
     const toggleGrade = (gradeId: string) => {
         const newExpanded = new Set(expandedGrades)
@@ -184,24 +188,34 @@ export function PhysicsSidebar({
                         const GradeIcon = getGradeIcon(grade.grade_number)
                         const isExpanded = expandedGrades.has(grade.id)
                         // Check if any chapter in this grade has a selected lesson
-                        const hasSelectedLesson = grade.chapters.some(chapter => 
+                        const hasSelectedLesson = grade.chapters.some(chapter =>
                             chapter.lessons.some(l => l.id === currentLessonId)
                         )
+
+                        const isLocked = grade.grade_number === 11 || grade.grade_number === 12
 
                         return (
                             <div key={grade.id} className="mb-2">
                                 {/* Grade Header */}
                                 <button
-                                    className="w-full text-left p-2 h-auto transition-all duration-200 ease-in-out hover:opacity-80"
-                                    onClick={() => toggleGrade(grade.id)}
+                                    className={`w-full text-left p-2 h-auto transition-all duration-200 ease-in-out ${isLocked
+                                        ? 'opacity-50 cursor-not-allowed'
+                                        : 'hover:opacity-80'
+                                        }`}
+                                    onClick={() => !isLocked && toggleGrade(grade.id)}
+                                    disabled={isLocked}
                                 >
                                     <div className="flex items-center w-full">
                                         <ChevronDown className={`w-4 h-4 mr-2 transition-transform duration-500 ease-in-out ${hasSelectedLesson ? 'text-blue-400' : 'text-white'} ${isExpanded ? 'rotate-0' : '-rotate-90'
-                                            }`} />
+                                            } ${isLocked ? 'invisible' : ''}`} />
                                         <GradeIcon className={`w-5 h-5 mr-3 ${hasSelectedLesson ? 'text-blue-400' : 'text-white'}`} />
                                         <div className="flex-1 text-left">
                                             <div className={`font-semibold ${hasSelectedLesson ? 'text-blue-400' : 'text-white'}`}>{grade.name}</div>
                                         </div>
+                                        <div className="text-xs text-white/50 bg-white/5 px-2 py-0.5 rounded-full ml-auto whitespace-nowrap">
+                                            {grade.completedLessons}/{grade.totalLessons}
+                                        </div>
+                                        {isLocked && <Lock className="w-4 h-4 ml-2 text-white/50" />}
                                     </div>
                                 </button>
 
@@ -209,8 +223,8 @@ export function PhysicsSidebar({
                                 <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
                                     }`}>
                                     <div className={`transition-all duration-500 ease-in-out ${isExpanded
-                                            ? 'translate-y-0 opacity-100'
-                                            : '-translate-y-4 opacity-0'
+                                        ? 'translate-y-0 opacity-100'
+                                        : '-translate-y-4 opacity-0'
                                         }`}>
                                         {grade.chapters.map((chapter) => {
                                             const isChapterExpanded = expandedChapters.has(chapter.id)
@@ -224,7 +238,7 @@ export function PhysicsSidebar({
                                                         className="w-full text-left p-2 h-auto transition-all duration-200 ease-in-out hover:opacity-80"
                                                         onClick={() => toggleChapter(chapter.id)}
                                                     >
-                                                            <div className="flex items-center w-full">
+                                                        <div className="flex items-center w-full">
                                                             <ChevronDown className={`w-3 h-3 mr-2 transition-transform duration-500 ease-in-out ${hasSelectedLesson ? 'text-blue-400' : 'text-white'} ${isChapterExpanded ? 'rotate-0' : '-rotate-90'
                                                                 }`} />
                                                             <div className="flex-1">
@@ -239,8 +253,8 @@ export function PhysicsSidebar({
                                                     <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isChapterExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
                                                         }`}>
                                                         <div className={`transition-all duration-500 ease-in-out ${isChapterExpanded
-                                                                ? 'translate-y-0 opacity-100'
-                                                                : '-translate-y-2 opacity-0'
+                                                            ? 'translate-y-0 opacity-100'
+                                                            : '-translate-y-2 opacity-0'
                                                             }`}>
                                                             {chapter.lessons.map((lesson, index) => {
                                                                 const isCurrentLesson = currentLessonId === lesson.id
@@ -252,9 +266,14 @@ export function PhysicsSidebar({
                                                                         onClick={() => onLessonSelect(lesson)}
                                                                     >
                                                                         <div className="flex items-center w-full">
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div className={`font-medium text-sm break-words ${isCurrentLesson ? 'text-blue-400' : 'text-white'}`}>
-                                                                                    {lesson.title}
+                                                                            <div className="flex items-center w-full group">
+                                                                                <div className="flex-1 min-w-0 flex items-center gap-2">
+                                                                                    <div className={`font-medium text-sm break-words flex-1 ${isCurrentLesson ? 'text-blue-400' : 'text-white'}`}>
+                                                                                        {lesson.title}
+                                                                                    </div>
+                                                                                    {completedLessonIds.has(lesson.id) && (
+                                                                                        <CheckCircle2 className={`w-4 h-4 text-green-500 shrink-0 ${isCurrentLesson ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} />
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
                                                                         </div>

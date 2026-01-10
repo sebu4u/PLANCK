@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, X, Atom, Users, Award, Star, BookOpen } from "lucide-react"
+import {
+  Search, X, Atom, Users, Award, Star, BookOpen, Check, SlidersHorizontal,
+  ArrowRight, TrendingDown, Scale, Circle, Orbit, Zap, Flame, ArrowUpDown, ArrowLeftRight,
+  Ruler, Sun, Eye, Glasses, HelpCircle, Thermometer, Battery, GitBranch, Network,
+  Waves, Radio, Triangle, Target, Sparkles, Lightbulb, Radiation, AtomIcon
+} from "lucide-react"
 import {
   Select,
   SelectTrigger,
@@ -168,6 +173,69 @@ const chapterEmojis: Record<string, string> = {
   "Toate": "📚",
 }
 
+// Monochrome icons for each chapter
+import type { LucideIcon } from "lucide-react"
+
+const chapterIcons: Record<string, LucideIcon> = {
+  // Clasa a 9-a
+  "Miscarea rectilinie si uniforma a punctului material": ArrowRight,
+  "Miscarea rectilinie uniform variata": ArrowUpDown,
+  "Miscarea punctului material sub actiunea greutatii": TrendingDown,
+  "Principiile mecanicii": Scale,
+  "Forta de frecare": Circle,
+  "Forta elastica": Circle,
+  "Legea atractiei universale": Orbit,
+  "Miscarea circular uniforma": Orbit,
+  "Lucrul mecanic si puterea mecanica": Zap,
+  "Energia mecanica": Flame,
+  "Impulsul punctului material": ArrowUpDown,
+  "Ciocniri plastice si elastice": ArrowLeftRight,
+  "Elemente de statica": Ruler,
+  "Principiile opticii geometrice": Sun,
+  "Lentile": Eye,
+  "Instrumente optice": Glasses,
+  "Probleme diverse.": HelpCircle,
+  // Clasa a 10-a
+  "Legea gazului ideal": Thermometer,
+  "Lucrul mecanic si energia interna": Zap,
+  "Principiul 1 al termodinamicii": Flame,
+  "Principiul 2 al termodinamicii": Flame,
+  "Calorimetrie": Thermometer,
+  "Electrostatica": Zap,
+  "Rezistenta electrica. Legea lui Ohm": Battery,
+  "Gruparea rezistoarelor": GitBranch,
+  "Legile lui Kirchhoff": Network,
+  "Energia si puterea electrica": Zap,
+  "magnetism": Orbit,
+  "probleme diverse.": HelpCircle,
+  // Clasa a 11-a
+  "Oscilații mecanice. Pendul gravitațional": Waves,
+  "Unde mecanice": Waves,
+  "circuite de curent alternativ": Zap,
+  "Circuite serie de curent alternativ": Zap,
+  "Circuite paralele de curent alternativ": GitBranch,
+  "Circuite mixte de curent alternativ": Network,
+  "Circuit oscilant. Antena": Radio,
+  "Prisma optică. Dispersia luminii": Triangle,
+  "Interferența luminii. Dispozitivul Young": Target,
+  "Dispozitive interferenționale": Eye,
+  "Interferența localizată": Circle,
+  "Difracția luminii": Sparkles,
+  "Polarizarea luminii": Glasses,
+  "probleme diverse": HelpCircle,
+  // Clasa a 12-a
+  "Efectul fotoelectric extern": Lightbulb,
+  "Efectul Compton": Zap,
+  "Modelul atomic": Atom,
+  "Atomul cu mai mulți electroni. Raze X": Radiation,
+  "Proprietățile generale ale nucleului atomic": Circle,
+  "Reacții nucleare": Atom,
+  "Radiații nucleare": Radiation,
+  "Particule elementare": Atom,
+  // Fallback
+  "Toate": BookOpen,
+}
+
 export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, onClosePanel }: ProblemFiltersProps) {
   const STORAGE_KEY = "problemFilters"
   const [filters, setFilters] = useState<FilterState>({
@@ -192,12 +260,12 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
     setFilters(applied)
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(applied))
-    } catch {}
+    } catch { }
     onFilterChange(applied)
     if (typeof window !== "undefined") {
       try {
         window.dispatchEvent(new Event("problemFiltersUpdated"))
-      } catch {}
+      } catch { }
     }
   }
 
@@ -213,12 +281,12 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
     setFilters(cleared)
     try {
       sessionStorage.removeItem(STORAGE_KEY)
-    } catch {}
+    } catch { }
     onFilterChange(cleared)
     if (typeof window !== "undefined") {
       try {
         window.dispatchEvent(new Event("problemFiltersUpdated"))
-      } catch {}
+      } catch { }
     }
     onClosePanel?.()
   }
@@ -229,6 +297,15 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
     filters.progress !== "Toate" ||
     filters.class !== "Toate" ||
     filters.chapter !== "Toate"
+
+  // Count active filters for badge
+  const activeFilterCount = [
+    filters.search ? 1 : 0,
+    filters.difficulty !== "Toate" ? 1 : 0,
+    filters.progress !== "Toate" ? 1 : 0,
+    filters.class !== "Toate" ? 1 : 0,
+    filters.chapter !== "Toate" ? 1 : 0,
+  ].reduce((a, b) => a + b, 0)
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -258,7 +335,7 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
       setSelectedClass(restored.class)
       setSelectedChapter(restored.chapter)
       onFilterChange(restored)
-    } catch {}
+    } catch { }
   }, [])
 
   // Listen for updates triggered from navbar dropdown when already on the problems page
@@ -280,203 +357,203 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
         setSelectedClass(restored.class)
         setSelectedChapter(restored.chapter)
         onFilterChange(restored)
-      } catch {}
+      } catch { }
     }
     window.addEventListener('problemFiltersUpdated', handler)
     return () => window.removeEventListener('problemFiltersUpdated', handler)
   }, [onFilterChange])
 
   return (
-    <div id="guide-filters-panel-body" className="space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-white/35">
-            Filtre
-          </p>
-          <h3 className="mt-2 text-lg font-semibold text-white">
-            Rafinează căutarea
-          </h3>
+    <div id="guide-filters-panel-body" className="text-white">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-5 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="h-5 w-5 text-white/70" />
+          <span className="text-base font-semibold text-white">Filtre</span>
         </div>
-        {onClosePanel && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClosePanel}
-            className="rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:bg-white/15 hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {activeFilterCount > 0 && (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+          {onClosePanel && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClosePanel}
+              className="h-8 w-8 rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-5 text-sm">
+      {/* Search Section */}
+      <div className="py-5 border-b border-white/10">
+        <label className="block text-sm font-medium text-white mb-3">Căutare</label>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
           <Input
             id="guide-search-input"
-            placeholder="Caută după enunț, cod (ex: M003) sau tag-uri..."
+            placeholder="Caută probleme..."
             value={filters.search}
             onChange={(e) => updateFilters({ search: e.target.value })}
-            className="h-11 rounded-2xl border-white/10 bg-white/[0.06] pl-11 text-sm text-white placeholder:text-white/40 focus-visible:ring-white/20"
+            className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-sm text-white placeholder:text-white/40 focus-visible:ring-white/20"
           />
-        </div>
-
-        <div className="grid gap-4">
-          <div className="space-y-2" id="guide-class-select">
-            <label className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
-              Clasa
-            </label>
-            <Select
-              value={selectedClass}
-              onValueChange={(value) => {
-                setSelectedClass(value)
-                setSelectedChapter("Toate")
-                updateFilters({ class: value, chapter: "Toate" })
-              }}
-            >
-              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-white/[0.06] text-sm text-white">
-                <SelectValue placeholder="Selectează clasa" />
-              </SelectTrigger>
-              <SelectContent className="border border-white/10 bg-[#1b1b1b] text-white">
-                {classOptions.map((cls) => (
-                  <SelectItem
-                    key={cls}
-                    value={cls}
-                    className="rounded-xl text-sm text-white/75 focus:bg-white/10 focus:text-white data-[state=checked]:bg-white/10 data-[state=checked]:text-white"
-                  >
-                    {classIcons[cls]} {cls}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2" id="guide-chapter-select">
-            <label className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
-              Capitol
-            </label>
-            <Select
-              value={selectedChapter}
-              onValueChange={(value) => {
-                setSelectedChapter(value)
-                updateFilters({ chapter: value })
-              }}
-              disabled={selectedClass === "Toate"}
-            >
-              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-white/[0.06] text-sm text-white disabled:text-white/30">
-                <SelectValue placeholder="Selectează capitolul" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[240px] border border-white/10 bg-[#1b1b1b] text-white">
-                {(chapterOptions[selectedClass] || ["Toate"]).map((chap) => (
-                  <SelectItem
-                    key={chap}
-                    value={chap}
-                    className="rounded-xl text-sm text-white/75 focus:bg-white/10 focus:text-white data-[state=checked]:bg-white/10 data-[state=checked]:text-white"
-                  >
-                    <span className="mr-2">{chapterEmojis[chap] || "📘"}</span>
-                    {chap}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2" id="guide-difficulty">
-          <span className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
-            Dificultate
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {["Toate", "Ușor", "Mediu", "Avansat"].map((difficulty) => {
-              const isActive = filters.difficulty === difficulty
-              const difficultyColors = {
-                "Toate": {
-                  hover: "hover:border-white/40",
-                  active: "border-white bg-white text-black hover:bg-white"
-                },
-                "Ușor": {
-                  hover: "hover:border-emerald-500/60 hover:text-emerald-300",
-                  active: "border-emerald-500/60 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 hover:border-emerald-500/80"
-                },
-                "Mediu": {
-                  hover: "hover:border-amber-500/60 hover:text-amber-300",
-                  active: "border-amber-500/60 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:border-amber-500/80"
-                },
-                "Avansat": {
-                  hover: "hover:border-rose-500/60 hover:text-rose-300",
-                  active: "border-rose-500/60 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30 hover:border-rose-500/80"
-                }
-              }
-              const colors = difficultyColors[difficulty as keyof typeof difficultyColors] || difficultyColors["Toate"]
-              
-              return (
-                <Button
-                  key={difficulty}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => updateFilters({ difficulty })}
-                  className={cn(
-                    "rounded-full border border-white/12 bg-white/[0.04] px-4 py-1.5 text-xs font-semibold text-white/65 transition",
-                    colors.hover,
-                    isActive ? colors.active : "hover:bg-white/12"
-                  )}
-                >
-                  {difficulty}
-                </Button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <span className="text-xs font-medium uppercase tracking-[0.2em] text-white/45">
-            Progres
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            {(["Toate", "Nerezolvate", "Rezolvate"] as const).map((progressOption) => {
-              const isActive = filters.progress === progressOption
-              return (
-                <Button
-                  key={progressOption}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => updateFilters({ progress: progressOption })}
-                  className={cn(
-                    "rounded-full border border-white/12 bg-white/[0.04] px-4 py-1.5 text-xs font-semibold text-white/65 transition hover:border-white/40 hover:bg-white/12 hover:text-white",
-                    progressOption === "Rezolvate" && "col-span-2",
-                    isActive && "border-white bg-white text-black hover:bg-white"
-                  )}
-                >
-                  {progressOption}
-                </Button>
-              )
-            })}
-          </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-white/10 pt-5 text-sm text-white/60">
+      {/* Difficulty Section */}
+      <div className="py-5 border-b border-white/10" id="guide-difficulty">
+        <label className="block text-sm font-medium text-white mb-3">Dificultate</label>
+        <div className="space-y-0.5">
+          {(["Ușor", "Mediu", "Avansat"] as const).map((difficulty) => {
+            const isActive = filters.difficulty === difficulty
+            const colors = {
+              "Ușor": "text-emerald-400",
+              "Mediu": "text-amber-400",
+              "Avansat": "text-rose-400"
+            }
+            return (
+              <button
+                key={difficulty}
+                onClick={() => updateFilters({ difficulty: isActive ? "Toate" : difficulty })}
+                className="flex w-full items-center gap-3 py-2 text-left text-sm transition-colors hover:text-white"
+              >
+                <span
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition",
+                    isActive ? "border-blue-500 bg-blue-500" : "border-white/30"
+                  )}
+                >
+                  {isActive && <span className="h-2 w-2 rounded-full bg-white" />}
+                </span>
+                <span className={cn("flex-1", colors[difficulty])}>{difficulty}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Class Section */}
+      <div className="py-5 border-b border-white/10" id="guide-class-select">
+        <label className="block text-sm font-medium text-white mb-3">Clasa</label>
+        <div className="flex flex-wrap gap-2">
+          {classOptions.map((cls) => {
+            const isActive = selectedClass === cls
+            return (
+              <button
+                key={cls}
+                onClick={() => {
+                  setSelectedClass(cls)
+                  setSelectedChapter("Toate")
+                  updateFilters({ class: cls, chapter: "Toate" })
+                }}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                  isActive
+                    ? "bg-white text-black"
+                    : "bg-white/[0.06] text-white/60 hover:bg-white/10 hover:text-white"
+                )}
+              >
+                {cls}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Chapter Section - Only shown when a specific class is selected */}
+      {selectedClass !== "Toate" && (
+        <div className="py-5 border-b border-white/10" id="guide-chapter-select">
+          <label className="block text-sm font-medium text-white mb-3">Capitol</label>
+          <div className="max-h-[250px] overflow-y-auto space-y-0.5">
+            {(chapterOptions[selectedClass] || ["Toate"]).map((chap) => {
+              const isActive = selectedChapter === chap
+              const ChapterIcon = chapterIcons[chap] || HelpCircle
+              return (
+                <button
+                  key={chap}
+                  onClick={() => {
+                    setSelectedChapter(chap)
+                    updateFilters({ chapter: chap })
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 py-1.5 text-left text-sm transition-colors",
+                    isActive ? "text-white" : "text-white/50 hover:text-white/70"
+                  )}
+                >
+                  {/* Checkbox */}
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition",
+                      isActive ? "border-blue-500 bg-blue-500" : "border-white/30"
+                    )}
+                  >
+                    {isActive && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                  </span>
+                  {/* Chapter Icon */}
+                  <ChapterIcon className={cn(
+                    "h-4 w-4 shrink-0",
+                    isActive ? "text-white" : "text-white/40"
+                  )} />
+                  {/* Chapter Name */}
+                  <span className="flex-1 leading-snug">{chap}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Progress Section */}
+      <div className="py-5 border-b border-white/10">
+        <label className="block text-sm font-medium text-white mb-3">Progres</label>
+        <div className="space-y-0.5">
+          {(["Nerezolvate", "Rezolvate"] as const).map((progressOption) => {
+            const isActive = filters.progress === progressOption
+            return (
+              <button
+                key={progressOption}
+                onClick={() => updateFilters({ progress: isActive ? "Toate" : progressOption })}
+                className="flex w-full items-center gap-3 py-2 text-left text-sm transition-colors hover:text-white"
+              >
+                <span
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition",
+                    isActive ? "border-blue-500 bg-blue-500" : "border-white/30"
+                  )}
+                >
+                  {isActive && <span className="h-2 w-2 rounded-full bg-white" />}
+                </span>
+                <span className={cn("flex-1", isActive ? "text-white" : "text-white/60")}>
+                  {progressOption}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Footer - Results count */}
+      <div className="pt-5 text-sm text-white/60">
         <p>
           Se afișează{" "}
-          <span className="font-semibold text-white">
-            {filteredCount}
-          </span>{" "}
+          <span className="font-semibold text-white">{filteredCount}</span>{" "}
           din{" "}
-          <span className="font-semibold text-white/80">
-            {totalProblems}
-          </span>{" "}
+          <span className="font-semibold text-white/80">{totalProblems}</span>{" "}
           probleme
         </p>
         {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={clearFilters}
-            className="self-start rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/15 hover:text-white"
+            className="mt-3 flex items-center gap-1.5 text-xs text-white/50 transition hover:text-white"
           >
-            <X className="mr-2 h-3.5 w-3.5" />
+            <X className="h-3.5 w-3.5" />
             Resetează filtrele
-          </Button>
+          </button>
         )}
       </div>
     </div>

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
+import { Check } from 'lucide-react'
 
 // Lazy load Monaco Editor to reduce initial bundle size
 const Editor = dynamic(() => import('@monaco-editor/react').then((mod) => mod.default), {
@@ -18,7 +19,7 @@ const Editor = dynamic(() => import('@monaco-editor/react').then((mod) => mod.de
 import { Card, CardContent } from '@/components/ui/card'
 import { Navigation } from '@/components/navigation'
 import { PlanckCodeSidebar } from '@/components/planckcode-sidebar'
-import { Loader2, Play, Plus, X, File, FileCode, ChevronDown, ChevronUp, Bug, Sparkles, Check } from 'lucide-react'
+import { Loader2, Play, Plus, X, File, FileCode, ChevronDown, ChevronUp, Save, Sparkles, Lock } from 'lucide-react'
 import axios from 'axios'
 import { InsightIdeChat } from '@/components/insight-ide-chat'
 import type { editor as MonacoEditor } from 'monaco-editor'
@@ -51,6 +52,15 @@ import {
 } from "@/components/ui/resizable"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
+import { supabase } from "@/lib/supabaseClient"
+import { FileItem } from "@/lib/types"
+import { SaveProjectDialog } from "@/components/save-project-dialog"
+import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from 'next/navigation'
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { PlusPromoCard } from "@/components/plus-promo-card"
+
+const FREE_PLAN_PROJECT_LIMIT = 3
 
 const defaultCode = `#include <iostream>
 using namespace std;
@@ -147,12 +157,7 @@ const ensureMonacoThemes = (monaco: typeof import('monaco-editor')) => {
   })
 }
 
-interface FileItem {
-  id: string
-  name: string
-  content: string
-  type: 'cpp' | 'txt'
-}
+
 
 type InsightCodeEditChange =
   | {
@@ -382,41 +387,19 @@ interface RunResponse {
 function IDEPageContent() {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
-  const [showUpgradeCard, setShowUpgradeCard] = useState<boolean>(true)
-  const [upgradeStarsMounted, setUpgradeStarsMounted] = useState(false)
-  const upgradeStars = useMemo(() => {
-    if (!upgradeStarsMounted) return []
+  const [showRaptorCard, setShowRaptorCard] = useState<boolean>(true)
+  const [showAuthRequiredCard, setShowAuthRequiredCard] = useState<boolean>(false)
+  // Default initial state - always used for first render (SSR/client must match)
+  const defaultFiles: FileItem[] = [{ id: '1', name: 'main.cpp', content: defaultCode, type: 'cpp' }]
+  const defaultActiveFileId = '1'
 
-    const starAreaWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth, 960) : 960
+  const [files, setFiles] = useState<FileItem[]>(defaultFiles)
+  const [activeFileId, setActiveFileId] = useState<string>(defaultActiveFileId)
+  const [isHydrated, setIsHydrated] = useState(false)
 
-    return Array.from({ length: 18 }, (_, i) => {
-      const seed = i * 0.618033988749895
-      const random = (seed: number) => {
-        const x = Math.sin(seed) * 10000
-        return x - Math.floor(x)
-      }
-
-      return {
-        id: i,
-        x: random(seed) * starAreaWidth,
-        y: random(seed + 1) * 320,
-        opacity: random(seed + 2) * 0.5 + 0.25,
-        scale: random(seed + 3) * 0.6 + 0.4,
-        width: random(seed + 4) * 2 + 1,
-        height: random(seed + 5) * 2 + 1,
-        animateY: random(seed + 6) * -18,
-        animateOpacity: random(seed + 7) * 0.3 + 0.2,
-        duration: random(seed + 8) * 4 + 5,
-      }
-    })
-  }, [upgradeStarsMounted])
+  // Load saved state from localStorage AFTER hydration
   useEffect(() => {
-    setUpgradeStarsMounted(true)
-  }, [])
-
-  // Load saved state from localStorage on mount
-  const loadSavedState = (): { files: FileItem[], activeFileId: string } | null => {
-    if (typeof window === 'undefined') return null
+    if (isHydrated) return // Only run once
 
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -438,26 +421,230 @@ function IDEPageContent() {
           if (validFiles) {
             // Ensure activeFileId exists in files, otherwise use first file
             const activeFileExists = parsed.files.find((f: FileItem) => f.id === parsed.activeFileId)
-            return {
-              files: parsed.files,
-              activeFileId: activeFileExists ? parsed.activeFileId : parsed.files[0].id
-            }
+            setFiles(parsed.files)
+            setActiveFileId(activeFileExists ? parsed.activeFileId : parsed.files[0].id)
           }
         }
       }
     } catch (error) {
       console.warn('Failed to load IDE state from localStorage:', error)
     }
-    return null
+
+    setIsHydrated(true)
+  }, [isHydrated])
+
+  // Project State
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
+  const { isFree } = useSubscriptionPlan()
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [userProjectCount, setUserProjectCount] = useState<number>(0)
+
+  // Load project from URL if present
+  useEffect(() => {
+    const projectId = searchParams?.get('projectId')
+    if (projectId) {
+      setCurrentProjectId(projectId)
+      loadProject(projectId)
+    }
+  }, [searchParams])
+
+  // Fetch user's project count for free plan limit check
+  useEffect(() => {
+    const fetchProjectCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { count, error } = await supabase
+          .from('projects')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+
+        if (!error && count !== null) {
+          setUserProjectCount(count)
+        }
+      } catch (err) {
+        console.warn('Failed to fetch project count:', err)
+      }
+    }
+
+    fetchProjectCount()
+  }, [currentProjectId]) // Re-fetch when a project is created/loaded
+
+  const loadProject = async (projectId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single()
+
+      if (error) throw error
+      if (data && data.files) {
+        setFiles(data.files as FileItem[]) // Cast assuming DB structure matches
+        if (data.files.length > 0) {
+          setActiveFileId(data.files[0].id)
+        }
+        toast({
+          title: "Proiect încărcat",
+          description: `Proiectul "${data.name}" a fost încărcat cu succes.`
+        })
+      }
+    } catch (err) {
+      console.error('Error loading project:', err)
+      toast({
+        variant: "destructive",
+        title: "Eroare la încărcare",
+        description: "Nu s-a putut încărca proiectul."
+      })
+    }
   }
 
-  const savedState = loadSavedState()
-  const [files, setFiles] = useState<FileItem[]>(() => {
-    return savedState?.files || [{ id: '1', name: 'main.cpp', content: defaultCode, type: 'cpp' }]
-  })
-  const [activeFileId, setActiveFileId] = useState<string>(() => {
-    return savedState?.activeFileId || '1'
-  })
+  const handleSaveProjectClick = async () => {
+    // Check authentication first
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      setShowAuthRequiredCard(true)
+      return
+    }
+
+    if (!currentProjectId) {
+      // Check free plan limit before opening dialog
+      if (isFree && userProjectCount >= FREE_PLAN_PROJECT_LIMIT) {
+        toast({
+          variant: "destructive",
+          title: "Limită atinsă",
+          description: `Ai atins limita de ${FREE_PLAN_PROJECT_LIMIT} proiecte pentru planul gratuit. Upgradează la Plus pentru proiecte nelimitate.`
+        })
+        return
+      }
+      setIsSaveDialogOpen(true)
+    } else {
+      await saveProjectToSupabase(currentProjectId)
+    }
+  }
+
+  const saveProjectToSupabase = async (projectId: string, name?: string, description?: string) => {
+    setIsSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({
+          title: "Nu ești autentificat",
+          description: "Trebuie să fii autentificat pentru a salva proiecte.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const updateData: any = {
+        files: files,
+        updated_at: new Date().toISOString()
+      }
+
+      // Only include name/description if provided (new project or explicit update)
+      // Otherwise we rely on existing DB values for updates
+      if (name) updateData.name = name
+      if (description !== undefined) updateData.description = description
+
+      // If we are updating an existing project (projectId exists), we just update
+      // But if we are called from the dialog (new project), we might need to INSERT.
+      // Actually, standard UPDATE logic applies if record exists.
+      // But for NEW project, we do INSERT.
+
+      // Since we separate "Save" (update existing) from "Create" (dialog), handle accordingly.
+
+      if (name) { // New project creation flow usually provides a name
+        // Actually, if projectId is null, we do INSERT
+      }
+
+      // Let's refine:
+      // If currentProjectId is set, we UPDATE.
+      // If NOT set, we do INSERT (and need name).
+
+      if (currentProjectId) {
+        const { error } = await supabase
+          .from('projects')
+          .update(updateData)
+          .eq('id', currentProjectId)
+
+        if (error) throw error
+
+        toast({
+          title: "Proiect salvat",
+          description: "Modificările au fost salvate cu succes."
+        })
+      } // The case for NEW project is handled in onSaveDialogConfirm actually
+
+    } catch (err) {
+      console.error('Error saving project:', err)
+      toast({
+        variant: "destructive",
+        title: "Eroare la salvare",
+        description: "Nu s-a putut salva proiectul."
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCreateProject = async (name: string, description: string) => {
+    setIsSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({
+          title: "Autentificare necesară",
+          description: "Trebuie să fii autentificat.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          user_id: user.id,
+          name,
+          description,
+          files,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setCurrentProjectId(data.id)
+      setIsSaveDialogOpen(false)
+
+      // Update URL without reload
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.set('projectId', data.id)
+      window.history.pushState({}, '', newUrl.toString())
+
+      toast({
+        title: "Proiect creat",
+        description: `Proiectul "${name}" a fost creat și salvat.`
+      })
+
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.error_description || JSON.stringify(err)
+      console.error('Error creating project:', errorMessage, err)
+      toast({
+        variant: "destructive",
+        title: "Eroare la creare",
+        description: errorMessage || "Nu s-a putut crea proiectul. Asigură-te că tabelul 'projects' există în Supabase."
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // Streaming state for glow effect
   const [isStreamingCode, setIsStreamingCode] = useState(false)
   const [output, setOutput] = useState<RunResponse | null>(null)
@@ -466,7 +653,17 @@ function IDEPageContent() {
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
   const [stdin, setStdin] = useState<string>('')
   const [isInsightOpen, setIsInsightOpen] = useState<boolean>(false)
-  const searchParams = useSearchParams()
+  const [showPromoCard, setShowPromoCard] = useState(false)
+  const [hasShownPromoCard, setHasShownPromoCard] = useState(false)
+
+  const handleMessageSent = () => {
+    // Show promo card only for free plan users and only once per session
+    if (isFree && !hasShownPromoCard) {
+      setShowPromoCard(true)
+      setHasShownPromoCard(true)
+    }
+  }
+
 
   // Interactive execution state
   const [isInteractiveMode, setIsInteractiveMode] = useState<boolean>(true)
@@ -753,12 +950,23 @@ function IDEPageContent() {
   const handleInsertCodeFromInsight = useCallback((code: string) => {
     if (!activeFileId) return
 
-    // Update file content state
-    setFiles((prevFiles) =>
-      prevFiles.map((file) =>
+    setFiles((prevFiles) => {
+      const activeFile = prevFiles.find(f => f.id === activeFileId)
+      if (activeFile) {
+        // Save state for Undo/Reject
+        setPendingInsightEdit({
+          fileId: activeFileId,
+          previousContent: activeFile.content,
+          newContent: code,
+          insertHighlights: [],
+          deleteHighlights: []
+        })
+      }
+
+      return prevFiles.map((file) =>
         file.id === activeFileId ? { ...file, content: code } : file
       )
-    )
+    })
 
     // Trigger streaming animation
     skipModelSyncRef.current.add(activeFileId)
@@ -966,9 +1174,17 @@ function IDEPageContent() {
   }, [clearInsightDecorations])
 
   const handleUndoInsightEdit = useCallback(() => {
+    // Clear any active streaming/sync blocks to ensure restoration happens
+    streamingEditRef.current = null
+
     setPendingInsightEdit((current) => {
       if (!current) {
         return null
+      }
+
+      // Ensure we don't skip the sync for the file we are restoring
+      if (skipModelSyncRef.current.has(current.fileId)) {
+        skipModelSyncRef.current.delete(current.fileId)
       }
 
       setFiles((prevFiles) =>
@@ -1337,84 +1553,133 @@ function IDEPageContent() {
         ])}
         id="breadcrumbs-planckcode-ide"
       />
-      {showUpgradeCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/15 bg-[#0c1017]/95 shadow-[0_30px_120px_-25px_rgba(0,0,0,0.95)]">
+      {showRaptorCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#181818] shadow-2xl"
+          >
             <button
-              onClick={() => setShowUpgradeCard(false)}
-              aria-label="Închide mesajul de upgrade"
-              className="absolute right-3 top-3 z-20 rounded-full p-2 text-gray-200 hover:bg-white/10 hover:text-white transition-colors"
+              onClick={() => setShowRaptorCard(false)}
+              className="absolute right-4 top-4 z-20 rounded-full bg-black/40 p-2 text-gray-200 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-md"
             >
               <X className="h-4 w-4" />
             </button>
 
-            <div className="absolute inset-0 pointer-events-none opacity-75">
-              <div className="absolute -top-44 left-1/2 -translate-x-1/2 w-[900px] h-[420px] bg-white/10 blur-[120px]" />
-              <div className="absolute inset-0 overflow-hidden">
-                {upgradeStars.map((star) => (
-                  <motion.div
-                    key={star.id}
-                    className="absolute bg-white rounded-full"
-                    initial={{
-                      x: star.x,
-                      y: star.y,
-                      opacity: star.opacity,
-                      scale: star.scale,
-                    }}
-                    animate={{
-                      y: [null, star.animateY],
-                      opacity: [null, star.animateOpacity],
-                    }}
-                    transition={{
-                      duration: star.duration,
-                      repeat: Infinity,
-                      repeatType: 'reverse',
-                      ease: 'easeInOut',
-                    }}
-                    style={{
-                      width: `${star.width}px`,
-                      height: `${star.height}px`,
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/30" />
+            {/* Ultrawide Image Section */}
+            <div className="relative h-44 w-full">
+              <img
+                src="/raptor1.png"
+                alt="RAPTOR1 AI"
+                className="h-full w-full object-cover object-[50%_25%]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/40 to-transparent" />
             </div>
 
-            <div className="relative z-10 p-7 sm:p-8 space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-xs font-semibold text-white/90 shadow-inner shadow-white/5">
-                Planck Code
-                <span className="text-white">Beta Update</span>
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                  Planck Code se upgradează ⚡️
-                </h2>
-                <p className="text-gray-200 text-base leading-relaxed">
-                  Lucrezi azi. Continui mâine. Fără să pierzi nimic.
-                </p>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  În curând vei putea să-ți salvezi proiectele odată cu lansarea planurilor Plus &amp; Pro.
-                </p>
-              </div>
-
-              <div className="grid gap-2 text-sm text-gray-100">
-                {['Mai multe limbaje', 'Probleme exclusive', 'Funcții avansate pentru developerii adevărați'].map((item) => (
-                  <div key={item} className="flex items-start gap-3 rounded-lg bg-white/5 px-3 py-2 border border-white/10">
-                    <Check className="mt-0.5 h-4 w-4 text-white" />
-                    <span className="leading-tight">{item}</span>
+            {/* Content Section - Landscape Layout */}
+            <div className="relative px-8 pb-8 pt-2">
+              <div className="grid md:grid-cols-[1.2fr_1fr] gap-8 items-end">
+                <div className="space-y-4 text-left">
+                  <div>
+                    <h2 className="text-4xl font-bold tracking-wider text-white mb-2 font-sans uppercase" style={{ fontFamily: 'Horizon, sans-serif' }}>
+                      RAPTOR1 Is Here
+                    </h2>
+                    <div className="h-1 w-24 bg-blue-500 rounded-full" />
                   </div>
-                ))}
-              </div>
 
-              <div className="space-y-2 pt-2 text-center">
-                <p className="text-gray-200 font-semibold">Pregătește-te să treci pe next level.</p>
-                <p className="text-xs text-gray-400">
-                  👉 Soon: Upgrade &amp; Save
-                </p>
+                  <p className="text-gray-300 text-base leading-relaxed">
+                    Experimentează noul model AI <span className="text-blue-400 font-semibold">RAPTOR1</span>.
+                    Optimizat pentru viteză, precizie și debugging avansat în C++.
+                    Analizează codul instantaneu și oferă sugestii inteligente.
+                  </p>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
+                    <span className="flex items-center gap-1.5">
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      Analiză instantă
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      Optimizare
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      STL Support
+                    </span>
+                  </div>
+
+                  <div>
+                    <Button
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 text-base rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] hover:scale-[1.02]"
+                      onClick={() => {
+                        window.location.href = '/pricing'
+                      }}
+                    >
+                      Upgrade to Pro
+                    </Button>
+                    <p className="mt-2 text-center text-[10px] text-gray-500 uppercase tracking-widest">
+                      Disponibil în planurile Plus & Pro
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showAuthRequiredCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#181818] shadow-2xl"
+          >
+            <button
+              onClick={() => setShowAuthRequiredCard(false)}
+              className="absolute right-4 top-4 z-20 rounded-full bg-black/40 p-2 text-gray-200 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-md"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Content Section */}
+            <div className="relative px-8 pb-8 pt-12">
+              <div className="space-y-6 text-center">
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4 border border-blue-500/20">
+                    <Lock className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <h2 className="text-3xl font-bold tracking-wider text-white mb-2 font-sans uppercase" style={{ fontFamily: 'Horizon, sans-serif' }}>
+                    Cont necesar
+                  </h2>
+                  <div className="h-1 w-16 bg-blue-500 rounded-full mb-4" />
+                  <p className="text-gray-300 text-base leading-relaxed max-w-md mx-auto">
+                    Pentru a salva proiectele și a accesa istoricul complet, ai nevoie de un cont PlanckCode.
+                  </p>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4 mt-6">
+                  <Button
+                    className="w-full bg-[#2d2d2d] hover:bg-[#3d3d3d] text-white font-bold h-12 text-base rounded-xl border border-white/10"
+                    onClick={() => setShowAuthRequiredCard(false)}
+                  >
+                    Mai târziu
+                  </Button>
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 text-base rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transition-all hover:scale-[1.02]"
+                    onClick={() => {
+                      window.location.href = '/auth'
+                    }}
+                  >
+                    Autentificare / Înregistrare
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
       <Navigation />
@@ -1480,7 +1745,7 @@ function IDEPageContent() {
                     <File className="w-4 h-4" />
                   )}
                   <span>{file.name}</span>
-                  {files.length > 1 && (
+                  {isHydrated && files.length > 1 && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -1527,9 +1792,11 @@ function IDEPageContent() {
               <Button
                 variant="outline"
                 className="bg-transparent border-white text-white hover:bg-white/10 font-medium px-4 h-8 flex items-center gap-2 text-sm"
+                onClick={handleSaveProjectClick}
+                disabled={isSaving}
               >
-                <Bug className="w-4 h-4" />
-                Debug
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isSaving ? "Saving..." : "Save"}
               </Button>
               <Button
                 onClick={handleRunCode}
@@ -1582,6 +1849,10 @@ function IDEPageContent() {
                     tabSize: 2,
                     wordWrap: 'on',
                   }}
+                />
+                <PlusPromoCard
+                  isOpen={showPromoCard}
+                  onClose={() => setShowPromoCard(false)}
                 />
               </div>
             </ResizablePanel>
@@ -1785,9 +2056,12 @@ function IDEPageContent() {
           onClose={() => setIsInsightOpen(false)}
           onInsertCode={handleInsertCodeFromInsight}
           onApplyCodeEdit={handleApplyCodeEdit}
+          onAcceptCodeChanges={handleConfirmInsightEdit}
+          onRejectCodeChanges={handleUndoInsightEdit}
           activeFileName={activeFile?.name}
           activeFileContent={activeFile?.content}
           activeFileLanguage={activeFile?.type === 'cpp' ? 'cpp' : 'plaintext'}
+          onMessageSent={handleMessageSent}
         />
       </aside>
       {/* New File Dialog */}
@@ -1849,6 +2123,12 @@ function IDEPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SaveProjectDialog
+        isOpen={isSaveDialogOpen}
+        onClose={() => setIsSaveDialogOpen(false)}
+        onSave={handleCreateProject}
+        isSaving={isSaving}
+      />
     </div>
   )
 }

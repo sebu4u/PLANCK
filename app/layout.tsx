@@ -13,17 +13,18 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { MobileViewportFix } from "@/components/mobile-viewport-fix"
 import { RealVHProvider } from "@/components/real-vh-provider"
 import { GettingStartedCard } from "@/components/getting-started-card"
+import { ProfileCompletionCard } from "@/components/profile-completion-card"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
 
-const monaSans = Mona_Sans({ 
+const monaSans = Mona_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
   variable: "--font-mona-sans"
 })
 
-const vt323 = VT323({ 
+const vt323 = VT323({
   weight: ["400"],
   subsets: ["latin"],
   variable: "--font-vt323"
@@ -91,6 +92,7 @@ export default function RootLayout({
               <Toaster />
               <CookieConsentBanner />
               <GettingStartedCard />
+              <ProfileCompletionCard />
               <div
                 className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
                 aria-label="Versiunea site-ului"

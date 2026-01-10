@@ -1,7 +1,6 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import { PhysicsLessonsClient } from "@/components/physics-lessons-client"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
@@ -122,10 +121,10 @@ export default async function PhysicsLessonsBySlugPage({ params }: { params: Pro
   ])
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white">
+    <div className="h-screen overflow-hidden bg-[#101010] text-white">
       <Navigation />
 
-      <div className="pt-16">
+      <div className="pt-16 h-full">
         <StructuredData data={breadcrumbs} />
         <PhysicsLessonsClient
           grades={grades}
@@ -134,8 +133,6 @@ export default async function PhysicsLessonsBySlugPage({ params }: { params: Pro
           initialLessonId={initialLessonId}
         />
       </div>
-
-      <Footer />
     </div>
   )
 }

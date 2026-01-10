@@ -18,8 +18,10 @@ function getOpenAIClient() {
   });
 }
 
-// Maximum prompts per day for Free plan
-const FREE_DAILY_LIMIT = 3;
+// Maximum prompts per day for Free plan (Raptor1 Fast)
+const FREE_DAILY_LIMIT = 20;
+// Maximum prompts per month for Free plan (Raptor1)
+const FREE_RAPTOR1_MONTHLY_LIMIT = 10;
 // Maximum prompts per month for Plus plan (combined Insight + AI Agent)
 const PLUS_MONTHLY_LIMIT = 800;
 
@@ -106,14 +108,14 @@ export async function POST(req: NextRequest) {
       );
     }
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
-    
+
     // Check if this is from IDE - IDE messages should not be saved to chat history
     const isIdeRequest = persona === 'ide';
-    
+
     // Support legacy format (messages array) for backward compatibility
     let userInput: string;
     let resolvedSessionId: string | undefined = sessionId;
-    
+
     if (Array.isArray(messages) && messages.length > 0) {
       // Legacy format: extract last user message
       const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
@@ -128,26 +130,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mesajul utilizatorului este necesar.' }, { status: 400 });
     }
 
+    // Determine requested model first to apply correct limits
+    const allowedModels = ['gpt-4o-mini', 'gpt-4o', 'deep-thinking'];
+    const requestedModel = body?.model;
+    const modelToUseParam = allowedModels.includes(requestedModel) ? requestedModel : 'gpt-4o-mini';
+
     // Check usage limits based on plan
     if (isFreePlan) {
-      // Free plan: daily limit check
-      const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
-      const { data: usageRow } = await supabase
-        .from('insight_usage')
-        .select('prompts_count')
-        .eq('user_id', user.id)
-        .eq('usage_date', usageDate)
-        .maybeSingle();
-
-      const currentCount = usageRow?.prompts_count ?? 0;
-      if (currentCount >= FREE_DAILY_LIMIT) {
+      // Block Deep Thinking (Raptor1 heavy) for Free plan
+      if (modelToUseParam === 'deep-thinking') {
         return NextResponse.json(
-          { error: 'Ai atins limita zilnică pentru planul Free (3 solicitări/zi).' },
-          { status: 429 }
+          { error: 'Modelul Raptor1 heavy este disponibil doar în planul Plus. Fă upgrade pentru a-l folosi.' },
+          { status: 403 }
         );
+      }
+
+      if (modelToUseParam === 'gpt-4o') {
+        // Free plan + Raptor1 (gpt-4o): Monthly limit check (10/month)
+        const now = new Date();
+        const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
+
+        const { data: monthlyUsageRow } = await supabase
+          .from('ai_monthly_usage')
+          .select('prompts_count')
+          .eq('user_id', user.id)
+          .eq('usage_month', monthKey)
+          .maybeSingle();
+
+        const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
+        if (currentMonthlyCount >= FREE_RAPTOR1_MONTHLY_LIMIT) {
+          return NextResponse.json(
+            { error: 'Ai atins limita lunară pentru Raptor1 (10 solicitări/lună) pe planul Free. Treci la Raptor1 fast sau fă upgrade.' },
+            { status: 429 }
+          );
+        }
+      } else {
+        // Free plan + Raptor1 fast (gpt-4o-mini): Daily limit check (20/day)
+        const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
+        const { data: usageRow } = await supabase
+          .from('insight_usage')
+          .select('prompts_count')
+          .eq('user_id', user.id)
+          .eq('usage_date', usageDate)
+          .maybeSingle();
+
+        const currentCount = usageRow?.prompts_count ?? 0;
+        if (currentCount >= FREE_DAILY_LIMIT) {
+          const now = new Date();
+          const nextReset = new Date(now);
+          nextReset.setUTCHours(24, 0, 0, 0); // Next midnight UTC
+
+          return NextResponse.json(
+            {
+              error: 'Ai atins limita zilnică pentru Raptor1 fast (20 solicitări/zi).',
+              resetTime: nextReset.toISOString()
+            },
+            { status: 429 }
+          );
+        }
       }
     } else if (isPlusPlan) {
       // Plus plan: monthly limit check (800 prompts/month combined for Insight + AI Agent)
+      // All models draw from the same bucket
       const now = new Date();
       const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
@@ -234,19 +279,19 @@ export async function POST(req: NextRequest) {
         logger.error('Failed to load history:', historyErr);
         return NextResponse.json({ error: 'Nu am putut încărca istoricul.' }, { status: 500 });
       }
-      
+
       history = historyData || [];
     }
 
     // Build messages array for OpenAI (include system message + history)
     const personaKey = typeof persona === 'string' ? persona : null;
     let systemContent =
-      'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.\n\nIMPORTANT:\n- Pentru formule matematice, folosește DOAR marcatori LaTeX de tipul $ pentru formule inline (de exemplu: $E=mc^2$) și $$ pentru formule pe bloc (de exemplu: $$\\int_0^1 x dx$$). NU folosi marcatori standard LaTeX precum \\(, \\), \\[, \\].\n- Răspunde DOAR la întrebări care țin de fizică, informatică sau matematică. Dacă utilizatorul întreabă despre altceva (istorie, literatură, sport, etc.), refuză politicos explicând că ești specializat doar în domeniile științifice menționate.';
+      'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.\n\nIMPORTANT:\n- OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu (ex: nu scrie "t_1 = 0,5", scrie "$t_1 = 0,5$").\n- Răspunde DOAR la întrebări care țin de fizică, informatică sau matematică. Dacă utilizatorul întreabă despre altceva (istorie, literatură, sport, etc.), refuză politicos explicând că ești specializat doar în domeniile științifice menționate.';
 
     if (personaKey === 'ide') {
       systemContent =
         'Ești Insight, co-pilotul din PlanckCode IDE. Ajută utilizatorii să scrie, să explici și să refactorizezi cod (în special C++), să depanezi erori și să oferi exemple practice. Menține răspunsurile concentrate pe programare și algoritmică; dacă utilizatorul cere altceva, redirecționează-l respectuos către subiecte tehnice.\n\nIMPORTANT - Cum răspunzi:\n1. Dacă utilizatorul îți cere în mod clar să **aplici/actualizezi/înlocuiești/rezolvi** codul din editor (ex: „corectează în IDE", „repară programul", „rescrie fișierul"), răspunde EXCLUSIV cu un obiect JSON valid, fără text suplimentar înainte sau după. Structura obligatorie este:\n{\n  "type": "code_edit",\n  "target": { "file_name": "<nume_fisier>" },\n  "explanation": "<scurtă explicație a modificărilor>",\n  "full_content": "<TOT codul final, complet, folosind \\n pentru linii noi>",\n  "changes": []\n}\n\nREGULI PENTRU JSON:\n- Include întotdeauna în `full_content` varianta completă și corectă a întregului fișier (inclusiv linii nemodificate).\n- `changes` poate rămâne gol sau poate sumariza modificările (nu trimite patch-uri linie cu linie).\n- Nu adăuga explicații în afara câmpului `explanation`.\n- Dacă nu ești sigur că utilizatorul dorește aplicarea automată, întreabă-l sau furnizează codul în chat, nu trimite JSON.\n\n2. Dacă utilizatorul solicită doar explicații, exemple, sugestii sau nu menționează clar că vrea modificări directe în editor, răspunde în text normal (Markdown) și oferă codul în blocuri ` ```limbaj ... ``` `. Aceste blocuri vor putea fi inserate manual din interfață.\n\nDacă utilizatorul cere explicit să NU modifici editorul, respectă cererea și răspunde doar cu explicații/cod în chat.';
-      
+
       // Adaugă instrucțiuni extra pentru modul Agent
       if (mode === 'agent') {
         systemContent += '\n\nINSTRUCȚIUNI SPECIALE PENTRU MODUL AGENT (când generezi cod direct în IDE - fie în JSON code_edit, fie în blocuri de cod Markdown):\n- Folosește DOAR următoarele biblioteci standard C++: <iostream>, <fstream>, <algorithm>, <cmath>, <cstring>. NU folosi alte biblioteci sau header-e (ex: <vector>, <string>, <map>, etc.).\n- NU adăuga comentarii în codul generat (nici inline cu //, nici pe blocuri cu /* */). Codul trebuie să fie complet curat, fără nicio formă de comentarii.\n- NU folosi cout sau orice alt mesaj înainte de cin. Când utilizatorul trebuie să introducă date, folosește direct cin fără mesaje prompt (ex: NU scrie "cout << \"Introdu un numar: \";" înainte de "cin >> numar;", ci doar "cin >> numar;").\n- Aceste restricții se aplică la orice cod generat care va fi inserat în IDE (în câmpul full_content din JSON sau în blocuri de cod Markdown).';
@@ -258,20 +303,52 @@ export async function POST(req: NextRequest) {
       content: systemContent,
     };
 
+    if (personaKey === 'problem_tutor') {
+      const problemTutorContent = `Ești Insight, un profesor de fizică răbdător și pedagog. Scopul tău este să ghicești studentul să rezolve singur problema, NU să îi dai rezolvarea directă.
+
+REGULI DE INTERACȚIUNE:
+1. NU rezolva problema numeric din prima.
+2. Explică fenomenele fizice implicate și principiile teoretice.
+3. Întreabă studentul ce pași crede că ar trebui urmați.
+4. Dacă studentul se blochează, dă-i un indiciu mic, nu tot pasul.
+5. OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu.
+
+EXCEPTIE - SOLUȚIA COMPLETĂ:
+Dacă utilizatorul cere explicit "Vreau să văd soluția completă" sau ceva similar:
+1. Oferă rezolvarea completă, pas cu pas, cu calcule numerice.
+2. NU mai genera întrebări de ghidaj.
+3. NU mai genera blocul ---SUGGESTIONS--- la final.
+
+GENERARE ÎNTREBĂRI SUGERATE:
+La finalul FIECARUI răspuns (EXCEPTÂND când oferi soluția completă), generează OBLIGATORIU un bloc special cu 2-3 întrebări scurte pe care studentul ți le-ar putea adresa în continuare.
+Aceste întrebări trebuie să fie pertinente pentru stadiul curent al discuției și să ajute studentul să avanseze.
+
+Formatul TREBUIE să fie exact acesta la finalul mesajului, PRECEDAT DOAR DE LINII GOALE (fără alte texte înainte sau după acest bloc în zona de sugestii) și FĂRĂ markdown (nu pune în \`\`\`json ... \`\`\`):
+
+---SUGGESTIONS---
+["Întrebare scurtă 1?", "Întrebare scurtă 2?", "Ce fac mai departe?"]
+
+Exemplu de întrebări: "Cum calculez forța?", "Ce formulă folosesc?", "E corect raționamentul?", "Care e următorul pas?".
+Asigură-te că JSON-ul este valid.`;
+
+      // Override system message
+      systemMessage.content = problemTutorContent;
+    }
+
     const sanitizedContextMessages = Array.isArray(contextMessages)
       ? contextMessages
-          .filter(
-            (msg: any) =>
-              msg &&
-              typeof msg === 'object' &&
-              (msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system') &&
-              typeof msg.content === 'string' &&
-              msg.content.trim().length > 0
-          )
-          .map((msg: any) => ({
-            role: msg.role as 'user' | 'assistant' | 'system',
-            content: msg.content as string,
-          }))
+        .filter(
+          (msg: any) =>
+            msg &&
+            typeof msg === 'object' &&
+            (msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system') &&
+            typeof msg.content === 'string' &&
+            msg.content.trim().length > 0
+        )
+        .map((msg: any) => ({
+          role: msg.role as 'user' | 'assistant' | 'system',
+          content: msg.content as string,
+        }))
       : [];
 
     const historyMessages = (history || []).map((m) => ({
@@ -297,7 +374,7 @@ export async function POST(req: NextRequest) {
         content: userInput,
       }]),
     ];
-    
+
     // Validate that messages array is not empty and has at least one user message
     if (!chatMessages || chatMessages.length === 0) {
       logger.error('Empty chatMessages array');
@@ -306,7 +383,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     const hasUserMessage = chatMessages.some((m) => m.role === 'user');
     if (!hasUserMessage) {
       logger.error('No user message in chatMessages array');
@@ -316,18 +393,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // activeModel was determined earlier for logic check:
+    const activeModel = modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
+
+    // For "deep-thinking" mode, inject Chain of Thought instructions
+    if (modelToUseParam === 'deep-thinking') {
+      systemContent += '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
+      // Update system message content
+      systemMessage.content = systemContent;
+    }
+
+    // Prepare parameters for OpenAI (standard models only, o1 removed)
+    const maxTokensParam = {
+      max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
+    };
+
+    let finalMessages = chatMessages;
+
     // Call OpenAI Chat Completions API with streaming
-    // Using gpt-4o-mini - the cheapest available model
     const t0 = Date.now();
-    let stream;
+    let stream: any;
     try {
       const openai = getOpenAIClient();
-      stream = await openai.chat.completions.create({
-        model: 'gpt-4o-mini', // Cheapest available model
-        messages: chatMessages,
-        max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
+
+      const completionParams: any = {
+        model: activeModel,
+        messages: finalMessages,
         stream: true,
-      });
+        ...maxTokensParam,
+      };
+
+      stream = await openai.chat.completions.create(completionParams);
     } catch (openaiError: any) {
       // Handle specific OpenAI errors - don't increment counter on failure
       if (openaiError?.status === 429) {
@@ -349,7 +445,7 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
-      
+
       // Handle missing API key error (this is a regular Error, not an OpenAI API error)
       if (openaiError instanceof Error && openaiError.message.includes('Missing credentials')) {
         logger.error('OPENAI_API_KEY is missing or invalid');
@@ -358,7 +454,7 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
-      
+
       // Handle other OpenAI API errors
       if (openaiError?.status === 401) {
         return NextResponse.json(
@@ -366,7 +462,7 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
-      
+
       // Re-throw other errors to be caught by outer catch
       throw openaiError;
     }
@@ -451,19 +547,36 @@ export async function POST(req: NextRequest) {
             // Only increment counter after successful OpenAI call
             // Use appropriate tracking based on plan
             if (isFreePlan) {
-              // Free plan: increment daily usage
-              const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-                'insight_check_and_increment',
-                {
-                  p_user_id: user.id,
-                  p_daily_limit: FREE_DAILY_LIMIT,
-                }
-              );
+              if (modelToUseParam === 'gpt-4o') {
+                // Raptor1 (gpt-4o) on Free plan: increment monthly usage
+                const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
+                  'ai_check_and_increment_monthly',
+                  {
+                    p_user_id: user.id,
+                    p_monthly_limit: FREE_RAPTOR1_MONTHLY_LIMIT,
+                  }
+                );
 
-              if (rpcErr) {
-                logger.error('RPC error after OpenAI success', rpcErr);
-              } else if (!incrementAllowed) {
-                logger.warn('Counter increment failed after OpenAI success - race condition?');
+                if (rpcErr) {
+                  logger.error('RPC error after OpenAI success (Raptor1 monthly)', rpcErr);
+                } else if (!incrementAllowed) {
+                  logger.warn('Monthly counter increment failed for Raptor1 after success');
+                }
+              } else {
+                // Raptor1 fast (gpt-4o-mini): increment daily usage
+                const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
+                  'insight_check_and_increment',
+                  {
+                    p_user_id: user.id,
+                    p_daily_limit: FREE_DAILY_LIMIT,
+                  }
+                );
+
+                if (rpcErr) {
+                  logger.error('RPC error after OpenAI success', rpcErr);
+                } else if (!incrementAllowed) {
+                  logger.warn('Counter increment failed after OpenAI success - race condition?');
+                }
               }
             } else if (isPlusPlan) {
               // Plus plan: increment monthly usage (combined for Insight + AI Agent)
@@ -569,7 +682,7 @@ export async function POST(req: NextRequest) {
       code: err?.code,
       stack: err?.stack,
     });
-    
+
     // Handle missing API key error
     if (err instanceof Error && err.message.includes('Missing credentials')) {
       logger.error('OPENAI_API_KEY is missing or invalid');
@@ -578,7 +691,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     // Handle JSON parsing errors
     if (err instanceof SyntaxError || (err?.message && err.message.includes('JSON'))) {
       return NextResponse.json(
@@ -586,7 +699,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     // Handle OpenAI-specific errors that weren't caught above
     if (err?.status === 429) {
       const errorCode = err?.code || '';
@@ -601,7 +714,7 @@ export async function POST(req: NextRequest) {
         { status: 429 }
       );
     }
-    
+
     // Handle invalid API key from OpenAI
     if (err?.status === 401) {
       return NextResponse.json(
@@ -609,7 +722,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     // Handle other OpenAI API errors
     if (err?.status && err.status >= 400 && err.status < 500) {
       const errorMessage = err?.message || err?.error?.message || 'Eroare la cererea către OpenAI.';
@@ -618,10 +731,10 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     // Generic error - log full error for debugging
     return NextResponse.json(
-      { 
+      {
         error: 'Eroare internă. Încearcă din nou.',
         ...(process.env.NODE_ENV === 'development' && err?.message ? { details: err.message } : {})
       },

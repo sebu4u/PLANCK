@@ -698,7 +698,7 @@ export async function getLearningInsights(userId: string, accessToken: string): 
     let averageDifficulty = 2.3 // Default
     if (solvedProblems && solvedProblems.length > 0) {
       const problemIds = solvedProblems.map(sp => sp.problem_id)
-      
+
       // Get difficulties for solved problems
       const { data: problems } = await supabase
         .from('problems')
@@ -712,11 +712,11 @@ export async function getLearningInsights(userId: string, accessToken: string): 
           'Mediu': 2,
           'Avansat': 3,
         }
-        
+
         const difficulties = problems
           .map(p => difficultyMap[p.difficulty] || 2)
           .filter(d => d !== undefined)
-        
+
         if (difficulties.length > 0) {
           averageDifficulty = difficulties.reduce((sum, d) => sum + d, 0) / difficulties.length
         }
@@ -850,5 +850,42 @@ export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+}
+
+// ============================================
+// Projects
+// ============================================
+
+export interface Project {
+  id: string
+  name: string
+  updated_at: string
+}
+
+export async function getLastProject(userId: string, accessToken: string): Promise<Project | null> {
+  const supabase = createAuthenticatedClient(accessToken)
+
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error) {
+      // It's normal to have no projects, so don't log error if it's just no rows
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching last project:', error)
+      }
+      return null
+    }
+
+    return data as Project
+  } catch (error) {
+    console.error('Error in getLastProject:', error)
+    return null
+  }
 }
 

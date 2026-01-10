@@ -1,13 +1,12 @@
 import { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import { PhysicsLessonsClient } from "@/components/physics-lessons-client"
 import { generateMetadata } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
-import { 
-  getAllGrades, 
-  getChaptersByGradeId, 
+import {
+  getAllGrades,
+  getChaptersByGradeId,
   getLessonSummariesByChapterId,
   Grade,
   Chapter,
@@ -23,13 +22,13 @@ export const revalidate = 600
 export default async function PhysicsLessonsPage() {
   // Obținem datele din Supabase
   const grades = await getAllGrades()
-  
+
   // Obținem capitolele pentru fiecare clasă
   const chaptersData: { [gradeId: string]: Chapter[] } = {}
   for (const grade of grades) {
     chaptersData[grade.id] = await getChaptersByGradeId(grade.id)
   }
-  
+
   // Obținem rezumatele lecțiilor pentru fiecare capitol (fără content)
   const lessonsData: { [chapterId: string]: LessonSummary[] } = {}
   for (const grade of grades) {
@@ -70,21 +69,19 @@ export default async function PhysicsLessonsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white">
+    <div className="h-screen overflow-hidden bg-[#101010] text-white">
       <Navigation />
 
-      <div className="pt-16 relative z-10">
+      <div className="pt-16 h-full relative z-10">
         <StructuredData data={breadcrumbs} />
         <StructuredData data={itemListStructuredData} />
-        <PhysicsLessonsClient 
+        <PhysicsLessonsClient
           grades={grades}
           chapters={chaptersData}
           lessons={lessonsData}
           initialLessonId={undefined}
         />
       </div>
-
-      <Footer />
     </div>
   )
 }

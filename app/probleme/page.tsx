@@ -3,14 +3,12 @@ import { Footer } from "@/components/footer"
 import ProblemsClient from "@/components/problems-client"
 import { Problem } from "@/data/problems"
 import { createClient } from "@supabase/supabase-js"
-import { Atom } from "lucide-react"
 import type { Metadata } from "next"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import { generateMetadata } from "@/lib/metadata"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
-import { PhysicsProblemsHeader } from "@/components/physics-problems-header"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
 
 export const revalidate = 300
@@ -38,9 +36,6 @@ export default async function ProblemsPage() {
     initialProblems = []
   }
 
-  const totalProblems = initialProblems.length
-  const freeProblems = totalProblems
-
   return (
     <CatalogThemeProvider catalogType="physics">
       <CatalogThemeBackground defaultBackgroundClass="bg-[#141414]">
@@ -48,12 +43,15 @@ export default async function ProblemsPage() {
           <Navigation />
           <main className="flex-1 overflow-x-hidden">
             <div className="px-6 sm:px-8 lg:px-16 xl:px-20 pt-20 pb-12">
-              <section className="w-full space-y-10">
-                <div>
-                  <PhysicsProblemsHeader
-                    totalProblems={totalProblems}
-                    freeProblems={freeProblems}
-                  />
+              <section className="w-full space-y-8">
+                {/* Page Title Section */}
+                <div className="text-center lg:text-left">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3">
+                    Probleme de fizică
+                  </h1>
+                  <p className="text-base sm:text-lg text-white/60 max-w-2xl mx-auto lg:mx-0">
+                    Exersează și aprofundează-ți cunoștințele cu probleme de toate nivelurile
+                  </p>
                   <StructuredData
                     id="structured-data-breadcrumbs"
                     data={breadcrumbStructuredData([

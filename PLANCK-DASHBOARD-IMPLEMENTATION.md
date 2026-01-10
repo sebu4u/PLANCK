@@ -54,7 +54,7 @@ Complete implementation of the Planck Dashboard system with redirect logic, fixe
   7. **Updates** - 3 system notifications
 
 - **Features**:
-  - Fixed positioning (300px width) on desktop
+  - Fixed positioning (250px width) on desktop
   - Mobile drawer with Sheet component (Radix UI)
   - Integrated main navigation links
   - Custom thin scrollbar
@@ -173,7 +173,7 @@ All cards located in `components/dashboard/cards/`:
 - `.pulse-glow` - Pulsing animation for streaks
 
 #### Responsive Design
-- Desktop: Fixed sidebar (300px) + main content
+- Desktop: Fixed sidebar (250px) + main content
 - Mobile: Drawer sidebar with hamburger toggle
 - Grid layouts:
   - Section 1: `grid-cols-1 md:grid-cols-2`

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
-import { Pencil, Settings, Lock, Shield, Trophy } from "lucide-react";
+import { Pencil, Settings, Lock, Shield, Trophy, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getNextRankThreshold } from "@/lib/dashboard-data";
+import { useRouter } from "next/navigation";
 
 // Skeleton components for profile page
 const ProfileSkeleton = () => (
@@ -44,6 +45,7 @@ const StatsSkeleton = () => (
 const ProfilPage = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [bio, setBio] = useState("");
   const [bioEdit, setBioEdit] = useState(false);
@@ -312,10 +314,10 @@ const ProfilPage = () => {
                               <span className="text-white/90 font-medium">
                                 {nickname || <span className="italic text-white/40">Adaugă un username...</span>}
                               </span>
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10" 
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10"
                                 onClick={() => setNicknameEdit(true)}
                               >
                                 <Pencil size={16} />
@@ -360,10 +362,10 @@ const ProfilPage = () => {
                                 <span className="text-white/70 text-sm flex-1">
                                   {bio || <span className="italic text-white/40">Adaugă un bio...</span>}
                                 </span>
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10" 
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10"
                                   onClick={() => setBioEdit(true)}
                                 >
                                   <Pencil size={16} />
@@ -399,16 +401,23 @@ const ProfilPage = () => {
 
                         {/* Settings Buttons */}
                         <div className="w-full mt-4 space-y-3">
-                          <Button 
-                            onClick={() => setShowChangePasswordModal(true)} 
+                          <Button
+                            onClick={() => router.push('/profil/referral')}
+                            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold border-none shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-[1.02]"
+                          >
+                            <Gift className="w-4 h-4 mr-2" />
+                            Invită prieteni & primește Plus+
+                          </Button>
+                          <Button
+                            onClick={() => setShowChangePasswordModal(true)}
                             className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
                             variant="outline"
                           >
                             <Lock className="w-4 h-4 mr-2" />
                             Schimbă parola
                           </Button>
-                          <Button 
-                            onClick={() => setShowPrivacyModal(true)} 
+                          <Button
+                            onClick={() => setShowPrivacyModal(true)}
                             className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
                             variant="outline"
                           >
@@ -465,8 +474,8 @@ const ProfilPage = () => {
                             <p className="text-sm text-white/70">Progress to {nextRankInfo.nextRank}</p>
                             <p className="text-sm text-white/60">+{nextRankInfo.threshold - userStats.elo} ELO needed</p>
                           </div>
-                          <Progress 
-                            value={nextRankInfo.progress} 
+                          <Progress
+                            value={nextRankInfo.progress}
                             className="h-2 bg-white/5"
                             indicatorClassName="bg-white"
                           />

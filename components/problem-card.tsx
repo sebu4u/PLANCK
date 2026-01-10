@@ -102,13 +102,13 @@ function MathContent({ content }: { content: string }) {
     // Check if content contains math expressions
     const containsMath = content.includes('$')
     setHasMath(containsMath)
-    
+
     if (containsMath) {
       // Lazy load math rendering
       const timer = setTimeout(() => {
         setIsMathLoaded(true)
       }, 100)
-      
+
       return () => clearTimeout(timer)
     }
   }, [content])
@@ -180,8 +180,10 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
     <Card
       onClick={isLocked ? handleLockedCardClick : handleUnlockedCardClick}
       className={cn(
-        "relative flex h-full flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)] transition-all duration-300 hover:bg-white/[0.08]",
-        solved ? "problem-card-solved" : "hover:border-white/20",
+        "group relative flex h-full flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-white shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]",
+        "transition-all duration-300 ease-out",
+        "hover:scale-[1.02] hover:bg-white/[0.08] hover:shadow-[0px_32px_80px_-30px_rgba(0,0,0,0.8)]",
+        solved ? "problem-card-solved" : "hover:border-white/25",
         "cursor-pointer"
       )}
     >
@@ -231,7 +233,7 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
         </div>
 
         {statementVisible && (
-          <div className="text-base leading-relaxed text-white/80 line-clamp-3 lg:line-clamp-4 xl:line-clamp-5 2xl:line-clamp-6">
+          <div className="text-base leading-relaxed text-white/60 line-clamp-3 lg:line-clamp-4 xl:line-clamp-5 2xl:line-clamp-6 transition-colors duration-300 group-hover:text-white">
             <MathContent content={fallbackPreview} />
           </div>
         )}

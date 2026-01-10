@@ -220,29 +220,112 @@ export async function getFullGradeData(gradeId: string): Promise<{
   return { grade, chapters: chaptersWithLessons }
 }
 
-// Funcții pentru progresul utilizatorului (pentru viitor)
+// Obține toate lecțiile finalizate de un utilizator
+export async function getUserCompletedLessons(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('user_lesson_progress')
+    .select('lesson_id')
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('Error fetching completed lessons:', error)
+    return []
+  }
+
+  return data.map(row => row.lesson_id)
+}
+
+export async function markLessonAsCompleted(userId: string, lessonId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('user_lesson_progress')
+    .insert({
+      user_id: userId,
+      lesson_id: lessonId,
+      completed_at: new Date().toISOString()
+    })
+    .select()
+
+  if (error) {
+    // Dacă eroarea este de duplicat (cod 23505), considerăm operațiunea reușită
+    if (error.code === '23505') return true
+    console.error('Error marking lesson as completed:', error)
+    return false
+  }
+
+  return true
+}
+
 export async function getUserProgress(userId: string, lessonId: string): Promise<{
   completed: boolean
   progress: number
   lastAccessed: string | null
 }> {
-  // Această funcție va fi implementată când vom adăuga sistemul de progres
-  // Pentru moment, returnăm date mock
+  const { data, error } = await supabase
+    .from('user_lesson_progress')
+    .select('completed_at')
+    .eq('user_id', userId)
+    .eq('lesson_id', lessonId)
+    .single()
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 înseamnă că nu a găsit rânduri (nu e eroare)
+    console.error('Error fetching lesson progress:', error)
+  }
+
   return {
-    completed: false,
-    progress: 0,
-    lastAccessed: null
+    completed: !!data,
+    progress: data ? 100 : 0,
+    lastAccessed: data?.completed_at || null
   }
 }
 
-export async function markLessonAsCompleted(userId: string, lessonId: string): Promise<boolean> {
-  // Această funcție va fi implementată când vom adăuga sistemul de progres
-  // Pentru moment, returnăm true
+export async function updateLessonProgress(userId: string, lessonId: string, progress: number): Promise<boolean> {
+  // Momentan permitem doar marcare ca complet (100%), nu și procente intermediare
+  if (progress >= 100) {
+    return markLessonAsCompleted(userId, lessonId)
+  }
   return true
 }
 
-export async function updateLessonProgress(userId: string, lessonId: string, progress: number): Promise<boolean> {
-  // Această funcție va fi implementată când vom adăuga sistemul de progres
-  // Pentru moment, returnăm true
-  return true
+// Obține lecții random pentru dashboard
+export async function getRandomLessonsForDashboard(count: number = 3): Promise<{
+  id: string
+  title: string
+  chapter_title: string
+  grade_number: number
+  estimated_duration: number | null
+}[]> {
+  // Fetch all lessons with chapter and grade info
+  const { data: lessons, error } = await supabase
+    .from('lessons')
+    .select(`
+      id,
+      title,
+      estimated_duration,
+      chapter_id,
+      chapters!inner (
+        title,
+        grade_id,
+        grades!inner (
+          grade_number
+        )
+      )
+    `)
+    .eq('is_active', true)
+
+  if (error || !lessons || lessons.length === 0) {
+    console.error('Error fetching random lessons:', error)
+    return []
+  }
+
+  // Shuffle and pick random lessons
+  const shuffled = lessons.sort(() => Math.random() - 0.5)
+  const selected = shuffled.slice(0, count)
+
+  return selected.map((lesson: any) => ({
+    id: lesson.id,
+    title: lesson.title,
+    chapter_title: lesson.chapters?.title || 'Capitol',
+    grade_number: lesson.chapters?.grades?.grade_number || 9,
+    estimated_duration: lesson.estimated_duration,
+  }))
 }

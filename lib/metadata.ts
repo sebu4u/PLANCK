@@ -379,6 +379,39 @@ export const pageMetadata: Record<string, Metadata> = {
       follow: true,
     },
   },
+
+  "bac-simulations": {
+    title: "Simulări BAC Fizică - Subiecte și Variante | PLANCK",
+    description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare. Vizualizează și descarcă subiectele de bacalaureat din anii anteriori.",
+    keywords: "simulari bac fizica, subiecte bac fizica, bacalaureat fizica, variante bac, modele bac, examen bac fizica",
+    alternates: {
+      canonical: '/simulari-bac',
+    },
+    openGraph: {
+      title: "Simulări BAC Fizică - Subiecte și Variante | PLANCK",
+      description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare din anii anteriori.",
+      url: 'https://www.planck.academy/simulari-bac',
+      type: 'website',
+      images: [
+        {
+          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          width: 1200,
+          height: 630,
+          alt: 'Simulări BAC Fizică – Planck Academy',
+        },
+      ],
+    },
+    twitter: {
+      title: "Simulări BAC Fizică - Subiecte și Variante",
+      description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare.",
+      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      card: 'summary_large_image',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  },
 }
 
 // Helper function to generate metadata for a specific page

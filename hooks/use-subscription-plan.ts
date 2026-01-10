@@ -22,8 +22,15 @@ export function useSubscriptionPlan() {
       candidates.push(appMetadata[prop])
     })
 
-    return resolvePlanFromCandidates(candidates)
-  }, [subscriptionPlan, profile?.plan, user])
+    const planFromMetadata = resolvePlanFromCandidates(candidates)
+
+    // Check for referral rewards (override free plan if user has Plus months remaining)
+    if (planFromMetadata === "free" && profile?.plus_months_remaining > 0) {
+      return "plus"
+    }
+
+    return planFromMetadata
+  }, [subscriptionPlan, profile?.plan, profile?.plus_months_remaining, user])
 
   return {
     plan: resolvedPlan,

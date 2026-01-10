@@ -13,6 +13,7 @@ interface AuthContextType {
   refreshUser: () => Promise<void>
   profile: any // nou: profilul din tabelul profiles
   subscriptionPlan: string
+  userElo: number | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -24,6 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null) // nou: profilul
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>(FREE_PLAN_IDENTIFIER)
+  const [userElo, setUserElo] = useState<number | null>(null)
 
   const isInvalidRefreshTokenError = (message?: string) => {
     if (!message) return false
@@ -41,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null)
     setProfile(null)
     setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+    setUserElo(null)
   }
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null)
         setProfile(null)
         setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+        setUserElo(null)
       } else if (event === 'TOKEN_REFRESHED' && !session) {
         // Token refresh failed - handle invalid refresh token
         await handleInvalidAuthSession('Token refresh failed');
@@ -99,19 +103,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) {
       setProfile(null)
       setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+      setUserElo(null)
       return
     }
     const fetchProfile = async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade, plan")
+        .select("name, nickname, user_icon, grade, plan, plus_months_remaining")
         .eq("user_id", user.id)
         .single()
       if (data) {
         // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
         if (data.user_icon) {
-          const iconUrl = data.user_icon.includes('?t=') 
-            ? data.user_icon 
+          const iconUrl = data.user_icon.includes('?t=')
+            ? data.user_icon
             : `${data.user_icon}?t=${Date.now()}`
           setProfile({ ...data, user_icon: iconUrl })
         } else {
@@ -121,6 +126,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSubscriptionPlan(data.plan)
         } else {
           setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+        }
+
+        // Override to plus if user has referral rewards (same logic as use-subscription-plan.ts)
+        if ((!data.plan || data.plan === FREE_PLAN_IDENTIFIER) && data.plus_months_remaining > 0) {
+          setSubscriptionPlan("plus")
         }
         return
       }
@@ -145,8 +155,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (created) {
             // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
             if (created.user_icon) {
-              const iconUrl = created.user_icon.includes('?t=') 
-                ? created.user_icon 
+              const iconUrl = created.user_icon.includes('?t=')
+                ? created.user_icon
                 : `${created.user_icon}?t=${Date.now()}`
               setProfile({ ...created, user_icon: iconUrl })
             } else {
@@ -162,6 +172,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     fetchProfile()
+
+    // Fetch user stats (elo) from user_stats table
+    const fetchUserStats = async () => {
+      const { data } = await supabase
+        .from('user_stats')
+        .select('elo')
+        .eq('user_id', user.id)
+        .single()
+      if (data) {
+        setUserElo(data.elo)
+      } else {
+        setUserElo(500) // Default ELO for new users
+      }
+    }
+    fetchUserStats()
   }, [user])
 
   const login = async (email: string, password: string) => {
@@ -241,6 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         refreshUser,
         profile,
         subscriptionPlan,
+        userElo,
       }}
     >
       {children}

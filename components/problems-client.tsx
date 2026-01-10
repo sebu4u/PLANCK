@@ -5,7 +5,8 @@ import { Problem } from "@/data/problems"
 import { ProblemFilters, type FilterState } from "@/components/problem-filters"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react"
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Search, X } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { Pagination, PaginationContent, PaginationItem, PaginationEllipsis } from "@/components/ui/pagination"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
@@ -35,7 +36,7 @@ const MONTHLY_FREE_PROBLEM_COUNT = 50
 
 // TEMPORARY: Feature flag to allow all problems for free/non-logged users
 // Set to false to restore original access restrictions
-const ALLOW_ALL_PROBLEMS_TEMPORARILY = true
+const ALLOW_ALL_PROBLEMS_TEMPORARILY = false
 
 const getCurrentMonthKey = () => {
   const now = new Date()
@@ -342,44 +343,44 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
     <>
 
       <div className="space-y-8 -mx-6 px-6 sm:-mx-8 sm:px-8 lg:-mx-16 lg:px-16 xl:-mx-20 xl:px-20 overflow-x-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-          <p>
-            Se afișează {filteredProblems.length} din {problems.length} probleme
-          </p>
-          {(isMobile || !isLargeScreen) && (
-            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-              <SheetContent
-                side="right"
-                className="w-full border-l border-white/10 bg-[#141414] text-white sm:max-w-md"
-              >
-                <div className="h-full overflow-y-auto">
-                  <SheetHeader className="mb-4 text-left">
-                    <SheetTitle className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">
-                      Filtre
-                    </SheetTitle>
-                  </SheetHeader>
-                  <ProblemFilters
-                    onFilterChange={(newFilters) => {
-                      handleFilterChange(newFilters)
-                    }}
-                    totalProblems={problems.length}
-                    filteredCount={filteredProblems.length}
-                    onClosePanel={() => setMobileFiltersOpen(false)}
-                  />
-                </div>
-              </SheetContent>
-              <Button
-                variant="outline"
-                size="sm"
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-white/80 transition hover:bg-white/15 hover:text-white"
-                onClick={() => setMobileFiltersOpen(true)}
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                Filtre
-              </Button>
-            </Sheet>
-          )}
-        </div>
+        {/* Mobile Filters Sheet */}
+        {(isMobile || !isLargeScreen) && (
+          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+            <SheetContent
+              side="right"
+              className="w-[70%] max-w-[320px] border-l border-white/10 bg-[#141414] text-white p-0 flex flex-col"
+            >
+              {/* Header */}
+              <SheetHeader className="px-5 pt-5 pb-3 border-b border-white/10">
+                <SheetTitle className="text-base font-semibold text-white flex items-center gap-2">
+                  <SlidersHorizontal className="h-5 w-5 text-white/70" />
+                  Filtre
+                </SheetTitle>
+              </SheetHeader>
+
+              {/* Scrollable Filters Area */}
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                <ProblemFilters
+                  onFilterChange={(newFilters) => {
+                    handleFilterChange(newFilters)
+                  }}
+                  totalProblems={problems.length}
+                  filteredCount={filteredProblems.length}
+                />
+              </div>
+
+              {/* Fixed Bottom Button */}
+              <div className="px-5 py-4 border-t border-white/10 bg-[#141414]">
+                <Button
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="w-full rounded-full bg-white py-3 text-sm font-semibold text-black hover:bg-white/90 transition"
+                >
+                  Aplică filtrele
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] lg:items-start">
           {!isMobile && (
@@ -395,15 +396,118 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
           )}
 
           <div>
+            {/* Mobile Search & Filters */}
+            {(isMobile || !isLargeScreen) && (
+              <div className="mb-6 flex items-center gap-3 lg:hidden">
+                {/* Mobile Search Bar */}
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                  <Input
+                    placeholder="Caută probleme..."
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange({ ...filters, search: e.target.value })}
+                    className="h-10 w-full rounded-full border-white/10 bg-white/[0.06] pl-11 pr-4 text-sm text-white placeholder:text-white/40 focus-visible:ring-white/20"
+                  />
+                </div>
+                {/* Filters Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-white/80 transition hover:bg-white/15 hover:text-white"
+                  onClick={() => setMobileFiltersOpen(true)}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filtre
+                </Button>
+              </div>
+            )}
             {loading ? (
-              <div className="mb-8 grid gap-5 md:grid-cols-2">
+              <div className="mb-8 grid gap-5 md:grid-cols-2 pt-2">
                 {Array.from({ length: 8 }).map((_, index) => (
                   <ProblemCardSkeleton key={index} />
                 ))}
               </div>
             ) : visibleProblems.length > 0 ? (
               <>
-                <div className="mb-8 grid gap-5 md:grid-cols-2">
+                {/* Active Filters Bar */}
+                {(filters.difficulty !== "Toate" ||
+                  filters.class !== "Toate" ||
+                  filters.chapter !== "Toate" ||
+                  filters.progress !== "Toate" ||
+                  filters.search) && (
+                    <div className="mb-5 flex flex-wrap items-center gap-2">
+                      {/* Difficulty chip */}
+                      {filters.difficulty !== "Toate" && (
+                        <button
+                          onClick={() => handleFilterChange({ ...filters, difficulty: "Toate" })}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition hover:opacity-80",
+                            filters.difficulty === "Ușor" && "bg-emerald-500/20 text-emerald-300",
+                            filters.difficulty === "Mediu" && "bg-amber-500/20 text-amber-300",
+                            filters.difficulty === "Avansat" && "bg-rose-500/20 text-rose-300"
+                          )}
+                        >
+                          {filters.difficulty}
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      {/* Class chip */}
+                      {filters.class !== "Toate" && (
+                        <button
+                          onClick={() => handleFilterChange({ ...filters, class: "Toate", chapter: "Toate" })}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                        >
+                          {filters.class}
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      {/* Chapter chip */}
+                      {filters.chapter !== "Toate" && (
+                        <button
+                          onClick={() => handleFilterChange({ ...filters, chapter: "Toate" })}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                        >
+                          {filters.chapter.length > 25 ? `${filters.chapter.slice(0, 25)}...` : filters.chapter}
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      {/* Progress chip */}
+                      {filters.progress !== "Toate" && (
+                        <button
+                          onClick={() => handleFilterChange({ ...filters, progress: "Toate" })}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                        >
+                          {filters.progress}
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      {/* Search chip */}
+                      {filters.search && (
+                        <button
+                          onClick={() => handleFilterChange({ ...filters, search: "" })}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                        >
+                          "{filters.search.length > 15 ? `${filters.search.slice(0, 15)}...` : filters.search}"
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      {/* Clear all link */}
+                      <button
+                        onClick={() => handleFilterChange({
+                          search: "",
+                          category: "Toate",
+                          difficulty: "Toate",
+                          progress: "Toate",
+                          class: "Toate",
+                          chapter: "Toate",
+                        })}
+                        className="ml-2 text-xs text-white/50 transition hover:text-white"
+                      >
+                        Șterge toate filtrele
+                      </button>
+                    </div>
+                  )}
+                <div className="mb-8 grid gap-5 md:grid-cols-2 pt-2 -mt-2">
                   {visibleProblems.map((problem) => {
                     // TEMPORARY: Allow all problems when flag is enabled
                     const canAccess = ALLOW_ALL_PROBLEMS_TEMPORARILY

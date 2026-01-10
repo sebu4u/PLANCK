@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, Suspense } from "react"
 import { Navigation } from "@/components/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,12 +17,14 @@ import {
   Users,
   Sparkles,
   Star,
+  Gift,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { gsap } from "gsap"
 import { motion } from "framer-motion"
+import { supabase } from "@/lib/supabaseClient"
 
 // Confetti component for celebration
 const Confetti = () => {
@@ -32,7 +34,7 @@ const Confetti = () => {
     if (confettiRef.current) {
       const confetti = confettiRef.current
       const colors = ['#9333ea', '#dc2626', '#f59e0b', '#10b981', '#3b82f6']
-      
+
       for (let i = 0; i < 50; i++) {
         const piece = document.createElement('div')
         piece.style.position = 'absolute'
@@ -65,16 +67,16 @@ const Confetti = () => {
 }
 
 type UserType = "student" | "teacher" | null
-type CardType = 
-  | "role-selection" 
-  | "role-confirmation" 
-  | "class-selection" 
-  | "class-message" 
-  | "username" 
-  | "auth-method" 
+type CardType =
+  | "role-selection"
+  | "role-confirmation"
+  | "class-selection"
+  | "class-message"
+  | "username"
+  | "auth-method"
   | "welcome"
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const [userType, setUserType] = useState<UserType>("student")
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [selectedClass, setSelectedClass] = useState("9")
@@ -84,9 +86,14 @@ export default function RegisterPage() {
   const [containerPadding, setContainerPadding] = useState({ left: 32, right: 32 })
   const [mounted, setMounted] = useState(false)
 
+  // Referral state
+  const [referralCode, setReferralCode] = useState<string | null>(null)
+  const [referrerName, setReferrerName] = useState<string | null>(null)
+
   const { toast } = useToast()
   const router = useRouter()
-  const { loginWithGoogle, loginWithGitHub } = useAuth()
+  const searchParams = useSearchParams()
+  const { loginWithGoogle, loginWithGitHub, user } = useAuth()
 
   // Refs for carousel
   const carouselContainerRef = useRef<HTMLDivElement>(null)
@@ -103,7 +110,7 @@ export default function RegisterPage() {
         const x = Math.sin(seed) * 10000
         return x - Math.floor(x)
       }
-      
+
       return {
         id: i,
         x: random(seed) * width,
@@ -122,6 +129,82 @@ export default function RegisterPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Handle referral code from URL
+  useEffect(() => {
+    const refCode = searchParams.get("ref")
+    if (refCode) {
+      const code = refCode.toUpperCase()
+      setReferralCode(code)
+      // Save to localStorage so it persists through OAuth redirect
+      localStorage.setItem("planck_referral_code", code)
+      // Validate and fetch referrer info
+      fetch(`/api/referral/info?code=${refCode}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.valid && data.referrer) {
+            setReferrerName(data.referrer.name || data.referrer.nickname || "Un prieten")
+          }
+        })
+        .catch(console.error)
+    } else {
+      // Check localStorage for referral code (in case user refreshed page)
+      const storedCode = localStorage.getItem("planck_referral_code")
+      if (storedCode) {
+        setReferralCode(storedCode)
+        fetch(`/api/referral/info?code=${storedCode}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.valid && data.referrer) {
+              setReferrerName(data.referrer.name || data.referrer.nickname || "Un prieten")
+            }
+          })
+          .catch(console.error)
+      }
+    }
+  }, [searchParams])
+
+  // Process referral after successful registration (backup for when user is already logged in)
+  useEffect(() => {
+    const processReferral = async () => {
+      // Check if we have both a user and a pending referral code
+      if (!user || !referralCode) return
+
+      // Avoid double processing if we already processed this session
+      const processedKey = `planck_referral_processed_${user.id}`
+      if (sessionStorage.getItem(processedKey)) return
+
+      try {
+        console.log("Processing referral for user:", user.id)
+        const response = await fetch("/api/referral/process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            referral_code: referralCode,
+            referred_user_id: user.id,
+          }),
+        })
+        const data = await response.json()
+
+        if (data.success) {
+          console.log("Referral processed successfully")
+          // Mark as processed for this session
+          sessionStorage.setItem(processedKey, "true")
+          // Clear localStorage after successful processing
+          localStorage.removeItem("planck_referral_code")
+        } else {
+          // If error is "User already referred" or "Cannot refer yourself", clear the code too
+          if (data.error === "User already referred" || data.error === "Cannot refer yourself") {
+            localStorage.removeItem("planck_referral_code")
+          }
+        }
+      } catch (error) {
+        console.error("Error processing referral:", error)
+      }
+    }
+
+    processReferral()
+  }, [user, referralCode])
 
   // Class selection messages
   const classMessages = {
@@ -197,13 +280,13 @@ export default function RegisterPage() {
       const padding = getPadding()
       setContainerPadding({ left: padding, right: padding })
     }
-    
+
     // Initial update
     updatePadding()
-    
+
     // Update on resize
     window.addEventListener('resize', updatePadding)
-    
+
     return () => window.removeEventListener('resize', updatePadding)
   }, []) // Only run on mount and resize, not on card change
 
@@ -216,7 +299,7 @@ export default function RegisterPage() {
       const cardWidth = getCardWidth()
       const gap = getGap()
       const padding = getPadding()
-      
+
       // For the first card, it should be centered with scroll = 0
       // The padding should already center it, so scroll should be 0
       if (index === 0) {
@@ -226,20 +309,20 @@ export default function RegisterPage() {
         })
         return
       }
-      
+
       // Calculate position of card's left edge within the flex container (includes padding)
       const cardLeftEdge = padding + index * (cardWidth + gap)
-      
+
       // Calculate container center position (viewport center)
       const containerCenter = containerRect.width / 2
-      
+
       // To center the card: card center should be at container center
       // Card center = cardLeftEdge + (cardWidth / 2)
       // We need: card center = container scrollLeft + containerCenter
       // So: scrollLeft = card center - containerCenter
       // scrollLeft = (cardLeftEdge + cardWidth / 2) - containerCenter
       const scrollPosition = cardLeftEdge + (cardWidth / 2) - containerCenter
-      
+
       container.scrollTo({
         left: Math.max(0, scrollPosition),
         behavior: 'smooth'
@@ -334,7 +417,7 @@ export default function RegisterPage() {
   // Handle OAuth login
   const handleOAuthLogin = async (method: "google" | "github") => {
     setLoading(method)
-    
+
     if (method === "google") {
       const { error } = await loginWithGoogle()
       if (error) {
@@ -358,7 +441,7 @@ export default function RegisterPage() {
         return
       }
     }
-    
+
     // Show welcome and confetti
     setShowConfetti(true)
     setLoading(null)
@@ -399,12 +482,29 @@ export default function RegisterPage() {
         return (
           <div className="h-full flex flex-col">
             <div className="text-center space-y-3 sm:space-y-4 flex-shrink-0">
-              <h2 className="text-xl sm:text-2xl font-bold text-white">
-                Bine ai venit pe Planck! 👋
-              </h2>
-              <p className="text-base sm:text-lg text-gray-400">
-                Hai să începem. Ești elev sau profesor?
-              </p>
+              {referrerName ? (
+                <>
+                  <div className="flex items-center justify-center gap-2 text-purple-400 mb-2">
+                    <Gift className="w-5 h-5" />
+                    <span className="text-sm uppercase tracking-wider">Invitație specială</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">
+                    {referrerName} te-a invitat pe Planck! 🎉
+                  </h2>
+                  <p className="text-base sm:text-lg text-gray-400">
+                    Creează-ți contul gratuit și începe să înveți fizica altfel.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">
+                    Bine ai venit pe Planck! 👋
+                  </h2>
+                  <p className="text-base sm:text-lg text-gray-400">
+                    Hai să începem. Ești elev sau profesor?
+                  </p>
+                </>
+              )}
             </div>
             <div className="flex-grow flex items-center justify-center">
               <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full">
@@ -469,7 +569,7 @@ export default function RegisterPage() {
                 Continuă
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
-        </div>
+            </div>
           </div>
         ) : (
           <div className="text-center space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
@@ -500,7 +600,7 @@ export default function RegisterPage() {
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
             </div>
-                </div>
+          </div>
         )
 
       case "class-selection":
@@ -509,33 +609,32 @@ export default function RegisterPage() {
             <div className="text-center flex-shrink-0 px-2">
               <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                 Selectează clasa ta
-                        </h2>
+              </h2>
               <p className="text-sm sm:text-base text-gray-400">
                 Alege clasa pentru a primi conținut personalizat
-                        </p>
-                      </div>
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:gap-4 flex-grow">
-                          {[
-                            { value: "9", label: "Clasa 9" },
-                            { value: "10", label: "Clasa 10" },
-                            { value: "11", label: "Clasa 11" },
-                            { value: "12", label: "Clasa 12" },
+              {[
+                { value: "9", label: "Clasa 9" },
+                { value: "10", label: "Clasa 10" },
+                { value: "11", label: "Clasa 11" },
+                { value: "12", label: "Clasa 12" },
                 { value: "other", label: "Altă clasă", colSpan: "col-span-2" }
               ].map((option) => (
-                            <Button
-                              key={option.value}
-                              variant={selectedClass === option.value ? "default" : "outline"}
-                              onClick={() => handleClassSelect(option.value)}
-                              className={`h-12 sm:h-14 text-sm sm:text-base md:text-lg font-semibold transition-all duration-300 ${
-                                selectedClass === option.value
-                      ? "bg-white text-[#0d1117] border-0 hover:bg-gray-200 hover:scale-105"
-                      : "bg-white text-[#0d1117] border-white/20 hover:bg-gray-200 hover:border-white/40 hover:scale-105"
-                              } ${option.colSpan || ""}`}
-                            >
-                              {option.label}
-                            </Button>
-                          ))}
-                        </div>
+                <Button
+                  key={option.value}
+                  variant={selectedClass === option.value ? "default" : "outline"}
+                  onClick={() => handleClassSelect(option.value)}
+                  className={`h-12 sm:h-14 text-sm sm:text-base md:text-lg font-semibold transition-all duration-300 ${selectedClass === option.value
+                    ? "bg-white text-[#0d1117] border-0 hover:bg-gray-200 hover:scale-105"
+                    : "bg-white text-[#0d1117] border-white/20 hover:bg-gray-200 hover:border-white/40 hover:scale-105"
+                    } ${option.colSpan || ""}`}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
             <div className="flex justify-center flex-shrink-0 px-4">
               {index > 0 && (
                 <Button
@@ -558,7 +657,7 @@ export default function RegisterPage() {
               <p className="text-gray-200 font-semibold text-base sm:text-lg md:text-xl leading-relaxed px-2">
                 {classMessages[selectedClass as keyof typeof classMessages]}
               </p>
-                  </div>
+            </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               {index > 0 && (
                 <Button
@@ -617,14 +716,14 @@ export default function RegisterPage() {
                     Înapoi
                   </Button>
                 )}
-                        <Button
+                <Button
                   type="submit"
                   className={`bg-white text-[#0d1117] hover:bg-gray-200 transition-all duration-300 h-11 sm:h-12 text-base sm:text-lg font-semibold hover:scale-105 ${index > 0 ? 'w-full sm:flex-1' : 'w-full'}`}
                 >
-                          Continuă
+                  Continuă
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
-                        </Button>
-                  </div>
+                </Button>
+              </div>
             </form>
           </div>
         )
@@ -634,50 +733,50 @@ export default function RegisterPage() {
           <div className="space-y-4 sm:space-y-6 h-full flex flex-col justify-center px-2">
             <div className="text-center space-y-2">
               <h2 className="text-xl sm:text-2xl font-bold text-white">
-                            Creează-ți contul
+                Creează-ți contul
               </h2>
               <p className="text-sm sm:text-base text-gray-400">
-                            Alege cum vrei să te înregistrezi
+                Alege cum vrei să te înregistrezi
               </p>
             </div>
-                          <div className="space-y-3 sm:space-y-4 px-2">
-                            <Button
-                              variant="outline"
-                              onClick={() => handleOAuthLogin("google")}
+            <div className="space-y-3 sm:space-y-4 px-2">
+              <Button
+                variant="outline"
+                onClick={() => handleOAuthLogin("google")}
                 className="w-full h-12 sm:h-14 border-white/20 bg-[#0d1117] text-white hover:bg-gray-800 hover:border-white/40 transition-all duration-300 text-base sm:text-lg font-semibold hover:scale-105"
-                              disabled={loading !== null}
-                            >
-                              {loading === "google" ? (
-                                <>
+                disabled={loading !== null}
+              >
+                {loading === "google" ? (
+                  <>
                     <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                                  <span className="text-sm sm:text-base">Se conectează...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Chrome className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                                  Continuă cu Google
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleOAuthLogin("github")}
+                    <span className="text-sm sm:text-base">Se conectează...</span>
+                  </>
+                ) : (
+                  <>
+                    <Chrome className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    Continuă cu Google
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleOAuthLogin("github")}
                 className="w-full h-12 sm:h-14 border-white/20 bg-[#0d1117] text-white hover:bg-gray-800 hover:border-white/40 transition-all duration-300 text-base sm:text-lg font-semibold hover:scale-105"
-                              disabled={loading !== null}
-                            >
-                              {loading === "github" ? (
-                                <>
-                                  <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                                  <span className="text-sm sm:text-base">Se conectează...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Github className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                                  Continuă cu GitHub
-                                </>
-                              )}
-                            </Button>
-                          </div>
+                disabled={loading !== null}
+              >
+                {loading === "github" ? (
+                  <>
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                    <span className="text-sm sm:text-base">Se conectează...</span>
+                  </>
+                ) : (
+                  <>
+                    <Github className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    Continuă cu GitHub
+                  </>
+                )}
+              </Button>
+            </div>
             <div className="flex justify-center px-4">
               {index > 0 && (
                 <Button
@@ -687,8 +786,8 @@ export default function RegisterPage() {
                   <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Înapoi
                 </Button>
-                    )}
-                  </div>
+              )}
+            </div>
           </div>
         )
 
@@ -698,7 +797,7 @@ export default function RegisterPage() {
             <div className="space-y-3 sm:space-y-4">
               <Star className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-yellow-400 mx-auto animate-pulse" />
               <h2 className="text-xl sm:text-2xl font-bold text-white">
-                {userType === "student" 
+                {userType === "student"
                   ? "Bun venit în comunitatea Planck! 🎉"
                   : "Bun venit, profesor! 🎉"
                 }
@@ -728,12 +827,12 @@ export default function RegisterPage() {
   return (
     <div className="relative min-h-screen w-full bg-[#101113] text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30">
       <Navigation />
-      
+
       {showConfetti && <Confetti />}
 
       {/* Top Glow Effect (matching pricing page) */}
       <div className="absolute -top-[300px] left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/10 blur-[120px] rounded-[100%] pointer-events-none z-0" />
-      
+
       {/* Stars Background (matching pricing page) */}
       <div className="absolute top-0 left-0 right-0 h-[600px] overflow-hidden pointer-events-none z-0 opacity-60">
         {stars.map((star) => (
@@ -772,7 +871,7 @@ export default function RegisterPage() {
         <div className="hidden sm:block absolute right-0 top-0 bottom-0 w-16 sm:w-32 md:w-64 bg-gradient-to-l from-[#101113] via-[#101113]/80 to-transparent z-20 pointer-events-none"></div>
 
         {/* Carousel Container */}
-        <div 
+        <div
           ref={carouselContainerRef}
           className="relative w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
           style={{
@@ -781,9 +880,9 @@ export default function RegisterPage() {
           }}
         >
           {/* Cards Container */}
-          <div 
-            className="flex items-center h-full gap-3 sm:gap-4 md:gap-6" 
-            style={{ 
+          <div
+            className="flex items-center h-full gap-3 sm:gap-4 md:gap-6"
+            style={{
               minWidth: 'fit-content',
               paddingLeft: `${containerPadding.left}px`,
               paddingRight: `${containerPadding.right}px`,
@@ -795,23 +894,23 @@ export default function RegisterPage() {
               const isLeftCard = index < currentCardIndex
               const isRightCard = index > currentCardIndex
               const distance = Math.abs(index - currentCardIndex)
-              
+
               return (
                 <div
                   key={`${cardType}-${index}`}
-                  ref={(el) => { 
+                  ref={(el) => {
                     if (el) {
                       cardRefs.current[index] = el
                     }
                   }}
                   className="flex-shrink-0 snap-center transition-all duration-500 ease-out relative w-[320px] sm:w-[400px] md:w-[480px] h-[500px] sm:h-[550px] md:h-[600px]"
-                  style={{ 
+                  style={{
                     transform: isCurrentCard ? 'scale(1)' : isAdjacent ? 'scale(0.85)' : 'scale(0.8)',
                     pointerEvents: isCurrentCard ? 'auto' : 'none',
                     willChange: 'transform, opacity',
                   }}
                 >
-                  <Card 
+                  <Card
                     className="w-full h-full bg-[#151619]/60 border-white/10 backdrop-blur-sm rounded-2xl shadow-2xl relative overflow-hidden hover:bg-[#1A1B1E]/80 hover:border-white/20 transition-all duration-300"
                     style={{
                       filter: isCurrentCard ? 'none' : 'grayscale(100%)',
@@ -821,18 +920,18 @@ export default function RegisterPage() {
                   >
                     {/* Dark overlay for non-current cards - simulates blur by hiding content */}
                     {!isCurrentCard && (
-                      <div 
+                      <div
                         className="absolute inset-0 z-30 pointer-events-none"
                         style={{
-                          backgroundColor: isAdjacent 
-                            ? 'rgba(16, 17, 19, 0.6)' 
+                          backgroundColor: isAdjacent
+                            ? 'rgba(16, 17, 19, 0.6)'
                             : 'rgba(16, 17, 19, 0.8)',
                         }}
                       />
                     )}
                     {/* Gradient overlay for adjacent cards */}
                     {isAdjacent && !isCurrentCard && (
-                      <div 
+                      <div
                         className="absolute inset-0 z-30 pointer-events-none"
                         style={{
                           background: isLeftCard
@@ -847,18 +946,30 @@ export default function RegisterPage() {
                         <CardTitle className="text-2xl sm:text-2xl md:text-3xl font-bold text-white">
                           PLANCK
                         </CardTitle>
-                </div>
+                      </div>
                     </CardHeader>
                     <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 h-[calc(100%-100px)] sm:h-[calc(100%-120px)] overflow-y-auto scrollbar-hide relative z-10">
                       {renderCardContent(cardType, index)}
-              </CardContent>
-            </Card>
-              </div>
+                    </CardContent>
+                  </Card>
+                </div>
               )
             })}
-            </div>
           </div>
-        </section>
+        </div>
+      </section>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#101113] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterPageContent />
+    </Suspense>
   )
 }

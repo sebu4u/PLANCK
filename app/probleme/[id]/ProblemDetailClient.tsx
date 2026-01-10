@@ -126,6 +126,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [desktopBoardExpanded, setDesktopBoardExpanded] = useState(false)
   const { user } = useAuth();
   const problemIcon = getProblemIcon(problem.id);
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
 
   // Create a shared store for the desktop whiteboard (minimized and maximized share the same instance)
   const desktopBoardStore = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), [])
@@ -269,13 +270,27 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   return (
     <div className="min-h-screen text-white flex flex-col">
       <Navigation />
+
+      {/* Upgrade Banner for Free Users */}
+      {showUpgradeBanner && (
+        <div className="fixed top-[116px] left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300">
+          <Link
+            href="/pricing"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500/90 to-amber-500/90 hover:from-orange-500 hover:to-amber-500 text-white text-sm font-medium rounded-full shadow-lg transition-all hover:scale-105"
+          >
+            <span>Upgrade to Plus</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+          </Link>
+        </div>
+      )}
+
       <div
         className={cn(
           "flex-1 transition-all duration-300 ease-in-out",
           insightSidebarOpen ? "lg:mr-[33vw]" : ""
         )}
       >
-        <div className="px-4 sm:px-6 lg:px-12 pt-20 pb-16">
+        <div className="px-4 sm:px-6 lg:px-12 pt-20 lg:pt-[116px] pb-16">
           <div className="mx-auto max-w-[1600px] space-y-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
@@ -546,6 +561,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         onClose={() => setInsightSidebarOpen(false)}
         problemId={problem.id}
         problemStatement={problem.statement || ''}
+        persona="problem_tutor"
+        onFreePlanMessage={() => setShowUpgradeBanner(true)}
       />
 
       <Dialog open={desktopBoardExpanded} onOpenChange={setDesktopBoardExpanded}>

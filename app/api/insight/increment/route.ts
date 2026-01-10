@@ -4,8 +4,8 @@ import { isJwtExpired } from '@/lib/auth-validate';
 import { logger } from '@/lib/logger';
 import { resolvePlanForRequest, parseAccessToken } from '@/lib/subscription-plan-server';
 
-// Limita zilnică pentru planul Free: 3 mesaje pe zi
-const FREE_DAILY_LIMIT = 3;
+// Limita zilnică pentru planul Free: 20 mesaje pe zi
+const FREE_DAILY_LIMIT = 20;
 // Limita lunară pentru planul Plus: 800 mesaje pe lună
 const PLUS_MONTHLY_LIMIT = 800;
 

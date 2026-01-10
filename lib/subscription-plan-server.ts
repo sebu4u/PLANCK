@@ -36,7 +36,7 @@ export const resolvePlanForRequest = async (
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("plan")
+      .select("plan, plus_months_remaining")
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -51,7 +51,14 @@ export const resolvePlanForRequest = async (
       candidates.push(appMetadata[prop])
     })
 
-    return resolvePlanFromCandidates(candidates)
+    const resolvedPlan = resolvePlanFromCandidates(candidates)
+
+    // Check for referral rewards (override free plan if user has Plus months remaining)
+    if (resolvedPlan === "free" && profile?.plus_months_remaining > 0) {
+      return "plus"
+    }
+
+    return resolvedPlan
   } catch (error) {
     console.error("[subscription-plan] Failed to resolve plan:", error)
     return FREE_PLAN

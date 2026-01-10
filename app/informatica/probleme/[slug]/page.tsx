@@ -2,7 +2,7 @@ import { CodingProblemDetailClient } from "@/components/coding-problems/problem-
 import { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import { createClient } from "@supabase/supabase-js"
 import { notFound } from "next/navigation"
-import { generateMetadata } from "@/lib/metadata"
+
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -61,8 +61,9 @@ async function doesProblemExist(slug: string) {
   return Boolean(data)
 }
 
-export async function generateMetadata({ params }: CodingProblemDetailPageProps) {
-  const { slug } = await params
+export async function generateMetadata(props: CodingProblemDetailPageProps) {
+  const params = await props.params
+  const { slug } = params
   const data = await fetchProblemData(slug)
 
   if (!data) {
@@ -77,10 +78,9 @@ export async function generateMetadata({ params }: CodingProblemDetailPageProps)
   }
 }
 
-export default async function CodingProblemDetailPage({
-  params,
-}: CodingProblemDetailPageProps) {
-  const { slug } = await params
+export default async function CodingProblemDetailPage(props: CodingProblemDetailPageProps) {
+  const params = await props.params
+  const { slug } = params
   const exists = await doesProblemExist(slug)
   if (!exists) {
     notFound()
