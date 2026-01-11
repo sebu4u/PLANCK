@@ -540,14 +540,14 @@ export function PhysicsChatSidebar({
         <>
             {isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-[95] lg:hidden"
+                    className="fixed inset-0 bg-black/50 z-[499] lg:hidden"
                     onClick={onClose}
                 />
             )}
 
             <div
                 ref={sidebarRef}
-                className={`fixed top-[100px] right-0 h-[calc(100dvh-100px)] w-[90vw] lg:w-[450px] bg-[#101010] border-l border-white/10 z-[100] flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`fixed top-0 lg:top-[100px] right-0 h-dvh lg:h-[calc(100dvh-100px)] w-[90vw] lg:w-[450px] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
                     }`}
                 style={{ maxWidth: '90vw' }}
             >

@@ -72,7 +72,7 @@ export default async function PhysicsLessonsPage() {
     <div className="h-screen overflow-hidden bg-[#101010] text-white">
       <Navigation />
 
-      <div className="pt-16 h-full relative z-10">
+      <div className="pt-16 h-full relative">
         <StructuredData data={breadcrumbs} />
         <StructuredData data={itemListStructuredData} />
         <PhysicsLessonsClient

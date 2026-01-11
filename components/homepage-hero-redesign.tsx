@@ -77,7 +77,7 @@ export function HomePageHeroRedesign() {
         <section
             ref={sectionRef}
             id="hero-section"
-            className="relative min-h-[140vh] w-full overflow-hidden"
+            className="relative min-h-svh lg:min-h-[140vh] w-full overflow-hidden"
             style={{ backgroundColor: '#090b0d' }}
             onMouseMove={handleMouseMove}
             onMouseEnter={() => setIsHovering(true)}
