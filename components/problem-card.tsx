@@ -162,6 +162,13 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
     })
   }
 
+  // Prefetch problem page on mount for visible cards
+  useEffect(() => {
+    if (!isLocked) {
+      router.prefetch(`/probleme/${problem.id}`)
+    }
+  }, [problem.id, router, isLocked])
+
   const handleLockedCardClick = () => {
     router.push('/pricing')
   }
@@ -247,6 +254,7 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
         ) : (
           <Link
             href={`/probleme/${problem.id}`}
+            prefetch={true}
             onClick={handleProblemClick}
             className="inline-flex w-full items-center justify-center rounded-full border border-white/15 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 sm:w-auto"
           >

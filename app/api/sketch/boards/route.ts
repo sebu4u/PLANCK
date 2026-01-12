@@ -105,23 +105,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update getting started progress for board creation
-    // The trigger should handle this, but we do it here as backup
-    if (data && user.id) {
-      supabase
-        .from('getting_started_progress')
-        .update({
-          board_created: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id)
-        .then(({ error: updateError }) => {
-          if (updateError) {
-            logger.warn('Failed to update getting started progress for board creation:', updateError);
-          }
-        });
-    }
-
     return NextResponse.json({ board: data });
   } catch (err: any) {
     logger.error('Create board API error:', err);

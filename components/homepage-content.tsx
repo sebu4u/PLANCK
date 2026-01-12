@@ -28,6 +28,7 @@ import { CoursesSectionHomepage } from "@/components/courses-section-homepage"
 
 import { ReviewsSection } from "@/components/homepage-reviews"
 import { FAQSection } from "@/components/faq-section"
+import { ConcursBanner } from "@/components/concurs-banner"
 
 // Lazy load heavy Three.js components to reduce initial bundle size
 
@@ -38,7 +39,7 @@ const ColorBends = dynamic(() => import("@/components/ColorBends").then((mod) =>
 
 const HowItWorksSection = dynamic(() => import("@/components/how-it-works-section"))
 
-export function HomePageContent() {
+export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
   const { user, loading } = useAuth()
 
   // Don't render homepage content if user is logged in or still loading
@@ -48,9 +49,12 @@ export function HomePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
+    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
       {/* Hero Section cu temă spațială */}
-      <HomePageHeroRedesign />
+      <HomePageHeroRedesign isMobile={isMobile} />
+
+      {/* Concurs Banner */}
+      <ConcursBanner />
 
       {/* Video Cards Section */}
       <VideoCardsSection />

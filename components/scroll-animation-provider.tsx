@@ -84,11 +84,18 @@ export default function ScrollAnimationProvider({
 
     if (!content || !wrapper) return
 
+    // Disable smooth scroll on mobile to prevent address bar issues
+    const isMobile = isTouchDevice()
+    if (isMobile) {
+      // On mobile, don't apply smooth scroll - use native scroll
+      // This prevents the body height manipulation that causes address bar hiding
+      isInitializedRef.current = true
+      return
+    }
+
     isInitializedRef.current = true
 
-    // For touch devices, use reduced smoothness for better feel
-    const isMobile = isTouchDevice()
-    scrollDataRef.current.ease = isMobile ? 0.15 : smoothness
+    scrollDataRef.current.ease = smoothness
 
     // Set initial styles for smooth scroll container
     wrapper.style.position = 'fixed'

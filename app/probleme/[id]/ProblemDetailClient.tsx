@@ -15,17 +15,19 @@ import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
-import { ProblemsSidebar } from "@/components/problems-sidebar"
 import { BadgeNotification } from "@/components/badge-notification"
 import ProblemOrbButton from "@/components/problem-orb-button"
-import InsightChatSidebar from "@/components/insight-chat-sidebar"
+
+// Lazy load heavy sidebar components for faster initial render
+const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
+const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ProblemBoard } from "@/components/problems/problem-board"
 import { cn } from "@/lib/utils"
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { createTLStore, defaultShapeUtils } from "@tldraw/tldraw"
+import type { TLStore } from "@tldraw/tldraw"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -128,8 +130,15 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const problemIcon = getProblemIcon(problem.id);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
 
-  // Create a shared store for the desktop whiteboard (minimized and maximized share the same instance)
-  const desktopBoardStore = useMemo(() => createTLStore({ shapeUtils: defaultShapeUtils }), [])
+  // Lazy create the shared store for the desktop whiteboard (minimized and maximized share the same instance)
+  const [desktopBoardStore, setDesktopBoardStore] = useState<TLStore | null>(null)
+
+  React.useEffect(() => {
+    // Defer tldraw store creation to after initial render for faster page load
+    import("@tldraw/tldraw").then(({ createTLStore, defaultShapeUtils }) => {
+      setDesktopBoardStore(createTLStore({ shapeUtils: defaultShapeUtils }))
+    })
+  }, [])
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
@@ -188,33 +197,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       problem_id: problem.id,
       solved_at: new Date().toISOString(),
     });
-
-    // Also manually update getting started progress as fallback
-    // The trigger should handle this, but we do it here as backup
-    if (!error) {
-      // Count actual solved problems and update
-      supabase
-        .from('solved_problems')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .then(({ count }) => {
-          if (count !== null) {
-            supabase
-              .from('getting_started_progress')
-              .upsert(
-                {
-                  user_id: user.id,
-                  problems_solved_count: count,
-                  updated_at: new Date().toISOString(),
-                },
-                {
-                  onConflict: 'user_id',
-                  ignoreDuplicates: false,
-                }
-              )
-          }
-        })
-    }
 
     if (error) {
       console.error('Error marking problem as solved:', error);
@@ -487,7 +469,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                       </Button>
                     </div>
                     <div className="relative h-[600px] overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                      <ProblemBoard problemId={problem.id} store={desktopBoardStore} />
+                      <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
                     </div>
                   </div>
                 )}
@@ -522,11 +504,13 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       </div>
       <Footer />
 
-      <ProblemsSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        currentProblemId={problem.id}
-      />
+      <Suspense fallback={null}>
+        <ProblemsSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          currentProblemId={problem.id}
+        />
+      </Suspense>
 
       {congratulationMessage && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -556,14 +540,16 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
       <ProblemOrbButton onOpenSidebar={() => setInsightSidebarOpen(true)} />
 
-      <InsightChatSidebar
-        isOpen={insightSidebarOpen}
-        onClose={() => setInsightSidebarOpen(false)}
-        problemId={problem.id}
-        problemStatement={problem.statement || ''}
-        persona="problem_tutor"
-        onFreePlanMessage={() => setShowUpgradeBanner(true)}
-      />
+      <Suspense fallback={null}>
+        <InsightChatSidebar
+          isOpen={insightSidebarOpen}
+          onClose={() => setInsightSidebarOpen(false)}
+          problemId={problem.id}
+          problemStatement={problem.statement || ''}
+          persona="problem_tutor"
+          onFreePlanMessage={() => setShowUpgradeBanner(true)}
+        />
+      </Suspense>
 
       <Dialog open={desktopBoardExpanded} onOpenChange={setDesktopBoardExpanded}>
         <DialogContent hideClose className="max-w-[95vw] border border-white/10 bg-[#141414] text-white top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]">
@@ -583,7 +569,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             </Button>
           </div>
           <div className="h-[75vh] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-            <ProblemBoard problemId={problem.id} store={desktopBoardStore} />
+            <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
           </div>
         </DialogContent>
       </Dialog>

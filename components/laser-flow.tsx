@@ -22,6 +22,7 @@ type Props = {
     falloffStart?: number;
     fogFallSpeed?: number;
     color?: string;
+    isStatic?: boolean;
 };
 
 const VERT = `
@@ -280,7 +281,8 @@ export const LaserFlow: React.FC<Props> = ({
     decay = 1.1,
     falloffStart = 1.2,
     fogFallSpeed = 0.6,
-    color = '#FF79C6'
+    color = '#FF79C6',
+    isStatic = false
 }) => {
     const mountRef = useRef<HTMLDivElement | null>(null);
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -524,7 +526,19 @@ export const LaserFlow: React.FC<Props> = ({
             adjustDprIfNeeded(performance.now());
         };
 
-        animate();
+        // Static mode: render single frame with preset values
+        // Animated mode: run continuous animation loop
+        if (isStatic) {
+            // Set fixed time values for a visually appealing static frame
+            uniforms.iTime.value = 2.0;
+            uniforms.uFlowTime.value = 1.5;
+            uniforms.uFogTime.value = 1.5;
+            uniforms.uFade.value = 1.0;
+            hasFadedRef.current = true;
+            renderer.render(scene, camera);
+        } else {
+            animate();
+        }
 
         return () => {
             cancelAnimationFrame(raf);
@@ -539,7 +553,7 @@ export const LaserFlow: React.FC<Props> = ({
             if (mount.contains(canvas)) mount.removeChild(canvas);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dpr]);
+    }, [dpr ?? null, isStatic ?? false]);
 
     useEffect(() => {
         const uniforms = uniformsRef.current;

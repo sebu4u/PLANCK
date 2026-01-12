@@ -7,7 +7,7 @@ import { LaserFlow } from "@/components/laser-flow"
 import { LiveStats } from "@/components/live-stats"
 import { useRef, useState, useEffect } from "react"
 
-export function HomePageHeroRedesign() {
+export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean }) {
     const pathname = usePathname()
     const revealImgRef = useRef<HTMLImageElement>(null)
     const sectionRef = useRef<HTMLElement>(null)
@@ -105,6 +105,7 @@ export function HomePageHeroRedesign() {
                     color="#cf9eff"
                     flowSpeed={0.4}
                     wispDensity={1.5}
+                    isStatic={isMobile}
                 />
             </div>
 
@@ -177,9 +178,9 @@ export function HomePageHeroRedesign() {
                                     className="w-full h-full object-cover"
                                 />
 
-                                {/* Bottom Fade Effect */}
+                                {/* Bottom Fade Effect - smaller on mobile */}
                                 <div
-                                    className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-[#090b0d] to-transparent"
+                                    className="absolute bottom-0 left-0 right-0 h-1/4 lg:h-1/2 bg-gradient-to-t from-[#090b0d] to-transparent"
                                     style={{ zIndex: 20 }}
                                 />
                             </div>
@@ -212,11 +213,11 @@ export function HomePageHeroRedesign() {
                 </div>
             </div>
 
-            {/* Bottom Fade Gradient - Overlays everything */}
-            <div className="absolute bottom-0 left-0 right-0 h-[480px] bg-[linear-gradient(to_top,#090b0d_40%,transparent)] z-40 pointer-events-none" />
+            {/* Bottom Fade Gradient - Overlays everything, smaller on mobile */}
+            <div className="absolute bottom-0 left-0 right-0 h-[200px] lg:h-[480px] bg-[linear-gradient(to_top,#090b0d_40%,transparent)] z-40 pointer-events-none" />
 
             {/* Feature Text - Over the gradient */}
-            <div className="absolute bottom-20 left-0 right-0 z-50 pointer-events-none">
+            <div className="absolute bottom-6 lg:bottom-20 left-0 right-0 z-50 pointer-events-none">
                 <div className="max-w-7xl mx-auto px-6">
                     <p className="text-gray-500 text-sm mb-2">
                         Tot ce ai nevoie pentru a învăța fizică mai ușor.
