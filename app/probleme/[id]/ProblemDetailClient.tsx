@@ -130,6 +130,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const problemIcon = getProblemIcon(problem.id);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
 
+  const [showMobileUpgradeModal, setShowMobileUpgradeModal] = useState(false)
+
   // Lazy create the shared store for the desktop whiteboard (minimized and maximized share the same instance)
   const [desktopBoardStore, setDesktopBoardStore] = useState<TLStore | null>(null)
 
@@ -548,6 +550,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           problemStatement={problem.statement || ''}
           persona="problem_tutor"
           onFreePlanMessage={() => setShowUpgradeBanner(true)}
+          onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
         />
       </Suspense>
 
@@ -614,6 +617,48 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           </div>
         </DrawerContent>
       </Drawer>
+
+      {/* Upgrade Modal for Mobile */}
+      {showMobileUpgradeModal && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-sm rounded-[32px] border border-white/10 bg-[#161616] p-8 text-center shadow-2xl relative animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+            <button
+              onClick={() => setShowMobileUpgradeModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="mb-6 mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-white/10">
+              <span className="text-3xl">🚀</span>
+            </div>
+
+            <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 mb-3">
+              Treci la nivelul următor
+            </h3>
+
+            <p className="text-white/60 text-base leading-relaxed mb-8">
+              Ai atins limita de mesaje gratuite. Fă upgrade la Plus pentru conversații nelimitate cu Insight.
+            </p>
+
+            <div className="space-y-3">
+              <Link
+                href="/pricing"
+                className="block w-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Upgrade la Plus
+              </Link>
+
+              <button
+                onClick={() => setShowMobileUpgradeModal(false)}
+                className="block w-full rounded-full px-6 py-4 text-sm font-semibold text-white/40 hover:text-white transition-colors"
+              >
+                Mai târziu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

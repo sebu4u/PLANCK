@@ -26,6 +26,7 @@ interface InsightChatSidebarProps {
   problemStatement: string
   persona?: string
   onFreePlanMessage?: () => void
+  onMobileUpgradePrompt?: () => void
 }
 
 interface SuggestedQuestionsProps {
@@ -88,6 +89,7 @@ export default function InsightChatSidebar({
   problemStatement,
   persona = 'problem_tutor',
   onFreePlanMessage,
+  onMobileUpgradePrompt
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -109,7 +111,7 @@ export default function InsightChatSidebar({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const [textareaHeight, setTextareaHeight] = useState(24)
+  const [textareaHeight, setTextareaHeight] = useState(40)
   const abortControllerRef = useRef<AbortController | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
@@ -117,6 +119,45 @@ export default function InsightChatSidebar({
   const [problemContext, setProblemContext] = useState<string | null>(null)
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
   const [limitResetTime, setLimitResetTime] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Handle mobile keyboard resizing
+  const [viewportHeight, setViewportHeight] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!isMobile) {
+      setViewportHeight(undefined)
+      return
+    }
+
+    const handleVisualViewportResize = () => {
+      if (window.visualViewport) {
+        // We set the height to the visual viewport height to allow the input to move up
+        setViewportHeight(`${window.visualViewport.height}px`)
+      }
+    }
+
+    // Initial check
+    if (window.visualViewport) {
+      handleVisualViewportResize()
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize)
+      window.visualViewport.addEventListener('scroll', handleVisualViewportResize)
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize)
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportResize)
+      }
+    }
+  }, [isMobile])
 
 
   const markdownComponents = useMemo(
@@ -373,7 +414,7 @@ export default function InsightChatSidebar({
     textarea.style.minHeight = originalMinHeight
 
     if (scrollHeight <= maxHeight) {
-      const newHeight = Math.max(24, scrollHeight)
+      const newHeight = Math.max(40, scrollHeight)
       setTextareaHeight(newHeight)
       textarea.style.height = `${newHeight}px`
       textarea.style.overflowY = 'hidden'
@@ -403,11 +444,24 @@ export default function InsightChatSidebar({
     setIsStreaming(true)
     setSuggestedQuestions([]) // Clear suggestions when new message starts
 
-    // Show upgrade banner for free users on their first message
+    // Show upgrade banner logic
     const isFreePlan = !profile?.plan || profile.plan === 'free'
-    const isFirstMessage = messages.filter(m => m.role === 'user').length === 0
-    if (isFreePlan && isFirstMessage && onFreePlanMessage) {
-      onFreePlanMessage()
+    const userMessageCount = messages.filter(m => m.role === 'user').length
+
+    if (isFreePlan) {
+      const isMobile = window.innerWidth < 1024
+
+      if (isMobile) {
+        // On mobile: show large card after 2 messages (so when sending the 2nd message, count is 1)
+        if (userMessageCount === 1 && onMobileUpgradePrompt) {
+          onMobileUpgradePrompt()
+        }
+      } else {
+        // On desktop: show banner on first message
+        if (userMessageCount === 0 && onFreePlanMessage) {
+          onFreePlanMessage()
+        }
+      }
     }
 
     try {
@@ -747,7 +801,7 @@ export default function InsightChatSidebar({
         ref={sidebarRef}
         className={`fixed top-0 lg:top-[100px] right-0 h-dvh lg:h-[calc(100dvh-100px)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
-        style={{ maxWidth: '90vw' }}
+        style={{ maxWidth: '90vw', height: viewportHeight }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
@@ -951,23 +1005,22 @@ export default function InsightChatSidebar({
                     : 'rounded-2xl'
                   }`}>
                   <button
-                    className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
+                    className="h-10 w-10 rounded hover:bg-gray-700 transition-colors flex items-center justify-center flex-shrink-0 self-end"
                     disabled
                     title="Atașează fișier (în curând)"
                   >
-                    <Paperclip className="w-4 h-4 text-gray-400" />
+                    <Paperclip className="w-5 h-5 text-gray-400" />
                   </button>
                   <Textarea
                     ref={textareaRef}
-                    placeholder={problemContext ? "Adaugă detalii sau întreabă..." : "Scrie un mesaj..."}
+                    placeholder={problemContext ? (isMobile ? "Scrie..." : "Adaugă detalii sau întreabă...") : "Scrie un mesaj..."}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     rows={1}
-                    className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] py-2"
                     disabled={busy}
                     style={{
-                      minHeight: '24px',
                       height: `${textareaHeight}px`,
                       overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
                     }}
@@ -975,7 +1028,7 @@ export default function InsightChatSidebar({
                   {busy && isStreaming ? (
                     <button
                       onClick={stopGeneration}
-                      className="p-2 rounded transition-colors flex-shrink-0 self-end mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Oprește răspunsul"
                     >
                       <span className="flex items-center justify-center w-5 h-5">
@@ -988,9 +1041,9 @@ export default function InsightChatSidebar({
                     <button
                       onClick={send}
                       disabled={busy || (!input.trim() && !problemContext)}
-                      className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
+                      className="h-10 w-10 rounded hover:bg-gray-700 transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end"
                     >
-                      <Send className="w-4 h-4 text-gray-400" />
+                      <Send className="w-5 h-5 text-gray-400" />
                     </button>
                   )}
                 </div>

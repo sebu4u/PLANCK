@@ -151,7 +151,7 @@ export function SpacePageContent() {
                         className="absolute bottom-0 left-0 w-full md:top-20 md:left-auto md:right-4 md:w-[340px] md:bottom-auto z-30 pointer-events-auto"
                     >
                         <div className="bg-gradient-to-t from-black via-black/90 to-transparent md:bg-none p-4 md:p-0">
-                            <div className="max-h-[75vh] md:max-h-[80vh] overflow-hidden rounded-2xl md:rounded-xl">
+                            <div className="max-h-[75dvh] md:max-h-[80vh] overflow-y-auto md:overflow-hidden rounded-2xl md:rounded-xl">
                                 <NodeInfoCard
                                     node={selectedNode}
                                     recommendations={recommendations}

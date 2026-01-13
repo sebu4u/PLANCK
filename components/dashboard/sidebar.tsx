@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,6 +19,8 @@ import {
   GraduationCap,
   Brain,
   Gift,
+  User,
+  LogOut,
 } from "lucide-react"
 import { UserStats, UserTask, DashboardUpdate, ContinueLearningItem, Achievement } from "@/lib/dashboard-data"
 
@@ -48,7 +51,14 @@ function DashboardSidebarComponent({
   onOpenChange,
 }: DashboardSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.refresh()
+  }
 
   // Local state for tasks to prevent full sidebar re-render
   const [localTasks, setLocalTasks] = useState(tasks)
@@ -245,6 +255,24 @@ function DashboardSidebarComponent({
             {/* Section 5: Tasks Today */}
             {TasksSection}
 
+            {/* Mobile Only: Profile & Sign Out Buttons */}
+            <div className="lg:hidden grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-white/5">
+              <Link
+                href="/profil"
+                className="col-span-1 h-10 w-full flex items-center justify-center gap-2 px-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/80"
+              >
+                <User className="w-4 h-4" />
+                <span className="text-sm font-medium">Profil</span>
+              </Link>
+
+              <button
+                onClick={handleSignOut}
+                className="col-span-1 h-10 w-full flex items-center justify-center px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+              >
+                <span className="text-sm font-medium whitespace-nowrap">Sign Out</span>
+              </button>
+            </div>
+
 
           </div>
         </ScrollArea>
@@ -280,7 +308,7 @@ function DashboardSidebarComponent({
       {/* Mobile Drawer */}
       <div className="lg:hidden">
         <Sheet open={open ?? false} onOpenChange={onOpenChange}>
-          <SheetContent side="right" hideClose className="w-[250px] bg-[#080808] border-[#1a1a1a] p-0 top-[64px] h-[calc(100vh-64px)]">
+          <SheetContent side="right" hideClose className="w-[250px] bg-[#080808] border-[#1a1a1a] p-0 top-[64px] h-[calc(100dvh-64px)]">
             <SheetTitle className="sr-only">Dashboard Menu</SheetTitle>
             <SidebarContent />
           </SheetContent>
