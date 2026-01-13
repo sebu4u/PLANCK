@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
-import { Pencil, Settings, Lock, Shield, Trophy, Gift } from "lucide-react";
+import { Pencil, Settings, Lock, Shield, Trophy, Gift, GraduationCap, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
@@ -59,6 +59,15 @@ const ProfilPage = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [userStats, setUserStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [contestRegistration, setContestRegistration] = useState<{
+    contest_code: string;
+    full_name: string;
+    school: string;
+    grade: string;
+    registered_at: string;
+  } | null>(null);
+  const [contestLoading, setContestLoading] = useState(true);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // Get rank icon path
   const getRankIconPath = (rankName: string): string => {
@@ -137,6 +146,47 @@ const ProfilPage = () => {
     };
     fetchUserStats();
   }, [user]);
+
+  // Fetch contest registration status
+  useEffect(() => {
+    if (!user) return;
+    const fetchContestStatus = async () => {
+      setContestLoading(true);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+
+        if (!accessToken) {
+          setContestLoading(false);
+          return;
+        }
+
+        const response = await fetch('/api/contest/status', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+        const data = await response.json();
+        if (data.registered && data.registration) {
+          setContestRegistration(data.registration);
+        }
+      } catch (error) {
+        console.error('Error fetching contest status:', error);
+      } finally {
+        setContestLoading(false);
+      }
+    };
+    fetchContestStatus();
+  }, [user]);
+
+  const copyContestCode = () => {
+    if (contestRegistration?.contest_code) {
+      navigator.clipboard.writeText(contestRegistration.contest_code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+      toast({ title: 'Cod copiat!' });
+    }
+  };
 
   const handleBioSave = async () => {
     if (!user) return;
@@ -497,6 +547,62 @@ const ProfilPage = () => {
                             <p className="text-lg font-semibold text-white/90">{userStats.best_streak || 0}</p>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Contest Registration Card */}
+                    {!contestLoading && (
+                      <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-orange-600/5 border border-orange-500/20 p-6 hover:border-orange-500/40 transition-colors">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                            <GraduationCap className="w-5 h-5 text-orange-400" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-white/90">Concursul PLANCK 2026</h3>
+                        </div>
+
+                        {contestRegistration ? (
+                          <div className="space-y-4">
+                            {/* Contest Code Display */}
+                            <div className="bg-black/20 rounded-xl p-4 border border-orange-500/20">
+                              <p className="text-xs text-orange-300 font-medium mb-2">Codul tău de concurs:</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-2xl font-mono font-bold text-white tracking-wider">
+                                  {contestRegistration.contest_code}
+                                </span>
+                                <button
+                                  onClick={copyContestCode}
+                                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                                >
+                                  {codeCopied ? (
+                                    <Check className="w-4 h-4 text-green-400" />
+                                  ) : (
+                                    <Copy className="w-4 h-4 text-white/60" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Registration Details */}
+                            <div className="text-sm text-white/60 space-y-1">
+                              <p><span className="text-white/40">Clasă:</span> a {contestRegistration.grade}-a</p>
+                              <p><span className="text-white/40">Școală:</span> {contestRegistration.school}</p>
+                            </div>
+
+                            <p className="text-xs text-orange-400/80">
+                              Folosește acest cod pentru a accesa subiectele în ziua concursului.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-white/60 mb-4">Nu ești încă înscris la concurs.</p>
+                            <Button
+                              onClick={() => router.push('/concurs/inscriere')}
+                              className="bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-medium"
+                            >
+                              Înscrie-te acum
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
 

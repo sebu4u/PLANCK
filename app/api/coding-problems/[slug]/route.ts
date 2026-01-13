@@ -5,6 +5,7 @@ import { isPaidPlan } from "@/lib/subscription-plan";
 import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
+import { ALLOW_ALL_CODING_PROBLEMS } from "@/lib/access-config";
 
 // Server-side: access environment variables directly
 // These are validated at build time in next.config.mjs
@@ -44,7 +45,8 @@ export async function GET(
   ]);
 
   const isFreeMonthly = monthlyFreeSet.has(problem.id);
-  if (!isPaidPlan(userPlan)) {
+  // Access controlled by centralized config - see lib/access-config.ts
+  if (!ALLOW_ALL_CODING_PROBLEMS && !isPaidPlan(userPlan)) {
     return NextResponse.json(
       { error: "Problem locked", code: "PROBLEM_LOCKED" },
       { status: 403 }

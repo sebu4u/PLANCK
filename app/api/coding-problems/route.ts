@@ -5,6 +5,7 @@ import { isPaidPlan } from "@/lib/subscription-plan";
 import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
+import { ALLOW_ALL_CODING_PROBLEMS } from "@/lib/access-config";
 
 // Server-side: access environment variables directly
 // These are validated at build time in next.config.mjs
@@ -182,7 +183,8 @@ export async function GET(request: NextRequest) {
   const userPlan = await resolvePlanForRequest(authedSupabase, accessToken)
   const enriched = (data ?? []).map((item) => {
     const isFreeMonthly = monthlyFreeSet.has(item.id)
-    const canAccess = isPaidPlan(userPlan)
+    // Access controlled by centralized config - see lib/access-config.ts
+    const canAccess = ALLOW_ALL_CODING_PROBLEMS || isPaidPlan(userPlan)
     return {
       ...item,
       isFreeMonthly,

@@ -58,19 +58,43 @@ export function ConcursContent() {
     const gradeData = [
         {
             grade: "Clasa a IX-a",
-            topics: ["Cinematică", "Dinamică", "Lucru mecanic și energie", "Noțiuni de bază de mecanică"]
+            topics: [
+                "Vectorul, operații cu vectori",
+                "Punctul material",
+                "MRU și MRUV",
+                "Aruncarea punctului material",
+                "Noțiuni de bază de dinamică",
+                "Principiile dinamicii",
+                "Mecanisme simple"
+            ]
         },
         {
             grade: "Clasa a X-a",
-            topics: ["Oscilații și unde mecanice", "Elemente de termodinamică", "Recapitulare mecanică"]
+            topics: [
+                "Optică geometrică",
+                "Proprietăți ale gazelor",
+                "Ecuația de stare a gazului ideal",
+                "Transformări termodinamice",
+                "Lucrul mecanic și energia internă",
+                "Principiul I al termodinamicii"
+            ]
         },
         {
             grade: "Clasa a XI-a",
-            topics: ["Electricitate și curent electric", "Câmp electric", "Elemente de circuit"]
+            topics: [
+                "Circuite electrice simple",
+                "Legea lui Ohm",
+                "Legile lui Kirchhoff",
+                "Grupări de rezistoare / rezistența echivalentă",
+                "Oscilații armonice",
+                "Elongație, viteză, accelerație",
+                "Perioada pendulului / resortului",
+                "Energia mecanică"
+            ]
         },
         {
             grade: "Clasa a XII-a",
-            topics: ["Magnetism", "Inducție electromagnetică", "Elemente de fizică modernă (nivel adaptat)"]
+            topics: ["Toată materia din clasele anterioare"]
         }
     ]
 
@@ -123,7 +147,7 @@ export function ConcursContent() {
 
                     {/* CTA Buttons */}
                     <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <Link href="#participa">
+                        <Link href="/concurs/inscriere">
                             <Button
                                 size="lg"
                                 className="bg-white text-gray-900 hover:bg-gray-100 transition-all duration-300 rounded-full px-8 py-6 text-lg font-semibold shadow-lg hover:shadow-xl border-0"
@@ -475,12 +499,14 @@ export function ConcursContent() {
                             Ești gata să te testezi?
                         </h3>
 
-                        <Button
-                            size="lg"
-                            className="scroll-animate-scale animate-delay-600 bg-gradient-to-r from-orange-500 to-orange-400 text-white hover:from-orange-600 hover:to-orange-500 transition-all duration-300 rounded-full px-10 py-7 text-lg font-semibold shadow-xl hover:shadow-2xl hover:scale-105"
-                        >
-                            🔵 Rezervă-ți locul în concurs
-                        </Button>
+                        <Link href="/concurs/inscriere">
+                            <Button
+                                size="lg"
+                                className="scroll-animate-scale animate-delay-600 bg-gradient-to-r from-orange-500 to-orange-400 text-white hover:from-orange-600 hover:to-orange-500 transition-all duration-300 rounded-full px-10 py-7 text-lg font-semibold shadow-xl hover:shadow-2xl hover:scale-105"
+                            >
+                                🔵 Rezervă-ți locul în concurs
+                            </Button>
+                        </Link>
 
                         <p className="text-gray-500 text-sm mt-6">
                             Data concursului va fi anunțată în curând. Vei primi toate detaliile pe email.

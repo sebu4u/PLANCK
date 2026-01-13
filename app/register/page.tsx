@@ -53,6 +53,10 @@ function RegisterPageContent() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState<"google" | "github" | "microsoft" | "email" | null>(null)
 
+  const [step, setStep] = useState<"email" | "password" | "confirmation">("email")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+
   // Referral state
   const [referralCode, setReferralCode] = useState<string | null>(null)
 
@@ -122,7 +126,11 @@ function RegisterPageContent() {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email.trim()) {
+    // Prevent TopLoader from triggering since we remain on the same page
+    e.stopPropagation()
+    e.nativeEvent.stopImmediatePropagation()
+
+    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
       toast({
         title: "Eroare",
         description: "Te rugăm să introduci un email valid",
@@ -130,13 +138,66 @@ function RegisterPageContent() {
       })
       return
     }
+    setStep("password")
+  }
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!password || password.length < 6) {
+      toast({
+        title: "Parolă invalidă",
+        description: "Parola trebuie să aibă cel puțin 6 caractere.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Parolele nu coincid",
+        description: "Te rugăm să verifici parola confirmată.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading("email")
-    // For now, redirect to OAuth - email/password can be implemented later
-    toast({
-      title: "Info",
-      description: "Te rugăm să folosești una din metodele de autentificare de mai jos",
+
+    // Use Supabase client directly here or via a wrapper if you prefer
+    // Importing locally to avoid circular dependencies if any, or just use the global import
+    const { supabase } = await import("@/lib/supabaseClient")
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          // You can add metadata here if needed
+        }
+      }
     })
-    setLoading(null)
+
+    if (error) {
+      toast({
+        title: "Eroare la înregistrare",
+        description: error.message,
+        variant: "destructive",
+      })
+      setLoading(null)
+    } else {
+      // If email confirmation is required, Supabase might not return a session immediately
+      // Check if user is created but session is null => email confirmation needed
+      if (data.user && !data.session) {
+        setStep("confirmation")
+      } else {
+        // If auto-confirm is on or something, we might get a session. 
+        // Usually for email/pass with confirm enabled, we go to confirmation screen.
+        setStep("confirmation")
+      }
+      setLoading(null)
+    }
   }
 
   const handleOAuthLogin = async (method: "google" | "github") => {
@@ -180,84 +241,164 @@ function RegisterPageContent() {
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 pb-8">
         <div className="w-full max-w-[400px] flex flex-col items-center">
-          {/* Title */}
-          <h1 className="text-[32px] font-semibold text-black mb-8 text-center">
-            Create an account
-          </h1>
 
-          {/* Email Form */}
-          <form onSubmit={handleEmailSubmit} className="w-full space-y-4 mb-4">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email address"
-              className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
-            />
-            <Button
-              type="submit"
-              disabled={loading === "email"}
-              className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors"
-            >
-              {loading === "email" ? "Se procesează..." : "Continue"}
-            </Button>
-          </form>
+          {step === "confirmation" ? (
+            <div className="text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-[32px] font-semibold text-black mb-4">
+                Verifică-ți emailul
+              </h1>
+              <p className="text-gray-600 mb-8">
+                Ți-am trimis un link de confirmare la adresa <strong>{email}</strong>. Te rugăm să verifici și spam-ul.
+              </p>
+              <div className="space-y-4">
+                <Link href="/login">
+                  <Button className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors">
+                    Înapoi la Login
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  onClick={() => setStep("email")}
+                  className="text-gray-500 hover:text-gray-900"
+                >
+                  Am greșit adresa de email
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Title */}
+              <h1 className="text-[32px] font-semibold text-black mb-8 text-center animate-in slide-in-from-bottom-2 fade-in duration-300">
+                {step === "email" ? "Create an account" : "Set password"}
+              </h1>
 
-          {/* Login Link */}
-          <p className="text-sm text-gray-600 mb-6">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="text-[#10a37f] hover:text-[#0d8c6d] font-medium transition-colors"
-            >
-              Log in
-            </Link>
-          </p>
+              {step === "email" && (
+                <div className="w-full animate-in slide-in-from-bottom-4 fade-in duration-300">
+                  {/* Email Form */}
+                  <form onSubmit={handleEmailSubmit} className="w-full space-y-4 mb-4">
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email address"
+                      className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white transition-all"
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors"
+                    >
+                      Continue
+                    </Button>
+                  </form>
 
-          {/* Divider */}
-          <div className="w-full flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="text-xs text-gray-500 font-medium">OR</span>
-            <div className="flex-1 h-px bg-gray-200"></div>
-          </div>
+                  {/* Login Link */}
+                  <p className="text-sm text-center text-gray-600 mb-6">
+                    Already have an account?{" "}
+                    <Link
+                      href="/login"
+                      className="text-[#10a37f] hover:text-[#0d8c6d] font-medium transition-colors"
+                    >
+                      Log in
+                    </Link>
+                  </p>
 
-          {/* Social Login Buttons */}
-          <div className="w-full space-y-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleOAuthLogin("google")}
-              disabled={loading !== null}
-              className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-            >
-              {loading === "google" ? (
-                <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-              ) : (
-                <GoogleIcon />
+                  {/* Divider */}
+                  <div className="w-full flex items-center gap-4 mb-6">
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                    <span className="text-xs text-gray-500 font-medium">OR</span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                  </div>
+
+                  {/* Social Login Buttons */}
+                  <div className="w-full space-y-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleOAuthLogin("google")}
+                      disabled={loading !== null}
+                      className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                    >
+                      {loading === "google" ? (
+                        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                      ) : (
+                        <GoogleIcon />
+                      )}
+                      <span>Continue with Google</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={loading !== null}
+                      className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                    >
+                      <AppleIcon />
+                      <span>Continue with Apple</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={loading !== null}
+                      className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                    >
+                      <MicrosoftIcon />
+                      <span>Continue with Microsoft</span>
+                    </Button>
+                  </div>
+                </div>
               )}
-              <span>Continue with Google</span>
-            </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loading !== null}
-              className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-            >
-              <AppleIcon />
-              <span>Continue with Apple</span>
-            </Button>
+              {step === "password" && (
+                <div className="w-full animate-in slide-in-from-right-8 fade-in duration-300">
+                  <div className="mb-6">
+                    <button
+                      onClick={() => setStep("email")}
+                      className="text-sm text-gray-500 hover:text-black flex items-center gap-1 transition-colors mb-2"
+                    >
+                      ← Back
+                    </button>
+                    <div className="text-gray-500 text-sm">Signing up as <span className="text-black font-medium">{email}</span></div>
+                  </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loading !== null}
-              className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-            >
-              <MicrosoftIcon />
-              <span>Continue with Microsoft</span>
-            </Button>
-          </div>
+                  <form onSubmit={handleRegister} className="w-full space-y-4">
+                    <div className="space-y-1">
+                      <Input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Password"
+                        className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm password"
+                        className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={loading === "email"}
+                      className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors mt-2"
+                    >
+                      {loading === "email" ? "Creating account..." : "Sign Up"}
+                    </Button>
+                  </form>
+                </div>
+              )}
+            </>
+          )}
+
         </div>
       </main>
 

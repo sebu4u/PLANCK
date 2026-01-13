@@ -14,6 +14,7 @@ import {
 import { CodingProblemFilterBar } from "./filter-bar"
 import { CodingProblemGrid } from "./problem-grid"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { ALLOW_ALL_CODING_PROBLEMS } from "@/lib/access-config"
 
 const DEFAULT_FILTERS: CodingProblemFiltersState = {
   search: "",
@@ -71,8 +72,8 @@ export function CodingProblemsClient({
           signal: controller.signal,
           headers: accessToken
             ? {
-                Authorization: `Bearer ${accessToken}`,
-              }
+              Authorization: `Bearer ${accessToken}`,
+            }
             : undefined,
         })
 
@@ -165,8 +166,10 @@ export function CodingProblemsClient({
         problems={problems}
         loading={loading}
         canAccessProblem={(problem) => {
+          // Access controlled by centralized config - see lib/access-config.ts
+          if (ALLOW_ALL_CODING_PROBLEMS) return true
           if (isPaid) return true
-          // Utilizatorii Free nu au acces la problemele de informatică
+          // Utilizatorii Free nu au acces la problemele de informatică (când flag-ul e dezactivat)
           return false
         }}
       />

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Pagination, PaginationContent, PaginationItem, PaginationEllipsis } from "@/components/ui/pagination"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { ALLOW_ALL_PHYSICS_PROBLEMS } from "@/lib/access-config"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -33,10 +34,6 @@ const problemsCache = new Map<string, { data: Problem[], timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
-
-// TEMPORARY: Feature flag to allow all problems for free/non-logged users
-// Set to false to restore original access restrictions
-const ALLOW_ALL_PROBLEMS_TEMPORARILY = false
 
 const getCurrentMonthKey = () => {
   const now = new Date()
@@ -172,7 +169,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
 
   // Memoized filtered problems
   const filteredProblems = useMemo(() => {
-    return problems.filter((problem) => {
+    const result = problems.filter((problem) => {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
@@ -212,6 +209,31 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
       if (filters.progress === "Nerezolvate" && solvedProblems.includes(problem.id)) return false
       return true
     })
+
+    // Generate placeholders if no problems found
+    if (result.length === 0 && !filters.search) {
+      const currentClass = filters.class !== "Toate" ? filters.class : "Fizică"
+      const currentChapter = filters.chapter !== "Toate" ? filters.chapter : "General"
+
+      const placeholders: Problem[] = Array.from({ length: 10 }).map((_, i) => ({
+        id: `PREMIUM-PLACEHOLDER-${i}`,
+        title: `Problemă Avansată - ${currentChapter} #${i + 1}`,
+        description: "Această problemă face parte din colecția premium.",
+        statement: "Conținut exclusiv pentru abonații Premium.",
+        difficulty: "Avansat",
+        category: currentChapter,
+        tags: "Premium, Exclusiv",
+        youtube_url: "",
+        created_at: new Date().toISOString(),
+        classString: currentClass,
+        // Proprietate pe care o detectăm la randare
+        isPlaceholder: true
+      } as any))
+
+      return placeholders
+    }
+
+    return result
   }, [problems, filters, solvedProblems])
 
   // Folosește set-ul primit de la server (care include selecțiile manuale dacă există)
@@ -509,13 +531,14 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
                   )}
                 <div className="mb-8 grid gap-5 md:grid-cols-2 pt-2 -mt-2">
                   {visibleProblems.map((problem) => {
-                    // TEMPORARY: Allow all problems when flag is enabled
-                    const canAccess = ALLOW_ALL_PROBLEMS_TEMPORARILY
+                    const isPlaceholder = (problem as any).isPlaceholder === true
+                    // Access controlled by centralized config - see lib/access-config.ts
+                    const canAccess = ALLOW_ALL_PHYSICS_PROBLEMS
                       ? true
                       : !isFree || isPaid || monthlyFreeSet.has(problem.id)
-                    const isLocked = ALLOW_ALL_PROBLEMS_TEMPORARILY
-                      ? false
-                      : isFree && !canAccess
+                    const isLocked = isPlaceholder
+                      ? true
+                      : (ALLOW_ALL_PHYSICS_PROBLEMS ? false : isFree && !canAccess)
                     return (
                       <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
                         <ProblemCard

@@ -53,6 +53,10 @@ function LoginPageContent() {
     const [email, setEmail] = useState("")
     const [loading, setLoading] = useState<"google" | "github" | "microsoft" | "phone" | "email" | null>(null)
 
+    const [step, setStep] = useState<"email" | "password">("email")
+    const [password, setPassword] = useState("")
+
+    // Check for "error" query param from Supabase Auth redirect
     const { toast } = useToast()
     const router = useRouter()
     const { loginWithGoogle, loginWithGitHub, user } = useAuth()
@@ -66,7 +70,11 @@ function LoginPageContent() {
 
     const handleEmailSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!email.trim()) {
+        // Prevent TopLoader from triggering since we remain on the same page
+        e.stopPropagation()
+        e.nativeEvent.stopImmediatePropagation()
+
+        if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
             toast({
                 title: "Eroare",
                 description: "Te rugăm să introduci un email valid",
@@ -74,13 +82,41 @@ function LoginPageContent() {
             })
             return
         }
+        setStep("password")
+    }
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!password) {
+            toast({
+                title: "Eroare",
+                description: "Te rugăm să introduci parola",
+                variant: "destructive",
+            })
+            return
+        }
+
         setLoading("email")
-        // For now, redirect to OAuth - email/password can be implemented later
-        toast({
-            title: "Info",
-            description: "Te rugăm să folosești una din metodele de autentificare de mai jos",
+
+        const { supabase } = await import("@/lib/supabaseClient")
+
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password
         })
-        setLoading(null)
+
+        if (error) {
+            toast({
+                title: "Eroare la autentificare",
+                description: error.message === "Invalid logs" ? "Date de logare incorecte." : error.message,
+                variant: "destructive",
+            })
+            setLoading(null)
+        } else {
+            // Success! The auth listener in AuthProvider will pick this up and redirect
+            // But we can also force a redirect or just wait for the loop
+            router.push("/dashboard")
+        }
     }
 
     const handleOAuthLogin = async (method: "google" | "github") => {
@@ -124,94 +160,137 @@ function LoginPageContent() {
             {/* Main Content */}
             <main className="flex-1 flex items-center justify-center px-4 pb-8">
                 <div className="w-full max-w-[400px] flex flex-col items-center">
+
                     {/* Title */}
-                    <h1 className="text-[32px] font-semibold text-black mb-8 text-center">
-                        Welcome back
+                    <h1 className="text-[32px] font-semibold text-black mb-8 text-center animate-in slide-in-from-bottom-2 fade-in duration-300">
+                        {step === "email" ? "Welcome back" : "Enter your password"}
                     </h1>
 
-                    {/* Email Form */}
-                    <form onSubmit={handleEmailSubmit} className="w-full space-y-4 mb-4">
-                        <Input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Email address"
-                            className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
-                        />
-                        <Button
-                            type="submit"
-                            disabled={loading === "email"}
-                            className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors"
-                        >
-                            {loading === "email" ? "Se procesează..." : "Continue"}
-                        </Button>
-                    </form>
+                    {step === "email" && (
+                        <div className="w-full animate-in slide-in-from-bottom-4 fade-in duration-300">
+                            {/* Email Form */}
+                            <form onSubmit={handleEmailSubmit} className="w-full space-y-4 mb-4">
+                                <Input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="Email address"
+                                    className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white transition-all"
+                                />
+                                <Button
+                                    type="submit"
+                                    className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors"
+                                >
+                                    Continue
+                                </Button>
+                            </form>
 
-                    {/* Register Link */}
-                    <p className="text-sm text-gray-600 mb-6">
-                        Don't have an account?{" "}
-                        <Link
-                            href="/register"
-                            className="text-[#10a37f] hover:text-[#0d8c6d] font-medium transition-colors"
-                        >
-                            Sign up
-                        </Link>
-                    </p>
+                            {/* Register Link */}
+                            <p className="text-sm text-center text-gray-600 mb-6">
+                                Don't have an account?{" "}
+                                <Link
+                                    href="/register"
+                                    className="text-[#10a37f] hover:text-[#0d8c6d] font-medium transition-colors"
+                                >
+                                    Sign up
+                                </Link>
+                            </p>
 
-                    {/* Divider */}
-                    <div className="w-full flex items-center gap-4 mb-6">
-                        <div className="flex-1 h-px bg-gray-200"></div>
-                        <span className="text-xs text-gray-500 font-medium">OR</span>
-                        <div className="flex-1 h-px bg-gray-200"></div>
-                    </div>
+                            {/* Divider */}
+                            <div className="w-full flex items-center gap-4 mb-6">
+                                <div className="flex-1 h-px bg-gray-200"></div>
+                                <span className="text-xs text-gray-500 font-medium">OR</span>
+                                <div className="flex-1 h-px bg-gray-200"></div>
+                            </div>
 
-                    {/* Social Login Buttons */}
-                    <div className="w-full space-y-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleOAuthLogin("google")}
-                            disabled={loading !== null}
-                            className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-                        >
-                            {loading === "google" ? (
-                                <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-                            ) : (
-                                <GoogleIcon />
-                            )}
-                            <span>Continue with Google</span>
-                        </Button>
+                            {/* Social Login Buttons */}
+                            <div className="w-full space-y-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => handleOAuthLogin("google")}
+                                    disabled={loading !== null}
+                                    className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                                >
+                                    {loading === "google" ? (
+                                        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                                    ) : (
+                                        <GoogleIcon />
+                                    )}
+                                    <span>Continue with Google</span>
+                                </Button>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={loading !== null}
-                            className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-                        >
-                            <AppleIcon />
-                            <span>Continue with Apple</span>
-                        </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={loading !== null}
+                                    className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                                >
+                                    <AppleIcon />
+                                    <span>Continue with Apple</span>
+                                </Button>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={loading !== null}
-                            className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-                        >
-                            <MicrosoftIcon />
-                            <span>Continue with Microsoft</span>
-                        </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={loading !== null}
+                                    className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                                >
+                                    <MicrosoftIcon />
+                                    <span>Continue with Microsoft</span>
+                                </Button>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={loading !== null}
-                            className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-                        >
-                            <Phone className="w-5 h-5" />
-                            <span>Continue with phone</span>
-                        </Button>
-                    </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={loading !== null}
+                                    className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                                >
+                                    <Phone className="w-5 h-5" />
+                                    <span>Continue with phone</span>
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === "password" && (
+                        <div className="w-full animate-in slide-in-from-right-8 fade-in duration-300">
+                            <div className="mb-6">
+                                <button
+                                    onClick={() => setStep("email")}
+                                    className="text-sm text-gray-500 hover:text-black flex items-center gap-1 transition-colors mb-2"
+                                >
+                                    ← Back
+                                </button>
+                                <div className="text-gray-500 text-sm">Logging in as <span className="text-black font-medium">{email}</span></div>
+                            </div>
+
+                            <form onSubmit={handleLogin} className="w-full space-y-4">
+                                <div className="space-y-1">
+                                    <Input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Password"
+                                        className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
+                                    />
+                                    <div className="flex justify-end pt-1">
+                                        <Link href="/reset-password" className="text-xs text-[#10a37f] hover:underline">
+                                            Forgot password?
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    disabled={loading === "email"}
+                                    className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors mt-2"
+                                >
+                                    {loading === "email" ? "Logging in..." : "Log In"}
+                                </Button>
+                            </form>
+                        </div>
+                    )}
                 </div>
             </main>
 

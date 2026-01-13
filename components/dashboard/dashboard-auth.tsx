@@ -31,10 +31,11 @@ import type {
   DashboardUpdate,
   Project,
 } from "@/lib/dashboard-data"
-import { getNextRankThreshold, getLastProject } from "@/lib/dashboard-data"
+import { getNextRankThreshold } from "@/lib/dashboard-data"
 
 import { ProblemOfTheDayCard } from "@/components/dashboard/cards/problem-of-the-day-card"
 import { QuickActionsRow } from "@/components/dashboard/quick-actions-row"
+import { ContestPromoCard } from "@/components/dashboard/cards/contest-promo-card"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -140,8 +141,7 @@ export function DashboardAuth() {
         ])
 
         const continueLearningData = await fetchContinueLearning()
-        const session = await supabase.auth.getSession()
-        const lastProjectData = await getLastProject(user.id, session.data.session?.access_token || '')
+        const lastProjectData = await fetchLastProject(user.id)
 
         // Set complete data all at once
         const completeData = {
@@ -214,8 +214,7 @@ export function DashboardAuth() {
         ])
 
         const continueLearningData = await fetchContinueLearning()
-        const session = await supabase.auth.getSession()
-        const lastProjectData = await getLastProject(userId, session.data.session?.access_token || '')
+        const lastProjectData = await fetchLastProject(userId)
 
         const fullData = {
           stats: statsData,
@@ -446,6 +445,11 @@ export function DashboardAuth() {
                     <p className="text-white/60">Here's your learning progress today</p>
                   </div>
 
+                  {/* Contest Promo Card - Mobile Only */}
+                  <div className="mb-3 lg:hidden">
+                    <ContestPromoCard />
+                  </div>
+
                   <div className="mb-3 md:mb-6">
                     <ProblemOfTheDayCard challenge={dashboardData.challenge} />
                   </div>
@@ -554,7 +558,7 @@ async function fetchUserStats(userId: string, skipStreakCheck: boolean = false):
     .select('problems_solved, time_minutes')
     .eq('user_id', userId)
     .eq('activity_date', today)
-    .single()
+    .maybeSingle()
 
   // Override problems_solved_today and total_time_minutes with actual values from daily_activity
   const stats = data as UserStats
@@ -777,7 +781,7 @@ async function fetchDailyChallenge(userId: string): Promise<DailyChallenge | nul
     .select('completed')
     .eq('user_id', userId)
     .eq('challenge_id', challenge.id)
-    .single()
+    .maybeSingle()
 
   // Check if user already solved this problem in the past
   const { data: solved } = await supabase
@@ -1085,3 +1089,29 @@ function getLearningInsightsPlaceholder(): LearningInsights {
   }
 }
 
+// Local function to fetch last project using shared supabase client
+// This avoids creating multiple GoTrueClient instances
+async function fetchLastProject(userId: string): Promise<Project | null> {
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      // It's normal to have no projects, so don't log error if it's just no rows
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching last project:', error)
+      }
+      return null
+    }
+
+    return data as Project
+  } catch (error) {
+    console.error('Error in fetchLastProject:', error)
+    return null
+  }
+}
