@@ -346,8 +346,8 @@ function RegisterPageContent() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={loading !== null}
-                      className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                      disabled={true}
+                      className="w-full h-12 border border-gray-200 rounded-full bg-gray-50 text-gray-400 font-medium text-base transition-colors flex items-center justify-center gap-3 opacity-50 cursor-not-allowed grayscale"
                     >
                       <AppleIcon />
                       <span>Continue with Apple</span>
@@ -356,8 +356,8 @@ function RegisterPageContent() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={loading !== null}
-                      className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
+                      disabled={true}
+                      className="w-full h-12 border border-gray-200 rounded-full bg-gray-50 text-gray-400 font-medium text-base transition-colors flex items-center justify-center gap-3 opacity-50 cursor-not-allowed grayscale"
                     >
                       <MicrosoftIcon />
                       <span>Continue with Microsoft</span>

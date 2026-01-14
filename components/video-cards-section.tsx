@@ -139,25 +139,25 @@ const VideoCard = memo(function VideoCard({ videoSrc, poster, title, description
 const cards = [
     {
         videoSrc: "/videos/AIo.mp4",
-        poster: "/feature-1.jpg",
+        poster: "/0035.jpg",
         title: "Catalog de probleme cu AI",
         description: "Sute de probleme rezolvate pas cu pas, cu ajutorul inteligenței artificiale."
     },
     {
         videoSrc: "/videos/grilev.mp4",
-        poster: "/feature-2.jpg",
+        poster: "/ezgif-frame-001.jpg",
         title: "Grile pentru admitere",
         description: "Teste grile interactive pentru pregătirea examenelor de admitere."
     },
     {
         videoSrc: "/videos/cod.mp4",
-        poster: "/feature-3.jpg",
+        poster: "/0057.jpg",
         title: "Planck Code",
         description: "Scrie și rulează cod Python pentru probleme de fizică și simulări."
     },
     {
         videoSrc: "/videos/sketcho.mp4",
-        poster: "/Sketch-sectiunea1.jpg",
+        poster: "/0001.jpg",
         title: "Tabla colaborativă",
         description: "Tablă interactivă pentru sesiuni de studiu și rezolvări în echipă."
     }

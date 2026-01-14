@@ -137,7 +137,7 @@ export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean 
                                     Rezolvă o problemă
                                 </Button>
                             </Link>
-                            <Link href="/insight/chat" className="group relative inline-flex">
+                            <Link href="/cursuri" className="group relative inline-flex">
                                 <span className="absolute -inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
                                 <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
                                 <span className="absolute inset-[1px] rounded-full bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
