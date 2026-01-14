@@ -4,11 +4,12 @@ import type React from "react"
 import { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Rocket } from "lucide-react"
+import { Rocket, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import Link from "next/link"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 // Google icon SVG component
 const GoogleIcon = () => (
@@ -240,7 +241,18 @@ function RegisterPageContent() {
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 pb-8">
-        <div className="w-full max-w-[400px] flex flex-col items-center">
+        <div className="w-full max-w-[400px] flex flex-col items-center relative">
+
+          {step === "password" && (
+            <Alert className="absolute bottom-[calc(100%+0.5rem)] sm:bottom-[calc(100%+1.5rem)] p-3 sm:p-4 border-amber-200 bg-amber-50 text-amber-900 animate-in slide-in-from-bottom-2 fade-in duration-300">
+              <AlertTriangle className="h-4 w-4 text-amber-600 !text-amber-600" />
+              <AlertTitle className="text-amber-800 font-semibold text-sm sm:text-base">Notă importantă</AlertTitle>
+              <AlertDescription className="text-amber-700 text-xs sm:text-sm">
+                <span className="hidden sm:inline">Din cauza volumului mare de înscrieri, confirmarea prin email poate întârzia. Vă recomandăm autentificarea prin Google sau Apple pentru acces imediat.</span>
+                <span className="sm:hidden">Confirmarea emailului poate întârzia. Recomandăm autentificarea cu Google/Apple.</span>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {step === "confirmation" ? (
             <div className="text-center animate-in fade-in zoom-in duration-300">

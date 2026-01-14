@@ -155,7 +155,7 @@ export function ConcursContent() {
                                 Vreau să particip
                             </Button>
                         </Link>
-                        <Link href="#regulament">
+                        <Link href="/concurs/regulament">
                             <Button
                                 variant="outline"
                                 size="lg"
@@ -450,11 +450,13 @@ export function ConcursContent() {
                                     ))}
                                 </ul>
 
-                                <Button
-                                    className="w-full mt-6 bg-gray-900 text-white hover:bg-orange-600 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    Vezi Materiale
-                                </Button>
+                                <Link href={idx === 0 ? "/concurs/materialeIX" : idx === 1 ? "/concurs/materialeX" : idx === 2 ? "/concurs/materialeXI" : "/concurs/materialeXII"}>
+                                    <Button
+                                        className="w-full mt-6 bg-gray-900 text-white hover:bg-orange-600 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Vezi Materiale
+                                    </Button>
+                                </Link>
                             </div>
                         ))}
                     </div>
