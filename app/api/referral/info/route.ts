@@ -3,10 +3,19 @@ import { createClient } from "@supabase/supabase-js"
 
 
 export async function GET(request: NextRequest) {
+  // Validate required environment variables
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[referral/info] Missing required environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
+    return NextResponse.json(
+      { valid: false, error: "Server configuration error" },
+      { status: 500 }
+    )
+  }
+
   // Initialize Supabase client with service role for admin operations
   const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
   try {

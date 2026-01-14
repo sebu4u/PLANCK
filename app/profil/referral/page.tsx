@@ -33,6 +33,7 @@ export default function ReferralPage() {
     const [loading, setLoading] = useState(true)
     const [copied, setCopied] = useState(false)
     const [mounted, setMounted] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     // Generate stable star positions only on client
     const stars = useMemo(() => {
@@ -73,11 +74,13 @@ export default function ReferralPage() {
         const fetchStats = async () => {
             if (!user) return
 
+            setError(null)
             try {
                 const { data: session } = await supabase.auth.getSession()
                 const token = session?.session?.access_token
 
                 if (!token) {
+                    setError("Nu s-a putut obține sesiunea. Te rugăm să te autentifici din nou.")
                     setLoading(false)
                     return
                 }
@@ -91,9 +94,14 @@ export default function ReferralPage() {
                 if (response.ok) {
                     const data = await response.json()
                     setStats(data)
+                } else {
+                    const errorData = await response.json().catch(() => ({}))
+                    console.error("API error:", response.status, errorData)
+                    setError("Nu s-a putut genera linkul de referral. Te rugăm să încerci din nou.")
                 }
-            } catch (error) {
-                console.error("Error fetching referral stats:", error)
+            } catch (err) {
+                console.error("Error fetching referral stats:", err)
+                setError("A apărut o eroare. Te rugăm să încerci din nou.")
             } finally {
                 setLoading(false)
             }
@@ -239,8 +247,10 @@ export default function ReferralPage() {
                         Linkul tău unic
                     </h3>
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="flex-1 bg-black/20 rounded-xl px-4 py-3 border border-white/5 font-mono text-sm text-gray-300 overflow-hidden flex items-center">
-                            <span className="truncate w-full">{referralLink || "Se generează linkul..."}</span>
+                        <div className={`flex-1 bg-black/20 rounded-xl px-4 py-3 border ${error ? 'border-red-500/30' : 'border-white/5'} font-mono text-sm overflow-hidden flex items-center`}>
+                            <span className={`truncate w-full ${error ? 'text-red-400' : 'text-gray-300'}`}>
+                                {error || referralLink || "Se generează linkul..."}
+                            </span>
                         </div>
                         <div className="flex gap-2">
                             <Button
