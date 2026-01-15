@@ -30,16 +30,16 @@ export function ConcursNavbar() {
                 {/* Navigation Links */}
                 <div className="flex items-center gap-1 sm:gap-2">
                     <Link
-                        href="#participa"
+                        href="/concurs/inscriere"
                         className="text-gray-700 hover:text-gray-900 px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium transition-colors rounded-full hover:bg-gray-100 leading-none flex items-center"
                     >
                         Participă
                     </Link>
                     <Link
-                        href="#subiecte"
+                        href="/cursuri"
                         className="text-gray-700 hover:text-gray-900 px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium transition-colors rounded-full hover:bg-gray-100 leading-none flex items-center"
                     >
-                        Subiecte
+                        Cursuri
                     </Link>
                 </div>
 
