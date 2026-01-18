@@ -4,7 +4,7 @@ import { useState, lazy, Suspense, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, XCircle, HelpCircle } from "lucide-react"
+import { CheckCircle2, XCircle, HelpCircle, Star } from "lucide-react"
 import 'katex/dist/katex.min.css'
 
 // Lazy load KaTeX components (reused logic from problem-card.tsx for consistency)
@@ -62,15 +62,20 @@ interface TrainingQuestion {
 
 interface TrainingQuestionCardProps {
     question: TrainingQuestion
+    showAiSuggestion?: boolean
+    onAnswerChecked?: (questionId: string, isCorrect: boolean) => void
+    onShowAiClick?: () => void
 }
 
-export function TrainingQuestionCard({ question }: TrainingQuestionCardProps) {
+export function TrainingQuestionCard({ question, showAiSuggestion = false, onAnswerChecked, onShowAiClick }: TrainingQuestionCardProps) {
     const [selectedOption, setSelectedOption] = useState<number | null>(null)
     const [isChecked, setIsChecked] = useState(false)
 
     const handleCheck = () => {
         if (selectedOption !== null) {
             setIsChecked(true)
+            const isCorrect = selectedOption === question.correct_option
+            onAnswerChecked?.(question.id, isCorrect)
         }
     }
 
@@ -92,8 +97,11 @@ export function TrainingQuestionCard({ question }: TrainingQuestionCardProps) {
         return "border-gray-100 bg-gray-50 text-gray-400 opacity-50" // Other options when checked
     }
 
+    const shouldShowAiCard = showAiSuggestion && isChecked && selectedOption !== question.correct_option
+
     return (
-        <Card className="relative overflow-hidden border border-gray-200 bg-white p-5 sm:p-6 rounded-2xl shadow-lg transition-all duration-300 hover:border-gray-300 hover:shadow-xl">
+        <div className={cn("space-y-0", shouldShowAiCard && "shadow-lg rounded-2xl")}>
+        <Card className={cn("relative overflow-hidden border border-gray-200 bg-white p-5 sm:p-6 rounded-2xl transition-all duration-300 hover:border-gray-300", shouldShowAiCard ? "rounded-b-none shadow-none" : "shadow-lg hover:shadow-xl")}>
             {/* Problem Number Badge */}
             <div className="absolute top-0 left-0 bg-gradient-to-br from-green-500 to-green-600 px-3 py-1.5 rounded-br-xl text-white font-bold text-sm shadow-md z-10">
                 #{question.problem_number}
@@ -192,6 +200,32 @@ export function TrainingQuestionCard({ question }: TrainingQuestionCardProps) {
                     </div>
                 )}
             </div>
+
         </Card>
+            {/* AI Suggestion Card - appears below when answer is wrong */}
+            {shouldShowAiCard && (
+                <Card className="border-t-0 border border-gray-200 bg-white p-4 sm:p-5 rounded-t-none rounded-b-2xl shadow-lg animate-in fade-in slide-in-from-top-2 relative z-10" style={{ boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 -2px 10px -5px rgba(0, 0, 0, 0.05), -8px 0 20px -5px rgba(0, 0, 0, 0.1), 8px 0 20px -5px rgba(0, 0, 0, 0.1)' }}>
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="hidden sm:flex shrink-0 w-10 h-10 rounded-full bg-gray-800 items-center justify-center shadow-sm">
+                                <Star className="w-5 h-5 text-white fill-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm sm:text-base text-gray-900 font-medium leading-relaxed">
+                                    <span className="sm:hidden">Vezi soluția cu AI</span>
+                                    <span className="hidden sm:inline">Poți vedea cum se rezolvă această problemă cu modul AI pentru testele de antrenament.</span>
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            onClick={onShowAiClick}
+                            className="shrink-0 rounded-full px-6 py-2 font-bold text-sm bg-gray-900 hover:bg-gray-700 text-white shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
+                        >
+                            Arata-mi
+                        </Button>
+                    </div>
+                </Card>
+            )}
+        </div>
     )
 }

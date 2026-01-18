@@ -87,16 +87,6 @@ export default function PlanckCodePage() {
                   Începe gratuit
                 </Link>
               </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="bg-transparent border-white text-white hover:bg-white hover:text-black transition-all duration-300 font-vt323 text-lg sm:text-xl px-8 py-6 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-              >
-                <Link href="/planckcode/learn">
-                  Vezi cursurile de C++
-                </Link>
-              </Button>
             </div>
           </div>
         </section>

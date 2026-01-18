@@ -5,9 +5,10 @@ import { supabase } from "@/lib/supabaseClient"
 import { TrainingQuestionCard } from "@/components/antrenament/training-question-card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { BookOpen, Loader2, Rocket, ChevronDown, Check } from "lucide-react"
+import { BookOpen, Loader2, Rocket, ChevronDown, Check, X, Sparkles } from "lucide-react"
 import { ConcursNavbar } from "@/components/concurs/concurs-navbar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card } from "@/components/ui/card"
 
 interface TrainingQuestion {
     id: string
@@ -33,6 +34,8 @@ export function TrainingPageContent() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [scrollProgress, setScrollProgress] = useState(0)
+    const [questionWithAiSuggestion, setQuestionWithAiSuggestion] = useState<string | null>(null)
+    const [showPlusModal, setShowPlusModal] = useState(false)
 
     useEffect(() => {
         const handleScroll = () => {
@@ -86,6 +89,33 @@ export function TrainingPageContent() {
 
         fetchQuestions()
     }, [selectedGrade])
+
+    // Block scroll when modal is open
+    useEffect(() => {
+        if (showPlusModal) {
+            // Save current scroll position
+            const scrollY = window.scrollY
+            document.body.style.position = 'fixed'
+            document.body.style.top = `-${scrollY}px`
+            document.body.style.width = '100%'
+        } else {
+            // Restore scroll position
+            const scrollY = document.body.style.top
+            document.body.style.position = ''
+            document.body.style.top = ''
+            document.body.style.width = ''
+            if (scrollY) {
+                window.scrollTo(0, parseInt(scrollY || '0') * -1)
+            }
+        }
+
+        // Cleanup function
+        return () => {
+            document.body.style.position = ''
+            document.body.style.top = ''
+            document.body.style.width = ''
+        }
+    }, [showPlusModal])
 
     return (
         <div className="min-h-screen bg-white text-gray-900 pb-20">
@@ -174,7 +204,23 @@ export function TrainingPageContent() {
                 ) : (
                     <div className="space-y-8">
                         {questions.map((q) => (
-                            <TrainingQuestionCard key={q.id} question={q} />
+                            <TrainingQuestionCard 
+                                key={q.id} 
+                                question={q} 
+                                showAiSuggestion={questionWithAiSuggestion === q.id}
+                                onAnswerChecked={(questionId, isCorrect) => {
+                                    if (isCorrect) {
+                                        // If answer is correct, hide AI suggestion for this question
+                                        if (questionWithAiSuggestion === questionId) {
+                                            setQuestionWithAiSuggestion(null)
+                                        }
+                                    } else {
+                                        // If answer is wrong, show AI suggestion for this question
+                                        setQuestionWithAiSuggestion(questionId)
+                                    }
+                                }}
+                                onShowAiClick={() => setShowPlusModal(true)}
+                            />
                         ))}
                     </div>
                 )}
@@ -223,6 +269,50 @@ export function TrainingPageContent() {
                     </div>
                 </div>
             </footer>
+
+            {/* Plus+ Modal - Full Screen */}
+            {showPlusModal && (
+                <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                    <Card className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200">
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setShowPlusModal(false)}
+                            className="absolute right-4 top-4 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                            aria-label="Închide"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        {/* Content */}
+                        <div className="flex flex-col items-center text-center space-y-6 pt-4">
+                            {/* Icon */}
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                                <Sparkles className="w-10 h-10 text-white" />
+                            </div>
+
+                            {/* Title */}
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                                Accesează modul AI pentru testele de antrenament
+                            </h2>
+
+                            {/* Description */}
+                            <p className="text-base sm:text-lg text-gray-600 max-w-lg leading-relaxed">
+                                Pentru a accesa modul AI pentru testele de antrenament, trebuie să fii pe planul <span className="font-bold text-blue-600">Plus+</span>.
+                            </p>
+
+                            {/* CTA Button */}
+                            <Link href="/pricing" className="w-full sm:w-auto">
+                                <Button
+                                    size="lg"
+                                    className="w-full sm:w-auto rounded-full px-8 py-6 text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                                >
+                                    Vezi planurile
+                                </Button>
+                            </Link>
+                        </div>
+                    </Card>
+                </div>
+            )}
         </div>
     )
 }
