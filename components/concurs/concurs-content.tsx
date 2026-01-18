@@ -40,7 +40,7 @@ function GradeAccordion({
                         </div>
                     ))}
                     <Link
-                        href={`#antrenament-${grade.toLowerCase().replace(/\s+/g, '-')}`}
+                        href={`/antrenament?grade=${grade.includes("IX") ? 9 : grade.includes("X") && !grade.includes("XI") ? 10 : grade.includes("XI") ? 11 : 12}`}
                         className="inline-flex items-center gap-2 mt-4 text-orange-600 hover:text-orange-700 font-medium transition-colors group"
                     >
                         <span>👉 Acces la subiecte de antrenament pentru {grade.toLowerCase()}</span>
