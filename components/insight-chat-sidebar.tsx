@@ -128,19 +128,51 @@ export default function InsightChatSidebar({
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Handle mobile keyboard resizing
+  // Handle mobile keyboard resizing and prevent body scroll
   const [viewportHeight, setViewportHeight] = useState<string | undefined>(undefined)
+  const [viewportOffset, setViewportOffset] = useState<number>(0)
+
+  // Block body scroll when chat is open on mobile
+  useEffect(() => {
+    if (!isOpen) return
+
+    if (isMobile) {
+      // Save current scroll position and lock body scroll
+      const scrollY = window.scrollY
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.left = '0'
+      document.body.style.right = '0'
+      document.body.style.overflow = 'hidden'
+
+      return () => {
+        // Restore scroll position when chat closes
+        document.body.style.position = ''
+        document.body.style.top = ''
+        document.body.style.left = ''
+        document.body.style.right = ''
+        document.body.style.overflow = ''
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isOpen, isMobile])
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobile || !isOpen) {
       setViewportHeight(undefined)
+      setViewportOffset(0)
       return
     }
 
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
-        // We set the height to the visual viewport height to allow the input to move up
-        setViewportHeight(`${window.visualViewport.height}px`)
+        // Set height to visual viewport height 
+        const height = window.visualViewport.height
+        setViewportHeight(`${height}px`)
+
+        // Calculate offset from top (when keyboard pushes content up)
+        const offset = window.visualViewport.offsetTop
+        setViewportOffset(offset)
       }
     }
 
@@ -157,7 +189,7 @@ export default function InsightChatSidebar({
         window.visualViewport.removeEventListener('scroll', handleVisualViewportResize)
       }
     }
-  }, [isMobile])
+  }, [isMobile, isOpen])
 
 
   const markdownComponents = useMemo(
@@ -791,17 +823,24 @@ export default function InsightChatSidebar({
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-[499] lg:hidden"
+          className="fixed inset-0 bg-black/50 z-[499] lg:hidden touch-none"
           onClick={onClose}
+          onTouchMove={(e) => e.preventDefault()}
         />
       )}
 
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`fixed top-0 lg:top-[100px] right-0 h-dvh lg:h-[calc(100dvh-100px)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 lg:top-[100px] right-0 h-dvh lg:h-[calc(100dvh-100px)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out overscroll-contain ${isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
-        style={{ maxWidth: '90vw', height: viewportHeight }}
+        style={{
+          maxWidth: '90vw',
+          ...(isMobile && viewportHeight ? {
+            height: viewportHeight,
+            top: `${viewportOffset}px`,
+          } : {})
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
@@ -818,7 +857,7 @@ export default function InsightChatSidebar({
         <div
           ref={messagesContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 py-6"
+          className="flex-1 overflow-y-auto px-4 py-6 overscroll-contain"
         >
           {!user ? (
             <div className="flex flex-col items-center justify-center h-full">
