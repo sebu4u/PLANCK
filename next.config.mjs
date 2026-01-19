@@ -61,6 +61,15 @@ const nextConfig = {
   experimental: {
     webpackBuildWorker: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/planckcode/learn',
+        destination: '/planckcode',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

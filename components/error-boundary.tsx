@@ -45,17 +45,6 @@ export class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     })
 
-    // Add noindex meta tag to prevent indexing of error pages
-    if (typeof document !== 'undefined') {
-      let metaRobots = document.querySelector('meta[name="robots"]')
-      if (!metaRobots) {
-        metaRobots = document.createElement('meta')
-        metaRobots.setAttribute('name', 'robots')
-        document.head.appendChild(metaRobots)
-      }
-      metaRobots.setAttribute('content', 'noindex, nofollow')
-    }
-
     // Here you could also log to an error reporting service like Sentry
     // Example: Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } })
   }
