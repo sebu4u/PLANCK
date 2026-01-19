@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, Maximize2, X } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, Maximize2, X, Rocket, Star } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -17,6 +17,7 @@ import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
 import { BadgeNotification } from "@/components/badge-notification"
 import ProblemOrbButton from "@/components/problem-orb-button"
+import Image from "next/image"
 
 // Lazy load heavy sidebar components for faster initial render
 const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
@@ -621,37 +622,68 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       {/* Upgrade Modal for Mobile */}
       {showMobileUpgradeModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-sm rounded-[32px] border border-white/10 bg-[#161616] p-8 text-center shadow-2xl relative animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+          <div className="w-full max-w-sm rounded-[32px] border border-gray-200 bg-white p-6 text-center shadow-2xl relative animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
             <button
               onClick={() => setShowMobileUpgradeModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="mb-6 mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-white/10">
-              <span className="text-3xl">🚀</span>
+            {/* PLANCK Logo */}
+            <div className="mb-6 flex items-center justify-center gap-2">
+              <Rocket className="w-6 h-6 text-gray-900" />
+              <span className="text-xl font-bold text-gray-900 title-font">PLANCK</span>
             </div>
 
-            <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 mb-3">
-              Treci la nivelul următor
+            {/* Main Text */}
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+              Fără limite cu Planck Plus. Încearcă 7 zile GRATUIT
             </h3>
 
-            <p className="text-white/60 text-base leading-relaxed mb-8">
-              Ai atins limita de mesaje gratuite. Fă upgrade la Plus pentru conversații nelimitate cu Insight.
-            </p>
+            {/* Review Section */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-xl text-left">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                    <Image
+                      src="/alex-dinu.jpg"
+                      alt="Alex Dinu"
+                      width={40}
+                      height={40}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to placeholder if image doesn't exist
+                        const target = e.target as HTMLImageElement;
+                        target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect fill='%23e5e7eb' width='40' height='40'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%239ca3af'%3EAD%3C/text%3E%3C/svg%3E";
+                      }}
+                    />
+                  </div>
+                  <div className="text-gray-900 font-medium text-sm">Alex Dinu</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+              </div>
+              <p className="text-gray-700 text-sm leading-relaxed italic">
+                "Am trecut de la nota 7 la 9,5 la fizică în 2 luni cu Planck Plus"
+              </p>
+            </div>
 
-            <div className="space-y-3">
+            {/* CTA Button */}
+            <div className="space-y-2">
               <Link
                 href="/pricing"
-                className="block w-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                className="block w-full rounded-full bg-[#111827] px-6 py-4 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                Upgrade la Plus
+                Vreau sa incerc
               </Link>
 
               <button
                 onClick={() => setShowMobileUpgradeModal(false)}
-                className="block w-full rounded-full px-6 py-4 text-sm font-semibold text-white/40 hover:text-white transition-colors"
+                className="block w-full rounded-full px-6 py-3 text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors"
               >
                 Mai târziu
               </button>
