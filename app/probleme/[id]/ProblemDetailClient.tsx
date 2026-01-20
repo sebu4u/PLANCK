@@ -6,12 +6,13 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, Maximize2, X, Rocket, Star } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, Maximize2, X, Rocket, Star, Lock } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
 import React from 'react';
 import { useAuth } from "@/components/auth-provider"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
@@ -98,6 +99,61 @@ function MissingVideoCard() {
   )
 }
 
+function LockedVideoCard({ onUpgradeClick }: { onUpgradeClick: () => void }) {
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-white/5">
+      <img
+        src="/video-locked-placeholder.jpg"
+        alt="Rezolvare video blocată"
+        className="h-full w-full object-cover blur-md scale-[1.03]"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/20" />
+
+      {/* Mobile: only lock icon + CTA (more space) */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 text-center sm:hidden">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-sm">
+          <Lock className="h-5 w-5 text-white" />
+        </div>
+        <Link
+          href="/pricing"
+          className="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-white/90"
+          aria-label="Încearcă Planck Plus+ gratuit 7 zile"
+        >
+          Încearcă Plus+ (7 zile gratuit)
+        </Link>
+      </div>
+
+      {/* Desktop: keep full copy + secondary CTA */}
+      <div className="absolute inset-0 hidden sm:flex flex-col items-center justify-center px-6 text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-sm">
+          <Lock className="h-6 w-6 text-white" />
+        </div>
+        <p className="text-xl sm:text-2xl font-semibold text-white">
+          Ai nevoie de Planck Plus+ pentru rezolvarea video
+        </p>
+        <p className="mt-2 text-sm sm:text-base text-white/70 max-w-md">
+          Deblochează videoclipul pentru această problemă și toate rezolvările video.
+        </p>
+        <div className="mt-5 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Link
+            href="/pricing"
+            className="inline-flex w-full sm:w-auto items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-white/90"
+          >
+            Încearcă Plus+ (7 zile gratuit)
+          </Link>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto rounded-full border-white/25 bg-transparent text-white hover:bg-white/10"
+            onClick={onUpgradeClick}
+          >
+            Vezi detalii
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Loading skeleton for problem image
 function ImageSkeleton() {
   return (
@@ -128,6 +184,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [mobileBoardVisible, setMobileBoardVisible] = useState(false)
   const [desktopBoardExpanded, setDesktopBoardExpanded] = useState(false)
   const { user } = useAuth();
+  const { isFree } = useSubscriptionPlan()
   const problemIcon = getProblemIcon(problem.id);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
 
@@ -146,6 +203,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
   }, [problem.youtube_url])
+
+  const isVideoLockedForUser = hasVideo && isFree
 
   const renderInlineMath = (value?: string | null) => {
     if (!value) return null
@@ -375,7 +434,13 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                     )}
                     <Tabs
                       value={activeTab}
-                      onValueChange={(value) => setActiveTab(value as 'statement' | 'video')}
+                      onValueChange={(value) => {
+                        const nextTab = value as 'statement' | 'video'
+                        setActiveTab(nextTab)
+                        if (nextTab === 'video' && isVideoLockedForUser) {
+                          setShowMobileUpgradeModal(true)
+                        }
+                      }}
                       className="w-full"
                     >
                       <TabsList className="flex w-full gap-1 sm:gap-2 rounded-2xl border border-white/10 bg-white/5 p-1 overflow-hidden">
@@ -420,11 +485,15 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         </div>
                       </TabsContent>
                       <TabsContent value="video" className="mt-6">
-                        <div className="rounded-2xl border border-white/8 bg-black/40 p-6">
+                        <div className="rounded-2xl border border-white/8 bg-black/40 p-3 sm:p-6">
                           {hasVideo ? (
-                            <Suspense fallback={<VideoSkeleton />}>
-                              <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
-                            </Suspense>
+                            isVideoLockedForUser ? (
+                              <LockedVideoCard onUpgradeClick={() => setShowMobileUpgradeModal(true)} />
+                            ) : (
+                              <Suspense fallback={<VideoSkeleton />}>
+                                <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
+                              </Suspense>
+                            )
                           ) : (
                             <MissingVideoCard />
                           )}
@@ -633,7 +702,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       {/* Upgrade Modal for Mobile */}
       {showMobileUpgradeModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-sm rounded-[32px] border border-gray-200 bg-white p-6 text-center shadow-2xl relative animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+          <div className="w-full max-w-sm sm:max-w-md rounded-[32px] border border-gray-200 bg-white p-6 text-center shadow-2xl relative animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
             <button
               onClick={() => setShowMobileUpgradeModal(false)}
               className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -649,7 +718,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
             {/* Main Text */}
             <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Fără limite cu Planck Plus. Încearcă 7 zile GRATUIT
+              Rezolvarea video este disponibilă cu Planck Plus+. Încearcă 7 zile GRATUIT
             </h3>
 
             {/* Review Section */}
