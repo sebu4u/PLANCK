@@ -794,6 +794,7 @@ export default function InsightChatSidebar({
   }, [isStreaming, supabase, user])
 
   const send = () => submitMessage()
+  const isInputDisabled = busy || !user
 
   // Prevent page scroll when hovering over sidebar
   useEffect(() => {
@@ -1058,7 +1059,7 @@ export default function InsightChatSidebar({
                     onKeyPress={handleKeyPress}
                     rows={1}
                     className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] py-2"
-                    disabled={busy}
+                    disabled={isInputDisabled}
                     style={{
                       height: `${textareaHeight}px`,
                       overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
@@ -1079,7 +1080,7 @@ export default function InsightChatSidebar({
                   ) : (
                     <button
                       onClick={send}
-                      disabled={busy || (!input.trim() && !problemContext)}
+                      disabled={isInputDisabled || (!input.trim() && !problemContext)}
                       className="h-10 w-10 rounded hover:bg-gray-700 transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end"
                     >
                       <Send className="w-5 h-5 text-gray-400" />

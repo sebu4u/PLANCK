@@ -388,6 +388,8 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
                   }}
                   totalProblems={problems.length}
                   filteredCount={filteredProblems.length}
+                  showSearch={false}
+                  showChapterHintWhenAllClasses
                 />
               </div>
 

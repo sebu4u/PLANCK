@@ -328,7 +328,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                           {problem.category}
                         </Badge>
                         {hasVideo && (
-                          <Badge className="border border-red-500/40 bg-red-500/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-200">
+                          <Badge className="hidden sm:inline-flex border border-red-500/40 bg-red-500/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-200">
                             🎥 Video
                           </Badge>
                         )}
@@ -343,15 +343,26 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-white">
                       {renderInlineMath(problem.title)}
                     </h1>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-white/70 sm:hidden">
+                      {classLabel && (
+                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/70">
+                          {classLabel}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-1">
+                        <span className="text-base leading-none">{problemIcon}</span>
+                        <span>ID {problem.id}</span>
+                      </span>
+                    </div>
 
                     {problem.description && (
-                      <p className="text-base sm:text-lg leading-relaxed text-white/70">
+                      <p className="hidden sm:block text-base sm:text-lg leading-relaxed text-white/70">
                         {renderInlineMath(problem.description)}
                       </p>
                     )}
 
                     {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="hidden sm:flex flex-wrap gap-2">
                         {problem.tags.map((tag, idx) => (
                           <span
                             key={idx}
@@ -383,7 +394,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                       </TabsList>
                       <TabsContent value="statement" className="mt-6">
                         <div className="rounded-2xl border border-white/8 bg-black/40 p-6">
-                          <ScrollArea className="max-h-[60vh] pr-3">
+                          <ScrollArea className="max-h-[calc(var(--vh)*60)] sm:max-h-[60vh] pr-3">
                             <div className="whitespace-pre-wrap text-base leading-relaxed text-white/85">
                               {renderInlineMath(problem.statement)}
                             </div>

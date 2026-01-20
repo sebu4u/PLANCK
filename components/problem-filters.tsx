@@ -23,6 +23,8 @@ interface ProblemFiltersProps {
   totalProblems: number
   filteredCount: number
   onClosePanel?: () => void
+  showSearch?: boolean
+  showChapterHintWhenAllClasses?: boolean
 }
 
 export interface FilterState {
@@ -236,7 +238,14 @@ const chapterIcons: Record<string, LucideIcon> = {
   "Toate": BookOpen,
 }
 
-export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, onClosePanel }: ProblemFiltersProps) {
+export function ProblemFilters({
+  onFilterChange,
+  totalProblems,
+  filteredCount,
+  onClosePanel,
+  showSearch = true,
+  showChapterHintWhenAllClasses = false,
+}: ProblemFiltersProps) {
   const STORAGE_KEY = "problemFilters"
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -391,19 +400,21 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
       </div>
 
       {/* Search Section */}
-      <div className="py-5 border-b border-white/10">
-        <label className="block text-sm font-medium text-white mb-3">Căutare</label>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-          <Input
-            id="guide-search-input"
-            placeholder="Caută probleme..."
-            value={filters.search}
-            onChange={(e) => updateFilters({ search: e.target.value })}
-            className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-sm text-white placeholder:text-white/40 focus-visible:ring-white/20"
-          />
+      {showSearch && (
+        <div className="py-5 border-b border-white/10">
+          <label className="block text-sm font-medium text-white mb-3">Căutare</label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <Input
+              id="guide-search-input"
+              placeholder="Caută probleme..."
+              value={filters.search}
+              onChange={(e) => updateFilters({ search: e.target.value })}
+              className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-sm text-white placeholder:text-white/40 focus-visible:ring-white/20"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Difficulty Section */}
       <div className="py-5 border-b border-white/10" id="guide-difficulty">
@@ -465,46 +476,52 @@ export function ProblemFilters({ onFilterChange, totalProblems, filteredCount, o
         </div>
       </div>
 
-      {/* Chapter Section - Only shown when a specific class is selected */}
-      {selectedClass !== "Toate" && (
+      {/* Chapter Section */}
+      {(selectedClass !== "Toate" || showChapterHintWhenAllClasses) && (
         <div className="py-5 border-b border-white/10" id="guide-chapter-select">
           <label className="block text-sm font-medium text-white mb-3">Capitol</label>
-          <div className="max-h-[250px] overflow-y-auto space-y-0.5">
-            {(chapterOptions[selectedClass] || ["Toate"]).map((chap) => {
-              const isActive = selectedChapter === chap
-              const ChapterIcon = chapterIcons[chap] || HelpCircle
-              return (
-                <button
-                  key={chap}
-                  onClick={() => {
-                    setSelectedChapter(chap)
-                    updateFilters({ chapter: chap })
-                  }}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 py-1.5 text-left text-sm transition-colors",
-                    isActive ? "text-white" : "text-white/50 hover:text-white/70"
-                  )}
-                >
-                  {/* Checkbox */}
-                  <span
+          {selectedClass === "Toate" ? (
+            <p className="text-sm text-white/60">
+              Selectează o clasă pentru a alege un capitol.
+            </p>
+          ) : (
+            <div className="max-h-[250px] overflow-y-auto space-y-0.5">
+              {(chapterOptions[selectedClass] || ["Toate"]).map((chap) => {
+                const isActive = selectedChapter === chap
+                const ChapterIcon = chapterIcons[chap] || HelpCircle
+                return (
+                  <button
+                    key={chap}
+                    onClick={() => {
+                      setSelectedChapter(chap)
+                      updateFilters({ chapter: chap })
+                    }}
                     className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition",
-                      isActive ? "border-blue-500 bg-blue-500" : "border-white/30"
+                      "flex w-full items-center gap-2.5 py-1.5 text-left text-sm transition-colors",
+                      isActive ? "text-white" : "text-white/50 hover:text-white/70"
                     )}
                   >
-                    {isActive && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                  </span>
-                  {/* Chapter Icon */}
-                  <ChapterIcon className={cn(
-                    "h-4 w-4 shrink-0",
-                    isActive ? "text-white" : "text-white/40"
-                  )} />
-                  {/* Chapter Name */}
-                  <span className="flex-1 leading-snug">{chap}</span>
-                </button>
-              )
-            })}
-          </div>
+                    {/* Checkbox */}
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition",
+                        isActive ? "border-blue-500 bg-blue-500" : "border-white/30"
+                      )}
+                    >
+                      {isActive && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                    </span>
+                    {/* Chapter Icon */}
+                    <ChapterIcon className={cn(
+                      "h-4 w-4 shrink-0",
+                      isActive ? "text-white" : "text-white/40"
+                    )} />
+                    {/* Chapter Name */}
+                    <span className="flex-1 leading-snug">{chap}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
