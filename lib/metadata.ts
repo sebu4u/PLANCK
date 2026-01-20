@@ -57,13 +57,20 @@ export const baseMetadata: Metadata = {
 // Page-specific metadata configurations
 export const pageMetadata: Record<string, Metadata> = {
   "planckcode-ide": {
-    title: "Planck Code Editor - C++ Compiler in Browser",
-    description: "Launch the Planck C++ IDE. Write, compile, and debug code instantly in your browser. Features intelligent autocompletion, real-time error checking, and AI assistance.",
-    keywords: "online c++ compiler, browser ide, coding environment, c++ editor, programming tool",
+    title: "PlanckCode IDE – C++ Compiler Online în Browser",
+    description: "IDE online C++ cu compilator integrat: scrii, compilezi și rulezi C++ direct în browser, cu autocompletare, erori în timp real și asistent AI.",
+    keywords: "C++ compiler, C++ compiler online, compilator C++ online, IDE C++ online, C++ online compiler, editor C++ online, browser IDE, coding environment",
+    alternates: {
+      canonical: '/planckcode/ide',
+    },
     openGraph: {
-      title: "Planck Code Editor",
-      description: "Full-featured C++ IDE in your browser.",
+      title: "PlanckCode IDE – C++ Compiler Online",
+      description: "IDE online C++ cu compilator C++ în browser: scrii, compilezi și rulezi instant, cu feedback și asistent AI.",
       url: 'https://www.planck.academy/planckcode/ide',
+    },
+    twitter: {
+      title: "PlanckCode IDE – C++ Compiler Online în Browser",
+      description: "IDE online C++ cu compilator integrat: scrii, compilezi și rulezi C++ direct în browser, cu autocompletare și asistent AI.",
     },
   },
   home: {
@@ -315,15 +322,15 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   planckcode: {
-    title: "Mediu de Programare pentru Liceu cu AI – Planck Code",
-    description: "Planck Code este un mediu online de programare pentru liceu, cu IDE și online judge integrate, unde un AI Agent generează, corectează și explică codul direct în editor.",
-    keywords: "C++ online IDE, competitive programming, online judge, informatica liceu, olimpiada informatica, bacalaureat informatica, learn C++, coding editor",
+    title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
+    description: "PlanckCode este un IDE online C++ cu C++ compiler în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI pentru liceu și concursuri.",
+    keywords: "C++, C++ compiler, compilator C++ online, IDE C++ online, C++ online compiler, online judge C++, competitive programming, informatica liceu",
     alternates: {
       canonical: '/planckcode',
     },
     openGraph: {
-      title: "Mediu de Programare pentru Liceu cu AI – Planck Code",
-      description: "Planck Code este un mediu online de programare pentru liceu, cu IDE și online judge integrate, unde un AI Agent generează, corectează și explică codul direct în editor.",
+      title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
+      description: "IDE online C++ cu compilator în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI.",
       url: 'https://www.planck.academy/planckcode',
       type: 'website',
       images: [
@@ -336,8 +343,8 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: "Mediu de Programare pentru Liceu cu AI – Planck Code",
-      description: "Planck Code este un mediu online de programare pentru liceu, cu IDE și online judge integrate, unde un AI Agent generează, corectează și explică codul direct în editor.",
+      title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
+      description: "IDE online C++ cu compilator în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI.",
       images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
       card: 'summary_large_image',
     },
