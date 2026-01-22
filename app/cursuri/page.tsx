@@ -16,8 +16,8 @@ import {
 
 export const metadata: Metadata = generateMetadata('physics-lessons')
 
-// Enable SSG with ISR (revalidate every 10 minutes)
-export const revalidate = 600
+// Enable SSG with ISR (revalidate every 6 hours)
+export const revalidate = 21600
 
 export default async function PhysicsLessonsPage() {
   // Obținem datele din Supabase

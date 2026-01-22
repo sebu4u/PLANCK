@@ -11,7 +11,7 @@ import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
 
-export const revalidate = 300
+export const revalidate = 21600
 
 export const metadata: Metadata = generateMetadata('problems')
 

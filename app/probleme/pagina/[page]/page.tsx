@@ -14,7 +14,7 @@ import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
 const PROBLEMS_PER_PAGE = 8
 const PREGENERATED_PAGES = 10
 
-export const revalidate = 300
+export const revalidate = 21600
 
 export async function generateStaticParams() {
   // Pre-generate first 10 pages

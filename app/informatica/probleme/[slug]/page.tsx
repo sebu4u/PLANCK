@@ -11,7 +11,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables")
 }
 
-export const revalidate = 300
+export const revalidate = 21600
 
 interface CodingProblemDetailPageProps {
   params: Promise<{ slug: string }>

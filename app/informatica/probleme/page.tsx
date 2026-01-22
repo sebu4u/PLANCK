@@ -21,7 +21,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const metadata = generateMetadata("coding-problems")
-export const revalidate = 300
+export const revalidate = 21600
 
 const PAGE_SIZE = 12
 const SUPPORTED_DIFFICULTIES: Record<string, string> = {

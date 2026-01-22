@@ -11,8 +11,8 @@ import {
 
 export const metadata: Metadata = generateMetadata('bac-simulations')
 
-// Enable SSG with ISR (revalidate every 10 minutes)
-export const revalidate = 600
+// Enable SSG with ISR (revalidate every 6 hours)
+export const revalidate = 21600
 
 export default async function BacSimulationsPage() {
     // Obținem datele din Supabase

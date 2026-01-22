@@ -31,8 +31,8 @@ const difficultyColors = {
   Avansat: "border-red-500 text-red-600 bg-red-50",
 }
 
-// Enable ISR with revalidation every hour
-export const revalidate = 3600
+// Enable ISR with revalidation every 6 hours
+export const revalidate = 21600
 export const dynamicParams = true
 
 // Pre-generate popular problem pages at build time
