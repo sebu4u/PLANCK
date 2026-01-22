@@ -17,27 +17,13 @@ export function MobileViewportFix() {
 
     // Prevent the address bar from hiding by preventing overscroll
     let lastTouchY = 0
-    let isScrolling = false
-
-    const preventAddressBarHide = (e: TouchEvent) => {
-      const currentTouchY = e.touches[0].clientY
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-      const scrollHeight = document.documentElement.scrollHeight
-      const clientHeight = document.documentElement.clientHeight
-
-      // If at the top and trying to scroll up (negative scroll), prevent it
-      if (scrollTop === 0 && currentTouchY > lastTouchY) {
-        e.preventDefault()
-        return false
+    const getScrollMetrics = () => {
+      const scrollElement = document.scrollingElement || document.documentElement
+      return {
+        scrollTop: scrollElement.scrollTop,
+        scrollHeight: scrollElement.scrollHeight,
+        clientHeight: scrollElement.clientHeight,
       }
-
-      // If at the bottom and trying to scroll down, prevent overscroll
-      if (scrollTop + clientHeight >= scrollHeight && currentTouchY < lastTouchY) {
-        e.preventDefault()
-        return false
-      }
-
-      lastTouchY = currentTouchY
     }
 
     // Prevent pull-to-refresh and overscroll
@@ -49,16 +35,14 @@ export function MobileViewportFix() {
       
       // If not in a scrollable container, prevent overscroll on body
       if (!scrollableParent) {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-        const scrollHeight = document.documentElement.scrollHeight
-        const clientHeight = document.documentElement.clientHeight
+        const { scrollTop, scrollHeight, clientHeight } = getScrollMetrics()
 
         // Prevent overscroll at top (pull-to-refresh)
-        if (scrollTop === 0 && e.touches[0].clientY > lastTouchY) {
+        if (e.cancelable && scrollTop === 0 && e.touches[0].clientY > lastTouchY) {
           e.preventDefault()
         }
         // Prevent overscroll at bottom
-        else if (scrollTop + clientHeight >= scrollHeight && e.touches[0].clientY < lastTouchY) {
+        else if (e.cancelable && scrollTop + clientHeight >= scrollHeight && e.touches[0].clientY < lastTouchY) {
           e.preventDefault()
         }
       }
@@ -67,15 +51,12 @@ export function MobileViewportFix() {
     // Handle touch start
     const handleTouchStart = (e: TouchEvent) => {
       lastTouchY = e.touches[0].clientY
-      isScrolling = false
     }
 
     // Handle touch move - prevent address bar interaction
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isScrolling) {
-        isScrolling = true
-      }
       preventOverscroll(e)
+      lastTouchY = e.touches[0].clientY
     }
 
     // Prevent default touch behaviors that cause address bar to hide
