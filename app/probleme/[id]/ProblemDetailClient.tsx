@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, Maximize2, X, Rocket, Star, Lock } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, Maximize2, X, Lock } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -18,18 +18,17 @@ import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
 import { BadgeNotification } from "@/components/badge-notification"
 import ProblemOrbButton from "@/components/problem-orb-button"
-import Image from "next/image"
 
 // Lazy load heavy sidebar components for faster initial render
 const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
 const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { ProblemBoard } from "@/components/problems/problem-board"
 import { cn } from "@/lib/utils"
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import type { TLStore } from "@tldraw/tldraw"
+import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -459,29 +458,27 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                       </TabsList>
                       <TabsContent value="statement" className="mt-6">
                         <div className="rounded-2xl border border-white/8 bg-black/40 p-6">
-                          <ScrollArea className="max-h-[calc(var(--vh)*60)] sm:max-h-[60vh] pr-3">
-                            <div className="whitespace-pre-wrap text-base leading-relaxed text-white/85">
-                              {renderInlineMath(problem.statement)}
+                          <div className="whitespace-pre-wrap text-base leading-relaxed text-white/85">
+                            {renderInlineMath(problem.statement)}
+                          </div>
+                          {problem.image_url && (
+                            <div className="mt-6 flex justify-center">
+                              {!imageLoaded && <ImageSkeleton />}
+                              <img
+                                src={problem.image_url.replace(/^@/, '')}
+                                alt="Ilustrație problemă"
+                                className={cn(
+                                  "w-full h-auto max-w-full rounded-xl border border-white/10 object-contain shadow-xl",
+                                  !imageLoaded && 'hidden'
+                                )}
+                                onLoad={() => setImageLoaded(true)}
+                                onError={(e) => {
+                                  console.error('Image failed to load:', problem.image_url, e)
+                                  setImageLoaded(true)
+                                }}
+                              />
                             </div>
-                            {problem.image_url && (
-                              <div className="mt-6 flex justify-center">
-                                {!imageLoaded && <ImageSkeleton />}
-                                <img
-                                  src={problem.image_url.replace(/^@/, '')}
-                                  alt="Ilustrație problemă"
-                                  className={cn(
-                                    "max-h-[420px] w-auto rounded-xl border border-white/10 object-contain shadow-xl",
-                                    !imageLoaded && 'hidden'
-                                  )}
-                                  onLoad={() => setImageLoaded(true)}
-                                  onError={(e) => {
-                                    console.error('Image failed to load:', problem.image_url, e)
-                                    setImageLoaded(true)
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </ScrollArea>
+                          )}
                         </div>
                       </TabsContent>
                       <TabsContent value="video" className="mt-6">
@@ -702,73 +699,10 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       {/* Upgrade Modal for Mobile */}
       {showMobileUpgradeModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-sm sm:max-w-md rounded-[32px] border border-gray-200 bg-white p-6 text-center shadow-2xl relative animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
-            <button
-              onClick={() => setShowMobileUpgradeModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* PLANCK Logo */}
-            <div className="mb-6 flex items-center justify-center gap-2">
-              <Rocket className="w-6 h-6 text-gray-900" />
-              <span className="text-xl font-bold text-gray-900 title-font">PLANCK</span>
-            </div>
-
-            {/* Main Text */}
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Rezolvarea video este disponibilă cu Planck Plus+. Încearcă 7 zile GRATUIT
-            </h3>
-
-            {/* Review Section */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl text-left">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                    <Image
-                      src="/alex-dinu.jpg"
-                      alt="Alex Dinu"
-                      width={40}
-                      height={40}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        // Fallback to placeholder if image doesn't exist
-                        const target = e.target as HTMLImageElement;
-                        target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect fill='%23e5e7eb' width='40' height='40'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%239ca3af'%3EAD%3C/text%3E%3C/svg%3E";
-                      }}
-                    />
-                  </div>
-                  <div className="text-gray-900 font-medium text-sm">Alex Dinu</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-              </div>
-              <p className="text-gray-700 text-sm leading-relaxed italic">
-                "Am trecut de la nota 7 la 9,5 la fizică în 2 luni cu Planck Plus"
-              </p>
-            </div>
-
-            {/* CTA Button */}
-            <div className="space-y-2">
-              <Link
-                href="/pricing"
-                className="block w-full rounded-full bg-[#111827] px-6 py-4 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Vreau sa incerc
-              </Link>
-
-              <button
-                onClick={() => setShowMobileUpgradeModal(false)}
-                className="block w-full rounded-full px-6 py-3 text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Mai târziu
-              </button>
-            </div>
-          </div>
+          <PlanckPlusTrialModal
+            title="Rezolvarea video este disponibilă cu Planck Plus+. Încearcă 7 zile GRATUIT"
+            onClose={() => setShowMobileUpgradeModal(false)}
+          />
         </div>
       )}
     </div>

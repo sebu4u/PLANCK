@@ -115,12 +115,12 @@ export function TrainingQuestionCard({ question, showAiSuggestion = false, onAns
 
                 {/* Optional Image */}
                 {question.image_url && (
-                    <div className="mb-4 rounded-xl overflow-hidden border border-gray-100">
+                    <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={question.image_url}
                             alt={`Imagine problema #${question.problem_number}`}
-                            className="w-full h-auto max-h-[300px] object-contain bg-gray-50"
+                            className="w-full h-auto max-w-full object-contain"
                         />
                     </div>
                 )}
