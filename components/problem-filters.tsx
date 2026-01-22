@@ -316,16 +316,6 @@ export function ProblemFilters({
     filters.chapter !== "Toate" ? 1 : 0,
   ].reduce((a, b) => a + b, 0)
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      if (document.body.style.overflow === "hidden") {
-        document.body.style.overflow = "auto";
-      }
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
-    return () => observer.disconnect();
-  }, []);
-
   // Restore saved filters on mount (from this session only)
   useEffect(() => {
     try {

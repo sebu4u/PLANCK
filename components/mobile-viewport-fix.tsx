@@ -5,6 +5,9 @@ import { useEffect } from 'react'
 /**
  * Component to fix mobile Chrome address bar scroll issue
  * Prevents the address bar from hiding/showing on scroll which causes layout inconsistencies
+ * 
+ * NOTE: On Android Chrome, we disable the touchmove preventDefault logic because it can
+ * cause scroll to be permanently blocked. We rely on CSS overscroll-behavior instead.
  */
 export function MobileViewportFix() {
   useEffect(() => {
@@ -15,8 +18,29 @@ export function MobileViewportFix() {
     
     if (!isMobile) return
 
-    // Prevent the address bar from hiding by preventing overscroll
+    // Detect Android Chrome - we skip touchmove preventDefault on this browser
+    // because it can cause scroll to be permanently blocked
+    const isAndroidChrome = /Android/i.test(navigator.userAgent) && /Chrome/i.test(navigator.userAgent)
+    
+    // On Android Chrome, we only rely on CSS overscroll-behavior (in globals.css)
+    // This prevents the scroll blocking bug while still preventing pull-to-refresh via CSS
+    if (isAndroidChrome) {
+      // Only add a passive scroll listener to prevent negative scroll positions
+      const handleScroll = () => {
+        if (window.scrollY < 0) {
+          window.scrollTo(0, 0)
+        }
+      }
+      window.addEventListener('scroll', handleScroll, { passive: true })
+      
+      return () => {
+        window.removeEventListener('scroll', handleScroll)
+      }
+    }
+
+    // For iOS and other mobile browsers, use the full overscroll prevention logic
     let lastTouchY = 0
+    
     const getScrollMetrics = () => {
       const scrollElement = document.scrollingElement || document.documentElement
       return {
@@ -26,25 +50,27 @@ export function MobileViewportFix() {
       }
     }
 
-    // Prevent pull-to-refresh and overscroll
+    // Prevent pull-to-refresh and overscroll (iOS only)
     const preventOverscroll = (e: TouchEvent) => {
       const target = e.target as HTMLElement
       
       // Check if the target is inside a scrollable container
       const scrollableParent = target.closest('[data-scrollable], .overflow-y-auto, .overflow-auto, [style*="overflow"]')
       
-      // If not in a scrollable container, prevent overscroll on body
-      if (!scrollableParent) {
-        const { scrollTop, scrollHeight, clientHeight } = getScrollMetrics()
+      // If inside a scrollable container, let it handle its own scroll
+      if (scrollableParent) {
+        return
+      }
+      
+      const { scrollTop, scrollHeight, clientHeight } = getScrollMetrics()
 
-        // Prevent overscroll at top (pull-to-refresh)
-        if (e.cancelable && scrollTop === 0 && e.touches[0].clientY > lastTouchY) {
-          e.preventDefault()
-        }
-        // Prevent overscroll at bottom
-        else if (e.cancelable && scrollTop + clientHeight >= scrollHeight && e.touches[0].clientY < lastTouchY) {
-          e.preventDefault()
-        }
+      // Prevent overscroll at top (pull-to-refresh)
+      if (e.cancelable && scrollTop <= 0 && e.touches[0].clientY > lastTouchY) {
+        e.preventDefault()
+      }
+      // Prevent overscroll at bottom
+      else if (e.cancelable && scrollTop + clientHeight >= scrollHeight - 1 && e.touches[0].clientY < lastTouchY) {
+        e.preventDefault()
       }
     }
 
@@ -64,16 +90,10 @@ export function MobileViewportFix() {
     document.addEventListener('touchmove', handleTouchMove, { passive: false })
     
     // Prevent scroll events that would trigger address bar hide
-    let lastScrollY = window.scrollY
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      
-      // If scroll position goes negative, reset it
-      if (currentScrollY < 0) {
+      if (window.scrollY < 0) {
         window.scrollTo(0, 0)
       }
-      
-      lastScrollY = currentScrollY
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -88,4 +108,3 @@ export function MobileViewportFix() {
 
   return null
 }
-
