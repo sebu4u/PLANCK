@@ -11,7 +11,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables")
 }
 
-export const revalidate = 21600
+// High-cardinality route: keep ISR, but revalidate rarely to reduce Vercel ISR writes.
+export const revalidate = 604800 // 7 days
 
 interface CodingProblemDetailPageProps {
   params: Promise<{ slug: string }>

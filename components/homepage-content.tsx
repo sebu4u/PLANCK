@@ -49,7 +49,7 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
+    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
       {/* Hero Section cu temă spațială */}
       <HomePageHeroRedesign isMobile={isMobile} />
 

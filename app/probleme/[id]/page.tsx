@@ -31,8 +31,8 @@ const difficultyColors = {
   Avansat: "border-red-500 text-red-600 bg-red-50",
 }
 
-// Enable ISR with revalidation every 6 hours
-export const revalidate = 21600
+// High-cardinality route: keep ISR, but revalidate rarely to reduce Vercel ISR writes.
+export const revalidate = 604800 // 7 days
 export const dynamicParams = true
 
 // Pre-generate popular problem pages at build time

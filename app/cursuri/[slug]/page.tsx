@@ -68,7 +68,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-export const revalidate = 21600
+// High-cardinality route + lessons rarely change: reduce ISR writes by revalidating rarely.
+export const revalidate = 2592000 // 30 days
 
 // Generate static params for all lesson slugs
 export async function generateStaticParams() {

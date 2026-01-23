@@ -3,106 +3,97 @@
 import { useEffect } from 'react'
 
 /**
- * Component to fix mobile Chrome address bar scroll issue
- * Prevents the address bar from hiding/showing on scroll which causes layout inconsistencies
+ * Component to fix mobile viewport issues
  * 
- * NOTE: On Android Chrome, we disable the touchmove preventDefault logic because it can
- * cause scroll to be permanently blocked. We rely on CSS overscroll-behavior instead.
+ * On Android: Adds a safety mechanism to prevent body.overflow from getting stuck as "hidden"
+ * On iOS: Uses preventDefault on touchmove at boundaries to prevent overscroll
  */
 export function MobileViewportFix() {
   useEffect(() => {
-    // Only run on mobile devices
     if (typeof window === 'undefined') return
     
-    const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const isAndroid = /Android/i.test(navigator.userAgent)
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    const isMobile = isAndroid || isIOS || window.innerWidth <= 768
     
     if (!isMobile) return
 
-    // Detect Android Chrome - we skip touchmove preventDefault on this browser
-    // because it can cause scroll to be permanently blocked
-    const isAndroidChrome = /Android/i.test(navigator.userAgent) && /Chrome/i.test(navigator.userAgent)
-    
-    // On Android Chrome, we only rely on CSS overscroll-behavior (in globals.css)
-    // This prevents the scroll blocking bug while still preventing pull-to-refresh via CSS
-    if (isAndroidChrome) {
-      // Only add a passive scroll listener to prevent negative scroll positions
-      const handleScroll = () => {
-        if (window.scrollY < 0) {
-          window.scrollTo(0, 0)
+    // On Android: Add a safety mechanism to ensure scroll is never permanently blocked
+    if (isAndroid) {
+      // Check if there's actually a modal/dialog open
+      const hasOpenModal = () => {
+        // Check for common modal indicators
+        const hasRadixDialog = document.querySelector('[data-state="open"][role="dialog"]')
+        const hasRadixSheet = document.querySelector('[data-state="open"][data-radix-popper-content-wrapper]')
+        const hasFixedOverlay = document.querySelector('.fixed.inset-0.z-\\[9999\\]') // ProfileCompletionCard
+        return hasRadixDialog || hasRadixSheet || hasFixedOverlay
+      }
+      
+      // Safety check: If body.overflow is hidden but no modal is open, reset it
+      const ensureScrollable = () => {
+        const bodyStyle = document.body.style
+        if (bodyStyle.overflow === 'hidden' && !hasOpenModal()) {
+          bodyStyle.overflow = ''
+          bodyStyle.position = ''
+          bodyStyle.top = ''
+          bodyStyle.left = ''
+          bodyStyle.right = ''
         }
       }
-      window.addEventListener('scroll', handleScroll, { passive: true })
+      
+      // Run safety check on page load and after any touch interaction
+      ensureScrollable()
+      
+      // Also run periodically as a fallback (every 2 seconds)
+      const intervalId = setInterval(ensureScrollable, 2000)
+      
+      // Run on touchend to catch cases where modals close
+      const handleTouchEnd = () => {
+        setTimeout(ensureScrollable, 100)
+      }
+      document.addEventListener('touchend', handleTouchEnd, { passive: true })
       
       return () => {
-        window.removeEventListener('scroll', handleScroll)
+        clearInterval(intervalId)
+        document.removeEventListener('touchend', handleTouchEnd)
       }
     }
 
-    // For iOS and other mobile browsers, use the full overscroll prevention logic
-    let lastTouchY = 0
-    
-    const getScrollMetrics = () => {
-      const scrollElement = document.scrollingElement || document.documentElement
-      return {
-        scrollTop: scrollElement.scrollTop,
-        scrollHeight: scrollElement.scrollHeight,
-        clientHeight: scrollElement.clientHeight,
-      }
-    }
-
-    // Prevent pull-to-refresh and overscroll (iOS only)
-    const preventOverscroll = (e: TouchEvent) => {
-      const target = e.target as HTMLElement
+    // iOS-only: prevent overscroll at page boundaries
+    if (isIOS) {
+      let lastTouchY = 0
       
-      // Check if the target is inside a scrollable container
-      const scrollableParent = target.closest('[data-scrollable], .overflow-y-auto, .overflow-auto, [style*="overflow"]')
-      
-      // If inside a scrollable container, let it handle its own scroll
-      if (scrollableParent) {
-        return
+      const handleTouchStart = (e: TouchEvent) => {
+        lastTouchY = e.touches[0].clientY
       }
-      
-      const { scrollTop, scrollHeight, clientHeight } = getScrollMetrics()
 
-      // Prevent overscroll at top (pull-to-refresh)
-      if (e.cancelable && scrollTop <= 0 && e.touches[0].clientY > lastTouchY) {
-        e.preventDefault()
+      const handleTouchMove = (e: TouchEvent) => {
+        const scrollTop = window.scrollY
+        const scrollHeight = document.documentElement.scrollHeight
+        const clientHeight = window.innerHeight
+        const currentTouchY = e.touches[0].clientY
+        const isScrollingUp = currentTouchY > lastTouchY
+        const isScrollingDown = currentTouchY < lastTouchY
+        
+        // Only prevent default at the very top or bottom of the page
+        if (e.cancelable) {
+          if (scrollTop <= 0 && isScrollingUp) {
+            e.preventDefault()
+          } else if (scrollTop + clientHeight >= scrollHeight && isScrollingDown) {
+            e.preventDefault()
+          }
+        }
+        
+        lastTouchY = currentTouchY
       }
-      // Prevent overscroll at bottom
-      else if (e.cancelable && scrollTop + clientHeight >= scrollHeight - 1 && e.touches[0].clientY < lastTouchY) {
-        e.preventDefault()
+
+      document.addEventListener('touchstart', handleTouchStart, { passive: true })
+      document.addEventListener('touchmove', handleTouchMove, { passive: false })
+
+      return () => {
+        document.removeEventListener('touchstart', handleTouchStart)
+        document.removeEventListener('touchmove', handleTouchMove)
       }
-    }
-
-    // Handle touch start
-    const handleTouchStart = (e: TouchEvent) => {
-      lastTouchY = e.touches[0].clientY
-    }
-
-    // Handle touch move - prevent address bar interaction
-    const handleTouchMove = (e: TouchEvent) => {
-      preventOverscroll(e)
-      lastTouchY = e.touches[0].clientY
-    }
-
-    // Prevent default touch behaviors that cause address bar to hide
-    document.addEventListener('touchstart', handleTouchStart, { passive: true })
-    document.addEventListener('touchmove', handleTouchMove, { passive: false })
-    
-    // Prevent scroll events that would trigger address bar hide
-    const handleScroll = () => {
-      if (window.scrollY < 0) {
-        window.scrollTo(0, 0)
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart)
-      document.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('scroll', handleScroll)
     }
   }, [])
 
