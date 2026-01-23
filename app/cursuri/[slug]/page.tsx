@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       type: 'article',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: `PLANCK - ${targetLesson.title}`,
@@ -62,7 +62,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     twitter: {
       title: `${targetLesson.title} | PLANCK`,
       description: `Lecție de fizică: ${targetLesson.title}`,
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
   }

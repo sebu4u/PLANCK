@@ -29,7 +29,7 @@ export const baseMetadata: Metadata = {
     description: 'Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.',
     images: [
       {
-        url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+        url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
         width: 1200,
         height: 630,
       }
@@ -39,7 +39,7 @@ export const baseMetadata: Metadata = {
     card: 'summary_large_image',
     title: 'Planck Academy',
     description: 'Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.',
-    images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+    images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
   },
   robots: {
     index: true,
@@ -86,7 +86,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "Cursuri de Fizică și Informatică pentru Liceu – Planck Academy",
       description: "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
   },
@@ -116,7 +116,7 @@ export const pageMetadata: Record<string, Metadata> = {
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: 'Lecții de Fizică – Planck Academy',
@@ -126,7 +126,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "Lecții de Fizică",
       description: "Lecții structurate pe capitole pentru clasa a 9-a și a 10-a.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
     robots: {
@@ -269,7 +269,7 @@ export const pageMetadata: Record<string, Metadata> = {
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: 'Planck Insight - AI Assistant pentru Fizică',
@@ -279,7 +279,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "Planck Insight - AI Assistant pentru Fizică",
       description: "Asistentul tău AI inteligent pentru învățarea fizicii cu explicații detaliate.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
     robots: {
@@ -302,7 +302,7 @@ export const pageMetadata: Record<string, Metadata> = {
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: 'Planck Sketch - Whiteboard Interactiv',
@@ -312,7 +312,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "Whiteboard Online Gratuit pentru Elevi – Planck Sketch",
       description: "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale, accesibil printr-un singur click.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
     robots: {
@@ -335,7 +335,7 @@ export const pageMetadata: Record<string, Metadata> = {
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: 'Planck Code - IDE & Online Judge',
@@ -345,7 +345,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
       description: "IDE online C++ cu compilator în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
     robots: {
@@ -368,7 +368,7 @@ export const pageMetadata: Record<string, Metadata> = {
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: 'PLANCK - Prețuri și Planuri',
@@ -378,7 +378,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "Prețuri și Planuri - PLANCK",
       description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
     robots: {
@@ -401,7 +401,7 @@ export const pageMetadata: Record<string, Metadata> = {
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png',
+          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
           width: 1200,
           height: 630,
           alt: 'Simulări BAC Fizică – Planck Academy',
@@ -411,7 +411,7 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: "Simulări BAC Fizică - Subiecte și Variante",
       description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare.",
-      images: ['https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png'],
+      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',
     },
     robots: {

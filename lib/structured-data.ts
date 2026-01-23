@@ -17,7 +17,7 @@ export const organizationStructuredData = {
   "@type": "EducationalOrganization",
   "name": "Planck Academy",
   "url": "https://www.planck.academy",
-  "logo": "https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png",
+  "logo": "https://i.ibb.co/DHgVg7gr/Untitled-design-4.png",
   "description": "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
   "educationalLevel": "High school",
   "teaches": ["Physics", "Computer Science"],
@@ -128,7 +128,7 @@ export const articleStructuredData = (articleData: any) => ({
     "name": "Planck Academy",
     "logo": {
       "@type": "ImageObject",
-      "url": "https://i.ibb.co/3mRP2krf/Logo-text-mai-mic.png"
+      "url": "https://i.ibb.co/DHgVg7gr/Untitled-design-4.png"
     }
   },
   "datePublished": articleData.publishedDate,
