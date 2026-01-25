@@ -11,7 +11,6 @@ import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sideb
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton"
 import { DashboardSidebarSkeleton } from "@/components/dashboard/dashboard-sidebar-skeleton"
 import { NavigationSkeleton } from "@/components/navigation-skeleton"
-import SplitText from "@/components/SplitText"
 import { LearnPhysicsCard, RecommendedLesson } from "@/components/dashboard/cards/learn-physics-card"
 import { RankEloCard } from "@/components/dashboard/cards/rank-elo-card"
 import { DailyChallengeCard } from "@/components/dashboard/cards/daily-challenge-card"
@@ -41,10 +40,6 @@ export function DashboardAuth() {
   const router = useRouter()
   const { user, loading: authLoading, profile } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [isFirstVisit, setIsFirstVisit] = useState(false)
-  const [animationComplete, setAnimationComplete] = useState(false)
-  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const animationCompletionTriggered = useRef(false)
   const isInitialLoadRef = useRef(true)
   const isFetchingRef = useRef(false)
   const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -66,16 +61,6 @@ export function DashboardAuth() {
     lastProject: Project | null
   } | null>(null)
 
-  // Check if this is the first visit in the session
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const visited = sessionStorage.getItem('dashboard_visited')
-      if (!visited) {
-        setIsFirstVisit(true)
-        sessionStorage.setItem('dashboard_visited', 'true')
-      }
-    }
-  }, [])
 
   useEffect(() => {
     if (authLoading) return
@@ -324,23 +309,6 @@ export function DashboardAuth() {
     }
   }, [user?.id, authLoading, router])
 
-  const username = profile?.nickname || profile?.name || 'Student'
-
-  const handleWelcomeAnimationComplete = useCallback(() => {
-    if (animationCompletionTriggered.current) return
-    animationCompletionTriggered.current = true
-    animationTimeoutRef.current = setTimeout(() => {
-      setAnimationComplete(true)
-    }, 300)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current)
-      }
-    }
-  }, [])
 
   // Memoize userData to prevent recreation on every render
   // Must be called before any conditional returns to follow Rules of Hooks
@@ -361,40 +329,8 @@ export function DashboardAuth() {
     }
   }, [user?.id, user?.email, profile?.user_icon, profile?.nickname, profile?.name])
 
-  const shouldShowWelcome =
-    isFirstVisit &&
-    user &&
-    (!animationComplete || authLoading || loading || !dashboardData)
-
-  if (shouldShowWelcome) {
-    return (
-      <div className="min-h-screen bg-[#0D0D0F] flex items-center justify-center transition-opacity duration-500">
-        <div className="text-center">
-          <SplitText
-            text={`Welcome back, ${username}!`}
-            tag="h1"
-            className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4"
-            delay={100}
-            duration={0.6}
-            ease="power3.out"
-            splitType="chars"
-            from={{ opacity: 0, y: 40 }}
-            to={{ opacity: 1, y: 0 }}
-            threshold={0.1}
-            rootMargin="-100px"
-            textAlign="center"
-            onLetterAnimationComplete={handleWelcomeAnimationComplete}
-          />
-          <p className="text-base sm:text-lg md:text-xl text-gray-400 mt-4">
-            Here's your learning progress today
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show skeleton loading only when NOT first visit
-  if ((authLoading || loading || !dashboardData) && !isFirstVisit) {
+  // Show skeleton loading while data is being fetched
+  if (authLoading || loading || !dashboardData) {
     return (
       <DashboardSidebarProvider>
         <NavigationSkeleton />
@@ -402,11 +338,6 @@ export function DashboardAuth() {
         <DashboardSkeleton />
       </DashboardSidebarProvider>
     )
-  }
-
-  // Still show welcome message on first visit even if loading
-  if (authLoading || loading || !dashboardData) {
-    return null // Will be handled by shouldShowWelcome check above
   }
 
   if (!user) return null

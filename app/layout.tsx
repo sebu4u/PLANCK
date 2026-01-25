@@ -14,6 +14,7 @@ import { MobileViewportFix } from "@/components/mobile-viewport-fix"
 import { RealVHProvider } from "@/components/real-vh-provider"
 
 import { ProfileCompletionCard } from "@/components/profile-completion-card"
+import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
@@ -65,6 +66,16 @@ export default function RootLayout({
   return (
     <html lang="ro">
       <head>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            html {
+              background-color: #121212;
+            }
+            body {
+              background-color: #121212;
+            }
+          `
+        }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -85,6 +96,7 @@ export default function RootLayout({
           <ScrollToTop />
           <TopLoader />
           <AuthProvider>
+            <GlobalLoadingOverlay />
             <AnalyticsProvider>
               <KatexProvider>
                 {children}

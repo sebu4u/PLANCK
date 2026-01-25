@@ -431,8 +431,9 @@ export function Navigation() {
     }
   }
 
+  // Don't render anything during initial auth loading - the DashboardRedirect overlay
+  // will cover everything anyway. This prevents navbar flash during redirect.
   if (loading) {
-    // Poți returna un skeleton sau null pentru a nu afișa login/profil până nu știm starea userului
     return null
   }
 

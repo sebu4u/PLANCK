@@ -90,5 +90,11 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    /* Set dark background by default to prevent white flash during navigation */
+    background-color: #121212;
+  }
+  /* Homepage will override this with white background */
+  html {
+    background-color: #121212;
   }
 }

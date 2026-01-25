@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { Grade, Chapter, Lesson, LessonSummary } from '@/lib/supabase-physics'
 import { Button } from '@/components/ui/button'
-import { Menu, X, Chrome, Github, Loader2, Lock } from 'lucide-react'
+import { Menu, X, Chrome, Github, Loader2, Lock, PanelRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { slugify } from '@/lib/slug'
 import { useAuth } from '@/components/auth-provider'
@@ -494,7 +494,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
             className="fixed right-4 top-20 z-[90] lg:hidden bg-[#101010] border-white/20 text-white shadow-lg transition-all duration-300 ease-in-out hover:scale-105 hover:bg-white/10"
             onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           >
-            <Menu className="w-4 h-4 animate-in zoom-in duration-200" />
+            <PanelRight className="w-4 h-4 animate-in zoom-in duration-200" />
           </Button>
         )}
 
