@@ -39,51 +39,49 @@ export default async function ProblemsPage() {
   return (
     <CatalogThemeProvider catalogType="physics">
       <CatalogThemeBackground defaultBackgroundClass="bg-[#141414]">
-        <div className="min-h-screen text-white flex flex-col overflow-x-hidden">
-          <Navigation />
-          <main className="flex-1 overflow-x-hidden">
-            <div className="px-6 sm:px-8 lg:px-16 xl:px-20 pt-20 pb-12">
-              <section className="w-full space-y-8">
-                {/* Page Title Section */}
-                <div className="text-center lg:text-left">
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3">
-                    Probleme de fizică
-                  </h1>
-                  <p className="text-base sm:text-lg text-white/60 max-w-2xl mx-auto lg:mx-0">
-                    Exersează și aprofundează-ți cunoștințele cu probleme de toate nivelurile
-                  </p>
-                  <StructuredData
-                    id="structured-data-breadcrumbs"
-                    data={breadcrumbStructuredData([
-                      { name: 'Acasă', url: 'https://www.planck.academy/' },
-                      { name: 'Probleme', url: 'https://www.planck.academy/probleme' },
-                    ])}
-                  />
-                </div>
+        <Navigation />
+        <main className="min-h-[100svh]">
+          <div className="px-6 sm:px-8 lg:px-16 xl:px-20 pt-20 pb-12">
+            <section className="w-full space-y-8">
+              {/* Page Title Section */}
+              <div className="text-center lg:text-left">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3">
+                  Probleme de fizică
+                </h1>
+                <p className="text-base sm:text-lg text-white/60 max-w-2xl mx-auto lg:mx-0">
+                  Exersează și aprofundează-ți cunoștințele cu probleme de toate nivelurile
+                </p>
+                <StructuredData
+                  id="structured-data-breadcrumbs"
+                  data={breadcrumbStructuredData([
+                    { name: 'Acasă', url: 'https://www.planck.academy/' },
+                    { name: 'Probleme', url: 'https://www.planck.academy/probleme' },
+                  ])}
+                />
+              </div>
 
-                <div className="space-y-8">
-                  <StructuredData
-                    id="structured-data-problems-list"
-                    data={{
-                      "@context": "https://schema.org",
-                      "@type": "ItemList",
-                      itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
-                        "@type": "ListItem",
-                        position: idx + 1,
-                        name: p.title,
-                      }))
-                    }}
-                  />
-                  <ProblemsClient
-                    initialProblems={initialProblems as any}
-                    initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
-                  />
-                </div>
-              </section>
-            </div>
-          </main>
-          <Footer />
-        </div>
+              <div className="space-y-8">
+                <StructuredData
+                  id="structured-data-problems-list"
+                  data={{
+                    "@context": "https://schema.org",
+                    "@type": "ItemList",
+                    itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
+                      "@type": "ListItem",
+                      position: idx + 1,
+                      name: p.title,
+                    }))
+                  }}
+                />
+                <ProblemsClient
+                  initialProblems={initialProblems as any}
+                  initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
+                />
+              </div>
+            </section>
+          </div>
+        </main>
+        <Footer />
       </CatalogThemeBackground>
     </CatalogThemeProvider>
   )
