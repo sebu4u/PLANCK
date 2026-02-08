@@ -62,6 +62,7 @@ const HOMEPAGE_LINKS = [
 
 export function NewWayToLearnSection() {
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const lockedNodeIds = useMemo(() => new Set<string>(), [])
 
     // Memoize graph data
     const forceGraphData: ForceGraphData = useMemo(() => ({
@@ -100,6 +101,7 @@ export function NewWayToLearnSection() {
                             data={forceGraphData}
                             selectedNodeId={selectedNodeId}
                             connectedNodeIds={connectedNodeIds}
+                            lockedNodeIds={lockedNodeIds}
                             onNodeClick={handleNodeClick}
                         />
 

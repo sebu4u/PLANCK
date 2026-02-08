@@ -19,7 +19,7 @@ function getOpenAIClient() {
 }
 
 // Maximum prompts per day for Free plan (Raptor1 Fast)
-const FREE_DAILY_LIMIT = 20;
+const FREE_DAILY_LIMIT = 3;
 // Maximum prompts per month for Free plan (Raptor1)
 const FREE_RAPTOR1_MONTHLY_LIMIT = 10;
 // Maximum prompts per month for Plus plan (combined Insight + AI Agent)
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
           );
         }
       } else {
-        // Free plan + Raptor1 fast (gpt-4o-mini): Daily limit check (20/day)
+        // Free plan + Raptor1 fast (gpt-4o-mini): Daily limit check (3/day)
         const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
         const { data: usageRow } = await supabase
           .from('insight_usage')
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
 
           return NextResponse.json(
             {
-              error: 'Ai atins limita zilnică pentru Raptor1 fast (20 solicitări/zi).',
+              error: 'Ai atins limita zilnică pentru Raptor1 fast (3 solicitări/zi).',
               resetTime: nextReset.toISOString()
             },
             { status: 429 }

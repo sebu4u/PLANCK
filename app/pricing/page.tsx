@@ -1,19 +1,14 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Home, Check, Loader2, Rocket, X } from "lucide-react"
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { supabase } from "@/lib/supabaseClient"
+import { useAuth } from "@/components/auth-provider"
+import { useToast } from "@/hooks/use-toast"
 
 function AnimatedPrice({ value }: { value: number }) {
   const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 })
@@ -28,10 +23,15 @@ function AnimatedPrice({ value }: { value: number }) {
 
 export default function PricingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user, subscriptionPlan, refreshProfile } = useAuth()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"individual" | "schools">("individual")
   const [isYearly, setIsYearly] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [popupOpen, setPopupOpen] = useState(false)
+  const [checkoutLoadingPlan, setCheckoutLoadingPlan] = useState<string | null>(null)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
 
   // Generate stable star positions only on client
   const stars = useMemo(() => {
@@ -63,6 +63,149 @@ export default function PricingPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    const status = searchParams?.get("checkout")
+    const sessionId = searchParams?.get("session_id")
+
+    if (status === "success") {
+      toast({
+        title: "Plată reușită",
+        description: "Abonamentul va fi activat în câteva secunde.",
+      })
+    } else if (status === "canceled") {
+      toast({
+        title: "Plata a fost anulată",
+        description: "Poți relua comanda oricând.",
+      })
+    }
+
+    if (!sessionId || !user) return
+    if (syncingSessionId === sessionId) return
+    if (status !== "success") return
+
+    const syncSubscription = async () => {
+      try {
+        setSyncingSessionId(sessionId)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+        if (!accessToken) return
+
+        const response = await fetch("/api/stripe/sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ session_id: sessionId }),
+        })
+
+        const payload = await response.json()
+        if (!response.ok) {
+          throw new Error(payload?.error || "Nu am putut sincroniza abonamentul.")
+        }
+
+        await refreshProfile()
+      } catch (error: any) {
+        toast({
+          title: "Sincronizare eșuată",
+          description: error?.message || "Încearcă din nou.",
+          variant: "destructive",
+        })
+      }
+    }
+
+    syncSubscription()
+  }, [searchParams, toast, user, syncingSessionId, refreshProfile])
+
+  const startCheckout = async (planId: "plus" | "premium") => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    try {
+      setCheckoutLoadingPlan(planId)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          plan: planId,
+          interval: isYearly ? "year" : "month",
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error || "Nu am putut iniția checkout-ul.")
+      }
+
+      if (payload?.url) {
+        window.location.assign(payload.url)
+      } else {
+        throw new Error("Checkout URL lipsă.")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Eroare la checkout",
+        description: error?.message || "Încearcă din nou.",
+        variant: "destructive",
+      })
+    } finally {
+      setCheckoutLoadingPlan(null)
+    }
+  }
+
+  const openBillingPortal = async () => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    try {
+      setPortalLoading(true)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch("/api/stripe/portal", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error || "Nu am putut deschide portalul.")
+      }
+      if (payload?.url) {
+        window.location.assign(payload.url)
+      } else {
+        throw new Error("Portal URL lipsă.")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Eroare",
+        description: error?.message || "Încearcă din nou.",
+        variant: "destructive",
+      })
+    } finally {
+      setPortalLoading(false)
+    }
+  }
 
   // Individual Plans Data
   const individualPlans = [
@@ -107,8 +250,8 @@ export default function PricingPage() {
       yearlyDiscountVal: "Economisești 58 RON",
     },
     {
-      id: "pro",
-      name: "Pro",
+      id: "premium",
+      name: "Premium",
       priceValue: isYearly ? 590 : 59,
       currency: "RON",
       period: isYearly ? "/an" : "/lună",
@@ -249,6 +392,17 @@ export default function PricingPage() {
 
         {/* Content Area */}
         <div className="w-full max-w-7xl mx-auto">
+          {user && subscriptionPlan !== "free" && (
+            <div className="flex justify-center mb-8">
+              <button
+                onClick={openBillingPortal}
+                disabled={portalLoading}
+                className="px-6 py-2 rounded-full bg-white/10 text-white border border-white/20 hover:bg-white/20 transition-colors text-sm font-medium"
+              >
+                {portalLoading ? "Se deschide portalul..." : "Gestionează abonamentul"}
+              </button>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             {activeTab === "individual" ? (
               <motion.div
@@ -261,75 +415,87 @@ export default function PricingPage() {
               >
                 {/* Cards Grid - Individual */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-10 px-2">
-                  {individualPlans.map((plan) => (
-                    <div
-                      key={plan.id}
-                      className={cn(
-                        "relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 group hover:-translate-y-1",
-                        plan.highlight
-                          ? "bg-[#1A1B1E]/80 border-white/40 shadow-[0_0_40px_-10px_rgba(255,255,255,0.2)]"
-                          : "bg-[#151619]/60 border-white/10 hover:border-white/20 hover:bg-[#1A1B1E]/80"
-                      )}
-                    >
-                      {plan.yearlyDiscountVal && isYearly && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-lg whitespace-nowrap">
-                          {plan.yearlyDiscountVal}
-                        </div>
-                      )}
-                      
-                      <div className="mb-5">
-                        <h3 className="text-lg font-medium text-gray-200 mb-1">{plan.name}</h3>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl sm:text-4xl font-bold text-white">
-                            {plan.priceValue ? (
-                              <>
-                                <AnimatedPrice value={plan.priceValue} /> {plan.currency}
-                              </>
-                            ) : (
-                              plan.priceLabel
-                            )}
-                          </span>
-                          {plan.priceLabel !== "Gratuit" && (
-                            <span className="text-gray-500 text-sm">{plan.period}</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-400 mt-2 min-h-[20px]">{plan.description}</p>
-                      </div>
+                  {individualPlans.map((plan) => {
+                    const isCurrentPlan = subscriptionPlan === plan.id
+                    const isPaidPlan = plan.id === "plus" || plan.id === "premium"
+                    const isCheckoutLoading = checkoutLoadingPlan === plan.id
 
-                      <ul className="space-y-3 mb-8 flex-1">
-                        {plan.features.map((feature, i) => (
-                          <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
-                            <Check className="w-4 h-4 text-white shrink-0 mt-0.5" />
-                            <span className="leading-tight">{feature}</span>
-                          </li>
-                        ))}
-                        {plan.missingFeatures?.map((feature, i) => (
-                          <li key={`missing-${i}`} className="flex items-start gap-3 text-sm text-gray-600">
-                            <X className="w-4 h-4 text-gray-700 shrink-0 mt-0.5" />
-                            <span className="leading-tight">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      <button
-                        onClick={() => {
-                          if (plan.id === "plus" || plan.id === "pro") {
-                            setPopupOpen(true)
-                          } else if (plan.id === "free") {
-                            router.push('/probleme')
-                          }
-                        }}
+                    return (
+                      <div
+                        key={plan.id}
                         className={cn(
-                          "w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                          "relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 group hover:-translate-y-1",
                           plan.highlight
-                            ? "bg-white text-black hover:bg-gray-200 shadow-lg shadow-white/10"
-                            : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                            ? "bg-[#1A1B1E]/80 border-white/40 shadow-[0_0_40px_-10px_rgba(255,255,255,0.2)]"
+                            : "bg-[#151619]/60 border-white/10 hover:border-white/20 hover:bg-[#1A1B1E]/80"
                         )}
                       >
-                        {plan.cta}
-                      </button>
-                    </div>
-                  ))}
+                        {plan.yearlyDiscountVal && isYearly && (
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-lg whitespace-nowrap">
+                            {plan.yearlyDiscountVal}
+                          </div>
+                        )}
+                        
+                        <div className="mb-5">
+                          <h3 className="text-lg font-medium text-gray-200 mb-1">{plan.name}</h3>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl sm:text-4xl font-bold text-white">
+                              {plan.priceValue ? (
+                                <>
+                                  <AnimatedPrice value={plan.priceValue} /> {plan.currency}
+                                </>
+                              ) : (
+                                plan.priceLabel
+                              )}
+                            </span>
+                            {plan.priceLabel !== "Gratuit" && (
+                              <span className="text-gray-500 text-sm">{plan.period}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-400 mt-2 min-h-[20px]">{plan.description}</p>
+                        </div>
+
+                        <ul className="space-y-3 mb-8 flex-1">
+                          {plan.features.map((feature, i) => (
+                            <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
+                              <Check className="w-4 h-4 text-white shrink-0 mt-0.5" />
+                              <span className="leading-tight">{feature}</span>
+                            </li>
+                          ))}
+                          {plan.missingFeatures?.map((feature, i) => (
+                            <li key={`missing-${i}`} className="flex items-start gap-3 text-sm text-gray-600">
+                              <X className="w-4 h-4 text-gray-700 shrink-0 mt-0.5" />
+                              <span className="leading-tight">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <button
+                          onClick={() => {
+                            if (plan.id === "plus" || plan.id === "premium") {
+                              startCheckout(plan.id as "plus" | "premium")
+                            } else if (plan.id === "free") {
+                              router.push('/probleme')
+                            }
+                          }}
+                          disabled={isCurrentPlan || isCheckoutLoading}
+                          className={cn(
+                            "w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            plan.highlight
+                              ? "bg-white text-black hover:bg-gray-200 shadow-lg shadow-white/10"
+                              : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                          )}
+                        >
+                          {isCheckoutLoading ? (
+                            <span className="inline-flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Se deschide...
+                            </span>
+                          ) : isPaidPlan && isCurrentPlan ? "Planul tău curent" : plan.cta}
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* Slider Section - Below Cards */}
@@ -379,7 +545,7 @@ export default function PricingPage() {
 
                       <div className="mt-auto pt-6 border-t border-white/5">
                         <button 
-                          onClick={() => setPopupOpen(true)}
+                          onClick={() => router.push("/contact")}
                           className="w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group"
                         >
                           {plan.cta}
@@ -397,28 +563,6 @@ export default function PricingPage() {
           </AnimatePresence>
         </div>
       </main>
-
-      {/* Popup Dialog */}
-      <Dialog open={popupOpen} onOpenChange={setPopupOpen}>
-        <DialogContent className="bg-[#1A1B1E]/90 backdrop-blur-sm border-white/40 text-white max-w-md rounded-2xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.2)]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Almost there.
-            </DialogTitle>
-            <DialogDescription className="text-gray-300 text-center mt-4 text-base leading-relaxed">
-              Lucrăm la un Planck Pro care chiar merită banii.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => setPopupOpen(false)}
-              className="px-8 py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-200 transition-colors shadow-lg shadow-white/10"
-            >
-              Închide
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

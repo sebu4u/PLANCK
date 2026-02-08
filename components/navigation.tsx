@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Menu, X, BookOpen, Calculator, Rocket, LogIn, Search as SearchIcon, Loader2, ArrowUpRight, ChevronDown, Sparkles, Code, Github, Chrome, CreditCard, Trophy, Atom, Magnet, Terminal, FileText, CheckSquare, BrainCircuit } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -1008,79 +1010,67 @@ export function Navigation() {
           {/* Mobile Navigation */}
           {isOpen && !isDashboard && (
             <div className="burger:hidden animate-slide-down z-[100] relative">
-              <div className={`px-2 pt-2 pb-3 space-y-1 sm:px-3 ${navTheme.dropdownBackground} backdrop-blur-md border-t ${navTheme.dropdownBorder}`}>
-                <Link
-                  href="/cursuri"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <BookOpen size={20} />
-                  Cursuri
-                </Link>
-                <Link
-                  href="/simulari-bac"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <FileText size={20} />
-                  Simulări Bac
-                </Link>
-                <Link
-                  href="/probleme"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Calculator size={20} />
-                  Probleme
-                </Link>
-                <Link
-                  href="/grile"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <CheckSquare size={20} />
-                  Grile
-                </Link>
-                <Link
-                  href="/space"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <BrainCircuit size={20} />
-                  Memorator
-                </Link>
-                <Link
-                  href="/sketch"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Sketch
-                  <span className="inline-block">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <defs>
-                        <linearGradient id="gradient-animated-mobile" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#3b82f6" />
-                          <stop offset="20%" stopColor="#8b5cf6" />
-                          <stop offset="40%" stopColor="#ec4899" />
-                          <stop offset="60%" stopColor="#f59e0b" />
-                          <stop offset="80%" stopColor="#10b981" />
-                          <stop offset="100%" stopColor="#3b82f6" />
-                          <animate attributeName="x1" values="0%;100%;0%" dur="3s" repeatCount="indefinite" />
-                          <animate attributeName="x2" values="100%;200%;100%" dur="3s" repeatCount="indefinite" />
-                        </linearGradient>
-                      </defs>
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#gradient-animated-mobile)" />
-                    </svg>
-                  </span>
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <CreditCard size={20} />
-                  Pricing
-                </Link>
+              <div className={`px-2 pt-2 pb-3 space-y-2 sm:px-3 ${navTheme.dropdownBackground} backdrop-blur-md border-t ${navTheme.dropdownBorder}`}>
+                <div className="space-y-2">
+                  <Link href="/probleme" className="block" onClick={() => setIsOpen(false)}>
+                    <Card className="relative h-20 w-full overflow-hidden rounded-xl border border-white/10 bg-[#181818] transition-all duration-300 hover:border-white/20 group">
+                      <div className="flex h-full items-center justify-between pl-6 pr-0">
+                        <div className="flex flex-col gap-1 relative z-10 max-w-[70%]">
+                          <h3 className="text-sm font-semibold text-white/90">Catalogul de probleme</h3>
+                          <p className="text-xs text-white/60 font-medium">Exersează și aprofundează fizica</p>
+                        </div>
+                        <div className="absolute right-0 top-0 bottom-0 w-1/3 h-full overflow-hidden">
+                          <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#181818] via-[#181818]/10 to-transparent" />
+                          <Image
+                            src="/pxl.png"
+                            alt="Catalogul de probleme"
+                            fill
+                            className="object-cover object-center opacity-80 group-hover:scale-105 transition-transform duration-500"
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+
+                  <Link href="/cursuri" className="block" onClick={() => setIsOpen(false)}>
+                    <Card className="relative h-20 w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:border-gray-300 group">
+                      <div className="flex h-full items-center justify-between pl-6 pr-0">
+                        <div className="flex flex-col gap-1 relative z-10 max-w-[70%]">
+                          <h3 className="text-sm font-semibold text-gray-900">Învață cu AI</h3>
+                          <p className="text-xs text-gray-600 font-medium">Cursuri interactive ghidate de AI</p>
+                        </div>
+                        <div className="absolute right-0 top-0 bottom-0 w-1/3 h-full overflow-hidden">
+                          <div className="absolute inset-0 z-10 bg-gradient-to-r from-white via-white/10 to-transparent" />
+                          <Image
+                            src="/insight-cta-card.PNG"
+                            alt="Învață cu AI"
+                            fill
+                            className="object-cover object-center opacity-90 group-hover:scale-105 transition-transform duration-500"
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                </div>
+
+                <div className="pt-1 space-y-1">
+                  <Link
+                    href="/space"
+                    className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <BrainCircuit size={20} />
+                    Memorator
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <CreditCard size={20} />
+                    Pricing
+                  </Link>
+                </div>
                 <div className="border-t border-gray-700 pt-3 mt-3">
                   {user ? (
                     <DropdownMenu>

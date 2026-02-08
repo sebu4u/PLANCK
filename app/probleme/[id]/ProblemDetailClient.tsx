@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, lazy, Suspense } from "react"
+import { createPortal } from "react-dom"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,7 @@ import { InlineMath } from 'react-katex';
 import React from 'react';
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
@@ -184,10 +186,12 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [desktopBoardExpanded, setDesktopBoardExpanded] = useState(false)
   const { user } = useAuth();
   const { isFree } = useSubscriptionPlan()
+  const isMobile = useIsMobile()
   const problemIcon = getProblemIcon(problem.id);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
 
   const [showMobileUpgradeModal, setShowMobileUpgradeModal] = useState(false)
+  const [openedInsightFromCard, setOpenedInsightFromCard] = useState(false)
 
   // Lazy create the shared store for the desktop whiteboard (minimized and maximized share the same instance)
   const [desktopBoardStore, setDesktopBoardStore] = useState<TLStore | null>(null)
@@ -618,12 +622,51 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         />
       )}
 
-      <ProblemOrbButton onOpenSidebar={() => setInsightSidebarOpen(true)} />
+      {isMobile &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <button
+            type="button"
+            onClick={() => {
+              setOpenedInsightFromCard(true)
+              setInsightSidebarOpen(true)
+            }}
+            className="fixed bottom-4 left-1/2 z-[100] flex h-16 w-[calc(100%-2rem)] max-w-[420px] -translate-x-1/2 items-center overflow-hidden rounded-2xl border-2 border-black/20 bg-white py-2 pl-4 pr-0 text-left shadow-[0_8px_20px_rgba(0,0,0,0.18),0_0_24px_rgba(255,255,255,0.6)] transition active:scale-[0.99]"
+            aria-label="Deschide chat Insight"
+          >
+            <span className="relative z-10 max-w-[65%] leading-tight text-black">
+              <span className="block text-sm font-bold">Blocat? Întreabă-l pe Insight</span>
+              <span className="mt-0.5 block text-xs font-semibold text-black/70">
+                Vezi soluția -&gt;
+              </span>
+            </span>
+            <div className="absolute right-0 top-0 bottom-0 w-1/3 overflow-hidden rounded-r-2xl">
+              <img
+                src="/insight-cta-card.png"
+                alt="Insight"
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
+          </button>,
+          document.body
+        )}
+
+      {!isMobile && (
+        <ProblemOrbButton
+          onOpenSidebar={() => {
+            setOpenedInsightFromCard(false)
+            setInsightSidebarOpen(true)
+          }}
+        />
+      )}
 
       <Suspense fallback={null}>
         <InsightChatSidebar
           isOpen={insightSidebarOpen}
-          onClose={() => setInsightSidebarOpen(false)}
+          onClose={() => {
+            setInsightSidebarOpen(false)
+            setOpenedInsightFromCard(false)
+          }}
           problemId={problem.id}
           problemStatement={problem.statement || ''}
           persona="problem_tutor"

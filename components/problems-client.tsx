@@ -34,6 +34,7 @@ const problemsCache = new Map<string, { data: Problem[], timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
+const INSIGHT_PROMO_DISMISSED_KEY = "probleme-insight-promo-dismissed"
 
 const getCurrentMonthKey = () => {
   const now = new Date()
@@ -77,6 +78,7 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
   const [loading, setLoading] = useState(!initialProblems || initialProblems.length === 0)
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
   const [visibleProblems, setVisibleProblems] = useState<Problem[]>([])
+  const [showInsightPromoCard, setShowInsightPromoCard] = useState(false)
 
 
   // Memoized fetch function with caching
@@ -361,6 +363,25 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
     window.scrollTo({ top: 0, behavior: 'auto' })
   }, [currentPage])
 
+  // Show Insight promo card on catalog entry unless user previously dismissed it
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem(INSIGHT_PROMO_DISMISSED_KEY)
+      if (dismissed !== "true") setShowInsightPromoCard(true)
+    } catch {
+      setShowInsightPromoCard(true)
+    }
+  }, [])
+
+  const dismissInsightPromo = useCallback(() => {
+    setShowInsightPromoCard(false)
+    try {
+      localStorage.setItem(INSIGHT_PROMO_DISMISSED_KEY, "true")
+    } catch {
+      // ignore
+    }
+  }, [])
+
   return (
     <>
 
@@ -420,6 +441,28 @@ export default function ProblemsClient({ initialProblems, initialPage = 1, initi
           )}
 
           <div>
+            {/* Insight promo card - alb, fără overlay, închidibil (doar desktop/tabletă) */}
+            {!isMobile && showInsightPromoCard && (
+              <div className="mb-6 relative rounded-2xl border border-gray-200 bg-white p-5 pr-10 shadow-sm">
+                <button
+                  type="button"
+                  onClick={dismissInsightPromo}
+                  className="absolute right-3 top-3 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+                  aria-label="Închide"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Poți înțelege problemele și fără profesor
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Insight te poate ghida pas cu pas pe fiecare problemă, ca un profesor răbdător care îți explică logica, nu doar rezultatul.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Mobile Search & Filters */}
             {(isMobile || !isLargeScreen) && (
               <div className="mb-6 flex items-center gap-3 lg:hidden">

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"
 import { supabase } from "@/lib/supabaseClient"
 
 interface AuthContextType {
@@ -11,6 +11,7 @@ interface AuthContextType {
   loginWithGitHub: () => Promise<any>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  refreshProfile: () => Promise<void>
   profile: any // nou: profilul din tabelul profiles
   subscriptionPlan: string
   userElo: number | null
@@ -99,95 +100,96 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   // Fetch profile din tabelul profiles când userul se schimbă
-  useEffect(() => {
+  const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null)
       setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
       setUserElo(null)
       return
     }
-    const fetchProfile = async () => {
-      const { data, error } = await supabase
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("name, nickname, user_icon, grade, plan, plus_months_remaining")
+      .eq("user_id", user.id)
+      .single()
+
+    if (data) {
+      // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
+      if (data.user_icon) {
+        const iconUrl = data.user_icon.includes('?t=')
+          ? data.user_icon
+          : `${data.user_icon}?t=${Date.now()}`
+        setProfile({ ...data, user_icon: iconUrl })
+      } else {
+        setProfile(data)
+      }
+      if (data.plan && typeof data.plan === "string") {
+        setSubscriptionPlan(data.plan)
+      } else {
+        setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
+      }
+
+      // Override to plus if user has referral rewards (same logic as use-subscription-plan.ts)
+      if ((!data.plan || data.plan === FREE_PLAN_IDENTIFIER) && data.plus_months_remaining > 0) {
+        setSubscriptionPlan("plus")
+      }
+      return
+    }
+
+    // Dacă nu există profil, îl creăm pe loc folosind user_metadata din Supabase
+    const userMeta: any = user?.user_metadata || {}
+    const { error: insertError } = await supabase.from("profiles").insert({
+      user_id: user.id,
+      name: (userMeta.name as string) || "",
+      nickname: (userMeta.nickname as string) || "",
+      grade: (userMeta.grade as string) || null,
+      plan: FREE_PLAN_IDENTIFIER,
+      created_at: new Date().toISOString(),
+    })
+    if (!insertError) {
+      const { data: created } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade, plan, plus_months_remaining")
+        .select("name, nickname, user_icon, grade, plan")
         .eq("user_id", user.id)
         .single()
-      if (data) {
+      if (created) {
         // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
-        if (data.user_icon) {
-          const iconUrl = data.user_icon.includes('?t=')
-            ? data.user_icon
-            : `${data.user_icon}?t=${Date.now()}`
-          setProfile({ ...data, user_icon: iconUrl })
+        if (created.user_icon) {
+          const iconUrl = created.user_icon.includes('?t=')
+            ? created.user_icon
+            : `${created.user_icon}?t=${Date.now()}`
+          setProfile({ ...created, user_icon: iconUrl })
         } else {
-          setProfile(data)
+          setProfile(created)
         }
-        if (data.plan && typeof data.plan === "string") {
-          setSubscriptionPlan(data.plan)
-        } else {
-          setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
-        }
-
-        // Override to plus if user has referral rewards (same logic as use-subscription-plan.ts)
-        if ((!data.plan || data.plan === FREE_PLAN_IDENTIFIER) && data.plus_months_remaining > 0) {
-          setSubscriptionPlan("plus")
-        }
-        return
-      }
-
-      // Dacă nu există profil, îl creăm pe loc folosind user_metadata din Supabase
-      if (!data) {
-        const userMeta: any = user?.user_metadata || {}
-        const { error: insertError } = await supabase.from("profiles").insert({
-          user_id: user.id,
-          name: (userMeta.name as string) || "",
-          nickname: (userMeta.nickname as string) || "",
-          grade: (userMeta.grade as string) || null,
-          plan: FREE_PLAN_IDENTIFIER,
-          created_at: new Date().toISOString(),
-        })
-        if (!insertError) {
-          const { data: created } = await supabase
-            .from("profiles")
-            .select("name, nickname, user_icon, grade, plan")
-            .eq("user_id", user.id)
-            .single()
-          if (created) {
-            // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
-            if (created.user_icon) {
-              const iconUrl = created.user_icon.includes('?t=')
-                ? created.user_icon
-                : `${created.user_icon}?t=${Date.now()}`
-              setProfile({ ...created, user_icon: iconUrl })
-            } else {
-              setProfile(created)
-            }
-            setSubscriptionPlan(
-              typeof created.plan === "string" && created.plan.trim().length > 0
-                ? created.plan
-                : FREE_PLAN_IDENTIFIER
-            )
-          }
-        }
+        setSubscriptionPlan(
+          typeof created.plan === "string" && created.plan.trim().length > 0
+            ? created.plan
+            : FREE_PLAN_IDENTIFIER
+        )
       }
     }
-    fetchProfile()
-
-    // Fetch user stats (elo) from user_stats table
-    const fetchUserStats = async () => {
-      const { data } = await supabase
-        .from('user_stats')
-        .select('elo')
-        .eq('user_id', user.id)
-        .single()
-      if (data) {
-        setUserElo(data.elo)
-      } else {
-        setUserElo(500) // Default ELO for new users
-      }
-    }
-    fetchUserStats()
   }, [user])
+
+  const fetchUserStats = useCallback(async () => {
+    if (!user) return
+    const { data } = await supabase
+      .from('user_stats')
+      .select('elo')
+      .eq('user_id', user.id)
+      .single()
+    if (data) {
+      setUserElo(data.elo)
+    } else {
+      setUserElo(500) // Default ELO for new users
+    }
+  }, [user])
+
+  useEffect(() => {
+    fetchProfile()
+    fetchUserStats()
+  }, [fetchProfile, fetchUserStats])
 
   const login = async (email: string, password: string) => {
     setLoading(true)
@@ -254,6 +256,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const refreshProfile = async () => {
+    await fetchProfile()
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -264,6 +270,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithGitHub,
         logout,
         refreshUser,
+        refreshProfile,
         profile,
         subscriptionPlan,
         userElo,

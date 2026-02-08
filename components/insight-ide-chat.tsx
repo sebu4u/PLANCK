@@ -10,6 +10,7 @@ import { Chrome, Github, Loader2, Send, X, Copy, Check, Sparkles, ChevronDown } 
 import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
+import { AiAgentLimitBanner } from "@/components/ai-agent-limit-banner"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -422,6 +423,7 @@ export function InsightIdeChat({
   const [busy, setBusy] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [limitReached, setLimitReached] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -535,6 +537,7 @@ export function InsightIdeChat({
     setIsStreaming(true)
     setIsGenerating(false)
     setError(null)
+    setLimitReached(false)
 
     try {
       abortControllerRef.current?.abort()
@@ -627,25 +630,31 @@ export function InsightIdeChat({
       if (response.status === 429) {
         const data = await response.json()
         const limitMessage = data.error || "Limită zilnică atinsă pentru Insight."
+        const isDailyLimit = Boolean(data.resetTime) || /zilnic/i.test(limitMessage)
 
-        setMessages((prev) => {
-          const updated = [...prev]
-          const lastIdx = updated.length - 1
-          if (lastIdx >= 0 && updated[lastIdx].role === "assistant") {
-            updated[lastIdx] = {
-              role: "assistant",
-              content: limitMessage,
+        if (isDailyLimit) {
+          setLimitReached(true)
+          setMessages((prev) => prev.slice(0, -1))
+        } else {
+          setMessages((prev) => {
+            const updated = [...prev]
+            const lastIdx = updated.length - 1
+            if (lastIdx >= 0 && updated[lastIdx].role === "assistant") {
+              updated[lastIdx] = {
+                role: "assistant",
+                content: limitMessage,
+              }
             }
-          }
-          return updated
-        })
+            return updated
+          })
 
-        setError(limitMessage)
-        toast({
-          title: "Limită atinsă",
-          description: limitMessage,
-          variant: "destructive",
-        })
+          setError(limitMessage)
+          toast({
+            title: "Limită atinsă",
+            description: limitMessage,
+            variant: "destructive",
+          })
+        }
 
         abortControllerRef.current = null
         setBusy(false)
@@ -1278,7 +1287,7 @@ export function InsightIdeChat({
               </div>
             )}
 
-            {error && (
+            {error && !limitReached && (
               <div className="bg-red-900/20 border border-red-800 text-red-300 rounded p-2 text-xs">
                 {error}
               </div>
@@ -1287,6 +1296,7 @@ export function InsightIdeChat({
           </div>
 
           <div className="p-4 space-y-3">
+            {limitReached && <AiAgentLimitBanner />}
             <div className="rounded-2xl border border-[#3b3b3b] bg-[#242424] px-3 py-1.5 space-y-1">
               <Input
                 value={input}

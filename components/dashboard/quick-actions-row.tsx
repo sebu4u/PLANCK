@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Play, Plus, CheckSquare, Code, ArrowRight } from "lucide-react"
+import { Play, Plus, CheckSquare, Code, Brain } from "lucide-react"
 import type { ContinueLearningItem, Project } from "@/lib/dashboard-data"
 
 interface QuickActionsRowProps {
@@ -87,8 +87,26 @@ export function QuickActionsRow({ lastLesson, userGrade, lastProject }: QuickAct
                 </div>
             </Link>
 
-            {/* 4. Ultimul proiect */}
-            <Link href={projectLink} className="block group">
+            {/* 4a. Memorator – doar pe mobil (în loc de PlanckCode) */}
+            <Link href="/space" className="block group md:hidden">
+                <div className="h-full bg-[#181818] border border-white/5 rounded-xl p-4 hover:bg-[#222222] hover:border-white/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden hover:scale-[1.02] transform origin-center">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-400 group-hover:scale-110 transition-transform">
+                            <Brain className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-xs text-white/40 mb-1 font-medium tracking-wide">Memorator</p>
+                        <p className="text-sm text-white/90 font-medium leading-tight group-hover:text-violet-400 transition-colors">
+                            Formule și concepte
+                        </p>
+                    </div>
+                    <div className="absolute -bottom-10 -right-10 w-20 h-20 bg-violet-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+            </Link>
+
+            {/* 4b. Ultimul proiect PlanckCode – doar de la md în sus */}
+            <Link href={projectLink} className="hidden md:block group">
                 <div className="h-full bg-[#181818] border border-white/5 rounded-xl p-4 hover:bg-[#222222] hover:border-white/10 transition-all duration-300 flex flex-col justify-between relative overflow-hidden md:hover:scale-[1.02] transform origin-center">
                     <div className="flex items-center justify-between mb-3">
                         <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">

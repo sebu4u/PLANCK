@@ -14,6 +14,9 @@ import type { KnowledgeNode, GraphData, ForceGraphData } from '@/lib/types/knowl
 import { Loader2, Network } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SpaceWelcomeCard } from '@/components/space/space-welcome-card'
+import { SpaceUpgradeCtaCard } from '@/components/space/space-upgrade-cta-card'
+import { useSubscriptionPlan } from '@/hooks/use-subscription-plan'
+import { isNodeAllowedForFreePlan } from '@/lib/space-allowed-nodes'
 
 export function SpacePageContent() {
     const [graphData, setGraphData] = useState<GraphData | null>(null)
@@ -23,6 +26,8 @@ export function SpacePageContent() {
     const [error, setError] = useState<string | null>(null)
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [showWelcome, setShowWelcome] = useState(true)
+    const [showUpgradeCta, setShowUpgradeCta] = useState(false)
+    const { isPaid } = useSubscriptionPlan()
 
     // Fetch graph data on mount
     useEffect(() => {
@@ -60,14 +65,38 @@ export function SpacePageContent() {
         return getNodeRecommendations(selectedNode, graphData.nodes)
     }, [selectedNode, graphData])
 
+    const lockedNodeIds = useMemo(() => {
+        if (!graphData || isPaid) {
+            return new Set<string>()
+        }
+
+        const locked = new Set<string>()
+        graphData.nodes.forEach((node) => {
+            if (!isNodeAllowedForFreePlan(node)) {
+                locked.add(node.id)
+            }
+        })
+        return locked
+    }, [graphData, isPaid])
+
     // Handle node selection
     const handleNodeClick = useCallback((nodeId: string) => {
+        if (lockedNodeIds.has(nodeId)) {
+            setSelectedNodeId(null)
+            setShowUpgradeCta(true)
+            if (window.innerWidth < 768) {
+                setSidebarOpen(false)
+            }
+            return
+        }
+
+        setShowUpgradeCta(false)
         setSelectedNodeId(nodeId)
         // On mobile, close sidebar if open
         if (window.innerWidth < 768) {
             setSidebarOpen(false)
         }
-    }, [])
+    }, [lockedNodeIds])
 
     // Handle close info card
     const handleCloseCard = useCallback(() => {
@@ -85,6 +114,12 @@ export function SpacePageContent() {
             return newState
         })
     }, [])
+
+    useEffect(() => {
+        if (isPaid) {
+            setShowUpgradeCta(false)
+        }
+    }, [isPaid])
 
     // Loading state
     if (loading) {
@@ -127,6 +162,7 @@ export function SpacePageContent() {
                     data={forceGraphData}
                     selectedNodeId={selectedNodeId}
                     connectedNodeIds={connectedNodeIds}
+                    lockedNodeIds={lockedNodeIds}
                     onNodeClick={handleNodeClick}
                 />
             </div>
@@ -138,6 +174,7 @@ export function SpacePageContent() {
                 isOpen={sidebarOpen}
                 onToggle={handleToggleSidebar}
                 onNodeSelect={handleNodeClick}
+                lockedNodeIds={lockedNodeIds}
             />
 
             {/* Floating cards overlay - appears on top of graph when node selected */}
@@ -160,6 +197,20 @@ export function SpacePageContent() {
                                 />
                             </div>
                         </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Upgrade CTA Overlay */}
+            <AnimatePresence>
+                {showUpgradeCta && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                    >
+                        <SpaceUpgradeCtaCard onClose={() => setShowUpgradeCta(false)} />
                     </motion.div>
                 )}
             </AnimatePresence>

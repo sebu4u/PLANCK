@@ -19,6 +19,7 @@ interface KnowledgeGraphProps {
     data: ForceGraphData
     selectedNodeId: string | null
     connectedNodeIds: Set<string>
+    lockedNodeIds: Set<string>
     onNodeClick: (nodeId: string) => void
 }
 
@@ -26,6 +27,7 @@ export function KnowledgeGraph({
     data,
     selectedNodeId,
     connectedNodeIds,
+    lockedNodeIds,
     onNodeClick
 }: KnowledgeGraphProps) {
     const graphRef = useRef<any>(null)
@@ -91,9 +93,10 @@ export function KnowledgeGraph({
     // Custom node rendering
     const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const graphNode = node as GraphNode
+        const isLocked = lockedNodeIds.has(graphNode.id)
         const isSelected = selectedNodeId === graphNode.id
         const isHighlighted = connectedNodeIds.has(graphNode.id)
-        const isActive = isSelected || isHighlighted
+        const isActive = !isLocked && (isSelected || isHighlighted)
 
         const nodeX = node.x ?? 0
         const nodeY = node.y ?? 0
@@ -117,7 +120,9 @@ export function KnowledgeGraph({
         // Draw main node circle - solid color, no border
         ctx.beginPath()
         ctx.arc(nodeX, nodeY, radius, 0, 2 * Math.PI)
-        ctx.fillStyle = getNodeColor(graphNode.type, isSelected, isHighlighted)
+        ctx.fillStyle = isLocked
+            ? 'rgba(255, 255, 255, 0.2)'
+            : getNodeColor(graphNode.type, isSelected, isHighlighted)
         ctx.fill()
 
         // Draw label
@@ -143,7 +148,7 @@ export function KnowledgeGraph({
         }
 
         // Label text
-        ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)'
+        ctx.fillStyle = isLocked ? 'rgba(255, 255, 255, 0.4)' : (isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)')
         ctx.fillText(label, nodeX, labelY)
 
         // Draw type indicator (small icon/badge)
@@ -153,7 +158,14 @@ export function KnowledgeGraph({
             ctx.fillStyle = '#f472b6'
             ctx.fillText('∑', nodeX + textWidth / 2 + 4, labelY)
         }
-    }, [selectedNodeId, connectedNodeIds])
+
+        if (isLocked) {
+            const tagSize = Math.max(8 / globalScale, 3)
+            ctx.font = `${tagSize}px Inter, system-ui, sans-serif`
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+            ctx.fillText('PLUS', nodeX + textWidth / 2 + 6, labelY)
+        }
+    }, [selectedNodeId, connectedNodeIds, lockedNodeIds])
 
     // Custom link rendering
     const linkColor = useCallback((link: any) => {

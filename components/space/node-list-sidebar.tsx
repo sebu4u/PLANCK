@@ -1,7 +1,7 @@
 "use client"
 
 import type { KnowledgeNode } from '@/lib/types/knowledge-graph'
-import { ChevronRight, BookOpen, Calculator, X } from 'lucide-react'
+import { ChevronRight, BookOpen, Calculator, X, Lock } from 'lucide-react'
 
 interface NodeListSidebarProps {
     nodes: KnowledgeNode[]
@@ -9,6 +9,7 @@ interface NodeListSidebarProps {
     isOpen: boolean
     onToggle: () => void
     onNodeSelect: (nodeId: string) => void
+    lockedNodeIds: Set<string>
 }
 
 export function NodeListSidebar({
@@ -16,7 +17,8 @@ export function NodeListSidebar({
     selectedNodeId,
     isOpen,
     onToggle,
-    onNodeSelect
+    onNodeSelect,
+    lockedNodeIds
 }: NodeListSidebarProps) {
     // Group nodes by type
     const concepts = nodes.filter(n => n.type === 'concept')
@@ -74,9 +76,17 @@ export function NodeListSidebar({
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedNodeId === node.id
                                             ? 'bg-blue-500/20 text-blue-400'
                                             : 'text-white/70 hover:bg-white/5 hover:text-white'
-                                            }`}
+                                            } ${lockedNodeIds.has(node.id) ? 'opacity-60' : ''}`}
                                     >
-                                        {node.title}
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span>{node.title}</span>
+                                            {lockedNodeIds.has(node.id) && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                                                    <Lock className="w-3 h-3" />
+                                                    Plus
+                                                </span>
+                                            )}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
@@ -98,9 +108,17 @@ export function NodeListSidebar({
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedNodeId === node.id
                                             ? 'bg-pink-500/20 text-pink-400'
                                             : 'text-white/70 hover:bg-white/5 hover:text-white'
-                                            }`}
+                                            } ${lockedNodeIds.has(node.id) ? 'opacity-60' : ''}`}
                                     >
-                                        {node.title}
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span>{node.title}</span>
+                                            {lockedNodeIds.has(node.id) && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+                                                    <Lock className="w-3 h-3" />
+                                                    Plus
+                                                </span>
+                                            )}
+                                        </span>
                                     </button>
                                 ))}
                             </div>

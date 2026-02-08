@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
@@ -35,14 +36,18 @@ import { getNextRankThreshold } from "@/lib/dashboard-data"
 import { ProblemOfTheDayCard } from "@/components/dashboard/cards/problem-of-the-day-card"
 import { QuickActionsRow } from "@/components/dashboard/quick-actions-row"
 import { ContestPromoCard } from "@/components/dashboard/cards/contest-promo-card"
+import { FreePlanUpgradeModal } from "@/components/dashboard/free-plan-upgrade-modal"
 
 export function DashboardAuth() {
   const router = useRouter()
   const { user, loading: authLoading, profile } = useAuth()
+  const { isFree } = useSubscriptionPlan()
   const [loading, setLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
   const isFetchingRef = useRef(false)
   const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const trialModalCheckedRef = useRef(false)
+  const [showTrialModal, setShowTrialModal] = useState(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -309,6 +314,39 @@ export function DashboardAuth() {
     }
   }, [user?.id, authLoading, router])
 
+  useEffect(() => {
+    if (authLoading || loading || !dashboardData || !user || !isFree) return
+    if (trialModalCheckedRef.current) return
+    trialModalCheckedRef.current = true
+
+    try {
+      const countKey = `dashboard_entry_count_${user.id}`
+      const sessionKey = `dashboard_trial_session_${user.id}`
+      const lastShownKey = `dashboard_trial_last_shown_${user.id}`
+
+      let sessionId = sessionStorage.getItem(sessionKey)
+      if (!sessionId) {
+        const fallbackId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        sessionId = typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : fallbackId
+        sessionStorage.setItem(sessionKey, sessionId)
+      }
+
+      const currentCount = Number(localStorage.getItem(countKey) || "0")
+      const nextCount = Number.isFinite(currentCount) ? currentCount + 1 : 1
+      localStorage.setItem(countKey, String(nextCount))
+
+      const lastShownSession = localStorage.getItem(lastShownKey)
+      if (nextCount % 3 === 0 && lastShownSession !== sessionId) {
+        localStorage.setItem(lastShownKey, sessionId)
+        setShowTrialModal(true)
+      }
+    } catch {
+      // Ignore storage errors silently
+    }
+  }, [authLoading, loading, dashboardData, user?.id, isFree])
+
 
   // Memoize userData to prevent recreation on every render
   // Must be called before any conditional returns to follow Rules of Hooks
@@ -429,6 +467,20 @@ export function DashboardAuth() {
         </div>
       </div>
 
+      {showTrialModal && (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300"
+          onClick={() => setShowTrialModal(false)}
+          role="presentation"
+        >
+          <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[520px]">
+            <FreePlanUpgradeModal
+              imageSrc="/dashboard-card.png"
+              onClose={() => setShowTrialModal(false)}
+            />
+          </div>
+        </div>
+      )}
 
     </DashboardSidebarProvider>
   )

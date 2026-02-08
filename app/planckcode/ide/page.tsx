@@ -1553,7 +1553,7 @@ function IDEPageContent() {
         ])}
         id="breadcrumbs-planckcode-ide"
       />
-      {showRaptorCard && (
+      {showRaptorCard && isFree && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -1618,10 +1618,10 @@ function IDEPageContent() {
                         window.location.href = '/pricing'
                       }}
                     >
-                      Upgrade to Pro
+                      Upgrade to Premium
                     </Button>
                     <p className="mt-2 text-center text-[10px] text-gray-500 uppercase tracking-widest">
-                      Disponibil în planurile Plus & Pro
+                      Disponibil în planurile Plus & Premium
                     </p>
                   </div>
                 </div>

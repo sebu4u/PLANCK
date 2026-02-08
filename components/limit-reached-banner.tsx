@@ -1,50 +1,44 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Clock } from "lucide-react"
 
 interface LimitReachedBannerProps {
     resetTime: string
 }
 
-export function LimitReachedBanner({ resetTime }: LimitReachedBannerProps) {
-    const [timeLeft, setTimeLeft] = useState("")
-
-    useEffect(() => {
-        const calculateTimeLeft = () => {
-            const now = new Date()
-            const reset = new Date(resetTime)
-            const diff = reset.getTime() - now.getTime()
-
-            if (diff <= 0) {
-                setTimeLeft("acum")
-                return
-            }
-
-            const hours = Math.floor(diff / (1000 * 60 * 60))
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-
-            setTimeLeft(`${hours}h ${minutes}m`)
-        }
-
-        calculateTimeLeft()
-        const interval = setInterval(calculateTimeLeft, 60000) // Update every minute
-
-        return () => clearInterval(interval)
-    }, [resetTime])
-
+export function LimitReachedBanner({ resetTime: _resetTime }: LimitReachedBannerProps) {
     return (
-        <div className="mx-4 mb-4 p-4 rounded-xl bg-[#1a1a1a] border border-orange-500/20 shadow-lg animate-in slide-in-from-bottom-2 duration-300">
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-orange-400 font-medium">
-                    <Clock className="w-4 h-4" />
-                    <span>Ai atins limita zilnică</span>
+        <div className="relative mx-4 mb-3">
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-10 left-1/2 h-28 w-[140%] -translate-x-1/2 rounded-full bg-gradient-radial from-white/20 via-white/10 to-transparent blur-2xl opacity-70"
+            />
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-6 left-1/2 h-20 w-[140%] -translate-x-1/2 opacity-50 animate-[twinkle_4s_ease-in-out_infinite_alternate]"
+                style={{
+                    backgroundImage:
+                        "radial-gradient(2px 2px at 20% 70%, rgba(255, 255, 255, 0.5), transparent 60%), radial-gradient(1px 1px at 45% 55%, rgba(255, 255, 255, 0.45), transparent 60%), radial-gradient(2px 2px at 70% 65%, rgba(255, 255, 255, 0.35), transparent 60%), radial-gradient(1px 1px at 85% 45%, rgba(255, 255, 255, 0.4), transparent 60%)",
+                    backgroundRepeat: "repeat",
+                    backgroundSize: "160px 80px",
+                }}
+            />
+            <div className="rounded-lg border border-white/10 bg-[#1a1a1a] p-3 shadow-md animate-in slide-in-from-bottom-2 duration-300">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2 text-gray-200">
+                        <Clock className="mt-0.5 h-4 w-4 text-gray-300" />
+                        <p className="text-sm text-gray-200">
+                            Ai atins limita zilnică. Problema asta pare grea... vrei să continui?
+                        </p>
+                    </div>
+                    <Link
+                        href="/pricing"
+                        className="inline-flex items-center justify-center rounded-md border border-white/20 px-2 py-1 text-xs font-semibold text-gray-200 transition-colors hover:border-white/40 hover:text-white"
+                    >
+                        Vezi Pricing
+                    </Link>
                 </div>
-                <p className="text-sm text-gray-400">
-                    Ai consumat cele 20 de mesaje gratuite.
-                    <br />
-                    Limita se resetează în <span className="text-white font-medium">{timeLeft}</span>.
-                </p>
             </div>
         </div>
     )

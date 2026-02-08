@@ -65,8 +65,8 @@ export default function InsightPricingSection({ variant = 'default' }: InsightPr
       shadowClass: "shadow-blue-500/20"
     },
     {
-      id: "pro",
-      name: "Pro",
+      id: "premium",
+      name: "Premium",
       price: "59 RON/lună",
       features: [
         { text: "tot ce conține planul Free și Plus", type: "check" },
@@ -186,7 +186,7 @@ export default function InsightPricingSection({ variant = 'default' }: InsightPr
                   onClick={() => {
                     if (plan.id === 'free') {
                       router.push('/probleme')
-                    } else if (plan.id === 'plus' || plan.id === 'pro') {
+                    } else if (plan.id === 'plus' || plan.id === 'premium') {
                       router.push('/pricing')
                     }
                   }}

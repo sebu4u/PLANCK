@@ -18,8 +18,8 @@ const classIcons: Record<GradeLevel, React.ReactNode> = {
 };
 
 const classDescriptions: Record<GradeLevel, string> = {
-    9: 'Mecanică, Termodinamică',
-    10: 'Optică, Electricitate',
+    9: 'Mecanică, Optică',
+    10: 'Termodinamică, Electricitate',
     11: 'Electrodinamică, Oscilații',
     12: 'Fizică atomică, Fizică nucleară',
 };
