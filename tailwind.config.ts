@@ -16,6 +16,7 @@ const config: Config = {
 		},
 		fontFamily: {
 			'vt323': ['var(--font-vt323)'],
+			'dancing': ['var(--font-dancing-script)', 'cursive'],
 		},
   		colors: {
   			background: 'hsl(var(--background))',

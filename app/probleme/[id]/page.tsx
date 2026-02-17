@@ -1,16 +1,8 @@
 import { notFound } from "next/navigation"
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabaseClient"
 import { createClient } from "@supabase/supabase-js"
 import { Problem } from "@/data/problems"
-import { ArrowLeft } from "lucide-react"
-import Link from "next/link"
 import ProblemDetailClient from "./ProblemDetailClient"
-import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
-import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 
 interface ProblemPageProps {
   params: Promise<{
@@ -67,10 +59,8 @@ export default async function ProblemPage({ params }: ProblemPageProps) {
     notFound()
   }
   return (
-    <CatalogThemeProvider catalogType="physics" pageType="detail">
-      <CatalogThemeBackground defaultBackgroundClass="bg-[#141414]">
-        <ProblemDetailClient problem={problem} categoryIcons={categoryIcons} difficultyColors={difficultyColors} />
-      </CatalogThemeBackground>
-    </CatalogThemeProvider>
+    <div className="bg-[#f6f5f4]">
+      <ProblemDetailClient problem={problem} categoryIcons={categoryIcons} difficultyColors={difficultyColors} />
+    </div>
   )
 }

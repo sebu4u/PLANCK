@@ -1,13 +1,14 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { Grade, Chapter, Lesson, LessonSummary } from '@/lib/supabase-physics'
 import { Button } from '@/components/ui/button'
-import { Menu, X, Chrome, Github, Loader2, Lock, PanelRight } from 'lucide-react'
+import { PanelRight, X, Shield } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { slugify } from '@/lib/slug'
 import { useAuth } from '@/components/auth-provider'
-import { useToast } from '@/hooks/use-toast'
+import { useAdmin } from '@/hooks/use-admin'
 
 // Lazy load heavy components
 const PhysicsSidebar = lazy(() => import('@/components/physics-sidebar').then(m => ({ default: m.PhysicsSidebar })))
@@ -24,9 +25,8 @@ interface PhysicsLessonsClientProps {
 }
 
 export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonId }: PhysicsLessonsClientProps) {
-  const { user, loading: authLoading, loginWithGoogle, loginWithGitHub } = useAuth()
-  const { toast } = useToast()
-  const [loginLoading, setLoginLoading] = useState<'google' | 'github' | null>(null)
+  const { user } = useAuth()
+  const { isAdmin } = useAdmin()
 
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null)
   const [currentLessonIndex, setCurrentLessonIndex] = useState<number>(-1)
@@ -38,67 +38,7 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
   const lessonCache = useRef<Map<string, Lesson>>(new Map())
   const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set())
   const [showCompletionModal, setShowCompletionModal] = useState(false)
-
-  // Check if user is not authenticated (show auth gate)
-  const showAuthGate = !authLoading && !user
-
-  // Login handlers
-  const handleGoogleLogin = async () => {
-    setLoginLoading('google')
-    const { error } = await loginWithGoogle()
-    setLoginLoading(null)
-    if (error) {
-      toast({
-        title: 'Eroare la autentificare cu Google',
-        description: error.message,
-        variant: 'destructive',
-      })
-    }
-  }
-
-  const handleGitHubLogin = async () => {
-    setLoginLoading('github')
-    const { error } = await loginWithGitHub()
-    setLoginLoading(null)
-    if (error) {
-      toast({
-        title: 'Eroare la autentificare cu GitHub',
-        description: error.message,
-        variant: 'destructive',
-      })
-    }
-  }
-
-  // Block scroll when auth gate is shown
-  useEffect(() => {
-    const lockScroll = () => {
-      if (showAuthGate) {
-        document.body.style.overflow = 'hidden'
-        document.documentElement.style.overflow = 'hidden'
-      } else {
-        if (!isMobileSidebarOpen) {
-          document.body.style.overflow = 'unset'
-          document.documentElement.style.overflow = 'unset'
-        }
-      }
-    }
-
-    lockScroll()
-
-    // Retry after a small delay to handle navigation race conditions
-    const timer = setTimeout(lockScroll, 100)
-    // Another retry for good measure
-    const timer2 = setTimeout(lockScroll, 300)
-
-    return () => {
-      clearTimeout(timer)
-      clearTimeout(timer2)
-      if (showAuthGate) {
-        document.body.style.overflow = 'unset'
-        document.documentElement.style.overflow = 'unset'
-      }
-    }
-  }, [showAuthGate, isMobileSidebarOpen])
+  const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false)
 
   // Fetch completed lessons
   useEffect(() => {
@@ -410,82 +350,21 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
 
   return (
     <div className="relative h-[calc(100vh-4rem)] overflow-hidden bg-[#101010]">
-      {/* Auth Gate Overlay - shown for unauthenticated users */}
-      {showAuthGate && (
-        <div className="fixed inset-x-0 top-16 bottom-0 z-[200] flex items-center justify-center">
-          {/* Backdrop blur overlay */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
+      <div className="flex relative h-full">
+        {/* Admin Button - only visible to admins */}
+        {isAdmin && (
+          <Link href="/admin/lessons">
+            <Button
+              variant="outline"
+              size="sm"
+              className="fixed left-4 top-20 z-[90] bg-[#101010] border-yellow-500/30 text-yellow-400 shadow-lg transition-all duration-300 ease-in-out hover:scale-105 hover:bg-yellow-500/10 hover:border-yellow-500/50 gap-1.5"
+            >
+              <Shield className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs">Admin Lecții</span>
+            </Button>
+          </Link>
+        )}
 
-          {/* Login Card */}
-          <div className="relative z-10 w-[min(580px,90vw)] bg-[#0d0d0d] border border-white/15 rounded-2xl shadow-[0_0_60px_rgba(255,255,255,0.05)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-            {/* Header Image */}
-            <div className="relative h-32 sm:h-44 w-full mb-0">
-              <img
-                src="/images/auth-gate-header.png"
-                alt="Physics Authentication"
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/60 to-transparent" />
-            </div>
-
-            <div className="p-5 sm:p-8 pt-4">
-
-              {/* Title & Description */}
-              <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-2">
-                Creează-ți un cont gratuit
-              </h2>
-              <p className="text-gray-400 text-center text-sm mb-4 sm:mb-8">
-                Pentru a accesa cursurile de fizică, ai nevoie de un cont PLANCK.
-                Este gratuit și durează doar câteva secunde!
-              </p>
-
-              {/* Login Buttons */}
-              <div className="space-y-3">
-                <Button
-                  onClick={handleGoogleLogin}
-                  disabled={loginLoading !== null}
-                  className="w-full h-10 sm:h-12 bg-white hover:bg-gray-100 text-black border border-white/20 hover:border-white/40 transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.15)]"
-                >
-                  {loginLoading === 'google' ? (
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  ) : (
-                    <Chrome className="w-5 h-5 mr-2 text-gray-800" />
-                  )}
-                  <span className="font-semibold">
-                    {loginLoading === 'google' ? 'Se conectează...' : 'Continuă cu Google'}
-                  </span>
-                </Button>
-
-                <Button
-                  onClick={handleGitHubLogin}
-                  disabled={loginLoading !== null}
-                  className="w-full h-10 sm:h-12 bg-[#1a1a1a] hover:bg-[#252525] text-white border border-white/10 hover:border-white/20 transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.08)]"
-                >
-                  {loginLoading === 'github' ? (
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  ) : (
-                    <Github className="w-5 h-5 mr-2" />
-                  )}
-                  <span className="font-semibold">
-                    {loginLoading === 'github' ? 'Se conectează...' : 'Continuă cu GitHub'}
-                  </span>
-                </Button>
-              </div>
-
-              {/* Footer note */}
-              <p className="text-gray-500 text-xs text-center mt-6">
-                Prin continuare, accepți{' '}
-                <a href="/termeni" className="text-white/60 hover:text-white/90 hover:underline transition-colors">Termenii și Condițiile</a>
-                {' '}și{' '}
-                <a href="/confidentialitate" className="text-white/60 hover:text-white/90 hover:underline transition-colors">Politica de Confidențialitate</a>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content - blurred when auth gate is shown */}
-      <div className={`flex relative h-full ${showAuthGate ? 'pointer-events-none blur-[3px] select-none' : ''}`}>
         {/* Mobile Menu Button */}
         {!isMobileSidebarOpen && (
           <Button
@@ -547,6 +426,8 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
                       setCompletedLessonIds(prev => new Set(prev).add(currentLesson.id))
                       setShowCompletionModal(true)
                     }
+                  } else {
+                    setShowGuestSavePrompt(true)
                   }
                 }}
                 onProgressChange={(p) => {
@@ -570,6 +451,44 @@ export function PhysicsLessonsClient({ grades, chapters, lessons, initialLessonI
         onNextLesson={handleNextLesson}
         hasNextLesson={hasNext}
       />
+
+      {showGuestSavePrompt && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/55 backdrop-blur-[3px]"
+            onClick={() => setShowGuestSavePrompt(false)}
+          />
+          <div className="relative z-10 w-[min(520px,92vw)] rounded-2xl border border-white/15 bg-[#0d0d0d] p-6 text-white shadow-[0_0_60px_rgba(255,255,255,0.05)] animate-in fade-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={() => setShowGuestSavePrompt(false)}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Închide"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h3 className="mb-2 text-xl font-bold">Creează-ți un cont gratuit</h3>
+            <p className="mb-6 text-sm text-gray-300">
+              Pentru a salva lecțiile și progresul tău, ai nevoie de un cont PLANCK.
+              Durează doar câteva secunde.
+            </p>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button asChild className="h-11 flex-1 bg-white text-black hover:bg-gray-100">
+                <Link href="/register">Creează cont</Link>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowGuestSavePrompt(false)}
+                className="h-11 flex-1 border-white/25 bg-transparent text-white hover:bg-white/10"
+              >
+                Mai târziu
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

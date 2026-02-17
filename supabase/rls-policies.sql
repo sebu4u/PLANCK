@@ -45,6 +45,7 @@ create table if not exists public.profiles (
   bio text,
   grade text,
   user_icon text,
+  is_admin boolean not null default false,
   created_at timestamp with time zone default now()
 );
 

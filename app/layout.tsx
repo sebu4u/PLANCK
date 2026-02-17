@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Mona_Sans, VT323 } from "next/font/google"
+import { Mona_Sans, VT323, Dancing_Script } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
@@ -29,6 +29,12 @@ const vt323 = VT323({
   weight: ["400"],
   subsets: ["latin"],
   variable: "--font-vt323"
+})
+
+const dancingScript = Dancing_Script({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-dancing-script"
 })
 
 export const metadata: Metadata = {
@@ -89,7 +95,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${monaSans.className} ${monaSans.variable} ${vt323.variable}`}>
+      <body className={`${monaSans.className} ${monaSans.variable} ${vt323.variable} ${dancingScript.variable}`}>
         <ErrorBoundary>
           <RealVHProvider />
           <MobileViewportFix />
@@ -109,7 +115,7 @@ export default function RootLayout({
                 className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
                 aria-label="Versiunea site-ului"
               >
-                v1.00.01
+                v1.02.30
               </div>
             </AnalyticsProvider>
           </AuthProvider>

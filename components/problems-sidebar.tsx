@@ -264,9 +264,12 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
       
       {/* Sidebar */}
       <div className={`
-        fixed top-0 left-0 h-full z-[360] bg-[#121212] text-white shadow-[0_30px_80px_rgba(0,0,0,0.65)] border-r border-white/10
+        fixed top-0 left-0 h-full z-[360] bg-[#121212] text-white
         transform transition-transform duration-300 ease-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${isOpen
+          ? 'translate-x-0 border-r border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.65)]'
+          : '-translate-x-full border-r border-transparent shadow-none'
+        }
         w-[380px] max-w-[85vw]
       `}>
         {/* Header */}

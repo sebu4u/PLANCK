@@ -135,6 +135,36 @@ export const articleStructuredData = (articleData: any) => ({
   "dateModified": articleData.modifiedDate
 })
 
+// AboutPage structured data for /despre
+export const aboutPageStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  "name": "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
+  "description": "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa PLANCK, misiunea noastră, cursuri interactive, Insight AI, PlanckCode IDE, Planck Sketch și modelele Raptor1.",
+  "url": "https://www.planck.academy/despre",
+  "mainEntity": {
+    "@type": "EducationalOrganization",
+    "name": "Planck Academy",
+    "url": "https://www.planck.academy",
+    "description": "Planck Academy este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
+    "foundingDate": "2024",
+    "founder": [
+      {
+        "@type": "Person",
+        "name": "Mițurcă Sebastian",
+        "jobTitle": "Co-fondator & Dezvoltator"
+      },
+      {
+        "@type": "Person",
+        "name": "Avram Marina",
+        "jobTitle": "Co-fondator & Content Creator"
+      }
+    ],
+    "teaches": ["Physics", "Computer Science"],
+    "educationalLevel": "High school"
+  }
+}
+
 // Learning Resource Structured Data for Planck Sketch
 export const sketchResourceStructuredData = {
   "@context": "https://schema.org",

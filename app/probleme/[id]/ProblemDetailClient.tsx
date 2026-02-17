@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, Maximize2, X, Lock } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, Maximize2, X, Lock, Play } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -24,11 +24,9 @@ import ProblemOrbButton from "@/components/problem-orb-button"
 // Lazy load heavy sidebar components for faster initial render
 const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
 const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProblemBoard } from "@/components/problems/problem-board"
 import { cn } from "@/lib/utils"
-import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import type { TLStore } from "@tldraw/tldraw"
 import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
 
@@ -71,9 +69,9 @@ const congratulationMessages = [
 ]
 
 const difficultyAccentClasses: Record<string, string> = {
-  "Ușor": "border-emerald-500/50 bg-emerald-500/10 text-emerald-200",
-  "Mediu": "border-amber-500/50 bg-amber-500/10 text-amber-200",
-  "Avansat": "border-rose-500/50 bg-rose-500/10 text-rose-200",
+  "Ușor": "border-emerald-600/30 bg-emerald-50 text-emerald-800",
+  "Mediu": "border-amber-600/30 bg-amber-50 text-amber-800",
+  "Avansat": "border-rose-600/30 bg-rose-50 text-rose-800",
 }
 
 // Loading skeleton for video content
@@ -159,7 +157,7 @@ function LockedVideoCard({ onUpgradeClick }: { onUpgradeClick: () => void }) {
 function ImageSkeleton() {
   return (
     <div className="mt-6 flex justify-center">
-      <Skeleton className="w-full max-w-2xl h-80 rounded-xl bg-white/10" />
+      <Skeleton className="w-full max-w-2xl h-80 rounded-xl bg-[#dfdcd8]" />
     </div>
   )
 }
@@ -171,9 +169,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   categoryIcons: any,
   difficultyColors: DifficultyColors
 }) {
-  const [activeTab, setActiveTab] = useState<'statement' | 'video'>(
-    typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== '' ? 'statement' : 'statement'
-  )
   const [isSolved, setIsSolved] = useState(false)
   const [loadingSolved, setLoadingSolved] = useState(true)
   const [congratulationMessage, setCongratulationMessage] = useState<string | null>(null)
@@ -182,8 +177,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [imageLoaded, setImageLoaded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [insightSidebarOpen, setInsightSidebarOpen] = useState(false)
-  const [mobileBoardVisible, setMobileBoardVisible] = useState(false)
   const [desktopBoardExpanded, setDesktopBoardExpanded] = useState(false)
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
   const { user } = useAuth();
   const { isFree } = useSubscriptionPlan()
   const isMobile = useIsMobile()
@@ -220,7 +215,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
     })
   }
 
-  const difficultyTone = difficultyAccentClasses[problem.difficulty] || "border-white/15 bg-white/5 text-white/80"
+  const difficultyTone = difficultyAccentClasses[problem.difficulty] || "border-[#0b0d10]/15 bg-white text-[#2C2F33]"
   const classLabel = problem.classString
     ? problem.classString
     : typeof problem.class === 'number'
@@ -315,7 +310,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   };
 
   return (
-    <div className="min-h-screen text-white flex flex-col">
+    <div className="min-h-screen bg-[#f6f5f4] text-[#2C2F33] flex flex-col">
       <Navigation />
 
       {/* Upgrade Banner for Free Users */}
@@ -331,12 +326,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         </div>
       )}
 
-      <div
-        className={cn(
-          "flex-1 transition-all duration-300 ease-in-out",
-          insightSidebarOpen ? "lg:mr-[33vw]" : ""
-        )}
-      >
+      <div className="flex-1">
         <div className="px-4 sm:px-6 lg:px-12 pt-20 lg:pt-[116px] pb-16">
           <div className="mx-auto max-w-[1600px] space-y-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -344,31 +334,31 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                 <Button
                   onClick={() => setSidebarOpen(true)}
                   variant="outline"
-                  className="flex items-center gap-2 rounded-full border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/20"
+                  className="flex items-center gap-2 rounded-full border-[#0b0d10]/15 bg-white/80 px-4 py-2 text-sm font-medium text-[#0b0d10] transition hover:bg-white"
                 >
                   <List className="w-4 h-4" />
                   <span>Toate problemele</span>
                 </Button>
                 <Link
                   href="/probleme"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-white/60 transition hover:text-white"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Înapoi la catalog</span>
                 </Link>
               </div>
-              <div className="hidden sm:flex items-center gap-3 text-sm text-white/60">
+              <div className="hidden sm:flex items-center gap-3 text-sm text-[#2C2F33]/75">
                 {classLabel && (
-                  <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/70">
+                  <span className="inline-flex items-center rounded-full border border-[#0b0d10]/10 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#2C2F33]/80">
                     {classLabel}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-1">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#0b0d10]/10 bg-white px-3 py-1">
                   <span className="text-lg leading-none">{problemIcon}</span>
                   <span>ID {problem.id}</span>
                 </span>
                 {isSolved && (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-emerald-200">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-600/30 bg-emerald-50 px-3 py-1 text-emerald-800">
                     <CheckCircle2 className="w-4 h-4" />
                     Rezolvată
                   </span>
@@ -378,129 +368,70 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
             <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.58fr)_minmax(0,0.42fr)] 2xl:grid-cols-[minmax(0,0.6fr)_minmax(0,0.4fr)]">
               <section className="space-y-8">
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-8 shadow-[0px_24px_70px_-40px_rgba(0,0,0,0.9)]">
-                  <div className="flex flex-col gap-6">
-                    <div className="flex flex-wrap items-start gap-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
-                          {problem.difficulty}
-                        </Badge>
-                        <Badge className="flex items-center gap-2 border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
-                          <span className="text-base leading-none">{categoryIcons?.[problem.category] ?? '📘'}</span>
-                          {problem.category}
-                        </Badge>
-                        {hasVideo && (
-                          <Badge className="hidden sm:inline-flex border border-red-500/40 bg-red-500/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-200">
-                            🎥 Video
-                          </Badge>
-                        )}
-                        {isSolved && (
-                          <Badge className="border border-emerald-500/50 bg-emerald-500/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">
-                            ✔️ Rezolvată
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-white">
-                      {renderInlineMath(problem.title)}
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-white/70 sm:hidden">
-                      {classLabel && (
-                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/70">
-                          {classLabel}
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-1">
-                        <span className="text-base leading-none">{problemIcon}</span>
-                        <span>ID {problem.id}</span>
+                <div className="flex flex-col gap-6">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-[#0b0d10]">
+                    {renderInlineMath(problem.title)}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#2C2F33]/75 sm:hidden">
+                    {classLabel && (
+                      <span className="inline-flex items-center rounded-full border border-[#0b0d10]/10 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#2C2F33]/80">
+                        {classLabel}
                       </span>
-                    </div>
-
-                    {problem.description && (
-                      <p className="hidden sm:block text-base sm:text-lg leading-relaxed text-white/70">
-                        {renderInlineMath(problem.description)}
-                      </p>
                     )}
+                    <span className="inline-flex items-center gap-2 rounded-full border border-[#0b0d10]/10 bg-white px-3 py-1">
+                      <span className="text-base leading-none">{problemIcon}</span>
+                      <span>ID {problem.id}</span>
+                    </span>
+                  </div>
 
-                    {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
-                      <div className="hidden sm:flex flex-wrap gap-2">
-                        {problem.tags.map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/60"
-                          >
-                            {tag.trim()}
-                          </span>
-                        ))}
+                  {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
+                    <div className="hidden sm:flex flex-wrap gap-2">
+                      {problem.tags.map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded-full border border-[#0b0d10]/15 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-[#2C2F33]/75"
+                        >
+                          {tag.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="space-y-6">
+                    <div className="rounded-2xl border border-[#0b0d10]/10 bg-white/95 p-6 shadow-[0_12px_30px_-24px_rgba(11,13,16,0.45)]">
+                      <div className="whitespace-pre-wrap text-base font-semibold leading-relaxed text-[#2C2F33]">
+                        {renderInlineMath(problem.statement)}
+                      </div>
+                    </div>
+                    {problem.image_url && (
+                      <div className="flex justify-center">
+                        {!imageLoaded && <ImageSkeleton />}
+                        <img
+                          src={problem.image_url.replace(/^@/, '')}
+                          alt="Ilustrație problemă"
+                          className={cn(
+                            "w-full h-auto max-w-full rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
+                            !imageLoaded && 'hidden'
+                          )}
+                          onLoad={() => setImageLoaded(true)}
+                          onError={(e) => {
+                            console.error('Image failed to load:', problem.image_url, e)
+                            setImageLoaded(true)
+                          }}
+                        />
                       </div>
                     )}
-                    <Tabs
-                      value={activeTab}
-                      onValueChange={(value) => {
-                        const nextTab = value as 'statement' | 'video'
-                        setActiveTab(nextTab)
-                        if (nextTab === 'video' && isVideoLockedForUser) {
-                          setShowMobileUpgradeModal(true)
-                        }
-                      }}
-                      className="w-full"
-                    >
-                      <TabsList className="flex w-full gap-1 sm:gap-2 rounded-2xl border border-white/10 bg-white/5 p-1 overflow-hidden">
-                        <TabsTrigger
-                          value="statement"
-                          className="flex-[0_0_calc(50%-0.125rem)] sm:flex-1 min-w-0 rounded-full text-sm font-medium text-white/60 data-[state=active]:bg-white data-[state=active]:text-black px-2 sm:px-4 py-2 text-center overflow-hidden"
-                        >
-                          <span className="truncate block">Enunț</span>
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="video"
-                          className="flex-[0_0_calc(50%-0.125rem)] sm:flex-1 min-w-0 rounded-full text-sm font-medium text-white/60 data-[state=active]:bg-white data-[state=active]:text-black px-2 sm:px-4 py-2 text-center overflow-hidden"
-                        >
-                          <span className="truncate block">Video</span>
-                        </TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="statement" className="mt-6">
-                        <div className="rounded-2xl border border-white/8 bg-black/40 p-6">
-                          <div className="whitespace-pre-wrap text-base leading-relaxed text-white/85">
-                            {renderInlineMath(problem.statement)}
-                          </div>
-                          {problem.image_url && (
-                            <div className="mt-6 flex justify-center">
-                              {!imageLoaded && <ImageSkeleton />}
-                              <img
-                                src={problem.image_url.replace(/^@/, '')}
-                                alt="Ilustrație problemă"
-                                className={cn(
-                                  "w-full h-auto max-w-full rounded-xl border border-white/10 object-contain shadow-xl",
-                                  !imageLoaded && 'hidden'
-                                )}
-                                onLoad={() => setImageLoaded(true)}
-                                onError={(e) => {
-                                  console.error('Image failed to load:', problem.image_url, e)
-                                  setImageLoaded(true)
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </TabsContent>
-                      <TabsContent value="video" className="mt-6">
-                        <div className="rounded-2xl border border-white/8 bg-black/40 p-3 sm:p-6">
-                          {hasVideo ? (
-                            isVideoLockedForUser ? (
-                              <LockedVideoCard onUpgradeClick={() => setShowMobileUpgradeModal(true)} />
-                            ) : (
-                              <Suspense fallback={<VideoSkeleton />}>
-                                <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
-                              </Suspense>
-                            )
-                          ) : (
-                            <MissingVideoCard />
-                          )}
-                        </div>
-                      </TabsContent>
-                    </Tabs>
+                    <div className="pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => hasVideo && setIsVideoModalOpen(true)}
+                        disabled={!hasVideo}
+                        className="rounded-full border-[#0b0d10]/20 bg-white/70 px-5 py-2.5 text-sm font-medium text-[#2C2F33] hover:bg-white disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        <Play className="mr-2 h-4 w-4" />
+                        {hasVideo ? "Rezolvare video" : "Video în curând"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -511,35 +442,43 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                       className={cn(
                         'rounded-full border px-6 py-3 text-sm font-semibold transition',
                         isSolved
-                          ? 'cursor-not-allowed border-emerald-500/50 bg-emerald-500/20 text-emerald-200'
-                          : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+                          ? 'cursor-not-allowed border-emerald-600/30 bg-emerald-50 text-emerald-800'
+                          : 'border-[#0b0d10]/15 bg-white text-[#0b0d10] hover:bg-white/80'
                       )}
                     >
                       {isSolved ? 'Rezolvată' : 'Marchează ca rezolvată'}
                     </Button>
                   )}
                   {!user && (
-                    <span className="text-xs uppercase tracking-[0.3em] text-white/40">
+                    <span className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/55">
                       Autentifică-te pentru a salva progresul
                     </span>
                   )}
-                  <Button
-                    onClick={() => setMobileBoardVisible(true)}
-                    className="rounded-full border border-indigo-500/40 bg-indigo-500/20 px-6 py-3 text-sm font-semibold text-indigo-100 transition hover:bg-indigo-500/30 lg:hidden"
-                  >
-                    Deschide tabla
-                  </Button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
+                    {problem.difficulty}
+                  </Badge>
+                  <Badge className="flex items-center gap-2 border border-[#0b0d10]/15 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-[#2C2F33]">
+                    <span className="text-base leading-none">{categoryIcons?.[problem.category] ?? '📘'}</span>
+                    {problem.category}
+                  </Badge>
+                  {hasVideo && (
+                    <Badge className="border border-red-600/30 bg-red-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-800">
+                      🎥 Video
+                    </Badge>
+                  )}
                 </div>
               </section>
 
-              <aside className="space-y-6">
+              <aside className="hidden lg:block space-y-6">
                 {/* Only show minimized board when dialog is not expanded */}
                 {!desktopBoardExpanded && (
-                  <div className="hidden lg:flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.02] p-5 shadow-[0px_24px_80px_-40px_rgba(0,0,0,1)]">
+                  <div className="flex flex-col gap-4 rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)]">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="text-lg font-semibold text-white">Tabla de lucru</h2>
-                        <p className="mt-1 text-sm text-white/50">
+                        <h2 className="text-lg font-semibold text-[#0b0d10]">Tabla de lucru</h2>
+                        <p className="mt-1 text-sm text-[#2C2F33]/70">
                           Rezolvă problema direct pe această tablă. Salvează dacă ai cont.
                         </p>
                       </div>
@@ -547,46 +486,26 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         variant="ghost"
                         size="icon"
                         onClick={() => setDesktopBoardExpanded(true)}
-                        className="hidden rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/20 lg:inline-flex"
+                        className="hidden rounded-full border border-[#0b0d10]/10 bg-white text-[#0b0d10] transition hover:bg-[#f6f5f4] lg:inline-flex"
                       >
                         <Maximize2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="relative h-[600px] overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                    <div className="relative h-[600px] overflow-hidden rounded-2xl border border-[#0b0d10]/10 bg-white">
                       <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
                     </div>
                   </div>
                 )}
-
-                <div className="lg:hidden rounded-3xl border border-white/10 bg-white/[0.02] p-5">
-                  <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
-                    {classLabel && (
-                      <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/70">
-                        {classLabel}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-1">
-                      <span className="text-base leading-none">{problemIcon}</span>
-                      <span className="font-mono uppercase tracking-[0.28em] text-white/60">ID {problem.id}</span>
-                    </span>
-                  </div>
-                  <h2 className="text-lg font-semibold text-white">Tabla de lucru</h2>
-                  <p className="mt-2 text-sm text-white/60">
-                    Pentru o experiență mai bună pe mobil, deschide tabla pe tot ecranul.
-                  </p>
-                  <Button
-                    onClick={() => setMobileBoardVisible(true)}
-                    className="mt-4 w-full rounded-full border border-indigo-500/40 bg-indigo-500/20 py-3 text-sm font-semibold text-indigo-100 transition hover:bg-indigo-500/30"
-                  >
-                    Deschide tabla
-                  </Button>
-                </div>
               </aside>
             </div>
           </div>
         </div>
       </div>
-      <Footer />
+      <Footer
+        theme="light"
+        backgroundColor="bg-[#f6f5f4]"
+        borderColor="border-[#0b0d10]/10"
+      />
 
       <Suspense fallback={null}>
         <ProblemsSidebar
@@ -675,69 +594,67 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         />
       </Suspense>
 
-      <Dialog open={desktopBoardExpanded} onOpenChange={setDesktopBoardExpanded}>
-        <DialogContent hideClose className="max-w-[95vw] border border-white/10 bg-[#141414] text-white top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]">
-          <DialogTitle className="sr-only">Tabla de lucru - Vizualizare pe tot ecranul</DialogTitle>
+      <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+        <DialogContent hideClose className="max-w-4xl border border-white/10 bg-[#141414] text-white top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]">
+          <DialogTitle className="sr-only">Rezolvare video</DialogTitle>
+          <DialogDescription className="sr-only">
+            Modal cu rezolvarea video pentru problema curentă.
+          </DialogDescription>
           <div className="flex items-center justify-between pb-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/40">Tabla de lucru</p>
-              <p className="text-sm text-white/60">Vizualizare pe tot ecranul</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/40">Video</p>
+              <p className="text-sm text-white/70">Rezolvare pentru această problemă</p>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setDesktopBoardExpanded(false)}
+              onClick={() => setIsVideoModalOpen(false)}
               className="rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/20"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="h-[75vh] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-            <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
+          <div className="rounded-2xl border border-white/8 bg-black/40 p-3 sm:p-6">
+            {hasVideo ? (
+              isVideoLockedForUser ? (
+                <LockedVideoCard onUpgradeClick={() => setShowMobileUpgradeModal(true)} />
+              ) : (
+                <Suspense fallback={<VideoSkeleton />}>
+                  <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
+                </Suspense>
+              )
+            ) : (
+              <MissingVideoCard />
+            )}
           </div>
         </DialogContent>
       </Dialog>
 
-      <Drawer
-        open={mobileBoardVisible}
-        onOpenChange={(open) => {
-          // Prevent automatic closing from swipe/scroll gestures
-          // Only allow closing via the button
-          if (open) {
-            setMobileBoardVisible(true)
-          }
-        }}
-        dismissible={false}
-      >
-        <DrawerContent
-          className="bg-[#141414] text-white border-t border-white/10"
-          onPointerDownOutside={(e) => {
-            // Prevent closing on outside click
-            e.preventDefault()
-          }}
-          onEscapeKeyDown={(e) => {
-            // Prevent closing on escape key
-            e.preventDefault()
-          }}
-        >
-          <DrawerHeader className="text-center">
-            <DrawerTitle className="text-base font-semibold uppercase tracking-[0.3em] text-white/60">
-              Tabla de lucru
-            </DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-6">
-            <div className="h-[70vh] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-              <ProblemBoard problemId={problem.id} />
+      <Dialog open={desktopBoardExpanded} onOpenChange={setDesktopBoardExpanded}>
+        <DialogContent hideClose className="max-w-[95vw] border border-[#0b0d10]/10 bg-white text-[#0b0d10] top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]">
+          <DialogTitle className="sr-only">Tabla de lucru - Vizualizare pe tot ecranul</DialogTitle>
+          <DialogDescription className="sr-only">
+            Vizualizare extinsă a tablei de lucru pentru această problemă.
+          </DialogDescription>
+          <div className="flex items-center justify-between pb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/55">Tabla de lucru</p>
+              <p className="text-sm text-[#2C2F33]/75">Vizualizare pe tot ecranul</p>
             </div>
             <Button
-              className="mt-4 w-full rounded-full border border-white/15 bg-white/10 py-3 text-sm font-semibold text-white hover:bg-white/20"
-              onClick={() => setMobileBoardVisible(false)}
+              variant="ghost"
+              size="icon"
+              onClick={() => setDesktopBoardExpanded(false)}
+              className="rounded-full border border-[#0b0d10]/10 bg-[#f6f5f4] text-[#0b0d10] transition hover:bg-[#ece8e4]"
             >
-              Închide tabla
+              <X className="h-4 w-4" />
             </Button>
           </div>
-        </DrawerContent>
-      </Drawer>
+          <div className="h-[75vh] overflow-hidden rounded-2xl border border-[#0b0d10]/10 bg-white">
+            <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Upgrade Modal for Mobile */}
       {showMobileUpgradeModal && (

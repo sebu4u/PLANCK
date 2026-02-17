@@ -146,12 +146,20 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   about: {
-    title: "Despre PLANCK - Echipa și Misiunea Noastră",
-    description: "Află despre echipa PLANCK și misiunea noastră de a face fizica accesibilă și captivantă pentru toți liceenii.",
-    keywords: "despre planck, echipa planck, misiune planck, educație fizică, platformă educațională",
+    title: "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
+    description: "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa PLANCK, misiunea noastră, cursuri interactive, Insight AI, PlanckCode IDE, Planck Sketch și modelele Raptor1.",
+    keywords: "despre planck, echipa planck, misiune planck, educație fizică, informatică liceu, Insight AI, PlanckCode, Planck Sketch, Raptor1, platformă educațională, cursuri fizică, probleme fizică, IDE C++ online",
+    alternates: {
+      canonical: '/despre',
+    },
     openGraph: {
-      title: "Despre PLANCK - Echipa și Misiunea Noastră",
-      description: "Află despre echipa PLANCK și misiunea noastră educațională.",
+      title: "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
+      description: "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa, cursuri interactive, Insight AI, PlanckCode și Planck Sketch.",
+      url: 'https://www.planck.academy/despre',
+    },
+    twitter: {
+      title: "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
+      description: "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa, cursuri interactive, Insight AI, PlanckCode și Planck Sketch.",
     },
   },
 

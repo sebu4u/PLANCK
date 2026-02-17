@@ -15,6 +15,7 @@ interface AuthContextType {
   profile: any // nou: profilul din tabelul profiles
   subscriptionPlan: string
   userElo: number | null
+  isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -27,6 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<any>(null) // nou: profilul
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>(FREE_PLAN_IDENTIFIER)
   const [userElo, setUserElo] = useState<number | null>(null)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
 
   const isInvalidRefreshTokenError = (message?: string) => {
     if (!message) return false
@@ -45,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(null)
     setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
     setUserElo(null)
+    setIsAdmin(false)
   }
 
   useEffect(() => {
@@ -85,6 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile(null)
         setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
         setUserElo(null)
+        setIsAdmin(false)
       } else if (event === 'TOKEN_REFRESHED' && !session) {
         // Token refresh failed - handle invalid refresh token
         await handleInvalidAuthSession('Token refresh failed');
@@ -105,12 +109,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(null)
       setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
       setUserElo(null)
+      setIsAdmin(false)
       return
     }
 
     const { data } = await supabase
       .from("profiles")
-      .select("name, nickname, user_icon, grade, plan, plus_months_remaining")
+      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, is_admin")
       .eq("user_id", user.id)
       .single()
 
@@ -134,6 +139,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if ((!data.plan || data.plan === FREE_PLAN_IDENTIFIER) && data.plus_months_remaining > 0) {
         setSubscriptionPlan("plus")
       }
+
+      // Setează starea de admin din baza de date
+      setIsAdmin(data.is_admin === true)
       return
     }
 
@@ -274,6 +282,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profile,
         subscriptionPlan,
         userElo,
+        isAdmin,
       }}
     >
       {children}

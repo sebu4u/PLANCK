@@ -1,6 +1,5 @@
 import { Metadata } from "next"
-import { Navigation } from "@/components/navigation"
-import { PhysicsLessonsClient } from "@/components/physics-lessons-client"
+import { CursuriPageClient } from "@/components/cursuri-page-client"
 import { generateMetadata } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
@@ -69,19 +68,15 @@ export default async function PhysicsLessonsPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#101010] text-white">
-      <Navigation />
-
-      <div className="pt-16 h-full relative">
-        <StructuredData data={breadcrumbs} />
-        <StructuredData data={itemListStructuredData} />
-        <PhysicsLessonsClient
-          grades={grades}
-          chapters={chaptersData}
-          lessons={lessonsData}
-          initialLessonId={undefined}
-        />
-      </div>
+    <div className="h-screen overflow-hidden">
+      <StructuredData data={breadcrumbs} />
+      <StructuredData data={itemListStructuredData} />
+      <CursuriPageClient
+        grades={grades}
+        chapters={chaptersData}
+        lessons={lessonsData}
+        initialLessonId={undefined}
+      />
     </div>
   )
 }

@@ -1,7 +1,10 @@
-import type { User } from "@supabase/supabase-js"
+import type { User, SupabaseClient } from "@supabase/supabase-js"
 
 /**
- * Verifică dacă un utilizator este admin
+ * Verifică dacă un utilizator este admin (verificare sincronă - fără DB)
+ * Folosește metadata și variabile de mediu.
+ * Pentru verificare completă (inclusiv DB), folosește isAdminFromDB().
+ *
  * Adminii pot fi identificați prin:
  * 1. Email-uri specificate în ADMIN_EMAILS (variabilă de mediu)
  * 2. app_metadata.role = 'admin'
@@ -31,6 +34,44 @@ export function isAdmin(user: User | null | undefined): boolean {
   }
 
   return false
+}
+
+/**
+ * Verifică dacă un utilizator este admin prin interogarea bazei de date (profiles.is_admin)
+ * Aceasta este metoda principală și recomandată pentru verificarea adminului.
+ * Combină verificarea din DB cu verificările din metadata/env ca fallback.
+ *
+ * @param supabase - Clientul Supabase autentificat
+ * @param user - Userul Supabase (opțional, pentru fallback pe metadata/env)
+ * @returns true dacă userul este admin
+ */
+export async function isAdminFromDB(
+  supabase: SupabaseClient,
+  user?: User | null
+): Promise<boolean> {
+  // Mai întâi verifică din baza de date (sursa principală)
+  try {
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const userId = authUser?.id
+
+    if (userId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("user_id", userId)
+        .single()
+
+      if (profile?.is_admin === true) {
+        return true
+      }
+    }
+  } catch {
+    // Dacă interogarea DB eșuează, continuă cu fallback-urile
+  }
+
+  // Fallback: verifică metadata și env vars
+  const userToCheck = user ?? null
+  return isAdmin(userToCheck)
 }
 
 /**

@@ -1688,23 +1688,23 @@ math-field::part(virtual-keyboard-toggle),
 /* Custom scrollbar for problem pages */
 body.problem-page-scrollbar,
 body.problem-page-scrollbar * {
-  scrollbar-color: #333333 transparent;
+  scrollbar-color: #7a7d82 #ece8e4;
 }
 
 body.problem-page-scrollbar::-webkit-scrollbar-track,
 body.problem-page-scrollbar *::-webkit-scrollbar-track {
-  background: transparent;
+  background: #ece8e4;
 }
 
 body.problem-page-scrollbar::-webkit-scrollbar-thumb,
 body.problem-page-scrollbar *::-webkit-scrollbar-thumb {
-  background: #333333;
+  background: #7a7d82;
   border-radius: 4px;
 }
 
 body.problem-page-scrollbar::-webkit-scrollbar-thumb:hover,
 body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
-  background: #444444;
+  background: #64686d;
 }
 
 /* Custom Scrollbar for Search Modal */

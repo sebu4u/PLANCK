@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { isJwtExpired } from "@/lib/auth-validate"
-import { isAdmin, getAccessTokenFromRequest } from "@/lib/admin-check"
+import { isAdminFromDB, getAccessTokenFromRequest } from "@/lib/admin-check"
 import { currentMonthKey } from "@/lib/monthly-free-rotation"
 import { logger } from "@/lib/logger"
 
@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
     }
 
-    // Verifică dacă utilizatorul este admin
-    if (!isAdmin(userData.user)) {
+    // Verifică dacă utilizatorul este admin (din DB + fallback metadata/env)
+    if (!(await isAdminFromDB(supabase, userData.user))) {
       return NextResponse.json({ error: "Acces interzis. Doar adminii pot accesa această resursă." }, { status: 403 })
     }
 
@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
     }
 
-    // Verifică dacă utilizatorul este admin
-    if (!isAdmin(userData.user)) {
+    // Verifică dacă utilizatorul este admin (din DB + fallback metadata/env)
+    if (!(await isAdminFromDB(supabase, userData.user))) {
       return NextResponse.json({ error: "Acces interzis. Doar adminii pot accesa această resursă." }, { status: 403 })
     }
 
@@ -185,8 +185,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
     }
 
-    // Verifică dacă utilizatorul este admin
-    if (!isAdmin(userData.user)) {
+    // Verifică dacă utilizatorul este admin (din DB + fallback metadata/env)
+    if (!(await isAdminFromDB(supabase, userData.user))) {
       return NextResponse.json({ error: "Acces interzis. Doar adminii pot accesa această resursă." }, { status: 403 })
     }
 
