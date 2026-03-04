@@ -652,7 +652,7 @@ function IDEPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
   const [stdin, setStdin] = useState<string>('')
-  const [isInsightOpen, setIsInsightOpen] = useState<boolean>(false)
+  const [isInsightOpen, setIsInsightOpen] = useState<boolean>(true)
   const [showPromoCard, setShowPromoCard] = useState(false)
   const [hasShownPromoCard, setHasShownPromoCard] = useState(false)
 

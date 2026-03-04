@@ -3,13 +3,10 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
-import { Menu, X, BookOpen, Calculator, Rocket, LogIn, Search as SearchIcon, Loader2, ArrowUpRight, ChevronDown, Sparkles, Code, Github, Chrome, CreditCard, Trophy, Atom, Magnet, Terminal, FileText, CheckSquare, BrainCircuit } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, Code, Github, Chrome, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -19,14 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { useDashboardSidebar } from "@/components/dashboard/dashboard-sidebar-context"
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [coursesOpen, setCoursesOpen] = useState(false)
-  const [problemsOpen, setProblemsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isNavbarHidden, setIsNavbarHidden] = useState(false)
@@ -37,17 +30,10 @@ export function Navigation() {
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
-  const dashboardSidebar = useDashboardSidebar()
 
-  // Check if we're on dashboard
-  const isDashboard = pathname === "/dashboard"
-
-  // Reset mobile menu when navigating to/from dashboard
-  useEffect(() => {
-    if (isDashboard) {
-      setIsOpen(false)
-    }
-  }, [isDashboard])
+  // Dashboard, /invata and /probleme catalog share the same white navbar theme.
+  const isDashboard = pathname === "/dashboard" || pathname?.startsWith("/invata") === true
+  const isDashboardPage = pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
   // Desktop search state
   const [query, setQuery] = useState("")
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false)
@@ -61,68 +47,6 @@ export function Navigation() {
   const resultsRef = useRef<HTMLDivElement | null>(null)
   const cacheRef = useRef<Map<string, { results: SearchResultItem[]; hasMore: boolean }>>(new Map())
   const [, startTransition] = useTransition()
-
-
-  const problemShortcuts: { chapter: string; classLabel: string }[] = [
-    { chapter: "Principiile mecanicii", classLabel: "a 9-a" },
-    { chapter: "Energia mecanica", classLabel: "a 9-a" },
-    { chapter: "Legea gazului ideal", classLabel: "a 10-a" },
-    { chapter: "Electrostatica", classLabel: "a 10-a" },
-    { chapter: "Unde mecanice", classLabel: "a 11-a" },
-    { chapter: "circuite de curent alternativ", classLabel: "a 11-a" },
-  ]
-
-  const classEmoji: Record<string, string> = {
-    'a 9-a': '🧪',
-    'a 10-a': '⚡',
-    'a 11-a': '🌊',
-    'a 12-a': '🔬',
-    'Toate': '📚',
-  }
-
-  const chapterEmoji: Record<string, string> = {
-    'Principiile mecanicii': '📐',
-    'Energia mecanica': '⚙️',
-    'Legea gazului ideal': '🧪',
-    'Electrostatica': '⚡',
-    'Unde mecanice': '🌊',
-    'circuite de curent alternativ': '🔁',
-  }
-
-  const goToProblemsWith = (classLabel: string, chapter: string) => {
-    try {
-      const payload = {
-        search: "",
-        category: "Toate",
-        difficulty: "Toate",
-        progress: "Toate",
-        class: classLabel,
-        chapter,
-      }
-      sessionStorage.setItem("problemFilters", JSON.stringify(payload))
-    } catch { }
-    if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/probleme')) {
-      try {
-        window.dispatchEvent(new Event('problemFiltersUpdated'))
-      } catch { }
-      // Trigger a soft refresh for visual feedback
-      try { router.refresh() } catch { }
-    } else {
-      router.push("/probleme")
-    }
-  }
-
-  const goToCoursesWith = (classLabel: string) => {
-    try {
-      sessionStorage.setItem('physicsSelectedClass', classLabel)
-    } catch { }
-    if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/cursuri')) {
-      try { window.dispatchEvent(new Event('physicsClassSelected')) } catch { }
-      try { router.refresh() } catch { }
-    } else {
-      router.push('/cursuri')
-    }
-  }
 
   // Track scroll position for transparent navbar on homepage
   useEffect(() => {
@@ -372,10 +296,6 @@ export function Navigation() {
     inputRef.current?.focus()
   }, [])
 
-  const handleSignInClick = () => {
-    router.push('/login')
-  }
-
   const handleGoogleLogin = async () => {
     setLoginLoading("google")
     const { error } = await loginWithGoogle()
@@ -445,8 +365,9 @@ export function Navigation() {
   const isRegisterRoute = pathname === '/register'
   const isTransparentRoute = isHomepage || isRegisterRoute
   const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
-  const isProblemsCatalog = pathname === '/probleme'
+  const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
+  const useLightNav = isDashboard || isProblemsCatalog || isProblemPage
   const isCoursePage = pathname?.startsWith('/cursuri') ?? false
   const isBacSimulationsPage = pathname?.startsWith('/simulari-bac') ?? false
   // On mobile, navbar should never be transparent when at the top of the screen
@@ -456,12 +377,12 @@ export function Navigation() {
   // Homepage-specific navbar background based on scroll position
   const homepageNavbarBackground = isScrolled ? 'bg-[#111111]/90' : 'bg-transparent'
 
-  const navTheme = isDashboard
+  const navTheme = useLightNav
     ? {
-      background: 'bg-[#080808]',
-      border: 'border-[#1a1a1a]',
-      dropdownBackground: 'bg-[#080808]',
-      dropdownBorder: 'border-[#1a1a1a]',
+      background: 'bg-[#ffffff]',
+      border: 'border-gray-200',
+      dropdownBackground: 'bg-[#ffffff]',
+      dropdownBorder: 'border-gray-200',
     }
     : isHomepage
       ? {
@@ -504,13 +425,19 @@ export function Navigation() {
                 dropdownBackground: 'bg-[#0d1117]',
                 dropdownBorder: 'border-gray-800',
               }
-  const mobileCtaLabel = user ? 'Dashboard' : 'Sign up'
-
-  const showBanner = !isHomepage && !isSpaceRoute
+  const navPrimaryText = useLightNav ? 'text-gray-900' : 'text-white'
+  const navSecondaryText = useLightNav ? 'text-gray-600' : 'text-gray-300'
+  const navSubtleText = useLightNav ? 'text-gray-500' : 'text-gray-400'
+  const navHoverText = useLightNav ? 'hover:text-gray-900' : 'hover:text-white'
+  const navHoverBg = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
+  const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
+  const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
+  const showBanner = !isHomepage && !isSpaceRoute && !isDashboard && !isProblemsCatalog && !isPlanckCodeRoute && !isProblemPage
+  const navDropShadowOnDesktop = pathname?.startsWith('/invata') || (isProblemPage && !isProblemsCatalog)
 
   return (
     <>
-      <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+      <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? 'burger:shadow-none' : ''}`}>
         {showBanner && (
           <div className="hidden lg:flex w-full bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white py-2 px-4 text-center text-sm font-medium z-[301] shadow-sm items-center justify-center relative">
             <Link href="/concurs" className="hover:opacity-90 transition-opacity flex items-center gap-2 group">
@@ -525,270 +452,148 @@ export function Navigation() {
         )}
         <nav className={`w-full ${isHomepage && isScrolled ? 'backdrop-blur-md' : !isHomepage ? 'backdrop-blur-md' : ''} transition-all duration-300 ${navTheme.background} ${navTheme.border}`}>
           <div className="w-full px-4 sm:px-6 lg:px-8">
-            <div className="relative h-16 flex items-center justify-between gap-6">
-              {isMobile && (
-                <div className="burger:hidden absolute left-0 top-0 h-full flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (user) {
-                        router.push('/dashboard')
-                      } else {
-                        router.push('/register')
-                      }
-                    }}
-                    className="inline-flex items-center justify-center rounded-md border border-white/90 text-white text-sm font-medium px-3 py-1.5 leading-tight min-h-0 bg-transparent transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                  >
-                    {mobileCtaLabel}
-                  </button>
-                </div>
-              )}
-              {isMobile && (
-                <Link
-                  href="/"
-                  className={`burger:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex items-center justify-center text-white title-font animate-fade-in hover:text-gray-300 transition-colors ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-                    }`}
-                >
-                  <Rocket className="w-6 h-6" />
-                </Link>
-              )}
-              {/* Logo + Navigation links */}
-              <div className={`flex items-center h-full gap-6 flex-1 min-w-0`}>
-                <Link
-                  href="/"
-                  className={`hidden burger:flex text-2xl font-bold text-white title-font animate-fade-in flex-shrink-0 items-center gap-2 hover:text-gray-300 transition-colors ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-                    }`}
-                >
-                  <Rocket className="w-6 h-6 text-white" />
-                  <span className="hidden logo:block">PLANCK</span>
-                </Link>
-
-                {/* Keep links visible on md and up, even when search is hidden */}
-                <div className={`hidden burger:flex items-center gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-                  }`}>
-                  <div
-                    className="relative"
-                    onMouseEnter={() => setCoursesOpen(true)}
-                    onMouseLeave={() => setCoursesOpen(false)}
-                  >
-                    <Link
-                      href="/cursuri"
-                      className="text-white hover:text-gray-500 pl-2.5 pr-1.5 py-2 text-sm font-medium flex items-center gap-0.5 transition-all duration-300 rounded-lg"
-                    >
-                      <BookOpen size={16} />
-                      Cursuri
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${coursesOpen ? 'rotate-180' : ''}`} />
-                    </Link>
-                    <div className={`absolute left-0 top-full w-max z-[400] transition-all duration-200 ${coursesOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
-                    >
-                      <div className={`rounded-lg ${navTheme.dropdownBackground} shadow-lg overflow-hidden`}>
-                        <div className="grid grid-cols-3 gap-2 p-3 w-[600px]">
-                          <button
-                            onClick={() => router.push('/cursuri')}
-                            className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left transition hover:bg-white/10 focus:outline-none flex items-center gap-3"
-                          >
-                            <Atom className="w-8 h-8 text-white" />
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Cursuri de</span>
-                              <span className="text-sm font-semibold text-white">Fizică Liceu</span>
-                            </span>
-                          </button>
-
-                          <div className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left flex items-center gap-3 opacity-50 cursor-not-allowed">
-                            <Magnet className="w-8 h-8 text-white" />
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Cursuri de</span>
-                              <span className="text-sm font-semibold text-white">Fizică Gimnaziu</span>
-                            </span>
-                          </div>
-
-                          <div className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left flex items-center gap-3 opacity-50 cursor-not-allowed">
-                            <Code className="w-8 h-8 text-white" />
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Cursuri de</span>
-                              <span className="text-sm font-semibold text-white">Informatică 9-11</span>
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={() => router.push('/simulari-bac')}
-                            className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left transition hover:bg-white/10 focus:outline-none flex items-center gap-3"
-                          >
-                            <FileText className="w-8 h-8 text-white" />
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Pregătire</span>
-                              <span className="text-sm font-semibold text-white">Simulări Bac</span>
-                            </span>
-                          </button>
-
-                          <button
-                            onClick={() => router.push('/grile')}
-                            className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left transition hover:bg-white/10 focus:outline-none flex items-center gap-3"
-                          >
-                            <CheckSquare className="w-8 h-8 text-white" />
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Exersare</span>
-                              <span className="text-sm font-semibold text-white">Teste Grilă</span>
-                            </span>
-                          </button>
-
-                          <button
-                            onClick={() => router.push('/space')}
-                            className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left transition hover:bg-white/10 focus:outline-none flex items-center gap-3"
-                          >
-                            <BrainCircuit className="w-8 h-8 text-white" />
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Instrumente</span>
-                              <span className="text-sm font-semibold text-white">Memorator</span>
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="relative"
-                    onMouseEnter={() => setProblemsOpen(true)}
-                    onMouseLeave={() => setProblemsOpen(false)}
-                  >
-                    <Link
-                      href="/probleme"
-                      className="text-white hover:text-gray-500 pl-2 pr-1.5 py-2 text-sm font-medium flex items-center gap-0.5 transition-all duration-300 rounded-lg"
-                    >
-                      <Calculator size={16} />
-                      Probleme
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${problemsOpen ? 'rotate-180' : ''}`} />
-                    </Link>
-                    <div className={`absolute left-0 top-full min-w-[280px] z-[400] transition-all duration-200 ${problemsOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
-                    >
-                      <div className={`rounded-lg ${navTheme.dropdownBackground} shadow-lg overflow-hidden`}>
-                        <div className="flex items-stretch gap-2 p-3">
-                          <button
-                            onClick={() => goToProblemsWith('Toate', 'Toate')}
-                            className="group flex-[1.15] rounded-lg bg-white/5 px-3 py-2 text-left transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 flex items-center gap-3"
-                          >
-                            <span className="text-3xl leading-none text-white" aria-hidden>⚛</span>
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Probleme de</span>
-                              <span className="text-sm font-semibold text-white">Fizică</span>
-                            </span>
-                          </button>
-                          <div
-                            className="group flex-1 rounded-lg bg-white/5 px-3 py-2 text-left flex items-center gap-3 opacity-50 cursor-not-allowed"
-                          >
-                            <span className="text-3xl leading-none text-white" aria-hidden>⌨</span>
-                            <span className="flex flex-col leading-snug">
-                              <span className="text-[10px] font-medium uppercase tracking-tight text-gray-400 whitespace-nowrap">Probleme de</span>
-                              <span className="text-sm font-semibold text-white">Informatică</span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <Link
-                    href="/insight"
-                    className="text-white hover:text-gray-500 px-3 py-2 text-sm font-medium transition-all duration-300 rounded-lg flex items-center gap-1"
-                  >
-                    <Sparkles size={16} />
-                    Insight
+            <div className="relative h-16 flex items-center justify-between gap-4">
+              <div className={`burger:hidden flex w-full items-center justify-between ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                <div className="flex items-center gap-2">
+                  <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                    <Home className="h-5 w-5" />
                   </Link>
-                  <Link
-                    href="/planckcode"
-                    className="text-white hover:text-gray-500 px-3 py-2 text-sm font-medium transition-all duration-300 rounded-lg flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <Code size={16} />
-                    Planck Code
+                  <Link href="/cursuri" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/cursuri') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                    <BookOpen className="h-5 w-5" />
                   </Link>
-                  <Link
-                    href="/sketch"
-                    className="text-white hover:text-gray-500 px-3 py-2 text-sm font-medium transition-all duration-300 rounded-lg flex items-center gap-1.5 relative"
-                  >
-                    Sketch
-                    <span className="absolute top-1.5 -right-0.5 inline-block">
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                        <defs>
-                          <linearGradient id="gradient-animated-desktop" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#3b82f6" />
-                            <stop offset="20%" stopColor="#8b5cf6" />
-                            <stop offset="40%" stopColor="#ec4899" />
-                            <stop offset="60%" stopColor="#f59e0b" />
-                            <stop offset="80%" stopColor="#10b981" />
-                            <stop offset="100%" stopColor="#3b82f6" />
-                            <animate attributeName="x1" values="0%;100%;0%" dur="3s" repeatCount="indefinite" />
-                            <animate attributeName="x2" values="100%;200%;100%" dur="3s" repeatCount="indefinite" />
-                          </linearGradient>
-                        </defs>
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#gradient-animated-desktop)" />
-                      </svg>
-                    </span>
-                  </Link>
-                  <Link
-                    href="/pricing"
-                    className="text-white hover:text-gray-500 px-3 py-2 text-sm font-medium transition-all duration-300 rounded-lg flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <CreditCard size={16} />
-                    Pricing
+                  <Link href="/probleme" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                    <Calculator className="h-5 w-5" />
                   </Link>
                 </div>
-              </div>
-
-              {/* Search bar + Desktop Login/Profile Button - dreapta */}
-              <div className={`hidden burger:flex items-center animate-fade-in-delay-2 justify-end gap-3 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-                }`}>
-                {/* Search triggers: 2xl full button, xl icon, hidden <=xl */}
-                <button
-                  onClick={() => setIsSearchDialogOpen(true)}
-                  className="hidden 2xl:flex items-center gap-2 w-[360px] h-8 rounded-md bg-white/5 border border-white/10 px-3 text-sm text-gray-400"
-                >
-                  <SearchIcon className="w-4 h-4" />
-                  <span className="flex-1 text-left">Search or jump to...</span>
-                  <kbd className="px-1.5 py-0.5 text-xs bg-white/10 border border-white/10 rounded">/</kbd>
-                </button>
-                <button
-                  onClick={() => setIsSearchDialogOpen(true)}
-                  className="hidden xl:flex 2xl:hidden items-center justify-center w-8 h-8 rounded-md border border-white/10 text-gray-300 bg-white/5"
-                  aria-label="Open search"
-                >
-                  <SearchIcon className="w-4 h-4" />
-                </button>
-                {user ? (
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium ${navSecondaryText}`}>
+                    <Trophy className="h-3.5 w-3.5" />
+                    {user ? (userElo ?? 500) : "—"}
+                  </span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-2 px-3 py-1.5 rounded transition">
-                        <Avatar>
-                          {profile?.user_icon ? (
-                            <AvatarImage src={profile.user_icon} alt={profile?.nickname || profile?.name || user.email || "U"} />
-                          ) : null}
-                          <AvatarFallback>{(profile?.nickname || profile?.name || user.user_metadata?.name || user.email || "U").charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium text-white text-sm leading-tight">{profile?.nickname || profile?.name || user.user_metadata?.name || user.email}</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs font-medium leading-tight ${subscriptionPlan === 'premium' ? 'text-orange-400' :
-                              subscriptionPlan === 'plus' ? 'text-green-400' :
-                                'text-gray-400'
-                              }`}>
-                              {subscriptionPlan === 'premium' ? 'premium' :
-                                subscriptionPlan === 'plus' ? 'plus+' :
-                                  'free'}
-                            </span>
-                            <span className="flex items-center gap-0.5 text-gray-400">
-                              <Trophy className="w-3 h-3" />
-                              <span className="text-xs">{userElo ?? 500}</span>
-                            </span>
-                          </div>
-                        </div>
+                      <button
+                        aria-label="Open navigation menu"
+                        className={`inline-flex h-9 w-9 items-center justify-center ${useLightNav ? 'text-gray-700' : 'text-gray-200'} ${navHoverText} transition-colors`}
+                      >
+                        <Menu className="h-5 w-5" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" sideOffset={12} className={`z-[400] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                       <DropdownMenuItem asChild>
-                        <a href="/profil" className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/10 rounded-md transition-colors">Profil</a>
+                        <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="block px-4 py-2 text-sm text-gray-500 cursor-not-allowed" disabled>
-                        Clasa mea
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
+                      {user ? (
+                        <DropdownMenuItem asChild>
+                          <button
+                            onClick={async () => {
+                              await logout()
+                              toast({ title: "Te-ai delogat cu succes!" })
+                              router.push("/")
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20"
+                          >
+                            Log out
+                          </button>
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem asChild>
+                          <a href="/register" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                            Creeaza cont acum
+                          </a>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              <div className="hidden burger:flex items-center h-full gap-6 flex-1 min-w-0">
+                <Link
+                  href="/"
+                  className={`relative flex h-full items-center gap-2 flex-shrink-0 text-2xl font-bold ${navPrimaryText} title-font animate-fade-in transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''} ${isHomepage ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : 'after:bg-transparent'}`}
+                >
+                  <Rocket className={`w-6 h-6 ${navPrimaryText}`} />
+                  <span className="hidden logo:block font-black whitespace-nowrap">PLANCK</span>
+                </Link>
+
+                <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                  <Link
+                    href="/invata"
+                    className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                  >
+                    <BookOpen size={16} />
+                    Învață
+                  </Link>
+
+                  <Link
+                    href="/probleme"
+                    className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                  >
+                    <Calculator size={16} />
+                    Exersează
+                  </Link>
+
+                  <Link
+                    href="/planckcode/ide"
+                    className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPlanckCodeRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                  >
+                    <Code size={16} />
+                    Code
+                  </Link>
+
+                  <button
+                    type="button"
+                    disabled
+                    className={`h-full border-b-2 border-transparent ${useLightNav ? 'text-gray-700 font-semibold' : `${navSubtleText} font-medium`} px-3 py-0 text-sm transition-all duration-300 rounded-lg cursor-not-allowed opacity-70 flex items-center ${useLightNav ? 'hover:border-gray-700' : 'hover:border-gray-500'}`}
+                  >
+                    Clasa mea
+                  </button>
+                </div>
+              </div>
+
+              <div className={`hidden burger:flex items-center animate-fade-in-delay-2 justify-end gap-3 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                <div className="inline-flex items-center gap-2 px-1 py-1">
+                  <span className={`text-xs font-medium leading-tight ${subscriptionPlan === 'premium' ? 'text-orange-400' : subscriptionPlan === 'plus' ? (useLightNav ? 'text-emerald-600' : 'text-green-400') : 'text-gray-400'}`}>
+                    {subscriptionPlan === 'premium' ? 'premium' : subscriptionPlan === 'plus' ? 'plus+' : 'free'}
+                  </span>
+                  <span className={`flex items-center gap-1 ${navSecondaryText}`}>
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span className="text-xs">{user ? (userElo ?? 500) : '—'}</span>
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setIsSearchDialogOpen(true)}
+                  className={`inline-flex items-center gap-2 w-[180px] h-9 rounded-full ${navChipBg} px-3 text-sm ${navSubtleText} ${useLightNav ? 'hover:bg-gray-200' : 'hover:bg-white/10'} transition-colors`}
+                >
+                  <SearchIcon className="w-4 h-4" />
+                  <span className="flex-1 text-left">Search...</span>
+                  <kbd className={`px-1.5 py-0.5 text-xs ${useLightNav ? 'bg-gray-200 border-gray-300' : 'bg-white/10 border-white/10'} border rounded`}>/</kbd>
+                </button>
+
+                <Link href="/pricing" className="group inline-flex rounded-full bg-gradient-to-r from-[#9a7bff] via-[#d77bff] to-[#ffb56b] p-[1px]">
+                  <span className="inline-flex h-9 items-center rounded-full bg-white px-5 text-sm font-semibold text-[#2f236f] transition-colors group-hover:bg-[#f8f5ff]">
+                    Go Premium
+                  </span>
+                </Link>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      aria-label="Open navigation menu"
+                      className={`inline-flex h-9 w-9 items-center justify-center ${useLightNav ? 'text-gray-700' : 'text-gray-200'} ${navHoverText} transition-colors`}
+                    >
+                      <Menu className="h-5 w-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={12} className={`z-[400] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
+                    <DropdownMenuItem asChild>
+                      <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
+                    {user ? (
                       <DropdownMenuItem asChild>
                         <button
                           onClick={async () => {
@@ -798,54 +603,18 @@ export function Navigation() {
                           }}
                           className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20"
                         >
-                          Logout
+                          Log out
                         </button>
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSignInClick}
-                      className="border-gray-600 text-white hover:border-gray-500 hover:text-gray-500 transition-all duration-300 flex items-center gap-2 bg-transparent"
-                    >
-                      Sign in
-                    </Button>
-                    <Link href="/register">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-white text-black hover:bg-gray-200 transition-all duration-300 flex items-center gap-2"
-                      >
-                        Sign up
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </div>
-
-              {/* Mobile menu button */}
-              <div className={`burger:hidden absolute right-0 top-0 h-full flex items-center ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''
-                }`}>
-                <button
-                  onClick={() => {
-                    // On dashboard, open sidebar if context is available
-                    if (isDashboard && dashboardSidebar) {
-                      dashboardSidebar.toggle()
-                    } else {
-                      // Normal behavior: toggle mobile menu
-                      setIsOpen(!isOpen)
-                    }
-                  }}
-                  className="inline-flex items-center justify-center w-10 h-10 text-gray-300 hover:text-white focus:outline-none transition-all duration-300"
-                >
-                  {isDashboard && dashboardSidebar
-                    ? (dashboardSidebar.isOpen ? <X size={24} /> : <Menu size={24} />)
-                    : (isOpen ? <X size={24} /> : <Menu size={24} />)
-                  }
-                </button>
+                    ) : (
+                      <DropdownMenuItem asChild>
+                        <a href="/register" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                          Creeaza cont acum
+                        </a>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
@@ -1007,141 +776,6 @@ export function Navigation() {
             </DialogContent>
           </Dialog>
 
-          {/* Mobile Navigation */}
-          {isOpen && !isDashboard && (
-            <div className="burger:hidden animate-slide-down z-[100] relative">
-              <div className={`px-2 pt-2 pb-3 space-y-2 sm:px-3 ${navTheme.dropdownBackground} backdrop-blur-md border-t ${navTheme.dropdownBorder}`}>
-                <div className="space-y-2">
-                  <Link href="/probleme" className="block" onClick={() => setIsOpen(false)}>
-                    <Card className="relative h-20 w-full overflow-hidden rounded-xl border border-white/10 bg-[#181818] transition-all duration-300 hover:border-white/20 group">
-                      <div className="flex h-full items-center justify-between pl-6 pr-0">
-                        <div className="flex flex-col gap-1 relative z-10 max-w-[70%]">
-                          <h3 className="text-sm font-semibold text-white/90">Catalogul de probleme</h3>
-                          <p className="text-xs text-white/60 font-medium">Exersează și aprofundează fizica</p>
-                        </div>
-                        <div className="absolute right-0 top-0 bottom-0 w-1/3 h-full overflow-hidden">
-                          <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#181818] via-[#181818]/10 to-transparent" />
-                          <Image
-                            src="/pxl.png"
-                            alt="Catalogul de probleme"
-                            fill
-                            className="object-cover object-center opacity-80 group-hover:scale-105 transition-transform duration-500"
-                          />
-                        </div>
-                      </div>
-                    </Card>
-                  </Link>
-
-                  <Link href="/cursuri" className="block" onClick={() => setIsOpen(false)}>
-                    <Card className="relative h-20 w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:border-gray-300 group">
-                      <div className="flex h-full items-center justify-between pl-6 pr-0">
-                        <div className="flex flex-col gap-1 relative z-10 max-w-[70%]">
-                          <h3 className="text-sm font-semibold text-gray-900">Învață cu AI</h3>
-                          <p className="text-xs text-gray-600 font-medium">Cursuri interactive ghidate de AI</p>
-                        </div>
-                        <div className="absolute right-0 top-0 bottom-0 w-1/3 h-full overflow-hidden">
-                          <div className="absolute inset-0 z-10 bg-gradient-to-r from-white via-white/10 to-transparent" />
-                          <Image
-                            src="/insight-cta-card.PNG"
-                            alt="Învață cu AI"
-                            fill
-                            className="object-cover object-center opacity-90 group-hover:scale-105 transition-transform duration-500"
-                          />
-                        </div>
-                      </div>
-                    </Card>
-                  </Link>
-                </div>
-
-                <div className="pt-1 space-y-1">
-                  <Link
-                    href="/space"
-                    className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <BrainCircuit size={20} />
-                    Memorator
-                  </Link>
-                  <Link
-                    href="/pricing"
-                    className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-2"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <CreditCard size={20} />
-                    Pricing
-                  </Link>
-                </div>
-                <div className="border-t border-gray-700 pt-3 mt-3">
-                  {user ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3 w-full">
-                          <Avatar>
-                            {profile?.user_icon ? (
-                              <AvatarImage src={profile.user_icon} alt={profile?.nickname || profile?.name || user.email || "U"} />
-                            ) : null}
-                            <AvatarFallback>{(profile?.nickname || profile?.name || user.user_metadata?.name || user.email || "U").charAt(0).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <span className="flex-1 text-left">{profile?.nickname || profile?.name || user.user_metadata?.name || user.email}</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs font-medium ${subscriptionPlan === 'premium' ? 'text-orange-400' :
-                              subscriptionPlan === 'plus' ? 'text-green-400' :
-                                'text-gray-400'
-                              }`}>
-                              {subscriptionPlan === 'premium' ? 'premium' :
-                                subscriptionPlan === 'plus' ? 'plus+' :
-                                  'free'}
-                            </span>
-                            <span className="flex items-center gap-0.5 text-gray-400">
-                              <Trophy className="w-3 h-3" />
-                              <span className="text-xs">{userElo ?? 500}</span>
-                            </span>
-                          </div>
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-[#21262d] border-gray-700">
-                        <DropdownMenuItem asChild>
-                          <a href="/profil" className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Profil</a>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-gray-700" />
-                        <DropdownMenuItem asChild>
-                          <button
-                            onClick={async () => {
-                              await logout()
-                              toast({ title: "Te-ai delogat cu succes!" })
-                              router.push("/")
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20"
-                          >
-                            Logout
-                          </button>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          setIsOpen(false)
-                          handleSignInClick()
-                        }}
-                        className="text-white hover:text-gray-500 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg border border-gray-600 text-center w-full"
-                      >
-                        Sign in
-                      </button>
-                      <Link
-                        href="/register"
-                        className="text-black bg-white hover:bg-gray-200 block px-3 py-3 text-base font-medium transition-all duration-300 rounded-lg text-center"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        Sign up
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </nav>
       </div>
       {showBanner && !isTransparentRoute && !isSpaceRoute && <div className="hidden lg:block h-9 w-full" />}

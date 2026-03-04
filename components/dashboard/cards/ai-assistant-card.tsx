@@ -29,17 +29,17 @@ export function AiAssistantCard() {
   ]
 
   return (
-    <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-all hover:scale-105 transform origin-center relative overflow-hidden">
+    <div className="rounded-xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-all hover:scale-105 transform origin-center relative overflow-hidden">
       {/* Decorative gradient */}
       <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-blue-500/10 blur-3xl -z-0" />
 
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white/90">AI Assistant – Insight</h3>
+          <h3 className="text-lg font-semibold text-gray-900">AI Assistant – Insight</h3>
         </div>
 
-        <p className="text-sm text-white/60 mb-6">
+        <p className="text-sm text-gray-600 mb-6">
           Ai nevoie de ajutor? Insight este aici pentru tine 24/7
         </p>
 
@@ -53,12 +53,12 @@ export function AiAssistantCard() {
 
         {/* Suggestion Chips */}
         <div className="space-y-2">
-          <p className="text-xs text-white/60 uppercase tracking-wider mb-3">Quick Actions</p>
+          <p className="text-xs text-gray-600 uppercase tracking-wider mb-3">Quick Actions</p>
           <div className="grid grid-cols-2 gap-2">
             {suggestions.map((suggestion, index) => (
               <Link key={index} href={suggestion.action}>
-                <button className="w-full p-3 bg-white/[0.03] hover:bg-white/[0.06] rounded-lg border border-white/10 hover:border-purple-500/30 transition-all text-left group">
-                  <div className="flex items-center gap-2 text-white/70 group-hover:text-white/90 transition-colors">
+                <button className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 hover:border-purple-500/30 transition-all text-left group">
+                  <div className="flex items-center gap-2 text-gray-700 group-hover:text-gray-900 transition-colors">
                     {suggestion.icon}
                     <span className="text-xs font-medium">{suggestion.text}</span>
                   </div>
@@ -69,15 +69,15 @@ export function AiAssistantCard() {
         </div>
 
         {/* Stats */}
-        <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between">
+        <div className="mt-6 pt-6 border-t border-gray-200 flex items-center justify-between">
           <div className="text-center flex-1">
-            <p className="text-lg font-bold text-white/90">47</p>
-            <p className="text-xs text-white/60">Questions Asked</p>
+            <p className="text-lg font-bold text-gray-900">47</p>
+            <p className="text-xs text-gray-600">Questions Asked</p>
           </div>
-          <div className="w-px h-8 bg-white/10" />
+          <div className="w-px h-8 bg-gray-200" />
           <div className="text-center flex-1">
-            <p className="text-lg font-bold text-white/90">98%</p>
-            <p className="text-xs text-white/60">Satisfaction</p>
+            <p className="text-lg font-bold text-gray-900">98%</p>
+            <p className="text-xs text-gray-600">Satisfaction</p>
           </div>
         </div>
       </div>

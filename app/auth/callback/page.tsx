@@ -1,14 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 
+const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
+
 export default function AuthCallbackPage() {
   const router = useRouter()
-  const [processing, setProcessing] = useState(false)
+  const processingRef = useRef(false)
 
   useEffect(() => {
+    const getPostAuthRedirect = () => {
+      const cameFromOnboarding = localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1"
+      if (cameFromOnboarding) {
+        localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+        return "/register?onboarding=1"
+      }
+      return "/"
+    }
+
     const handleSession = async () => {
       // Supabase v2 handles hash parsing internally when using the client.
       // We just need to confirm session is set, then redirect.
@@ -17,7 +28,7 @@ export default function AuthCallbackPage() {
       if (data.session) {
         // Process referral if there's a stored referral code
         await processReferralIfNeeded(data.session.user.id)
-        router.replace("/")
+        router.replace(getPostAuthRedirect())
       } else {
         // If no session yet, wait briefly then check again (OAuth callback may be processing)
         setTimeout(async () => {
@@ -25,7 +36,7 @@ export default function AuthCallbackPage() {
           if (data2.session) {
             // Process referral if there's a stored referral code
             await processReferralIfNeeded(data2.session.user.id)
-            router.replace("/")
+            router.replace(getPostAuthRedirect())
           } else {
             // If no session, redirect to register page
             router.replace("/register")
@@ -35,14 +46,14 @@ export default function AuthCallbackPage() {
     }
 
     const processReferralIfNeeded = async (userId: string) => {
-      if (processing) return
+      if (processingRef.current) return
 
       try {
         // Check if there's a stored referral code
         const referralCode = localStorage.getItem("planck_referral_code")
         if (!referralCode) return
 
-        setProcessing(true)
+        processingRef.current = true
         console.log("Processing referral for user:", userId, "with code:", referralCode)
 
         // Wait a bit for the profile to be created by the trigger
@@ -75,12 +86,12 @@ export default function AuthCallbackPage() {
         // Clear the code on error to prevent loops
         localStorage.removeItem("planck_referral_code")
       } finally {
-        setProcessing(false)
+        processingRef.current = false
       }
     }
 
     handleSession()
-  }, [router, processing])
+  }, [router])
 
   return (
     <div className="min-h-screen bg-[#101113] flex items-center justify-center">

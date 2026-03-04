@@ -10,7 +10,7 @@ export function ContestPromoCard() {
             prefetch={false}
             className="block lg:hidden group"
         >
-            <div className="relative overflow-hidden rounded-xl p-3 bg-[#181818] border border-orange-500/40 hover:border-orange-500/60 transition-all duration-300 hover:bg-[#1c1c1c]">
+            <div className="relative overflow-hidden rounded-xl p-3 bg-white border border-orange-300 hover:border-orange-400 transition-all duration-300 hover:bg-orange-50/40">
                 {/* Subtle orange glow on hover */}
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                     <div className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl" />
@@ -25,10 +25,10 @@ export function ContestPromoCard() {
 
                     {/* Text content */}
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-white/90 leading-tight group-hover:text-orange-400 transition-colors">
+                        <h3 className="text-sm font-semibold text-gray-900 leading-tight group-hover:text-orange-600 transition-colors">
                             🏆 Concursul Național PLANCK 2026
                         </h3>
-                        <p className="text-xs text-white/50 mt-0.5">
+                        <p className="text-xs text-gray-600 mt-0.5">
                             Înscrie-te gratuit și câștigă premii
                         </p>
                     </div>

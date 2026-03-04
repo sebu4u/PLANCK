@@ -235,6 +235,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true)
     await supabase.auth.signOut()
     setUser(null)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("planck_register_onboarding")
+      localStorage.removeItem("planck_onboarding_after_oauth")
+    }
     setLoading(false)
   }
 

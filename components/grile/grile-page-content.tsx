@@ -1,17 +1,18 @@
 "use client";
 
-import React, { useCallback, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { QuizProvider, useQuiz } from './quiz-context';
 import { ClassSelector } from './class-selector';
 import { QuestionCard } from './question-card';
 import { AnswersList } from './answers-list';
 import { NavigationControls } from './navigation-controls';
-import { fetchAndShuffleQuestions } from '@/lib/supabase-quiz';
+import { fetchAndShuffleQuestions, fetchQuizQuestionById } from '@/lib/supabase-quiz';
 import type { GradeLevel } from '@/lib/types/quiz-questions';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 function QuizContent() {
+    const router = useRouter();
     const {
         classLevel,
         questions,
@@ -32,6 +33,7 @@ function QuizContent() {
         canGoNext,
         canGoPrevious,
     } = useQuiz();
+    const [singleQuestionNotFound, setSingleQuestionNotFound] = useState(false);
 
     const handleClassSelect = useCallback(async (level: GradeLevel) => {
         setClassLevel(level);
@@ -49,15 +51,84 @@ function QuizContent() {
 
     const searchParams = useSearchParams();
     const gradeParam = searchParams.get('grade');
+    const questionParam = searchParams.get('question');
 
     useEffect(() => {
-        if (gradeParam && !classLevel) {
+        if (!questionParam || classLevel) return;
+
+        let cancelled = false;
+
+        const loadSpecificQuestion = async () => {
+            setLoading(true);
+            setSingleQuestionNotFound(false);
+
+            try {
+                const question = await fetchQuizQuestionById(questionParam);
+                if (cancelled) return;
+
+                if (!question) {
+                    setSingleQuestionNotFound(true);
+                    return;
+                }
+
+                setClassLevel(question.class);
+                setQuestions([question]);
+            } catch (error) {
+                console.error('Error fetching specific quiz question:', error);
+                if (!cancelled) {
+                    setSingleQuestionNotFound(true);
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void loadSpecificQuestion();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [questionParam, classLevel, setClassLevel, setLoading, setQuestions]);
+
+    useEffect(() => {
+        if (questionParam || !gradeParam || classLevel) return;
+
             const grade = parseInt(gradeParam);
             if (!isNaN(grade) && [9, 10, 11, 12].includes(grade)) {
                 handleClassSelect(grade as GradeLevel);
             }
-        }
-    }, [gradeParam, classLevel, handleClassSelect]);
+    }, [questionParam, gradeParam, classLevel, handleClassSelect]);
+
+    if (questionParam && !classLevel && !singleQuestionNotFound) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="h-10 w-10 text-violet-400 animate-spin mb-4" />
+                <p className="text-white/60">Se încarcă grila selectată...</p>
+            </div>
+        );
+    }
+
+    if (questionParam && singleQuestionNotFound) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <AlertCircle className="h-12 w-12 text-amber-400 mb-4" />
+                <h2 className="text-xl font-semibold text-white mb-2">
+                    Grila selectată nu a fost găsită
+                </h2>
+                <p className="text-white/60 mb-6 max-w-md">
+                    ID-ul trimis nu corespunde unei întrebări existente.
+                </p>
+                <button
+                    onClick={() => router.push('/grile')}
+                    className="text-violet-400 hover:text-violet-300 font-medium transition-colors"
+                >
+                    Vezi toate grilele
+                </button>
+            </div>
+        );
+    }
 
     // Show class selector if no class selected
     if (!classLevel) {

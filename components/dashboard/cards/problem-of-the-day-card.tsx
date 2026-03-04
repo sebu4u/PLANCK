@@ -8,10 +8,10 @@ import { Card } from "@/components/ui/card"
 import type { DailyChallenge } from "@/lib/dashboard-data"
 
 const DIFFICULTY_STYLES: Record<string, string> = {
-    "Ușor": "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
-    "Mediu": "border-amber-500/40 bg-amber-500/15 text-amber-200",
-    "Avansat": "border-rose-500/40 bg-rose-500/15 text-rose-200",
-    "Concurs": "border-indigo-500/40 bg-indigo-500/15 text-indigo-200",
+    "Ușor": "border-emerald-300 bg-emerald-50 text-emerald-700",
+    "Mediu": "border-amber-300 bg-amber-50 text-amber-700",
+    "Avansat": "border-rose-300 bg-rose-50 text-rose-700",
+    "Concurs": "border-indigo-300 bg-indigo-50 text-indigo-700",
 }
 
 interface ProblemOfTheDayCardProps {
@@ -64,14 +64,14 @@ export function ProblemOfTheDayCard({ challenge }: ProblemOfTheDayCardProps) {
 
     return (
         <Link href={`/probleme/${challenge.problem_id || challenge.id}`} className="block h-full">
-            <Card className="relative h-20 w-full overflow-hidden rounded-xl border border-white/10 bg-[#181818] transition-all duration-300 hover:border-white/20 md:hover:scale-[1.02] transform origin-center group">
+            <Card className="relative h-20 w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:border-gray-300 md:hover:scale-[1.02] transform origin-center group">
 
                 {/* Content Side */}
                 <div className="flex h-full items-center justify-between pl-6 pr-0">
                     <div className="flex flex-col gap-1 relative z-10 max-w-[70%]">
 
                         <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-3">
-                            <h3 className="text-sm font-semibold text-white/90">
+                            <h3 className="text-sm font-semibold text-gray-900">
                                 <span className="md:hidden">Începe aici</span>
                                 <span className="hidden md:inline">Rezolvă problema următoare</span>
                             </h3>
@@ -81,7 +81,7 @@ export function ProblemOfTheDayCard({ challenge }: ProblemOfTheDayCardProps) {
                                     {difficulty}
                                 </Badge>
 
-                                <span className="text-xs font-mono text-white/40">
+                                <span className="text-xs font-mono text-gray-500">
                                     #{challenge.problem_id || challenge.id}
                                 </span>
 
@@ -91,7 +91,7 @@ export function ProblemOfTheDayCard({ challenge }: ProblemOfTheDayCardProps) {
                             </div>
                         </div>
 
-                        <p className="hidden md:block text-sm text-white/60 font-medium truncate">
+                        <p className="hidden md:block text-sm text-gray-600 font-medium truncate">
                             {shortSnippet}
                         </p>
                     </div>
@@ -99,7 +99,7 @@ export function ProblemOfTheDayCard({ challenge }: ProblemOfTheDayCardProps) {
                     {/* Image Side */}
                     <div className="absolute right-0 top-0 bottom-0 w-1/3 h-full overflow-hidden">
                         {/* Gradient Overlay for Fade Effect - Using color matching card bg */}
-                        <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#181818] via-[#181818]/10 to-transparent" />
+                        <div className="absolute inset-0 z-10 bg-gradient-to-r from-white via-white/10 to-transparent" />
 
                         <Image
                             src="/pxl.png"

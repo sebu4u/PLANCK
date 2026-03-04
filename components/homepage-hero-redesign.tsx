@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { LaserFlow } from "@/components/laser-flow"
 import { LiveStats } from "@/components/live-stats"
+import { HomePageNavbar } from "@/components/homepage-navbar"
 import { useRef, useState, useEffect } from "react"
 
 export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean }) {
@@ -83,6 +84,8 @@ export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean 
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
         >
+            <HomePageNavbar />
+
             {/* Background Image with Circular Hover Reveal */}
             <div
                 className="hidden lg:block absolute inset-0 z-0 pointer-events-none transition-opacity duration-300"
@@ -120,24 +123,31 @@ export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean 
 
                         {/* Original Text Content */}
                         <h1 className="scroll-animate-fade-up text-3xl sm:text-4xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-white mb-6 leading-tight">
-                            Where human curiosity
-                            <span className="block">meets intelligent learning.</span>
+                            Explicații clare pentru note mai mari
                         </h1>
-                        <p className="scroll-animate-fade-up animate-delay-200 text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed">
-                            Înveți fizică și informatică cu AI, exerciții interactive și progres salvat.
+                        <p className="scroll-animate-fade-up animate-delay-200 text-base sm:text-lg text-[#dbd1d7] mb-8 leading-relaxed">
+                            Lecții structurate, exerciții interactive și AI care te ajută exact când te blochezi.
                         </p>
 
                         {/* Action buttons */}
                         <div className="scroll-animate-fade-up animate-delay-400 flex flex-row gap-4 justify-center items-center lg:justify-start lg:items-start mb-16 lg:mb-24">
-                            <Link href="/probleme" className="flex justify-center">
+                            <Link href="/register" className="group relative flex justify-center">
                                 <Button
                                     size="lg"
-                                    className="bg-white text-black hover:bg-gray-200 transition-all duration-300 flex items-center gap-2 rounded-full"
+                                    className="relative isolate overflow-hidden bg-white hover:bg-white focus-visible:bg-white active:bg-white text-black flex items-center gap-2 rounded-full"
                                 >
-                                    Rezolvă o problemă
+                                    <span className="relative z-10">Începe gratuit</span>
+                                    <span
+                                        aria-hidden="true"
+                                        className="shimmer-sweep pointer-events-none absolute inset-0 -translate-x-[170%] opacity-0 bg-[linear-gradient(115deg,transparent_28%,rgba(168,85,247,0.14)_40%,rgba(59,130,246,0.5)_48%,rgba(255,255,255,0.98)_52%,rgba(59,130,246,0.5)_56%,rgba(168,85,247,0.14)_64%,transparent_74%)]"
+                                    />
+                                    <span
+                                        aria-hidden="true"
+                                        className="shimmer-sweep-glow pointer-events-none absolute -inset-2 -translate-x-[170%] opacity-0 blur-md bg-[linear-gradient(115deg,transparent_34%,rgba(168,85,247,0.35)_48%,rgba(59,130,246,0.45)_52%,transparent_66%)]"
+                                    />
                                 </Button>
                             </Link>
-                            <Link href="/cursuri" className="group relative inline-flex">
+                            <Link href="/probleme" className="group relative inline-flex">
                                 <span className="absolute -inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
                                 <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
                                 <span className="absolute inset-[1px] rounded-full bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
@@ -148,7 +158,7 @@ export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean 
                                     className="border-white text-white hover:border-transparent transition-all duration-300 flex items-center gap-2 bg-transparent relative z-10 rounded-full"
                                 >
                                     <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300">
-                                        Învață cu AI
+                                        Explorează problemele
                                     </span>
                                 </Button>
                             </Link>

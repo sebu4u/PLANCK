@@ -27,6 +27,12 @@ interface InsightChatSidebarProps {
   persona?: string
   onFreePlanMessage?: () => void
   onMobileUpgradePrompt?: () => void
+  /** When set, send this as the first user message as soon as the sidebar is ready (e.g. from Hint). */
+  initialUserMessage?: string | null
+  /** If set, this is shown in the chat as the user message instead of the full content sent to the model (e.g. "Am nevoie de un hint"). */
+  initialUserMessageDisplay?: string | null
+  /** Called after initialUserMessage has been sent so parent can clear it. */
+  onInitialMessageSent?: () => void
 }
 
 interface SuggestedQuestionsProps {
@@ -89,7 +95,10 @@ export default function InsightChatSidebar({
   problemStatement,
   persona = 'problem_tutor',
   onFreePlanMessage,
-  onMobileUpgradePrompt
+  onMobileUpgradePrompt,
+  initialUserMessage,
+  initialUserMessageDisplay,
+  onInitialMessageSent,
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -466,8 +475,8 @@ export default function InsightChatSidebar({
     submitMessage(question)
   }
 
-  const submitMessage = async (textOverride?: string) => {
-    const textToSend = textOverride || input
+  const submitMessage = async (textOverride?: string, displayContentOverride?: string) => {
+    const textToSend = textOverride ?? input
     if (!user || (!textToSend.trim() && !problemContext) || busy) return
 
     setBusy(true)
@@ -515,7 +524,7 @@ export default function InsightChatSidebar({
         return
       }
 
-      // Combine context and input if context exists
+      // Combine context and input if context exists (this is what we send to the API)
       let finalContent = textToSend.trim()
       if (problemContext) {
         finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
@@ -523,7 +532,7 @@ export default function InsightChatSidebar({
 
       const newUserMsg: ChatMessage = {
         role: 'user',
-        content: finalContent,
+        content: displayContentOverride !== undefined && displayContentOverride !== null ? displayContentOverride : finalContent,
       }
 
       setMessages((prev) => [...prev, newUserMsg])
@@ -569,7 +578,7 @@ export default function InsightChatSidebar({
         },
         body: JSON.stringify({
           sessionId: currentSessionId,
-          input: newUserMsg.content,
+          input: finalContent,
           persona // Pass the persona
         }),
         signal: controller.signal,
@@ -731,6 +740,21 @@ export default function InsightChatSidebar({
     }
   }
 
+  const initialMessageSentRef = useRef(false)
+  useEffect(() => {
+    if (!isOpen) {
+      initialMessageSentRef.current = false
+      return
+    }
+    if (!initialUserMessage?.trim() || loadingSession || busy || initialMessageSentRef.current) return
+    initialMessageSentRef.current = true
+    const display = (initialUserMessageDisplay !== undefined && initialUserMessageDisplay !== null)
+      ? initialUserMessageDisplay
+      : initialUserMessage.trim()
+    submitMessage(initialUserMessage.trim(), display)
+    onInitialMessageSent?.()
+  }, [isOpen, initialUserMessage, initialUserMessageDisplay, loadingSession, busy])
+
   const handleGoogleLogin = async () => {
     setLoginLoading('google')
     const { error } = await loginWithGoogle()
@@ -830,10 +854,10 @@ export default function InsightChatSidebar({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar: on desktop (lg) full height and above navbar (z-[500] > navbar z-[300]); on mobile unchanged */}
       <div
         ref={sidebarRef}
-        className={`fixed top-0 lg:top-[100px] right-0 h-dvh lg:h-[calc(100dvh-100px)] w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out overscroll-contain ${isOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 right-0 h-dvh lg:h-dvh w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out overscroll-contain ${isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         style={{
           maxWidth: '90vw',

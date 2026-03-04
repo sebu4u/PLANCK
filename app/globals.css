@@ -182,7 +182,7 @@
 /* Custom Scrollbar Styles for Dashboard */
 .dashboard-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+  scrollbar-color: rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.06);
 }
 
 .dashboard-scrollbar::-webkit-scrollbar {
@@ -191,17 +191,17 @@
 }
 
 .dashboard-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 3px;
 }
 
 .dashboard-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 3px;
 }
 
 .dashboard-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* Dashboard Card Hover Effects */
@@ -211,7 +211,7 @@
 
 .dashboard-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 /* Smooth Transitions */
@@ -547,6 +547,66 @@
     display: none;
     /* Safari and Chrome */
   }
+}
+
+/* Catalog sidebar: scrollbar visible only while user is scrolling; reserve space so layout doesn't shift */
+.catalog-sidebar-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.catalog-sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.catalog-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.catalog-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.catalog-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+.catalog-sidebar-scroll.is-scrolling {
+  scrollbar-color: #9ca3af transparent;
+}
+
+.catalog-sidebar-scroll.is-scrolling::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+}
+
+.catalog-sidebar-scroll.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Catalog problems list: scrollbar always visible (same look as sidebar when scrolling) */
+.catalog-problems-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af transparent;
+}
+
+.catalog-problems-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.catalog-problems-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.catalog-problems-scroll::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 3px;
+}
+
+.catalog-problems-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 /* Title font using Mona Sans as primary font */
@@ -1770,4 +1830,76 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
 
 .animate-border-glow-shadow {
   animation: border-glow-shadow 4s ease-in-out infinite;
+}
+
+/* Hero CTA shimmer sweep */
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-170%);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(170%);
+    opacity: 0;
+  }
+}
+
+.group:hover .shimmer-sweep {
+  animation: shimmer-sweep 1.1s cubic-bezier(0.22, 0.68, 0.35, 1) forwards;
+}
+
+.group:hover .shimmer-sweep-glow {
+  animation: shimmer-sweep 1.1s cubic-bezier(0.22, 0.68, 0.35, 1) forwards;
+}
+
+/* Dashboard learning path Start button sweep glow (1s every 5s) */
+@keyframes dashboard-start-glow-sweep {
+  0% {
+    transform: translateX(-190%) skewX(-20deg);
+    opacity: 0;
+  }
+  2% {
+    opacity: 0;
+  }
+  7% {
+    opacity: 1;
+  }
+  20% {
+    transform: translateX(240%) skewX(-20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(240%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+.dashboard-start-glow {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.dashboard-start-glow::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: -70%;
+  left: -30%;
+  width: 36%;
+  height: 240%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    var(--start-glow-tint, rgba(224, 215, 255, 0.84)) 48%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(2px);
+  transform: translateX(-190%) skewX(-20deg);
+  opacity: 0;
+  animation: dashboard-start-glow-sweep 5s linear infinite;
+  mix-blend-mode: screen;
 }

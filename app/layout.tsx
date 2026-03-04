@@ -72,6 +72,12 @@ export default function RootLayout({
   return (
     <html lang="ro">
       <head>
+        <link
+          rel="preload"
+          href="/videos/loading.webm"
+          as="video"
+          type="video/webm"
+        />
         <style dangerouslySetInnerHTML={{
           __html: `
             html {

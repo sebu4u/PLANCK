@@ -1,78 +1,71 @@
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
-import { Skeleton } from "@/components/ui/skeleton"
 import { ProblemCardSkeleton } from "@/components/problems/problem-card-skeleton"
+import { Skeleton } from "@/components/ui/skeleton"
+
+function CatalogSidebarSkeleton() {
+  return (
+    <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] bg-white lg:block">
+      <div className="h-full overflow-y-auto px-5 py-5">
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full rounded-xl bg-[#0b0c0f]/10" />
+          <Skeleton className="h-10 w-full rounded-full bg-[#0b0c0f]/10" />
+          <Skeleton className="h-10 w-full rounded-full bg-[#0b0c0f]/10" />
+          <Skeleton className="h-10 w-full rounded-full bg-[#0b0c0f]/10" />
+          <Skeleton className="h-10 w-4/5 rounded-full bg-[#0b0c0f]/10" />
+          <div className="pt-4 space-y-3">
+            <Skeleton className="h-4 w-24 rounded bg-[#0b0c0f]/10" />
+            <Skeleton className="h-8 w-full rounded-lg bg-[#0b0c0f]/10" />
+            <Skeleton className="h-8 w-full rounded-lg bg-[#0b0c0f]/10" />
+            <Skeleton className="h-8 w-3/4 rounded-lg bg-[#0b0c0f]/10" />
+          </div>
+        </div>
+      </div>
+    </aside>
+  )
+}
 
 export default function LoadingProblems() {
   return (
-    <div className="min-h-screen bg-[#141414] text-white flex flex-col overflow-x-hidden">
+    <div className="h-[100dvh] overflow-hidden bg-[#ffffff] pt-16">
       <Navigation />
-      <main className="flex-1 overflow-x-hidden">
-        <div className="px-6 sm:px-8 lg:px-16 xl:px-20 pt-20 pb-12">
-          <section className="w-full space-y-10">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-8 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 text-white/70">
-                    <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
-                      <Skeleton className="h-6 w-6 rounded-lg bg-white/15" />
-                    </span>
-                    <div className="space-y-2">
-                      <Skeleton className="h-3 w-28 bg-white/10" />
-                      <Skeleton className="h-8 w-56 max-w-full bg-white/10" />
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Skeleton className="h-8 w-32 rounded-full bg-white/10" />
-                    <Skeleton className="h-8 w-32 rounded-full bg-white/10" />
-                  </div>
-                </div>
-                <Skeleton className="h-4 w-3/4 bg-white/10" />
-              </div>
-            </div>
+      <div className="flex h-full flex-row">
+        <CatalogSidebarSkeleton />
 
-            <div className="space-y-8">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white/70 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-                <Skeleton className="h-4 w-72 max-w-full bg-white/10" />
-                <div className="flex items-center gap-3 lg:hidden">
-                  <Skeleton className="h-9 w-28 rounded-full bg-white/10" />
-                  <Skeleton className="h-9 w-9 rounded-full bg-white/10" />
-                </div>
-              </div>
-
-              <div className="grid gap-8 lg:grid-cols-[320px,minmax(0,1fr)] lg:items-start">
-                <div className="hidden lg:block">
-                  <div className="sticky top-28">
-                    <div className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0px_24px_70px_-40px_rgba(0,0,0,1)]">
-                      <Skeleton className="h-12 w-full rounded-2xl bg-white/10" />
-                      <Skeleton className="h-10 w-full rounded-full bg-white/10" />
-                      <Skeleton className="h-10 w-full rounded-full bg-white/10" />
-                      <Skeleton className="h-10 w-full rounded-full bg-white/10" />
-                      <Skeleton className="h-10 w-2/3 rounded-full bg-white/10" />
-                    </div>
-                  </div>
+        <div className="flex-1 relative h-full lg:ml-[300px]">
+          <div className="absolute inset-[3px] top-0 overflow-hidden bg-[#f5f4f2] lg:rounded-xl">
+            <div className="h-full overflow-y-auto">
+              <div className="space-y-6 pl-6 pr-[19px] pt-6 pb-12 sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px]">
+                {/* Header */}
+                <div className="space-y-2">
+                  <Skeleton className="h-9 w-64 rounded-lg bg-[#0b0c0f]/10 sm:h-10 sm:w-80" />
+                  <Skeleton className="h-4 w-full max-w-md rounded bg-[#0b0c0f]/10 sm:h-5" />
                 </div>
 
-                <div>
-                  <div className="mb-8 grid gap-5 md:grid-cols-2">
-                    {Array.from({ length: 8 }).map((_, index) => (
-                      <ProblemCardSkeleton key={index} />
-                    ))}
-                  </div>
-                  <div className="mt-8 flex justify-center gap-4">
-                    <Skeleton className="h-10 w-24 rounded-full bg-white/10" />
-                    <Skeleton className="h-10 w-10 rounded-full bg-white/10" />
-                    <Skeleton className="h-10 w-10 rounded-full bg-white/10" />
-                    <Skeleton className="h-10 w-10 rounded-full bg-white/10" />
-                    <Skeleton className="h-10 w-24 rounded-full bg-white/10" />
-                  </div>
+                {/* Mobile filter button */}
+                <div className="flex items-center justify-between lg:hidden">
+                  <Skeleton className="h-10 w-36 rounded-full bg-[#0b0c0f]/10" />
+                </div>
+
+                {/* Cards grid - responsive: 1 col mobile, 2 cols sm, 3 cols lg */}
+                <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <ProblemCardSkeleton key={index} />
+                  ))}
+                </div>
+
+                {/* Pagination skeleton */}
+                <div className="mt-6 flex justify-center gap-2">
+                  <Skeleton className="h-10 w-10 rounded-full bg-[#0b0c0f]/10" />
+                  <Skeleton className="h-10 w-10 rounded-full bg-[#0b0c0f]/10" />
+                  <Skeleton className="h-10 w-10 rounded-full bg-[#0b0c0f]/10" />
+                  <Skeleton className="h-10 w-10 rounded-full bg-[#0b0c0f]/10" />
+                  <Skeleton className="h-10 w-10 rounded-full bg-[#0b0c0f]/10" />
                 </div>
               </div>
             </div>
-          </section>
+          </div>
         </div>
-      </main>
-      <Footer backgroundColor="bg-[#0b0b0b]" />
+      </div>
     </div>
   )
 }

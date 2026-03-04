@@ -54,13 +54,13 @@ export function DailyChallengeCard({ challenge }: DailyChallengeCardProps) {
   }
 
   return (
-    <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-all hover:scale-105 transform origin-center relative overflow-hidden">
+    <div className="rounded-xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-all hover:scale-105 transform origin-center relative overflow-hidden">
       {/* Decorative gradient */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-blue-500/10 blur-3xl -z-0" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white/90">Daily Challenge</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Daily Challenge</h3>
           <Badge className={`${getDifficultyColor(challenge.difficulty)} border`}>
             {challenge.difficulty}
           </Badge>
@@ -71,33 +71,33 @@ export function DailyChallengeCard({ challenge }: DailyChallengeCardProps) {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
               <Trophy className="w-8 h-8 text-green-400" />
             </div>
-            <p className="text-lg font-semibold text-white/90 mb-2">Challenge Completed! 🎉</p>
-            <p className="text-sm text-white/60 mb-4">
+            <p className="text-lg font-semibold text-gray-900 mb-2">Challenge Completed! 🎉</p>
+            <p className="text-sm text-gray-600 mb-4">
               You earned <span className="text-green-400 font-semibold">+{challenge.bonus_elo} ELO</span>
             </p>
-            <p className="text-xs text-white/50">Come back tomorrow for a new challenge</p>
+            <p className="text-xs text-gray-500">Come back tomorrow for a new challenge</p>
           </div>
         ) : (
           <>
             {/* Challenge Content */}
             <div className="mb-6">
-              <h4 className="text-base font-semibold text-white/90 mb-2">{challenge.title}</h4>
-              <p className="text-sm text-white/60 line-clamp-2">{challenge.description}</p>
+              <h4 className="text-base font-semibold text-gray-900 mb-2">{challenge.title}</h4>
+              <p className="text-sm text-gray-600 line-clamp-2">{challenge.description}</p>
             </div>
 
             {/* Bonus Display */}
             <div className="flex items-center justify-between mb-6 p-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg border border-yellow-500/20">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm text-white/90">Bonus Reward</span>
+                <span className="text-sm text-gray-900">Bonus Reward</span>
               </div>
               <span className="text-lg font-bold text-yellow-400">+{challenge.bonus_elo} ELO</span>
             </div>
 
             {/* Timer */}
-            <div className="flex items-center justify-center gap-2 mb-6 text-white/60">
+            <div className="flex items-center justify-center gap-2 mb-6 text-gray-600">
               <Timer className="w-4 h-4" />
-              <span className="text-sm">Expires in: <span className="font-semibold text-white/80">{timeLeft}</span></span>
+              <span className="text-sm">Expires in: <span className="font-semibold text-gray-800">{timeLeft}</span></span>
             </div>
 
             {/* CTA Button */}

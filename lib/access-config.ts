@@ -41,6 +41,18 @@ export const ALLOW_ALL_PHYSICS_PROBLEMS = true
 export const ALLOW_ALL_CODING_PROBLEMS = true
 
 // ============================================================================
+// SUBSCRIPTION PURCHASES
+// ============================================================================
+/**
+ * When TRUE: Users can start Stripe checkout for Plus/Premium plans.
+ * When FALSE: New subscription purchases are temporarily disabled for users.
+ *
+ * TO RE-ENABLE PURCHASES:
+ * Set this flag to `true` and redeploy.
+ */
+export const ALLOW_SUBSCRIPTION_PURCHASES = false
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 /**
@@ -58,3 +70,8 @@ export const canAccessAllCodingProblems = () => ALLOW_ALL_CODING_PROBLEMS
  */
 export const isAllContentUnlocked = () =>
     ALLOW_ALL_PHYSICS_PROBLEMS && ALLOW_ALL_CODING_PROBLEMS
+
+/**
+ * Check if users are currently allowed to purchase subscriptions
+ */
+export const canPurchaseSubscriptions = () => ALLOW_SUBSCRIPTION_PURCHASES

@@ -17,7 +17,7 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
       return <Check className="w-5 h-5 text-green-400" />
     }
     if (step.is_locked) {
-      return <Lock className="w-5 h-5 text-white/30" />
+      return <Lock className="w-5 h-5 text-gray-400" />
     }
     return <Circle className="w-5 h-5 text-blue-400" />
   }
@@ -27,7 +27,7 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
       return "bg-green-500/10 border-green-500/30"
     }
     if (step.is_locked) {
-      return "bg-white/[0.02] border-white/10 opacity-60"
+      return "bg-gray-100 border-gray-200 opacity-60"
     }
     return "bg-blue-500/10 border-blue-500/30 ring-2 ring-blue-500/20"
   }
@@ -35,8 +35,8 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
   const currentStepIndex = steps.findIndex(step => !step.is_completed && !step.is_locked)
 
   return (
-    <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-all hover:scale-105 transform origin-center relative overflow-hidden">
-      <h3 className="text-lg font-semibold text-white/90 mb-4 flex items-center gap-2">
+    <div className="rounded-xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-all hover:scale-105 transform origin-center relative overflow-hidden">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
         Roadmap Personalizat
         {isFree && <Lock className="w-4 h-4 text-yellow-500" />}
       </h3>
@@ -63,7 +63,7 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-1">
                     <div>
-                      <h4 className="text-sm font-semibold text-white/90 flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                         {step.title}
                         {isCurrentStep && (
                           <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full">
@@ -71,9 +71,9 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
                           </span>
                         )}
                       </h4>
-                      <p className="text-xs text-white/60 mt-0.5">{step.description}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">{step.description}</p>
                     </div>
-                    <span className="text-xs text-white/50 whitespace-nowrap ml-2">
+                    <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
                       {step.completed_items}/{step.total_items}
                     </span>
                   </div>
@@ -81,7 +81,7 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
                   {/* Progress Bar */}
                   {!step.is_locked && step.total_items > 0 && (
                     <div className="mt-2">
-                      <Progress value={progressPercent} className="h-1.5 bg-white/5">
+                      <Progress value={progressPercent} className="h-1.5 bg-gray-100">
                         <div
                           className={`h-full transition-all rounded-full ${
                             step.is_completed
@@ -96,7 +96,7 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
 
                   {/* Category Badge */}
                   <div className="mt-2">
-                    <span className="text-xs px-2 py-1 bg-white/5 text-white/60 rounded-md">
+                    <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md">
                       {step.category}
                     </span>
                   </div>
@@ -108,16 +108,16 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
       </div>
 
       {/* Overall Progress */}
-      <div className="mt-6 pt-6 border-t border-white/10">
+      <div className="mt-6 pt-6 border-t border-gray-200">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-white/70">Overall Progress</p>
-          <p className="text-sm font-semibold text-white/90">
+          <p className="text-sm text-gray-700">Overall Progress</p>
+          <p className="text-sm font-semibold text-gray-900">
             {steps.filter(s => s.is_completed).length}/{steps.length} completed
           </p>
         </div>
         <Progress
           value={(steps.filter(s => s.is_completed).length / steps.length) * 100}
-          className="h-2 bg-white/5"
+          className="h-2 bg-gray-100"
         >
           <div
             className="h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all rounded-full"
@@ -130,15 +130,15 @@ export function RoadmapCard({ steps }: RoadmapCardProps) {
 
       {/* Locked Overlay for Free Users */}
       {isFree && (
-        <div className="absolute inset-0 bg-[#131316]/95 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-6 text-center">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-2 border-yellow-500/30 flex items-center justify-center mb-4">
             <Lock className="w-8 h-8 text-yellow-500" />
           </div>
-          <h4 className="text-lg font-bold text-white/90 mb-2 flex items-center gap-2">
+          <h4 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
             <Crown className="w-5 h-5 text-yellow-500" />
             Premium Feature
           </h4>
-          <p className="text-sm text-white/60 mb-4 max-w-xs">
+          <p className="text-sm text-gray-600 mb-4 max-w-xs">
             Roadmap-ul personalizat este disponibil doar pentru utilizatorii Premium
           </p>
           <Link href="/insight">

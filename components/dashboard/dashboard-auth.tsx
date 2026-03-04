@@ -1,23 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useMemo } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
+import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-wrapper"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton"
-import { DashboardSidebarSkeleton } from "@/components/dashboard/dashboard-sidebar-skeleton"
-import { NavigationSkeleton } from "@/components/navigation-skeleton"
-import { LearnPhysicsCard, RecommendedLesson } from "@/components/dashboard/cards/learn-physics-card"
-import { RankEloCard } from "@/components/dashboard/cards/rank-elo-card"
-import { DailyChallengeCard } from "@/components/dashboard/cards/daily-challenge-card"
-import { SketchCard } from "@/components/dashboard/cards/sketch-card"
-import { AchievementsCard } from "@/components/dashboard/cards/achievements-card"
-import { LearningInsightsCard } from "@/components/dashboard/cards/learning-insights-card"
+import type { RecommendedLesson } from "@/components/dashboard/cards/learn-physics-card"
 import type {
   UserStats,
   DailyChallenge,
@@ -31,12 +24,24 @@ import type {
   DashboardUpdate,
   Project,
 } from "@/lib/dashboard-data"
-import { getNextRankThreshold } from "@/lib/dashboard-data"
-
-import { ProblemOfTheDayCard } from "@/components/dashboard/cards/problem-of-the-day-card"
-import { QuickActionsRow } from "@/components/dashboard/quick-actions-row"
-import { ContestPromoCard } from "@/components/dashboard/cards/contest-promo-card"
 import { FreePlanUpgradeModal } from "@/components/dashboard/free-plan-upgrade-modal"
+import {
+  getLearningPathChapters,
+  getLearningPathLessonsByChapterId,
+  getProblemsByClass,
+  type LearningPathChapter,
+  type LearningPathLesson,
+} from "@/lib/supabase-learning-paths"
+import type { Problem } from "@/data/problems"
+import {
+  DashboardStreakCard,
+  type DashboardStreakDay,
+} from "@/components/dashboard/cards/dashboard-streak-card"
+import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
+import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
+import { ArrowUpRight } from "lucide-react"
+
+const PHYSICS_CONTEST_DATE_LABEL = "22 martie 2026"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -64,6 +69,10 @@ export function DashboardAuth() {
     eloWeekGain: number
     eloHistory: number[]
     lastProject: Project | null
+    streakDays: DashboardStreakDay[]
+    dashboardLearningPaths: LearningPathChapter[]
+    dashboardLessonsByChapter: Record<string, LearningPathLesson[]>
+    recommendedProblems: Problem[]
   } | null>(null)
 
 
@@ -82,7 +91,7 @@ export function DashboardAuth() {
 
       try {
         // Check cache in dev mode
-        const cacheKey = `dashboard_cache_${user.id}`
+        const cacheKey = `dashboard_cache_v2_${user.id}`
         const cacheExpiry = 5 * 60 * 1000 // 5 minutes
         const isDev = process.env.NODE_ENV === 'development'
 
@@ -116,6 +125,9 @@ export function DashboardAuth() {
           updatesData,
           eloQuickStats,
           eloHistoryData,
+          streakDaysData,
+          learningPathsData,
+          recommendedProblemsData,
         ] = await Promise.all([
           fetchUserStats(user.id, isInitialLoadRef.current),
           fetchRandomLessons(),
@@ -128,6 +140,9 @@ export function DashboardAuth() {
           fetchDashboardUpdates(),
           fetchEloQuickStats(user.id),
           fetchEloHistory(user.id),
+          fetchLastFiveStreakDays(user.id),
+          fetchDashboardLearningPaths(),
+          fetchRecommendedProblemsForDashboard(profile?.grade),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -150,6 +165,10 @@ export function DashboardAuth() {
           eloWeekGain: eloQuickStats.weekGain,
           eloHistory: eloHistoryData,
           lastProject: lastProjectData,
+          streakDays: streakDaysData,
+          dashboardLearningPaths: learningPathsData.chapters,
+          dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
+          recommendedProblems: recommendedProblemsData,
         }
 
         setDashboardData(completeData)
@@ -189,6 +208,9 @@ export function DashboardAuth() {
           updatesData,
           eloQuickStats,
           eloHistoryData,
+          streakDaysData,
+          learningPathsData,
+          recommendedProblemsData,
         ] = await Promise.all([
           fetchUserStats(userId, true), // Skip streak check in background fetch
           fetchRandomLessons(),
@@ -201,6 +223,9 @@ export function DashboardAuth() {
           fetchDashboardUpdates(),
           fetchEloQuickStats(userId),
           fetchEloHistory(userId),
+          fetchLastFiveStreakDays(userId),
+          fetchDashboardLearningPaths(),
+          fetchRecommendedProblemsForDashboard(profile?.grade),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -222,6 +247,10 @@ export function DashboardAuth() {
           eloWeekGain: eloQuickStats.weekGain,
           eloHistory: eloHistoryData,
           lastProject: lastProjectData,
+          streakDays: streakDaysData,
+          dashboardLearningPaths: learningPathsData.chapters,
+          dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
+          recommendedProblems: recommendedProblemsData,
         }
 
         // Only update cache, don't update UI if silent mode
@@ -275,9 +304,10 @@ export function DashboardAuth() {
           realtimeUpdateTimeoutRef.current = setTimeout(async () => {
             try {
               // Skip streak check in realtime updates to prevent loops
-              const [updatedStats, eloQuickStats] = await Promise.all([
+              const [updatedStats, eloQuickStats, streakDaysData] = await Promise.all([
                 fetchUserStats(user.id, true), // Skip streak check
                 fetchEloQuickStats(user.id),
+                fetchLastFiveStreakDays(user.id),
               ])
 
               const updatedEloHistory = await fetchEloHistory(user.id)
@@ -290,6 +320,7 @@ export function DashboardAuth() {
                   eloWeekGain: eloQuickStats.weekGain,
                   eloHistory: updatedEloHistory,
                   lastProject: prev.lastProject, // Preserve existing
+                  streakDays: streakDaysData,
                 }
               })
             } catch (error) {
@@ -312,7 +343,7 @@ export function DashboardAuth() {
       isInitialLoadRef.current = true
       isInitialLoadRef.current = true
     }
-  }, [user?.id, authLoading, router])
+  }, [user?.id, authLoading, router, profile?.grade])
 
   useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || !isFree) return
@@ -367,27 +398,19 @@ export function DashboardAuth() {
     }
   }, [user?.id, user?.email, profile?.user_icon, profile?.nickname, profile?.name])
 
-  // Show skeleton loading while data is being fetched
+  // Show loading video while dashboard data is being fetched
   if (authLoading || loading || !dashboardData) {
-    return (
-      <DashboardSidebarProvider>
-        <NavigationSkeleton />
-        <DashboardSidebarSkeleton />
-        <DashboardSkeleton />
-      </DashboardSidebarProvider>
-    )
+    return <LoadingVideoOverlay zIndex={600} />
   }
 
   if (!user) return null
-
-  const nextRankInfo = getNextRankThreshold(dashboardData.stats.elo)
 
   return (
     <DashboardSidebarProvider>
       <Navigation />
 
       {/* Main Container - Fixed Height matching viewport minus header */}
-      <div className="h-[calc(100vh-64px)] lg:h-[calc(100vh-100px)] mt-16 overflow-hidden bg-[#080808] relative flex flex-row">
+      <div className="h-[100dvh] pt-16 overflow-hidden bg-[#ffffff] relative flex flex-row">
         <DashboardClientWrapper
           user={userData}
           stats={dashboardData.stats}
@@ -398,70 +421,99 @@ export function DashboardAuth() {
         />
 
         {/* Content Wrapper - takes remaining width */}
-        <div className="flex-1 lg:ml-[250px] relative h-full transition-all duration-300">
+        <div className="flex-1 lg:ml-[250px] h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
+          {/* Mobile-only: banner lipit de navbar, shadow-ul navbar-ului cade peste el */}
+          <Link
+            href="/concurs"
+            className="lg:hidden flex-shrink-0 block border-b border-[#d4c8e0] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-3 py-2.5"
+          >
+            <div className="flex w-full items-center justify-center gap-1.5 text-center text-[12px] font-medium text-[#4a4656] sm:text-sm">
+              <span className="font-semibold text-[#2f2a3c]">Concurs de Fizică</span>
+              <span className="text-[#8f889e]">•</span>
+              <span>{PHYSICS_CONTEST_DATE_LABEL}</span>
+              <span className="text-[#8f889e]">•</span>
+              <span className="underline decoration-[#c9bfd8] underline-offset-4 transition-colors group-hover:text-[#2f2a3c]">
+                Vezi detalii
+              </span>
+              <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </div>
+          </Link>
 
           {/* Floating Card Container */}
-          <div className="absolute inset-[3px] bg-[#0D0D0F] lg:rounded-xl overflow-hidden border border-white/5 shadow-2xl flex flex-col">
+          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-[3px]">
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#0D0D0F]">
+            <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa]">
               <main className="p-4 md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="max-w-[1000px] mx-auto">
-                  <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-white/90 mb-2">
+                  {/* Desktop: banner în zona cardurilor */}
+                  <Link
+                    href="/concurs"
+                    className="hidden lg:block group mb-4 rounded-xl border border-[#d4c8e0] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-3 py-2.5 md:mb-6 md:px-5"
+                  >
+                    <div className="flex w-full items-center justify-center gap-1.5 text-center text-[12px] font-medium text-[#4a4656] sm:text-sm">
+                      <span className="font-semibold text-[#2f2a3c]">Concurs de Fizică</span>
+                      <span className="text-[#8f889e]">•</span>
+                      <span>{PHYSICS_CONTEST_DATE_LABEL}</span>
+                      <span className="text-[#8f889e]">•</span>
+                      <span className="underline decoration-[#c9bfd8] underline-offset-4 transition-colors group-hover:text-[#2f2a3c]">
+                        Vezi detalii
+                      </span>
+                      <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </div>
+                  </Link>
+
+                  {/* Mobile welcome */}
+                  <div className="mb-4 pt-3 md:hidden">
+                    <p className="text-2xl font-extrabold text-gray-900">
+                      Bună, {userData.username || 'Student'} 👋
+                    </p>
+                    <p className="mt-0.5 text-sm text-gray-500">
+                      {(() => {
+                        const d = new Date()
+                        const weekdays = ['Duminică', 'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă']
+                        const months = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'nov', 'dec']
+                        return `${weekdays[d.getDay()]} • ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
+                      })()}
+                    </p>
+                  </div>
+                  {/* Desktop welcome */}
+                  <div className="mb-8 hidden md:block">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
                       Welcome back, {userData.username || 'Student'}! 👋
                     </h1>
-                    <p className="text-white/60">Here's your learning progress today</p>
+                    <p className="text-gray-600">Here's your learning progress today</p>
                   </div>
 
-                  {/* Contest Promo Card - Mobile Only */}
-                  <div className="mb-3 lg:hidden">
-                    <ContestPromoCard />
-                  </div>
-
-                  <div className="mb-3 md:mb-6">
-                    <ProblemOfTheDayCard challenge={dashboardData.challenge} />
-                  </div>
-
-                  <QuickActionsRow
-                    lastLesson={dashboardData.continueItems.find(i => i.type === 'lesson')}
-                    userGrade={profile?.grade}
-                    lastProject={dashboardData.lastProject}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 mb-3 md:mb-6">
-                    <LearnPhysicsCard lessons={dashboardData.recommendedLessons} />
-                    <RankEloCard
-                      elo={dashboardData.stats.elo}
-                      rank={dashboardData.stats.rank}
-                      nextRank={nextRankInfo.nextRank}
-                      nextThreshold={nextRankInfo.threshold}
-                      progress={nextRankInfo.progress}
-                      currentStreak={dashboardData.stats.current_streak}
-                      bestStreak={dashboardData.stats.best_streak}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 mb-3 md:mb-6">
-                    {dashboardData.challenge && <DailyChallengeCard challenge={dashboardData.challenge} />}
-                    <SketchCard sketches={dashboardData.sketches} />
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-3 md:gap-6">
-                    <div className="flex-[2]">
-                      <AchievementsCard achievements={dashboardData.achievements} />
+                  <div className="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6">
+                    <div className="order-1 xl:col-start-1 xl:row-start-1">
+                      <DashboardStreakCard
+                        currentStreak={dashboardData.stats.current_streak}
+                        problemsToday={dashboardData.stats.problems_solved_today}
+                        streakDays={dashboardData.streakDays}
+                        streakImageSrc="/streak-icon.png"
+                      />
                     </div>
-                    <div className="flex-[3]">
-                      <LearningInsightsCard insights={dashboardData.insights} />
+
+                    <div className="order-2 md:order-3 xl:order-none overflow-visible xl:col-start-2 xl:row-span-2">
+                      <p className="mb-3 text-sm font-bold text-gray-500 md:hidden">
+                        Continuă de unde ai rămas
+                      </p>
+                      <DashboardLearningPathsCarousel
+                        chapters={dashboardData.dashboardLearningPaths}
+                        lessonsByChapter={dashboardData.dashboardLessonsByChapter}
+                      />
+                    </div>
+
+                    <div className="order-3 md:order-2 xl:order-none xl:col-start-1 xl:row-start-2">
+                      <DashboardRecommendedProblemsCard
+                        problems={dashboardData.recommendedProblems}
+                        userGrade={profile?.grade}
+                      />
                     </div>
                   </div>
                 </div>
               </main>
-
-              {/* Footer inside the card */}
-              <footer>
-                <Footer backgroundColor="bg-[#080808]" borderColor="border-[#1a1a1a]" />
-              </footer>
             </div>
           </div>
         </div>
@@ -534,8 +586,7 @@ async function fetchUserStats(userId: string, skipStreakCheck: boolean = false):
     }
   }
 
-  // Get problems solved today and time from daily_activity to ensure accuracy
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatLocalDate(new Date())
   const { data: todayActivity } = await supabase
     .from('daily_activity')
     .select('problems_solved, time_minutes')
@@ -736,7 +787,7 @@ async function fetchRandomLessons(): Promise<RecommendedLesson[]> {
 }
 
 async function fetchDailyChallenge(userId: string): Promise<DailyChallenge | null> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatLocalDate(new Date())
 
   // Ensure challenge exists for today
   await supabase.rpc('ensure_daily_challenge_for_today')
@@ -954,7 +1005,7 @@ async function fetchAchievements(userId: string): Promise<Achievement[]> {
 }
 
 async function fetchUserTasks(userId: string): Promise<UserTask[]> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatLocalDate(new Date())
 
   const { data, error } = await supabase
     .from('user_tasks')
@@ -1050,6 +1101,133 @@ async function fetchContinueLearning(): Promise<ContinueLearningItem[]> {
     console.error('Error fetching continue learning items:', error)
     return getContinueLearningPlaceholder()
   }
+}
+
+interface DashboardLearningPathsData {
+  chapters: LearningPathChapter[]
+  lessonsByChapter: Record<string, LearningPathLesson[]>
+}
+
+function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): LearningPathChapter[] {
+  const preferredSlugs = ["cinematica-punctului-material", "dinamica", "optica-geometrica"]
+  const picked: LearningPathChapter[] = []
+  const pickedIds = new Set<string>()
+
+  for (const slug of preferredSlugs) {
+    const chapter = chapters.find((item) => item.slug === slug && !pickedIds.has(item.id))
+    if (!chapter) continue
+    picked.push(chapter)
+    pickedIds.add(chapter.id)
+  }
+
+  const titleMatchers = [
+    /(cinematica|punctului material)/i,
+    /dinamica/i,
+    /optica/i,
+  ]
+
+  for (const matcher of titleMatchers) {
+    if (picked.length >= 3) break
+    const chapter = chapters.find(
+      (item) => !pickedIds.has(item.id) && matcher.test(item.title)
+    )
+    if (!chapter) continue
+    picked.push(chapter)
+    pickedIds.add(chapter.id)
+  }
+
+  if (picked.length < 3) {
+    for (const chapter of chapters) {
+      if (pickedIds.has(chapter.id)) continue
+      picked.push(chapter)
+      pickedIds.add(chapter.id)
+      if (picked.length >= 3) break
+    }
+  }
+
+  return picked.slice(0, 3)
+}
+
+async function fetchDashboardLearningPaths(): Promise<DashboardLearningPathsData> {
+  const chapters = await getLearningPathChapters()
+  const selectedChapters = selectDashboardLearningPathChapters(chapters)
+  const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
+
+  await Promise.all(
+    selectedChapters.map(async (chapter) => {
+      const lessons = await getLearningPathLessonsByChapterId(chapter.id)
+      lessonsByChapter[chapter.id] = lessons.slice(0, 2)
+    })
+  )
+
+  return {
+    chapters: selectedChapters,
+    lessonsByChapter,
+  }
+}
+
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function getWeekdayLabel(date: Date): string {
+  const labels = ["D", "L", "Ma", "Mi", "J", "V", "S"]
+  return labels[date.getDay()] || "?"
+}
+
+async function fetchLastFiveStreakDays(userId: string): Promise<DashboardStreakDay[]> {
+  const endDate = new Date()
+  endDate.setHours(0, 0, 0, 0)
+  const startDate = new Date(endDate)
+  startDate.setDate(endDate.getDate() - 4)
+
+  const startIso = formatLocalDate(startDate)
+  const endIso = formatLocalDate(endDate)
+
+  const { data } = await supabase
+    .from("daily_activity")
+    .select("activity_date, problems_solved")
+    .eq("user_id", userId)
+    .gte("activity_date", startIso)
+    .lte("activity_date", endIso)
+
+  const activeDays = new Set(
+    (data || [])
+      .filter((item: any) => (item.problems_solved || 0) > 0)
+      .map((item: any) => {
+        if (typeof item.activity_date === "string") return item.activity_date
+        return formatLocalDate(new Date(item.activity_date))
+      })
+  )
+
+  const streakDays: DashboardStreakDay[] = []
+  for (let index = 0; index < 5; index++) {
+    const date = new Date(startDate)
+    date.setDate(startDate.getDate() + index)
+    const localDate = formatLocalDate(date)
+    streakDays.push({
+      date: localDate,
+      label: getWeekdayLabel(date),
+      active: activeDays.has(localDate),
+    })
+  }
+
+  return streakDays
+}
+
+async function fetchRecommendedProblemsForDashboard(grade: unknown): Promise<Problem[]> {
+  const gradeValue =
+    typeof grade === "number" || typeof grade === "string"
+      ? grade
+      : null
+
+  const scopedProblems = await getProblemsByClass(gradeValue, 5)
+  if (scopedProblems.length > 0) return scopedProblems
+
+  return getProblemsByClass(null, 5)
 }
 
 function getContinueLearningPlaceholder(): ContinueLearningItem[] {

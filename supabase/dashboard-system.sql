@@ -327,8 +327,8 @@ create policy "dashboard_updates_select_all"
 -- ============================================
 
 -- Function to check and reset streak if needed (called when viewing dashboard)
--- This resets streak to 0 if user skipped a day, and updates best_streak
--- NOTE: This only checks last_activity_date, not daily_activity, to avoid race conditions
+-- This resets streak to 0 if user skipped a full day (gap > 1 day), and updates best_streak
+-- If last activity was yesterday, the user still has today to continue the streak
 create or replace function public.check_and_reset_streak_if_needed(user_uuid uuid)
 returns void as $$
 declare
@@ -336,29 +336,22 @@ declare
   today date := current_date;
   current_streak_count integer;
 begin
-  -- Get last activity date and current streak
   select last_activity_date, current_streak into last_activity, current_streak_count
   from public.user_stats
   where user_id = user_uuid;
 
-  -- If no activity yet, do nothing (will be initialized when solving first problem)
   if last_activity is null then
     return;
   end if;
 
-  -- If activity is today, do nothing (user has activity today)
-  if last_activity = today then
+  if last_activity >= today - interval '1 day' then
     return;
   end if;
 
-  -- If last activity was before today (including yesterday), reset streak to 0 and update best_streak
-  -- This covers both cases: yesterday (last_activity = today - 1 day) and older (last_activity < today - 1 day)
-  if last_activity < today then
-    update public.user_stats
-    set current_streak = 0,
-        best_streak = greatest(best_streak, current_streak_count)
-    where user_id = user_uuid;
-  end if;
+  update public.user_stats
+  set current_streak = 0,
+      best_streak = greatest(best_streak, current_streak_count)
+  where user_id = user_uuid;
 end;
 $$ language plpgsql security definer;
 

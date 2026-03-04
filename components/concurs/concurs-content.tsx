@@ -141,9 +141,19 @@ export function ConcursContent() {
                     </h1>
 
                     {/* Edition Subtitle */}
-                    <p className="scroll-animate-fade-up animate-delay-200 text-xl sm:text-2xl md:text-3xl text-gray-800 mb-10 font-medium">
+                    <p className="scroll-animate-fade-up animate-delay-200 text-xl sm:text-2xl md:text-3xl text-gray-800 mb-4 font-medium">
                         Ediția 2026
                     </p>
+
+                    {/* Date & Time Badge */}
+                    <div className="scroll-animate-fade-up animate-delay-300 flex items-center justify-center mb-10 px-2">
+                        <div className="inline-flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-2xl sm:rounded-full bg-white/95 px-4 sm:px-6 py-3 text-xs sm:text-sm md:text-base font-semibold text-gray-900 shadow-md border border-orange-200 max-w-md">
+                            <span className="text-base sm:text-lg">📅</span>
+                            <span className="text-center leading-snug">
+                                Concursul are loc <span className="font-bold">Duminică, 22 martie</span> de la ora <span className="font-bold">12:00</span>
+                            </span>
+                        </div>
+                    </div>
 
                     {/* CTA Buttons */}
                     <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -511,7 +521,7 @@ export function ConcursContent() {
                         </Link>
 
                         <p className="text-gray-500 text-sm mt-6">
-                            Data concursului va fi anunțată în curând. Vei primi toate detaliile pe email.
+                            Concursul se va desfășura <span className="font-semibold text-gray-900">Duminică, 22 martie, de la ora 12:00</span>. Vei primi toate detaliile pe email după înscriere.
                         </p>
                     </div>
                 </div>

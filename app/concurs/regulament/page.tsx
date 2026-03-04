@@ -37,7 +37,7 @@ export default function RegulamentPage() {
                         <ul>
                             <li>elevii înscriși în clasele IX – XII, indiferent de profil;</li>
                             <li>elevii care dețin un cont valid pe platforma PLANCK;</li>
-                            <li>elevii care finalizează înscrierea până la 20 februarie, inclusiv.</li>
+                            <li>elevii care finalizează înscrierea până la <strong>14 martie</strong>, inclusiv.</li>
                         </ul>
                         <p>Nu există taxă de participare (dacă ulterior se va introduce, acest aspect va fi anunțat explicit pe pagina concursului).</p>
                     </section>
@@ -54,7 +54,7 @@ export default function RegulamentPage() {
                         </ul>
 
                         <h3 className="text-xl font-semibold mt-4 mb-2">3.2 Termen limită</h3>
-                        <p>Data limită pentru înscriere este 20 februarie. După această dată, înscrierile vor fi închise automat.</p>
+                        <p>Data limită pentru înscriere este <strong>14 martie</strong>. După această dată, înscrierile vor fi închise automat.</p>
                     </section>
 
                     <section className="mb-8">
@@ -88,8 +88,8 @@ export default function RegulamentPage() {
 
                     <section className="mb-8">
                         <h2>5. Data concursului</h2>
-                        <p>Data exactă a concursului va fi anunțată ulterior pe platforma PLANCK și prin canalele oficiale de comunicare.</p>
-                        <p>Participanții au obligația de a verifica periodic informațiile afișate pe pagina concursului.</p>
+                        <p>Concursul se va desfășura <strong>Duminică, 22 martie, începând cu ora 12:00</strong>.</p>
+                        <p>Orice modificare ulterioară a datei sau orei va fi anunțată pe platforma PLANCK și prin canalele oficiale de comunicare.</p>
                     </section>
 
                     <section className="mb-8">

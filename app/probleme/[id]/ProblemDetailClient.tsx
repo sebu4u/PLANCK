@@ -1,13 +1,12 @@
 "use client"
 
-import { useMemo, useState, lazy, Suspense } from "react"
-import { createPortal } from "react-dom"
+import { useMemo, useState, lazy, Suspense, useEffect } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, Maximize2, X, Lock, Play } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, X, Lock, Play } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -24,11 +23,12 @@ import ProblemOrbButton from "@/components/problem-orb-button"
 // Lazy load heavy sidebar components for faster initial render
 const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
 const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
-import { ProblemBoard } from "@/components/problems/problem-board"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import type { TLStore } from "@tldraw/tldraw"
 import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
+import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
+import { ProblemAnswerBottomSheet } from "@/components/problems/problem-answer-bottom-sheet"
+import { RecommendedProblemCard } from "@/components/problems/recommended-problem-card"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -93,6 +93,18 @@ function MissingVideoCard() {
       <p className="text-2xl font-semibold text-white">Ups, ne-ai prins de data asta..</p>
       <p className="mt-3 text-sm sm:text-base text-white/70 max-w-md">
         Lucrăm la rezolvarea video pentru această problemă. Revino curând sau explorează soluția în enunțul detaliat.
+      </p>
+    </div>
+  )
+}
+
+function NoAnswerCard() {
+  return (
+    <div className="flex flex-col gap-4 rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-6 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)] text-center">
+      <div className="text-4xl">🛠️</div>
+      <h2 className="text-lg font-semibold text-[#0b0d10]">Ups, ne-ai prins de data asta!</h2>
+      <p className="text-sm text-[#2C2F33]/70">
+        Încă lucrăm la rezolvarea acestei probleme. Revino curând sau explorează alte probleme din catalog.
       </p>
     </div>
   )
@@ -177,7 +189,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [imageLoaded, setImageLoaded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [insightSidebarOpen, setInsightSidebarOpen] = useState(false)
-  const [desktopBoardExpanded, setDesktopBoardExpanded] = useState(false)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
   const { user } = useAuth();
   const { isFree } = useSubscriptionPlan()
@@ -187,22 +198,40 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
   const [showMobileUpgradeModal, setShowMobileUpgradeModal] = useState(false)
   const [openedInsightFromCard, setOpenedInsightFromCard] = useState(false)
-
-  // Lazy create the shared store for the desktop whiteboard (minimized and maximized share the same instance)
-  const [desktopBoardStore, setDesktopBoardStore] = useState<TLStore | null>(null)
-
-  React.useEffect(() => {
-    // Defer tldraw store creation to after initial render for faster page load
-    import("@tldraw/tldraw").then(({ createTLStore, defaultShapeUtils }) => {
-      setDesktopBoardStore(createTLStore({ shapeUtils: defaultShapeUtils }))
-    })
-  }, [])
+  const [canMarkSolvedByAnswer, setCanMarkSolvedByAnswer] = useState(false)
+  const [initialHintMessage, setInitialHintMessage] = useState<string | null>(null)
+  const [showCongratulationCloseButton, setShowCongratulationCloseButton] = useState(false)
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
   }, [problem.youtube_url])
+  const hasAnswerCard = problem.answer_type === "value" || problem.answer_type === "grila"
 
   const isVideoLockedForUser = hasVideo && isFree
+
+  React.useEffect(() => {
+    setCanMarkSolvedByAnswer(false)
+  }, [problem.id, problem.answer_type])
+
+  useEffect(() => {
+    if (!congratulationMessage) {
+      setShowCongratulationCloseButton(false)
+      return
+    }
+
+    const closeButtonTimer = window.setTimeout(() => {
+      setShowCongratulationCloseButton(true)
+    }, 2000)
+
+    const autoDismissTimer = window.setTimeout(() => {
+      setCongratulationMessage(null)
+    }, 7000)
+
+    return () => {
+      window.clearTimeout(closeButtonTimer)
+      window.clearTimeout(autoDismissTimer)
+    }
+  }, [congratulationMessage])
 
   const renderInlineMath = (value?: string | null) => {
     if (!value) return null
@@ -300,13 +329,9 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
     confetti({
       particleCount: 100,
       spread: 70,
-      origin: { y: 0.6 }
+      origin: { y: 0.6 },
+      zIndex: 1000,
     });
-
-    // Ascunde mesajul după 3 secunde
-    setTimeout(() => {
-      setCongratulationMessage(null);
-    }, 3000);
   };
 
   return (
@@ -315,7 +340,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
       {/* Upgrade Banner for Free Users */}
       {showUpgradeBanner && (
-        <div className="fixed top-[116px] left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="fixed top-[72px] left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300">
           <Link
             href="/pricing"
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500/90 to-amber-500/90 hover:from-orange-500 hover:to-amber-500 text-white text-sm font-medium rounded-full shadow-lg transition-all hover:scale-105"
@@ -327,7 +352,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       )}
 
       <div className="flex-1">
-        <div className="px-4 sm:px-6 lg:px-12 pt-20 lg:pt-[116px] pb-16">
+        <div className={cn("px-4 sm:px-6 lg:px-12 pt-20 lg:pt-20 pb-16", isMobile && "pb-28")}>
           <div className="mx-auto max-w-[1600px] space-y-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
@@ -434,27 +459,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  {user && !loadingSolved && (
-                    <Button
-                      onClick={handleMarkSolved}
-                      disabled={isSolved}
-                      className={cn(
-                        'rounded-full border px-6 py-3 text-sm font-semibold transition',
-                        isSolved
-                          ? 'cursor-not-allowed border-emerald-600/30 bg-emerald-50 text-emerald-800'
-                          : 'border-[#0b0d10]/15 bg-white text-[#0b0d10] hover:bg-white/80'
-                      )}
-                    >
-                      {isSolved ? 'Rezolvată' : 'Marchează ca rezolvată'}
-                    </Button>
-                  )}
-                  {!user && (
-                    <span className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/55">
-                      Autentifică-te pentru a salva progresul
-                    </span>
-                  )}
-                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
                     {problem.difficulty}
@@ -472,31 +476,29 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
               </section>
 
               <aside className="hidden lg:block space-y-6">
-                {/* Only show minimized board when dialog is not expanded */}
-                {!desktopBoardExpanded && (
-                  <div className="flex flex-col gap-4 rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-lg font-semibold text-[#0b0d10]">Tabla de lucru</h2>
-                        <p className="mt-1 text-sm text-[#2C2F33]/70">
-                          Rezolvă problema direct pe această tablă. Salvează dacă ai cont.
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDesktopBoardExpanded(true)}
-                        className="hidden rounded-full border border-[#0b0d10]/10 bg-white text-[#0b0d10] transition hover:bg-[#f6f5f4] lg:inline-flex"
-                      >
-                        <Maximize2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="relative h-[600px] overflow-hidden rounded-2xl border border-[#0b0d10]/10 bg-white">
-                      <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
-                    </div>
+                {hasAnswerCard ? (
+                  <div className="mx-auto max-w-md">
+                    <ProblemAnswerCard
+                      problem={problem}
+                      onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                      onSolvedCorrectly={handleMarkSolved}
+                      isSolved={isSolved}
+                    />
+                  </div>
+                ) : (
+                  <div className="mx-auto max-w-md">
+                    <NoAnswerCard />
                   </div>
                 )}
+                <div className="mx-auto max-w-md">
+                  <RecommendedProblemCard currentProblem={problem} />
+                </div>
               </aside>
+
+              {/* Pe mobil: card problema recomandată sub datele problemei, înainte de footer */}
+              <div className="lg:hidden w-full">
+                <RecommendedProblemCard currentProblem={problem} />
+              </div>
             </div>
           </div>
         </div>
@@ -517,16 +519,23 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
 
       {congratulationMessage && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#1a1a1a] p-8 text-center shadow-2xl">
+          <div className="w-full max-w-md rounded-3xl border border-[#0b0d10]/10 bg-white p-8 text-center shadow-2xl">
             <div className="mb-4 text-6xl">🎉</div>
-            <h3 className="mb-3 text-2xl font-bold">Felicitări!</h3>
-            <p className="mb-6 text-white/70">{congratulationMessage}</p>
-            <Button
-              onClick={() => setCongratulationMessage(null)}
-              className="rounded-full border border-white/20 bg-white/15 px-6 py-3 text-sm font-semibold text-white hover:bg-white/25"
+            <h3 className="mb-3 text-2xl font-bold text-[#0b0d10]">Felicitări!</h3>
+            <p className="mb-6 text-[#2C2F33]/70">{congratulationMessage}</p>
+            <div
+              className={cn(
+                "transition-opacity duration-500",
+                showCongratulationCloseButton ? "opacity-100" : "pointer-events-none opacity-0"
+              )}
             >
-              Continuă
-            </Button>
+              <Button
+                onClick={() => setCongratulationMessage(null)}
+                className="rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] hover:bg-[#2a2a2a]"
+              >
+                Continuă
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -541,34 +550,20 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         />
       )}
 
-      {isMobile &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <button
-            type="button"
-            onClick={() => {
-              setOpenedInsightFromCard(true)
-              setInsightSidebarOpen(true)
-            }}
-            className="fixed bottom-4 left-1/2 z-[100] flex h-16 w-[calc(100%-2rem)] max-w-[420px] -translate-x-1/2 items-center overflow-hidden rounded-2xl border-2 border-black/20 bg-white py-2 pl-4 pr-0 text-left shadow-[0_8px_20px_rgba(0,0,0,0.18),0_0_24px_rgba(255,255,255,0.6)] transition active:scale-[0.99]"
-            aria-label="Deschide chat Insight"
-          >
-            <span className="relative z-10 max-w-[65%] leading-tight text-black">
-              <span className="block text-sm font-bold">Blocat? Întreabă-l pe Insight</span>
-              <span className="mt-0.5 block text-xs font-semibold text-black/70">
-                Vezi soluția -&gt;
-              </span>
-            </span>
-            <div className="absolute right-0 top-0 bottom-0 w-1/3 overflow-hidden rounded-r-2xl">
-              <img
-                src="/insight-cta-card.png"
-                alt="Insight"
-                className="h-full w-full object-cover object-center"
-              />
-            </div>
-          </button>,
-          document.body
-        )}
+      {isMobile && (
+        <ProblemAnswerBottomSheet
+          problem={problem}
+          hasAnswerCard={hasAnswerCard}
+          isSolved={isSolved}
+          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+          onSolvedCorrectly={handleMarkSolved}
+          onOpenHint={() => {
+            setOpenedInsightFromCard(true)
+            setInsightSidebarOpen(true)
+            setInitialHintMessage("Am nevoie de un hint")
+          }}
+        />
+      )}
 
       {!isMobile && (
         <ProblemOrbButton
@@ -585,12 +580,16 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           onClose={() => {
             setInsightSidebarOpen(false)
             setOpenedInsightFromCard(false)
+            setInitialHintMessage(null)
           }}
           problemId={problem.id}
           problemStatement={problem.statement || ''}
           persona="problem_tutor"
           onFreePlanMessage={() => setShowUpgradeBanner(true)}
           onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
+          initialUserMessage={initialHintMessage}
+          initialUserMessageDisplay={initialHintMessage}
+          onInitialMessageSent={() => setInitialHintMessage(null)}
         />
       </Suspense>
 
@@ -626,32 +625,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             ) : (
               <MissingVideoCard />
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={desktopBoardExpanded} onOpenChange={setDesktopBoardExpanded}>
-        <DialogContent hideClose className="max-w-[95vw] border border-[#0b0d10]/10 bg-white text-[#0b0d10] top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]">
-          <DialogTitle className="sr-only">Tabla de lucru - Vizualizare pe tot ecranul</DialogTitle>
-          <DialogDescription className="sr-only">
-            Vizualizare extinsă a tablei de lucru pentru această problemă.
-          </DialogDescription>
-          <div className="flex items-center justify-between pb-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/55">Tabla de lucru</p>
-              <p className="text-sm text-[#2C2F33]/75">Vizualizare pe tot ecranul</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDesktopBoardExpanded(false)}
-              className="rounded-full border border-[#0b0d10]/10 bg-[#f6f5f4] text-[#0b0d10] transition hover:bg-[#ece8e4]"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="h-[75vh] overflow-hidden rounded-2xl border border-[#0b0d10]/10 bg-white">
-            <ProblemBoard problemId={problem.id} store={desktopBoardStore ?? undefined} />
           </div>
         </DialogContent>
       </Dialog>

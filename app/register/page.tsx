@@ -1,30 +1,93 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, Suspense } from "react"
-import { Button } from "@/components/ui/button"
+import Image from "next/image"
+import { Suspense, useEffect, useState } from "react"
+import { ChevronLeft, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Rocket, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
-import Link from "next/link"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabaseClient"
+import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
 
-// Google icon SVG component
+type SubjectOption = "fizica" | "informatica"
+type GradeOption = "9" | "10" | "11" | "12"
+type DailyTimeOption = "15" | "30" | "60"
+type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | "name"
+
+type OnboardingState = {
+  step: RegisterStep
+  subject: SubjectOption | null
+  grade: GradeOption | null
+  dailyTime: DailyTimeOption | null
+  awaitingPostAuth: boolean
+}
+
+const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
+const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
+
+const defaultOnboardingState: OnboardingState = {
+  step: 1,
+  subject: null,
+  grade: null,
+  dailyTime: null,
+  awaitingPostAuth: false,
+}
+
+const subjectHeadlines: Record<SubjectOption, string> = {
+  fizica: "Perfect, facem fizica mai clară împreună.",
+  informatica: "Excelent, construim logică de programator.",
+}
+
+const gradeHeadlines: Record<GradeOption, string> = {
+  "9": "Clasa a IX-a, punem fundația corectă.",
+  "10": "Clasa a X-a, consolidăm ideile-cheie rapid.",
+  "11": "Clasa a XI-a, trecem la nivel avansat.",
+  "12": "Clasa a XII-a, focus pe examen.",
+}
+
+const timeHeadlines: Record<DailyTimeOption, string> = {
+  "15": "Puțin și zilnic bate maratonul.",
+  "30": "30 de minute schimbă ritmul.",
+  "60": "Ritm intens, progres accelerat.",
+}
+
+const mainCtaClassName =
+  "inline-flex min-w-[200px] items-center justify-center rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#050505]"
+
+const choiceButtonClassName =
+  "w-full rounded-full border px-5 py-3 text-left text-sm font-semibold transition-colors"
+
+const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 => typeof step === "number"
+
+const sanitizeStep = (value: unknown): RegisterStep => {
+  if (value === "name") return "name"
+  if (typeof value === "number" && value >= 1 && value <= 7) return value as RegisterStep
+  return 1
+}
+
+const sanitizeSubject = (value: unknown): SubjectOption | null =>
+  value === "fizica" || value === "informatica" ? value : null
+
+const sanitizeGrade = (value: unknown): GradeOption | null =>
+  value === "9" || value === "10" || value === "11" || value === "12" ? value : null
+
+const sanitizeDailyTime = (value: unknown): DailyTimeOption | null =>
+  value === "15" || value === "30" || value === "60" ? value : null
+
 const GoogleIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24">
+  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
     <path
       fill="#4285F4"
-      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a6 6 0 0 1-2.21 3.31v2.77h3.57a11.95 11.95 0 0 0 3.28-8.09z"
     />
     <path
       fill="#34A853"
-      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11.99 11.99 0 0 0 12 23z"
     />
     <path
       fill="#FBBC05"
-      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      d="M5.84 14.09A7.02 7.02 0 0 1 5.49 12c0-.73.13-1.43.35-2.09V7.07H2.18A11.99 11.99 0 0 0 1 12c0 1.78.43 3.45 1.18 4.93l3.66-2.84z"
     />
     <path
       fill="#EA4335"
@@ -33,410 +96,817 @@ const GoogleIcon = () => (
   </svg>
 )
 
-// Apple icon SVG component
-const AppleIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+const GitHubIcon = () => (
+  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="#181717"
+      d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.3 9.43 7.88 10.96.58.1.8-.25.8-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.35-3.88-1.35-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.97.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.71 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.62 1.59.23 2.76.12 3.05.73.8 1.17 1.82 1.17 3.08 0 4.44-2.69 5.41-5.25 5.69.42.36.78 1.07.78 2.17 0 1.56-.01 2.82-.01 3.2 0 .31.2.67.81.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
+    />
   </svg>
 )
 
-// Microsoft icon SVG component
-const MicrosoftIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24">
-    <path fill="#F25022" d="M1 1h10v10H1z" />
-    <path fill="#00A4EF" d="M1 13h10v10H1z" />
-    <path fill="#7FBA00" d="M13 1h10v10H13z" />
-    <path fill="#FFB900" d="M13 13h10v10H13z" />
-  </svg>
-)
+function AnimatedWords({
+  text,
+  className,
+  startDelay = 0,
+  as: Tag = "p",
+}: {
+  text: string
+  className?: string
+  startDelay?: number
+  as?: "p" | "h1"
+}) {
+  const words = text.split(" ")
+
+  return (
+    <Tag className={className}>
+      {words.map((word, index) => (
+        <span
+          key={`${word}-${index}`}
+          className="inline-block opacity-0"
+          style={{
+            animation: "registerWordFade 420ms ease-out forwards",
+            animationDelay: `${startDelay + index * 80}ms`,
+          }}
+        >
+          {word}
+          {index === words.length - 1 ? "" : "\u00A0"}
+        </span>
+      ))}
+    </Tag>
+  )
+}
+
+const STEP_ENTER_ANIM = "registerStepEnter 500ms ease-out forwards"
+const STEP_POP_FROM_LEFT_ANIM = "registerStepPopFromLeft 420ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards"
+const STEP_IMAGE_ANIM = "registerStepImageEnter 450ms ease-out forwards"
+const STEP_BUTTON_ANIM = "registerStepButtonEnter 400ms ease-out forwards"
+
+function StepHeadingWithIcon({
+  children,
+  subtitle,
+  className,
+  popFromLeft,
+}: {
+  children: React.ReactNode
+  subtitle?: React.ReactNode
+  className?: string
+  popFromLeft?: boolean
+}) {
+  const headingText = typeof children === "string" ? children : String(children)
+  const useWordByWord = !popFromLeft
+  const headingClassName = "text-[25px] font-semibold leading-tight text-[#0f1115] sm:text-[32px]"
+
+  return (
+    <div className={`mb-5 flex items-start gap-3 sm:mb-7 sm:gap-5 ${className ?? ""}`}>
+      <div
+        className="-mt-0.5 flex-shrink-0 opacity-0"
+        style={{ animation: STEP_IMAGE_ANIM }}
+      >
+        <Image
+          src="/streak-icon.png"
+          alt=""
+          width={64}
+          height={64}
+          className="h-12 w-12 rounded-lg object-contain sm:h-16 sm:w-16"
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        {useWordByWord ? (
+          <AnimatedWords
+            as="h1"
+            text={headingText}
+            className={headingClassName}
+            startDelay={80}
+          />
+        ) : (
+          <h1
+            key={headingText}
+            className={`${headingClassName} opacity-0`}
+            style={{ animation: STEP_POP_FROM_LEFT_ANIM, animationDelay: "0ms" }}
+          >
+            {children}
+          </h1>
+        )}
+        {subtitle && (
+          <p
+            className="mt-2 text-[13px] text-[#666a73] opacity-0 sm:text-sm"
+            style={{ animation: STEP_ENTER_ANIM, animationDelay: "180ms" }}
+          >
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function RegisterPageContent() {
-  const [email, setEmail] = useState("")
-  const [loading, setLoading] = useState<"google" | "github" | "microsoft" | "email" | null>(null)
-
-  const [step, setStep] = useState<"email" | "password" | "confirmation">("email")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-
-  // Referral state
-  const [referralCode, setReferralCode] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false)
+  const [welcomePhase, setWelcomePhase] = useState<"intro" | "final">("intro")
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(defaultOnboardingState)
+  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null)
+  const [displayName, setDisplayName] = useState("")
+  const [nameSaving, setNameSaving] = useState(false)
 
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { loginWithGoogle, loginWithGitHub, user } = useAuth()
+  const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
 
-  // Handle referral code from URL
+  const shouldForcePostAuthStep = searchParams.get("onboarding") === "1"
+
   useEffect(() => {
-    const refCode = searchParams.get("ref")
-    if (refCode) {
-      const code = refCode.toUpperCase()
-      setReferralCode(code)
-      // Save to localStorage so it persists through OAuth redirect
-      localStorage.setItem("planck_referral_code", code)
-    } else {
-      // Check localStorage for referral code (in case user refreshed page)
-      const storedCode = localStorage.getItem("planck_referral_code")
-      if (storedCode) {
-        setReferralCode(storedCode)
-      }
-    }
+    const referralFromUrl = searchParams.get("ref")
+    if (!referralFromUrl) return
+    localStorage.setItem("planck_referral_code", referralFromUrl.toUpperCase())
   }, [searchParams])
 
-  // Process referral after successful registration
   useEffect(() => {
-    const processReferral = async () => {
-      if (!user || !referralCode) return
-
-      const processedKey = `planck_referral_processed_${user.id}`
-      if (sessionStorage.getItem(processedKey)) return
-
+    let parsedState = { ...defaultOnboardingState }
+    const rawState = localStorage.getItem(REGISTER_ONBOARDING_STORAGE_KEY)
+    if (rawState) {
       try {
-        const response = await fetch("/api/referral/process", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            referral_code: referralCode,
-            referred_user_id: user.id,
-          }),
-        })
-        const data = await response.json()
-
-        if (data.success) {
-          sessionStorage.setItem(processedKey, "true")
-          localStorage.removeItem("planck_referral_code")
-        } else {
-          if (data.error === "User already referred" || data.error === "Cannot refer yourself") {
-            localStorage.removeItem("planck_referral_code")
-          }
+        const decoded = JSON.parse(rawState) as Partial<OnboardingState>
+        parsedState = {
+          step: sanitizeStep(decoded.step),
+          subject: sanitizeSubject(decoded.subject),
+          grade: sanitizeGrade(decoded.grade),
+          dailyTime: sanitizeDailyTime(decoded.dailyTime),
+          awaitingPostAuth: Boolean(decoded.awaitingPostAuth),
         }
-      } catch (error) {
-        console.error("Error processing referral:", error)
+      } catch {
+        parsedState = { ...defaultOnboardingState }
       }
     }
 
-    processReferral()
-  }, [user, referralCode])
+    if (shouldForcePostAuthStep) {
+      parsedState.step = 7
+      parsedState.awaitingPostAuth = true
+    }
 
-  // Redirect if already logged in
+    const wasInAccountCreationFlow =
+      parsedState.step === 6 ||
+      parsedState.step === 7 ||
+      parsedState.step === "name" ||
+      parsedState.awaitingPostAuth
+    if (!user && wasInAccountCreationFlow) {
+      parsedState = { ...defaultOnboardingState }
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
+        localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+      }
+    }
+
+    setOnboardingState(parsedState)
+    setDisplayName(profile?.name ?? profile?.nickname ?? "")
+    setHydrated(true)
+  }, [profile?.name, profile?.nickname, shouldForcePostAuthStep, user])
+
   useEffect(() => {
-    if (user) {
-      router.push("/dashboard")
-    }
-  }, [user, router])
+    if (!shouldForcePostAuthStep) return
+    router.replace("/register")
+  }, [router, shouldForcePostAuthStep])
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    // Prevent TopLoader from triggering since we remain on the same page
-    e.stopPropagation()
-    e.nativeEvent.stopImmediatePropagation()
+  useEffect(() => {
+    if (!hydrated) return
+    localStorage.setItem(REGISTER_ONBOARDING_STORAGE_KEY, JSON.stringify(onboardingState))
+  }, [onboardingState, hydrated])
 
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
-      toast({
-        title: "Eroare",
-        description: "Te rugăm să introduci un email valid",
-        variant: "destructive",
-      })
-      return
+  useEffect(() => {
+    if (onboardingState.step !== 1) return
+    setWelcomePhase("intro")
+    const timer = window.setTimeout(() => setWelcomePhase("final"), 3000)
+    return () => window.clearTimeout(timer)
+  }, [onboardingState.step])
+
+  useEffect(() => {
+    if (onboardingState.step !== 7) return
+    const timer = window.setTimeout(() => {
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: "name",
+        awaitingPostAuth: false,
+      }))
+    }, 4500)
+    return () => window.clearTimeout(timer)
+  }, [onboardingState.step])
+
+  useEffect(() => {
+    if (!hydrated || !user) return
+
+    const isOnboardingFinalFlow =
+      shouldForcePostAuthStep ||
+      onboardingState.awaitingPostAuth ||
+      onboardingState.step === 7 ||
+      onboardingState.step === "name"
+
+    if (!isOnboardingFinalFlow) {
+      router.replace("/dashboard")
     }
-    setStep("password")
+  }, [
+    hydrated,
+    onboardingState.awaitingPostAuth,
+    onboardingState.step,
+    router,
+    shouldForcePostAuthStep,
+    user,
+  ])
+
+  useEffect(() => {
+    if (!hydrated || user || onboardingState.step !== 7) return
+    setOnboardingState((prev) => ({ ...prev, step: 6, awaitingPostAuth: false }))
+  }, [hydrated, onboardingState.step, user])
+
+  const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= 6
+  const showBackButton =
+    isNumericStep(onboardingState.step) && onboardingState.step >= 2 && onboardingState.step <= 5
+  const showBottomCta =
+    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 5
+
+  const progressPercent =
+    isNumericStep(onboardingState.step) && onboardingState.step <= 6
+      ? (onboardingState.step / 6) * 100
+      : 0
+
+  const continueLabel = onboardingState.step === 5 ? "Salveaza-ti progresul" : "Continua"
+
+  const isContinueDisabled =
+    (onboardingState.step === 2 && !onboardingState.subject) ||
+    (onboardingState.step === 3 && !onboardingState.grade) ||
+    (onboardingState.step === 4 && !onboardingState.dailyTime)
+
+  const setStep = (step: RegisterStep) =>
+    setOnboardingState((prev) => ({
+      ...prev,
+      step,
+    }))
+
+  const handleBack = () => {
+    if (!isNumericStep(onboardingState.step)) return
+    if (onboardingState.step <= 1) return
+    setStep((onboardingState.step - 1) as RegisterStep)
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!password || password.length < 6) {
-      toast({
-        title: "Parolă invalidă",
-        description: "Parola trebuie să aibă cel puțin 6 caractere.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (password !== confirmPassword) {
-      toast({
-        title: "Parolele nu coincid",
-        description: "Te rugăm să verifici parola confirmată.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setLoading("email")
-
-    // Use Supabase client directly here or via a wrapper if you prefer
-    // Importing locally to avoid circular dependencies if any, or just use the global import
-    const { supabase } = await import("@/lib/supabaseClient")
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: {
-          // You can add metadata here if needed
+  const handleContinue = () => {
+    switch (onboardingState.step) {
+      case 1:
+        setStep(2)
+        break
+      case 2:
+        if (!onboardingState.subject) {
+          toast({
+            title: "Alege o opțiune",
+            description: "Selectează Fizică sau Informatică ca să continuăm.",
+            variant: "destructive",
+          })
+          return
         }
-      }
-    })
+        setStep(3)
+        break
+      case 3:
+        if (!onboardingState.grade) {
+          toast({
+            title: "Alege clasa",
+            description: "Avem nevoie de clasă pentru a adapta parcursul.",
+            variant: "destructive",
+          })
+          return
+        }
+        setStep(4)
+        break
+      case 4:
+        if (!onboardingState.dailyTime) {
+          toast({
+            title: "Alege timpul zilnic",
+            description: "Doar un interval scurt ne ajută să-ți calibrăm ritmul.",
+            variant: "destructive",
+          })
+          return
+        }
+        setStep(5)
+        break
+      case 5:
+        setStep(6)
+        break
+      default:
+        break
+    }
+  }
+
+  const handleSubjectSelect = (subject: SubjectOption) => {
+    setOnboardingState((prev) => ({
+      ...prev,
+      subject,
+    }))
+  }
+
+  const handleGradeSelect = (grade: GradeOption) => {
+    setOnboardingState((prev) => ({
+      ...prev,
+      grade,
+    }))
+  }
+
+  const handleDailyTimeSelect = (dailyTime: DailyTimeOption) => {
+    setOnboardingState((prev) => ({
+      ...prev,
+      dailyTime,
+    }))
+  }
+
+  const markStateForOAuthReturn = () => {
+    const nextState: OnboardingState = {
+      ...onboardingState,
+      step: 7,
+      awaitingPostAuth: true,
+    }
+    localStorage.setItem(REGISTER_ONBOARDING_STORAGE_KEY, JSON.stringify(nextState))
+    localStorage.setItem(ONBOARDING_AFTER_OAUTH_KEY, "1")
+    setOnboardingState(nextState)
+  }
+
+  const clearOAuthFlag = () => localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+
+  const handleOAuthLogin = async (provider: "google" | "github") => {
+    setOauthLoading(provider)
+    markStateForOAuthReturn()
+
+    const { error } =
+      provider === "google" ? await loginWithGoogle() : await loginWithGitHub()
 
     if (error) {
+      clearOAuthFlag()
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: 6,
+        awaitingPostAuth: false,
+      }))
       toast({
-        title: "Eroare la înregistrare",
+        title:
+          provider === "google"
+            ? "Eroare la autentificare cu Google"
+            : "Eroare la autentificare cu GitHub",
         description: error.message,
         variant: "destructive",
       })
-      setLoading(null)
-    } else {
-      // If email confirmation is required, Supabase might not return a session immediately
-      // Check if user is created but session is null => email confirmation needed
-      if (data.user && !data.session) {
-        setStep("confirmation")
-      } else {
-        // If auto-confirm is on or something, we might get a session. 
-        // Usually for email/pass with confirm enabled, we go to confirmation screen.
-        setStep("confirmation")
-      }
-      setLoading(null)
+      setOauthLoading(null)
     }
   }
 
-  const handleOAuthLogin = async (method: "google" | "github") => {
-    setLoading(method)
+  const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
 
-    if (method === "google") {
-      const { error } = await loginWithGoogle()
-      if (error) {
-        toast({
-          title: "Eroare la autentificare cu Google",
-          description: error.message,
-          variant: "destructive",
-        })
-        setLoading(null)
-        return
+    if (!user) {
+      toast({
+        title: "Conectează-te mai întâi",
+        description: "Pentru a salva numele, trebuie să fii autentificat.",
+        variant: "destructive",
+      })
+      setStep(6)
+      return
+    }
+
+    const cleanName = displayName.trim()
+    if (cleanName.length < 2) {
+      toast({
+        title: "Nume prea scurt",
+        description: "Introdu un nume de cel puțin 2 caractere.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setNameSaving(true)
+
+    const payload: { name: string; grade?: string } = { name: cleanName }
+    if (onboardingState.grade) payload.grade = onboardingState.grade
+
+    const { error } = await supabase.from("profiles").update(payload).eq("user_id", user.id)
+
+    if (error) {
+      toast({
+        title: "Nu am putut salva numele",
+        description: "Mai încearcă o dată, te rog.",
+        variant: "destructive",
+      })
+      setNameSaving(false)
+      return
+    }
+
+    localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
+    localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+    router.push("/dashboard")
+  }
+
+  const renderStepContent = () => {
+    if (!hydrated) {
+      return (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      )
+    }
+
+    switch (onboardingState.step) {
+      case 1:
+        return (
+          <div className="mx-auto max-w-[560px] text-center">
+            {welcomePhase === "intro" ? (
+              <div className="space-y-3">
+                <AnimatedWords
+                  text="Materia nu e grea."
+                  className="text-[1.75rem] font-bold text-[#111111] sm:text-4xl"
+                />
+                <AnimatedWords
+                  text="Doar n-ai avut unealta potrivită."
+                  className="text-base font-semibold text-[#222222] sm:text-lg"
+                  startDelay={850}
+                />
+              </div>
+            ) : (
+              <AnimatedWords
+                text="Hai să vedem unde ești acum și să construim de acolo."
+                className="text-[1.75rem] font-bold text-[#111111] sm:text-4xl"
+              />
+            )}
+          </div>
+        )
+
+      case 2:
+        return (
+          <div className="mx-auto w-full max-w-[520px]">
+            <StepHeadingWithIcon popFromLeft={!!onboardingState.subject}>
+              {onboardingState.subject ? subjectHeadlines[onboardingState.subject] : "Ce te-a adus aici?"}
+            </StepHeadingWithIcon>
+            <div className="space-y-3">
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.subject === "fizica"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "220ms" }}
+                onClick={() => handleSubjectSelect("fizica")}
+              >
+                Fizică
+              </button>
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.subject === "informatica"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "320ms" }}
+                onClick={() => handleSubjectSelect("informatica")}
+              >
+                Informatică
+              </button>
+            </div>
+          </div>
+        )
+
+      case 3:
+        return (
+          <div className="mx-auto w-full max-w-[520px]">
+            <StepHeadingWithIcon
+              popFromLeft={!!onboardingState.grade}
+              subtitle="Îți adaptăm conținutul la programa ta."
+            >
+              {onboardingState.grade ? gradeHeadlines[onboardingState.grade] : "În ce clasă ești?"}
+            </StepHeadingWithIcon>
+            <div className="space-y-3">
+              {(["9", "10", "11", "12"] as GradeOption[]).map((grade, idx) => (
+                <button
+                  key={grade}
+                  type="button"
+                  className={`${choiceButtonClassName} opacity-0 ${
+                    onboardingState.grade === grade
+                      ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                      : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                  }`}
+                  style={{ animation: STEP_BUTTON_ANIM, animationDelay: `${280 + idx * 70}ms` }}
+                  onClick={() => handleGradeSelect(grade)}
+                >
+                  Clasa a {grade}-a
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+
+      case 4:
+        return (
+          <div className="mx-auto w-full max-w-[520px]">
+            <StepHeadingWithIcon
+              popFromLeft={!!onboardingState.dailyTime}
+              subtitle="Nu îți cerem mult. Chiar și 15 minute pe zi fac diferența."
+            >
+              {onboardingState.dailyTime ? timeHeadlines[onboardingState.dailyTime] : "Cât timp ai zilnic?"}
+            </StepHeadingWithIcon>
+            <div className="space-y-3">
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.dailyTime === "15"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
+                onClick={() => handleDailyTimeSelect("15")}
+              >
+                15 min
+              </button>
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.dailyTime === "30"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "360ms" }}
+                onClick={() => handleDailyTimeSelect("30")}
+              >
+                30 min
+              </button>
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.dailyTime === "60"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "440ms" }}
+                onClick={() => handleDailyTimeSelect("60")}
+              >
+                1h+
+              </button>
+            </div>
+          </div>
+        )
+
+      case 5: {
+        const selectedSubject = onboardingState.subject ?? "fizica"
+        const selectedGrade = onboardingState.grade ?? "9"
+
+        return (
+          <div className="mx-auto w-full max-w-[600px]">
+            <StepHeadingWithIcon
+              className="mb-4 sm:mb-8"
+              subtitle="Experimentează interactiv o parte din ce te așteaptă."
+            >
+              Un preview pentru tine
+            </StepHeadingWithIcon>
+
+            <div
+              className="opacity-0"
+              style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
+            >
+              <OnboardingSimulationCard subject={selectedSubject} grade={selectedGrade} />
+            </div>
+          </div>
+        )
       }
-    } else if (method === "github") {
-      const { error } = await loginWithGitHub()
-      if (error) {
-        toast({
-          title: "Eroare la autentificare cu GitHub",
-          description: error.message,
-          variant: "destructive",
-        })
-        setLoading(null)
-        return
-      }
+
+      case 6:
+        return (
+          <div className="mx-auto w-full max-w-[420px] rounded-3xl border border-[#ececf1] bg-white px-6 py-8 shadow-[0_30px_70px_-40px_rgba(18,20,28,0.5)]">
+            <h1 className="text-center text-[30px] font-semibold leading-tight text-[#0f1115]">
+              Creează un cont gratuit
+            </h1>
+            <p className="mb-6 mt-2 text-center text-sm text-[#666a73]">ca să salvăm parcursul tău de învățare.</p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => handleOAuthLogin("google")}
+                disabled={oauthLoading !== null}
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
+              >
+                {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
+                Continuă cu Google
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOAuthLogin("github")}
+                disabled={oauthLoading !== null}
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
+              >
+                {oauthLoading === "github" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GitHubIcon />}
+                Continuă cu GitHub
+              </button>
+            </div>
+          </div>
+        )
+
+      case 7:
+        return (
+          <div className="relative flex h-[65vh] flex-col items-center justify-center">
+            <p
+              className="title-font text-[5rem] font-black text-[#121212] sm:text-[7rem] md:text-[8.5rem]"
+              style={{ animation: "registerScaleUp 4.5s ease-out forwards", transform: "scale(0.72)", fontWeight: 900 }}
+            >
+              PLANCK
+            </p>
+            <p className="absolute bottom-2 text-center text-sm font-medium text-[#555a66] sm:text-base">
+              Cream un Learning Path special pentru tine
+            </p>
+          </div>
+        )
+
+      case "name":
+        return (
+          <div className="mx-auto w-full max-w-[420px] rounded-3xl border border-[#ececf1] bg-white p-7 shadow-[0_30px_70px_-45px_rgba(18,20,28,0.5)]">
+            <h1 className="text-3xl font-semibold text-[#0f1115]">Cum te cheamă?</h1>
+            <p className="mb-6 mt-2 text-sm text-[#666a73]">
+              Așa te vor recunoaște colegii în timp ce înveți.
+            </p>
+
+            <form onSubmit={handleNameSubmit} className="space-y-4">
+              <Input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Numele tău"
+                maxLength={60}
+                className="h-12 rounded-full border-[#d8dbe3] px-4 text-base text-[#101216] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
+              />
+
+              <button type="submit" disabled={nameSaving} className={`${mainCtaClassName} w-full`}>
+                {nameSaving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvăm...
+                  </span>
+                ) : (
+                  "Mergi la dashboard"
+                )}
+              </button>
+            </form>
+          </div>
+        )
+
+      default:
+        return null
     }
   }
 
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col">
-      {/* Header with Logo */}
-      <header className="w-full px-6 py-6">
-        <Link href="/" className="flex items-center gap-2 w-fit text-2xl font-bold text-black title-font">
-          <Rocket className="w-6 h-6 text-black" />
-          <span>PLANCK</span>
-        </Link>
-      </header>
+    <div className="h-dvh w-full overflow-hidden bg-[#ffffff] sm:min-h-screen sm:h-auto sm:overflow-visible">
+      <style jsx global>{`
+        @keyframes registerWordFade {
+          0% {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
 
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-4 pb-8">
-        <div className="w-full max-w-[400px] flex flex-col items-center relative">
+        @keyframes registerStepEnter {
+          0% {
+            opacity: 0;
+            transform: translateY(14px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
 
-          {step === "password" && (
-            <Alert className="absolute bottom-[calc(100%+0.5rem)] sm:bottom-[calc(100%+1.5rem)] p-3 sm:p-4 border-amber-200 bg-amber-50 text-amber-900 animate-in slide-in-from-bottom-2 fade-in duration-300">
-              <AlertTriangle className="h-4 w-4 text-amber-600 !text-amber-600" />
-              <AlertTitle className="text-amber-800 font-semibold text-sm sm:text-base">Notă importantă</AlertTitle>
-              <AlertDescription className="text-amber-700 text-xs sm:text-sm">
-                <span className="hidden sm:inline">Din cauza volumului mare de înscrieri, confirmarea prin email poate întârzia. Vă recomandăm autentificarea prin Google sau Apple pentru acces imediat.</span>
-                <span className="sm:hidden">Confirmarea emailului poate întârzia. Recomandăm autentificarea cu Google/Apple.</span>
-              </AlertDescription>
-            </Alert>
-          )}
+        @keyframes registerStepImageEnter {
+          0% {
+            opacity: 0;
+            transform: translateX(-12px) scale(0.9);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
 
-          {step === "confirmation" ? (
-            <div className="text-center animate-in fade-in zoom-in duration-300">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+        @keyframes registerStepButtonEnter {
+          0% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes registerStepPopFromLeft {
+          0% {
+            opacity: 0;
+            transform: translateX(-18px) scale(0.96);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
+
+        @keyframes registerScaleUp {
+          0% {
+            opacity: 0.5;
+            transform: scale(0.72);
+          }
+          70% {
+            opacity: 1;
+            transform: scale(1.04);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `}</style>
+
+      <div className="mx-auto flex h-full w-full max-w-[1100px] flex-col sm:min-h-screen sm:h-auto">
+        {showProgressBar && (
+          <header className="w-full px-4 pb-1 pt-4 sm:px-8 sm:pt-7">
+            <div className="mx-auto hidden w-full max-w-[520px] items-center gap-4 sm:flex">
+              <div className="w-6">
+                {showBackButton ? (
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[#16181d] transition-colors hover:bg-[#f0f1f5]"
+                    aria-label="Înapoi"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
-              <h1 className="text-[32px] font-semibold text-black mb-4">
-                Verifică-ți emailul
-              </h1>
-              <p className="text-gray-600 mb-8">
-                Ți-am trimis un link de confirmare la adresa <strong>{email}</strong>. Te rugăm să verifici și spam-ul.
-              </p>
-              <div className="space-y-4">
-                <Link href="/login">
-                  <Button className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors">
-                    Înapoi la Login
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  onClick={() => setStep("email")}
-                  className="text-gray-500 hover:text-gray-900"
-                >
-                  Am greșit adresa de email
-                </Button>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ebebef]">
+                <div
+                  className="h-full rounded-full bg-[#8043f0] transition-[width] duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
             </div>
-          ) : (
-            <>
-              {/* Title */}
-              <h1 className="text-[32px] font-semibold text-black mb-8 text-center animate-in slide-in-from-bottom-2 fade-in duration-300">
-                {step === "email" ? "Create an account" : "Set password"}
-              </h1>
+            <div className="relative mx-auto flex w-full max-w-[520px] items-center justify-center sm:hidden">
+              {showBackButton ? (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="absolute left-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[#16181d] transition-colors active:bg-[#f0f1f5]"
+                  aria-label="Înapoi"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              ) : null}
+              <div className="h-1.5 w-[78%] overflow-hidden rounded-full bg-[#ebebef]">
+                <div
+                  className="h-full rounded-full bg-[#8043f0] transition-[width] duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          </header>
+        )}
 
-              {step === "email" && (
-                <div className="w-full animate-in slide-in-from-bottom-4 fade-in duration-300">
-                  {/* Email Form */}
-                  <form onSubmit={handleEmailSubmit} className="w-full space-y-4 mb-4">
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Email address"
-                      className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white transition-all"
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors"
-                    >
-                      Continue
-                    </Button>
-                  </form>
+        <main
+          className={`flex flex-1 justify-center overflow-hidden px-4 sm:items-center sm:px-6 ${
+            showBottomCta ? "items-center pb-28 pt-3 sm:items-center sm:pb-28 sm:pt-8" : "items-center py-4 sm:py-8"
+          }`}
+        >
+          {renderStepContent()}
+        </main>
 
-                  {/* Login Link */}
-                  <p className="text-sm text-center text-gray-600 mb-6">
-                    Already have an account?{" "}
-                    <Link
-                      href="/login"
-                      className="text-[#10a37f] hover:text-[#0d8c6d] font-medium transition-colors"
-                    >
-                      Log in
-                    </Link>
-                  </p>
-
-                  {/* Divider */}
-                  <div className="w-full flex items-center gap-4 mb-6">
-                    <div className="flex-1 h-px bg-gray-200"></div>
-                    <span className="text-xs text-gray-500 font-medium">OR</span>
-                    <div className="flex-1 h-px bg-gray-200"></div>
-                  </div>
-
-                  {/* Social Login Buttons */}
-                  <div className="w-full space-y-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleOAuthLogin("google")}
-                      disabled={loading !== null}
-                      className="w-full h-12 border border-gray-300 rounded-full bg-white hover:bg-gray-50 text-black font-medium text-base transition-colors flex items-center justify-center gap-3"
-                    >
-                      {loading === "google" ? (
-                        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-                      ) : (
-                        <GoogleIcon />
-                      )}
-                      <span>Continue with Google</span>
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={true}
-                      className="w-full h-12 border border-gray-200 rounded-full bg-gray-50 text-gray-400 font-medium text-base transition-colors flex items-center justify-center gap-3 opacity-50 cursor-not-allowed grayscale"
-                    >
-                      <AppleIcon />
-                      <span>Continue with Apple</span>
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={true}
-                      className="w-full h-12 border border-gray-200 rounded-full bg-gray-50 text-gray-400 font-medium text-base transition-colors flex items-center justify-center gap-3 opacity-50 cursor-not-allowed grayscale"
-                    >
-                      <MicrosoftIcon />
-                      <span>Continue with Microsoft</span>
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {step === "password" && (
-                <div className="w-full animate-in slide-in-from-right-8 fade-in duration-300">
-                  <div className="mb-6">
-                    <button
-                      onClick={() => setStep("email")}
-                      className="text-sm text-gray-500 hover:text-black flex items-center gap-1 transition-colors mb-2"
-                    >
-                      ← Back
-                    </button>
-                    <div className="text-gray-500 text-sm">Signing up as <span className="text-black font-medium">{email}</span></div>
-                  </div>
-
-                  <form onSubmit={handleRegister} className="w-full space-y-4">
-                    <div className="space-y-1">
-                      <Input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password"
-                        className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm password"
-                        className="w-full h-12 px-4 border border-gray-300 rounded-full text-black placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none bg-white"
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={loading === "email"}
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-full font-medium text-base transition-colors mt-2"
-                    >
-                      {loading === "email" ? "Creating account..." : "Sign Up"}
-                    </Button>
-                  </form>
-                </div>
-              )}
-            </>
-          )}
-
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full py-6 flex justify-center">
-        <div className="flex items-center gap-2 text-sm">
-          <Link href="/terms" className="text-gray-500 hover:text-gray-700 underline transition-colors">
-            Terms of Use
-          </Link>
-          <span className="text-gray-300">|</span>
-          <Link href="/privacy" className="text-gray-500 hover:text-gray-700 underline transition-colors">
-            Privacy Policy
-          </Link>
-        </div>
-      </footer>
+        {showBottomCta && (
+          <footer className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-white via-white to-transparent px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-6 pt-3 sm:pt-3">
+            <div className="mx-auto flex max-w-[520px] justify-center">
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={isContinueDisabled}
+                className={`${mainCtaClassName} w-full sm:w-auto`}
+              >
+                {continueLabel}
+              </button>
+            </div>
+          </footer>
+        )}
+      </div>
     </div>
   )
 }
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-white">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      }
+    >
       <RegisterPageContent />
     </Suspense>
   )

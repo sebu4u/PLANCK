@@ -36,6 +36,12 @@ const requireEnv = (name: string, value?: string) => {
   return value
 }
 
+const optionalEnv = (value?: string) => {
+  if (!value) return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 const resolveSiteUrl = () => {
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL
   return requireEnv("NEXT_PUBLIC_SITE_URL", siteUrl)
@@ -56,6 +62,8 @@ const resolvePriceMap = (mode: StripeMode): StripePriceMap => {
 }
 
 export const getStripeConfig = (): StripeConfig => {
+  // This project uses Stripe-hosted Checkout + Billing Portal flows.
+  // Backend requests should only carry plan/subscription metadata.
   const mode = getStripeMode()
   const isLive = mode === "live"
 
@@ -84,6 +92,15 @@ export const getStripeConfig = (): StripeConfig => {
   }
 }
 
+export const getStripeSecretKey = (): string => {
+  const mode = getStripeMode()
+  const isLive = mode === "live"
+  return requireEnv(
+    isLive ? "STRIPE_SECRET_KEY_LIVE" : "STRIPE_SECRET_KEY",
+    isLive ? process.env.STRIPE_SECRET_KEY_LIVE : process.env.STRIPE_SECRET_KEY
+  )
+}
+
 export const resolvePlanFromPriceId = (
   priceId: string | null | undefined,
   prices: StripePriceMap
@@ -96,4 +113,17 @@ export const resolvePlanFromPriceId = (
     return "premium"
   }
   return null
+}
+
+export const getStripeWebhookSecrets = (): string[] => {
+  const secrets = [
+    optionalEnv(process.env.STRIPE_WEBHOOK_SECRET),
+    optionalEnv(process.env.STRIPE_WEBHOOK_SECRET_LIVE),
+  ].filter((value): value is string => Boolean(value))
+
+  if (secrets.length === 0) {
+    throw new Error("Missing required env var: STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET_LIVE")
+  }
+
+  return [...new Set(secrets)]
 }

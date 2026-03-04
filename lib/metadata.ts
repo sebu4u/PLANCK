@@ -135,6 +135,35 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  "learning-paths": {
+    title: "Learning Paths – Învață Structurat",
+    description: "Parcurge capitolele și lecțiile în pași clari, organizate în learning paths.",
+    keywords: "learning paths, invata, capitole, lectii, invatare structurata, planck",
+    alternates: {
+      canonical: "/invata",
+    },
+    openGraph: {
+      title: "Learning Paths – Planck Academy",
+      description: "Învață organizat pe capitole și lecții, cu paths ușor de urmărit.",
+      url: "https://www.planck.academy/invata",
+      type: "website",
+      images: [
+        {
+          url: "https://i.ibb.co/DHgVg7gr/Untitled-design-4.png",
+          width: 1200,
+          height: 630,
+          alt: "Learning Paths – Planck Academy",
+        },
+      ],
+    },
+    twitter: {
+      title: "Learning Paths – Planck Academy",
+      description: "Capitole și lecții organizate în paths clare pentru învățare.",
+      images: ["https://i.ibb.co/DHgVg7gr/Untitled-design-4.png"],
+      card: "summary_large_image",
+    },
+  },
+
   problems: {
     title: "Probleme de Fizică - Grilă & Rezolvări Complete | PLANCK",
     description: "Cea mai mare colecție de probleme de fizică pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. Mecanică, Termodinamică, Electricitate și Optică.",

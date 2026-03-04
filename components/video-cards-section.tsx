@@ -1,119 +1,27 @@
 "use client"
 
-import { useRef, useEffect, useState, memo } from "react"
+import { memo } from "react"
 import { FadeInUp } from "@/components/scroll-animations"
 
 interface VideoCardProps {
-    videoSrc: string
     poster: string
     title: string
     description: string
     className?: string
 }
 
-const VideoCard = memo(function VideoCard({ videoSrc, poster, title, description, className = "" }: VideoCardProps) {
-    const videoRef = useRef<HTMLVideoElement>(null)
-    const [shouldLoad, setShouldLoad] = useState(false)
-    const [isMobile, setIsMobile] = useState(false)
-
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 1024)
-        }
-
-        // Check initially
-        checkMobile()
-
-        window.addEventListener('resize', checkMobile)
-        return () => window.removeEventListener('resize', checkMobile)
-    }, [])
-
-    useEffect(() => {
-        // Don't setup observer on mobile to save resources
-        if (isMobile) return
-
-        const videoElement = videoRef.current
-        if (!videoElement) return
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        setShouldLoad(true)
-                    } else {
-                        // Pause video if it plays and goes out of view
-                        if (videoElement && !videoElement.paused) {
-                            videoElement.pause()
-                        }
-                    }
-                })
-            },
-            {
-                threshold: 0.2, // Trigger earlier to have it ready slightly before
-                rootMargin: "100px 0px" // Load shortly before it enters viewport
-            }
-        )
-
-        observer.observe(videoElement)
-
-        return () => {
-            if (videoElement) {
-                observer.unobserve(videoElement)
-            }
-        }
-    }, [isMobile]) // Re-run if mobile state changes
-
-    const handleMouseEnter = () => {
-        if (isMobile) return // No video interaction on mobile
-
-        if (videoRef.current) {
-            // Ensure it is loaded if somehow interaction happens before intersection (unlikely with observer)
-            if (!shouldLoad) setShouldLoad(true)
-
-            const playPromise = videoRef.current.play()
-            if (playPromise !== undefined) {
-                playPromise.catch((error) => {
-                    // Auto-play was prevented
-                    // console.log("Video play failed:", error);
-                })
-            }
-        }
-    }
-
-    const handleMouseLeave = () => {
-        if (isMobile) return
-
-        if (videoRef.current) {
-            videoRef.current.pause()
-        }
-    }
-
+const VideoCard = memo(function VideoCard({ poster, title, description, className = "" }: VideoCardProps) {
     return (
         <div
             className={`relative overflow-hidden rounded-2xl cursor-pointer group ${className}`}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
         >
-            {/* Conditional Rendering: Image for Mobile, Video for Desktop */}
-            {isMobile ? (
-                <img
-                    src={poster}
-                    alt={title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                />
-            ) : (
-                <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    muted
-                    loop
-                    playsInline
-                    preload={shouldLoad ? "metadata" : "none"}
-                    className="w-full h-full object-cover"
-                    poster={poster} // Show poster while loading video
-                />
-            )}
+            {/* Image only - no video loading on any device for performance */}
+            <img
+                src={poster}
+                alt={title}
+                className="w-full h-full object-cover"
+                loading="lazy"
+            />
 
             {/* Bottom fade gradient overlay */}
             <div
@@ -138,25 +46,21 @@ const VideoCard = memo(function VideoCard({ videoSrc, poster, title, description
 
 const cards = [
     {
-        videoSrc: "/videos/AIo.mp4",
         poster: "/0035.jpg",
         title: "Catalog de probleme cu AI",
         description: "Sute de probleme rezolvate pas cu pas, cu ajutorul inteligenței artificiale."
     },
     {
-        videoSrc: "/videos/grilev.mp4",
         poster: "/ezgif-frame-001.jpg",
         title: "Grile pentru admitere",
         description: "Teste grile interactive pentru pregătirea examenelor de admitere."
     },
     {
-        videoSrc: "/videos/cod.mp4",
         poster: "/0057.jpg",
         title: "Planck Code",
         description: "Scrie și rulează cod Python pentru probleme de fizică și simulări."
     },
     {
-        videoSrc: "/videos/sketcho.mp4",
         poster: "/0001.jpg",
         title: "Tabla colaborativă",
         description: "Tablă interactivă pentru sesiuni de studiu și rezolvări în echipă."
@@ -195,7 +99,6 @@ export function VideoCardsSection() {
                     {/* Wide card - left */}
                     <FadeInUp className="lg:col-span-7" delay={0.1}>
                         <VideoCard
-                            videoSrc={cards[0].videoSrc}
                             poster={cards[0].poster}
                             title={cards[0].title}
                             description={cards[0].description}
@@ -205,7 +108,6 @@ export function VideoCardsSection() {
                     {/* Smaller card - right top */}
                     <FadeInUp className="lg:col-span-5" delay={0.2}>
                         <VideoCard
-                            videoSrc={cards[1].videoSrc}
                             poster={cards[1].poster}
                             title={cards[1].title}
                             description={cards[1].description}
@@ -217,7 +119,6 @@ export function VideoCardsSection() {
                     {/* Smaller card - left bottom */}
                     <FadeInUp className="lg:col-span-5" delay={0.3}>
                         <VideoCard
-                            videoSrc={cards[2].videoSrc}
                             poster={cards[2].poster}
                             title={cards[2].title}
                             description={cards[2].description}
@@ -227,7 +128,6 @@ export function VideoCardsSection() {
                     {/* Wide card - right */}
                     <FadeInUp className="lg:col-span-7" delay={0.4}>
                         <VideoCard
-                            videoSrc={cards[3].videoSrc}
                             poster={cards[3].poster}
                             title={cards[3].title}
                             description={cards[3].description}

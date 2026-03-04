@@ -10,7 +10,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 
 import {
-  Pencil,
   BookOpen,
   Home,
   Sparkles,
@@ -18,9 +17,8 @@ import {
   ListChecks,
   GraduationCap,
   Brain,
-  Gift,
+  Bell,
   User,
-  LogOut,
 } from "lucide-react"
 import { UserStats, UserTask, DashboardUpdate, ContinueLearningItem, Achievement } from "@/lib/dashboard-data"
 
@@ -77,7 +75,7 @@ function DashboardSidebarComponent({
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
     { href: "/cursuri", label: "Cursuri de fizica", icon: <BookOpen className="w-4 h-4" /> },
-    { href: "/sketch", label: "Sketch", icon: <Pencil className="w-4 h-4" /> },
+    { href: null, label: "Noutati", icon: <Bell className="w-4 h-4" /> },
     { href: "/insight/chat", label: "Insight", icon: <Sparkles className="w-4 h-4" /> },
     { href: "/grile", label: "Teste Grila", icon: <ListChecks className="w-4 h-4" /> },
     { href: "/simulari-bac", label: "Simulari Bac", icon: <GraduationCap className="w-4 h-4" /> },
@@ -118,17 +116,17 @@ function DashboardSidebarComponent({
   // Memoize the tasks section to prevent unnecessary re-renders
   const TasksSection = useMemo(() => (
     <div className="space-y-3">
-      <h4 className="text-xs uppercase tracking-wider text-white/50 font-semibold">Tasks Today</h4>
+      <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Tasks Today</h4>
       <div className="space-y-2">
         {localTasks.map((task) => (
           <div key={task.id} className="flex items-center gap-3">
             <Checkbox
               checked={task.is_completed}
               onCheckedChange={() => handleTaskToggle(task.id)}
-              className="border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+              className="border-gray-400 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
             />
             <span
-              className={`text-sm ${task.is_completed ? 'line-through text-white/50' : 'text-white/80'
+              className={`text-sm ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-700'
                 }`}
             >
               {task.task_description}
@@ -142,7 +140,7 @@ function DashboardSidebarComponent({
 
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-[#080808]">
+    <div className="flex flex-col h-full bg-[#ffffff]">
       <div className="flex-1 min-h-0">
         <ScrollArea ref={scrollAreaRef} className="h-full dashboard-scrollbar">
           <div className="p-5 space-y-6">
@@ -160,8 +158,8 @@ function DashboardSidebarComponent({
                     <Link key={key} href={link.href!}>
                       <div
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive
-                          ? 'bg-white/10 text-white/100'
-                          : 'text-white/70 hover:bg-white/6 hover:text-white/90'
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                           }`}
                       >
                         {link.icon}
@@ -171,45 +169,40 @@ function DashboardSidebarComponent({
                   )
                 }
 
-                // Insert mobile-only "Probleme" button before Sketch (on mobile)
-                if (link.href === "/sketch") {
+                // Insert mobile-only "Probleme" button before Noutati (on mobile)
+                if (link.href === null) {
                   const problemeIsActive = pathname === "/probleme"
                   return [
                     // Mobile-only Probleme button
                     <Link key="probleme-mobile" href="/probleme" className="lg:hidden block">
                       <div
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${problemeIsActive
-                          ? 'bg-white/10 text-white/100'
-                          : 'text-white/70 hover:bg-white/6 hover:text-white/90'
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                           }`}
                       >
                         <Calculator className="w-4 h-4" />
                         <span className="text-sm font-medium">Probleme</span>
                       </div>
                     </Link>,
-                    // Original Sketch link
-                    <Link key={key} href={link.href!}>
-                      <div
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive
-                          ? 'bg-white/10 text-white/100'
-                          : 'text-white/70 hover:bg-white/6 hover:text-white/90'
-                          }`}
-                      >
-                        {link.icon}
-                        <span className="text-sm font-medium">{link.label}</span>
-                      </div>
-                    </Link>
+                    // Noutati - nu navighează
+                    <button
+                      key={key}
+                      type="button"
+                      className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    >
+                      {link.icon}
+                      <span className="text-sm font-medium">{link.label}</span>
+                    </button>
                   ]
                 }
-
-
 
                 return (
                   <Link key={key} href={link.href!}>
                     <div
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive
-                        ? 'bg-white/10 text-white/100'
-                        : 'text-white/70 hover:bg-white/6 hover:text-white/90'
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                         }`}
                     >
                       {link.icon}
@@ -222,8 +215,8 @@ function DashboardSidebarComponent({
 
             {/* Section 2: Today Overview */}
             <div className="space-y-3">
-              <h4 className="text-xs uppercase tracking-wider text-white/50 font-semibold">Today</h4>
-              <div className="space-y-2 text-sm text-white/85">
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Today</h4>
+              <div className="space-y-2 text-sm text-gray-700">
                 <p className={Math.min(stats.problems_solved_today, 3) === 3 ? 'text-green-500 font-semibold' : ''}>
                   • {Math.min(stats.problems_solved_today, 3)}/3 probleme rezolvate
                 </p>
@@ -237,11 +230,11 @@ function DashboardSidebarComponent({
             {/* Section 3: Continue Learning */}
             {continueItems.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs uppercase tracking-wider text-white/50 font-semibold">Continue Learning</h4>
+                <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Continue Learning</h4>
                 <div className="space-y-2">
                   {continueItems.slice(0, 3).map((item, index) => (
                     <Link key={index} href={item.url}>
-                      <div className="text-sm text-white/70 hover:text-white/100 hover:underline transition-colors cursor-pointer">
+                      <div className="text-sm text-gray-700 hover:text-gray-900 hover:underline transition-colors cursor-pointer">
                         • {item.title}
                       </div>
                     </Link>
@@ -256,10 +249,10 @@ function DashboardSidebarComponent({
             {TasksSection}
 
             {/* Mobile Only: Profile & Sign Out Buttons */}
-            <div className="lg:hidden grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-white/5">
+            <div className="lg:hidden grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-200">
               <Link
                 href="/profil"
-                className="col-span-1 h-10 w-full flex items-center justify-center gap-2 px-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/80"
+                className="col-span-1 h-10 w-full flex items-center justify-center gap-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700"
               >
                 <User className="w-4 h-4" />
                 <span className="text-sm font-medium">Profil</span>
@@ -279,16 +272,16 @@ function DashboardSidebarComponent({
       </div>
 
       {/* Fixed Invite Friend Card */}
-      <div className="p-4 border-t border-white/5 bg-[#080808]">
+      <div className="p-4 border-t border-gray-200 bg-[#ffffff]">
         <Link href="/profil/referral">
-          <div className="bg-transparent border border-white/20 rounded-xl p-3 hover:border-blue-500/30 transition-all group cursor-pointer">
+          <div className="bg-transparent border border-gray-300 rounded-xl p-3 hover:border-blue-500/40 transition-all group cursor-pointer">
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-white/90 group-hover:text-blue-400 transition-colors">
+                <h4 className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
                   Invită un prieten
                 </h4>
-                <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                  Primești <span className="text-white/80 font-medium">1 lună Plus</span> gratuit pentru fiecare prieten invitat.
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Primești <span className="text-gray-700 font-medium">1 lună Plus</span> gratuit pentru fiecare prieten invitat.
                 </p>
               </div>
             </div>
@@ -301,14 +294,14 @@ function DashboardSidebarComponent({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-[100px] bottom-0 w-[250px] bg-[#080808] z-30">
+      <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-[250px] bg-[#ffffff] z-30">
         <SidebarContent />
       </aside>
 
       {/* Mobile Drawer */}
       <div className="lg:hidden">
         <Sheet open={open ?? false} onOpenChange={onOpenChange}>
-          <SheetContent side="right" hideClose className="w-[250px] bg-[#080808] border-[#1a1a1a] p-0 top-[64px] h-[calc(100dvh-64px)]">
+          <SheetContent side="right" hideClose className="w-[250px] bg-[#ffffff] border-gray-200 p-0 top-[64px] h-[calc(100dvh-64px)]">
             <SheetTitle className="sr-only">Dashboard Menu</SheetTitle>
             <SidebarContent />
           </SheetContent>

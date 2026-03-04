@@ -99,11 +99,6 @@ export function Footer({
                   Planck Insight
                 </Link>
               </li>
-              <li>
-                <Link href="/sketch" className={linkClass}>
-                  Sketch
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -161,16 +156,6 @@ export function Footer({
               <li>
                 <Link href="/insight/chat" className={linkClass}>
                   Chat Insight
-                </Link>
-              </li>
-              <li>
-                <Link href="/sketch/new" className={linkClass}>
-                  Creează Sketch
-                </Link>
-              </li>
-              <li>
-                <Link href="/sketch/boards" className={linkClass}>
-                  Sketch Boards
                 </Link>
               </li>
               <li>

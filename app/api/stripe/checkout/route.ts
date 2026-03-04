@@ -5,12 +5,37 @@ import { getStripeClient } from "@/lib/stripe"
 import { getStripeConfig } from "@/lib/stripe-config"
 import { normalizeSubscriptionPlan } from "@/lib/subscription-plan"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
+import { canPurchaseSubscriptions } from "@/lib/access-config"
 
 export const runtime = "nodejs"
 
 type CheckoutBody = {
   plan?: string
   interval?: "month" | "year"
+}
+
+const FORBIDDEN_CARD_FIELDS = new Set([
+  "card",
+  "number",
+  "exp_month",
+  "exp_year",
+  "cvc",
+  "card_number",
+  "cardnumber",
+  "payment_method_data",
+  "source",
+])
+
+const hasRawCardData = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false
+  if (Array.isArray(value)) return value.some(hasRawCardData)
+  if (typeof value !== "object") return false
+
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (FORBIDDEN_CARD_FIELDS.has(key.toLowerCase())) return true
+    if (hasRawCardData(nested)) return true
+  }
+  return false
 }
 
 const resolvePriceId = (plan: "plus" | "premium", interval: "month" | "year") => {
@@ -23,6 +48,13 @@ const resolvePriceId = (plan: "plus" | "premium", interval: "month" | "year") =>
 
 export async function POST(req: NextRequest) {
   try {
+    if (!canPurchaseSubscriptions()) {
+      return NextResponse.json(
+        { error: "Achiziția abonamentelor este dezactivată temporar." },
+        { status: 403 }
+      )
+    }
+
     const accessToken = parseAccessToken(req)
     if (!accessToken) {
       return NextResponse.json({ error: "Necesită autentificare." }, { status: 401 })
@@ -39,6 +71,15 @@ export async function POST(req: NextRequest) {
       body = await req.json()
     } catch {
       return NextResponse.json({ error: "Payload invalid." }, { status: 400 })
+    }
+
+    // Compliance guard: card data must never pass through our API.
+    // Payments are collected only on Stripe-hosted Checkout/Billing pages.
+    if (hasRawCardData(body)) {
+      return NextResponse.json(
+        { error: "Datele cardului nu pot fi transmise către server. Folosește checkout-ul Stripe." },
+        { status: 400 }
+      )
     }
 
     const normalizedPlan = normalizeSubscriptionPlan(body?.plan)
@@ -76,6 +117,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // We only create hosted Checkout sessions here; sensitive card input stays on Stripe.
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: stripeCustomerId,

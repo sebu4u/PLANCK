@@ -70,12 +70,12 @@ export function DailyActivityCard({
   // Get level color
   const getLevelColor = (level: number) => {
     switch (level) {
-      case 0: return 'bg-white/[0.05]'
+      case 0: return 'bg-gray-200'
       case 1: return 'bg-green-900/40'
       case 2: return 'bg-green-700/60'
       case 3: return 'bg-green-500/70'
       case 4: return 'bg-green-400/80'
-      default: return 'bg-white/[0.05]'
+      default: return 'bg-gray-200'
     }
   }
 
@@ -99,28 +99,28 @@ export function DailyActivityCard({
   }
 
   return (
-    <div className="rounded-xl bg-[#131316] border border-white/10 p-4 hover:border-white/20 transition-all hover:scale-105 transform origin-center">
-      <h3 className="text-base font-semibold text-white/90 mb-3">Activitate Zilnică</h3>
+    <div className="rounded-xl bg-white border border-gray-200 p-4 hover:border-gray-300 transition-all hover:scale-105 transform origin-center">
+      <h3 className="text-base font-semibold text-gray-900 mb-3">Activitate Zilnică</h3>
 
       {/* Streak + Today stats */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-4">
           <div>
-            <p className="text-xs text-white/60">Streak Curent</p>
-            <p className="text-xl font-bold text-white/90 flex items-center gap-1">
+            <p className="text-xs text-gray-600">Streak Curent</p>
+            <p className="text-xl font-bold text-gray-900 flex items-center gap-1">
               {currentStreak ?? 0} <span className="text-base">🔥</span>
             </p>
           </div>
           <div>
-            <p className="text-xs text-white/60">Best Streak</p>
-            <p className="text-xl font-bold text-white/70">{bestStreak ?? 0}</p>
+            <p className="text-xs text-gray-600">Best Streak</p>
+            <p className="text-xl font-bold text-gray-700">{bestStreak ?? 0}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs text-white/60">Astăzi</p>
+          <p className="text-xs text-gray-600">Astăzi</p>
           <p className={`text-xs ${Math.min(problemsToday ?? 0, 3) === 3
               ? 'text-green-500 font-semibold'
-              : 'text-white/85'
+              : 'text-gray-700'
             }`}>
             {Math.min(problemsToday ?? 0, 3)}/3 probleme • {timeTodayActual} min
           </p>
@@ -140,20 +140,20 @@ export function DailyActivityCard({
                     <TooltipTrigger asChild>
                       <div
                         className={`w-[16px] h-[16px] rounded-sm ${day.level === -1 ? 'bg-transparent' : getLevelColor(day.level)
-                          } ${day.isToday ? 'ring-2 ring-white/80' : 'hover:ring-1 hover:ring-white/30'
+                          } ${day.isToday ? 'ring-2 ring-gray-400' : 'hover:ring-1 hover:ring-gray-300'
                           } transition-all cursor-pointer`}
                       />
                     </TooltipTrigger>
                     {day.date && (
-                      <TooltipContent side="top" className="bg-[#1f1f23] border-white/20">
-                        <p className="text-xs text-white/90">
+                      <TooltipContent side="top" className="bg-white border-gray-200">
+                        <p className="text-xs text-gray-900">
                           {new Date(day.date).toLocaleDateString('ro-RO', {
                             day: 'numeric',
                             month: 'short',
                             year: 'numeric',
                           })}
                         </p>
-                        <p className="text-xs text-white/70">
+                        <p className="text-xs text-gray-700">
                           {day.count} {day.count === 1 ? 'problemă' : 'probleme'}
                         </p>
                       </TooltipContent>
@@ -167,7 +167,7 @@ export function DailyActivityCard({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-1.5 mt-2 text-xs text-white/60">
+      <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-600">
         <span>Mai puțin</span>
         <div className="flex gap-0.5">
           {[0, 1, 2, 3, 4].map(level => (

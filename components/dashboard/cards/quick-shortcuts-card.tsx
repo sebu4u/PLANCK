@@ -64,8 +64,8 @@ export function QuickShortcutsCard() {
   ]
 
   return (
-    <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-all">
-      <h3 className="text-lg font-semibold text-white/90 mb-4">Quick Shortcuts</h3>
+    <div className="rounded-xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-all">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Shortcuts</h3>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {shortcuts.map((shortcut, index) => (
@@ -77,7 +77,7 @@ export function QuickShortcutsCard() {
                 <div className={`${shortcut.color} group-hover:scale-110 transition-transform`}>
                   {shortcut.icon}
                 </div>
-                <span className="text-xs font-medium text-white/80 group-hover:text-white/100 transition-colors text-center">
+                <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900 transition-colors text-center">
                   {shortcut.label}
                 </span>
               </div>
@@ -87,20 +87,20 @@ export function QuickShortcutsCard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/10">
+      <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-gray-200">
         <div className="text-center">
-          <p className="text-lg font-bold text-white/90">127</p>
-          <p className="text-xs text-white/60">Total Actions</p>
+          <p className="text-lg font-bold text-gray-900">127</p>
+          <p className="text-xs text-gray-600">Total Actions</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-bold text-white/90">15</p>
-          <p className="text-xs text-white/60">This Week</p>
+          <p className="text-lg font-bold text-gray-900">15</p>
+          <p className="text-xs text-gray-600">This Week</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-bold text-white/90">
+          <p className="text-lg font-bold text-gray-900">
             <Pencil className="w-5 h-5 inline text-green-400" />
           </p>
-          <p className="text-xs text-white/60">Most Used</p>
+          <p className="text-xs text-gray-600">Most Used</p>
         </div>
       </div>
     </div>

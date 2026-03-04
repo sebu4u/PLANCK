@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type Stripe from "stripe"
 
 import { getStripeClient } from "@/lib/stripe"
-import { getStripeConfig } from "@/lib/stripe-config"
+import { getStripeWebhookSecrets } from "@/lib/stripe-config"
 import {
   getSupabaseAdmin,
   resolveCustomerId,
@@ -20,6 +20,10 @@ const recordWebhookEvent = async (eventId: string) => {
   if (error.code === "23505" || error.message?.toLowerCase().includes("duplicate")) {
     return false
   }
+  if (error.code === "42P01") {
+    console.warn("[stripe/webhook] stripe_webhook_events table missing; processing without idempotency.")
+    return true
+  }
   throw error
 }
 
@@ -30,7 +34,7 @@ const resolveSubscriptionId = (value: Stripe.Checkout.Session["subscription"] | 
 
 export async function POST(req: NextRequest) {
   const stripe = getStripeClient()
-  const { webhookSecret } = getStripeConfig()
+  const webhookSecrets = getStripeWebhookSecrets()
 
   const signature = req.headers.get("stripe-signature")
   if (!signature) {
@@ -38,11 +42,21 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.text()
-  let event: Stripe.Event
+  let event: Stripe.Event | null = null
+  let signatureError: unknown = null
 
-  try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
-  } catch (err: any) {
+  for (const secret of webhookSecrets) {
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, secret)
+      signatureError = null
+      break
+    } catch (err) {
+      signatureError = err
+    }
+  }
+
+  if (!event) {
+    const err: any = signatureError
     console.error("[stripe/webhook] Signature error:", err?.message || err)
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 })
   }

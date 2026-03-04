@@ -23,6 +23,27 @@ export async function fetchQuizQuestionsByClass(classLevel: GradeLevel): Promise
 }
 
 /**
+ * Fetch a single quiz question by its UUID id
+ */
+export async function fetchQuizQuestionById(questionId: string): Promise<QuizQuestion | null> {
+    const normalizedId = questionId.trim();
+    if (!normalizedId) return null;
+
+    const { data, error } = await supabase
+        .from('quiz_questions')
+        .select('*')
+        .eq('id', normalizedId)
+        .maybeSingle();
+
+    if (error) {
+        console.error('Error fetching quiz question by id:', error);
+        return null;
+    }
+
+    return (data as QuizQuestion | null) || null;
+}
+
+/**
  * Shuffle an array using Fisher-Yates algorithm
  * Used to randomize question order at the start of a quiz session
  */

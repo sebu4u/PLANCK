@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { Suspense, useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Home, Check, Loader2, Rocket, X } from "lucide-react"
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion"
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { canPurchaseSubscriptions } from "@/lib/access-config"
 
 function AnimatedPrice({ value }: { value: number }) {
   const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 })
@@ -21,7 +22,7 @@ function AnimatedPrice({ value }: { value: number }) {
   return <motion.span>{display}</motion.span>
 }
 
-export default function PricingPage() {
+function PricingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, subscriptionPlan, refreshProfile } = useAuth()
@@ -32,6 +33,7 @@ export default function PricingPage() {
   const [checkoutLoadingPlan, setCheckoutLoadingPlan] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
+  const purchasesEnabled = canPurchaseSubscriptions()
 
   // Generate stable star positions only on client
   const stars = useMemo(() => {
@@ -419,6 +421,7 @@ export default function PricingPage() {
                     const isCurrentPlan = subscriptionPlan === plan.id
                     const isPaidPlan = plan.id === "plus" || plan.id === "premium"
                     const isCheckoutLoading = checkoutLoadingPlan === plan.id
+                    const isPaidPlanPurchaseDisabled = isPaidPlan && !purchasesEnabled
 
                     return (
                       <div
@@ -472,13 +475,14 @@ export default function PricingPage() {
 
                         <button
                           onClick={() => {
+                            if (isPaidPlanPurchaseDisabled) return
                             if (plan.id === "plus" || plan.id === "premium") {
                               startCheckout(plan.id as "plus" | "premium")
                             } else if (plan.id === "free") {
                               router.push('/probleme')
                             }
                           }}
-                          disabled={isCurrentPlan || isCheckoutLoading}
+                          disabled={isCurrentPlan || isCheckoutLoading || isPaidPlanPurchaseDisabled}
                           className={cn(
                             "w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                             plan.highlight
@@ -491,7 +495,7 @@ export default function PricingPage() {
                               <Loader2 className="w-4 h-4 animate-spin" />
                               Se deschide...
                             </span>
-                          ) : isPaidPlan && isCurrentPlan ? "Planul tău curent" : plan.cta}
+                          ) : isPaidPlan && isPaidPlanPurchaseDisabled ? "Indisponibil momentan" : isPaidPlan && isCurrentPlan ? "Planul tău curent" : plan.cta}
                         </button>
                       </div>
                     )
@@ -564,6 +568,18 @@ export default function PricingPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full bg-[#101113] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-white" />
+      </div>
+    }>
+      <PricingPageContent />
+    </Suspense>
   )
 }
 

@@ -1,5 +1,4 @@
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import ProblemsClient from "@/components/problems-client"
 import { Problem } from "@/data/problems"
 import { createClient } from "@supabase/supabase-js"
@@ -15,7 +14,15 @@ export const revalidate = 21600
 
 export const metadata: Metadata = generateMetadata('problems')
 
-export default async function ProblemsPage() {
+export default async function ProblemsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ capitol?: string | string[] }>
+}) {
+  const resolvedSearchParams = await searchParams
+  const capitolParam = resolvedSearchParams?.capitol
+  const initialChapter = Array.isArray(capitolParam) ? capitolParam[0] : capitolParam
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
   const serverSupabase = createClient(supabaseUrl, supabaseAnonKey)
@@ -38,50 +45,34 @@ export default async function ProblemsPage() {
 
   return (
     <CatalogThemeProvider catalogType="physics">
-      <CatalogThemeBackground defaultBackgroundClass="bg-[#141414]">
+      <CatalogThemeBackground defaultBackgroundClass="bg-[#ffffff]">
         <Navigation />
-        <main className="min-h-[100svh]">
-          <div className="px-6 sm:px-8 lg:px-16 xl:px-20 pt-20 pb-12">
-            <section className="w-full space-y-8">
-              {/* Page Title Section */}
-              <div className="text-center lg:text-left">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3">
-                  Probleme de fizică
-                </h1>
-                <p className="text-base sm:text-lg text-white/60 max-w-2xl mx-auto lg:mx-0">
-                  Exersează și aprofundează-ți cunoștințele cu probleme de toate nivelurile
-                </p>
-                <StructuredData
-                  id="structured-data-breadcrumbs"
-                  data={breadcrumbStructuredData([
-                    { name: 'Acasă', url: 'https://www.planck.academy/' },
-                    { name: 'Probleme', url: 'https://www.planck.academy/probleme' },
-                  ])}
-                />
-              </div>
-
-              <div className="space-y-8">
-                <StructuredData
-                  id="structured-data-problems-list"
-                  data={{
-                    "@context": "https://schema.org",
-                    "@type": "ItemList",
-                    itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
-                      "@type": "ListItem",
-                      position: idx + 1,
-                      name: p.title,
-                    }))
-                  }}
-                />
-                <ProblemsClient
-                  initialProblems={initialProblems as any}
-                  initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
-                />
-              </div>
-            </section>
-          </div>
-        </main>
-        <Footer />
+        <div className="h-[100dvh] pt-16 overflow-hidden bg-[#ffffff] relative">
+          <StructuredData
+            id="structured-data-breadcrumbs"
+            data={breadcrumbStructuredData([
+              { name: 'Acasă', url: 'https://www.planck.academy/' },
+              { name: 'Probleme', url: 'https://www.planck.academy/probleme' },
+            ])}
+          />
+          <StructuredData
+            id="structured-data-problems-list"
+            data={{
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
+                "@type": "ListItem",
+                position: idx + 1,
+                name: p.title,
+              }))
+            }}
+          />
+          <ProblemsClient
+            initialProblems={initialProblems as any}
+            initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
+            initialChapter={initialChapter}
+          />
+        </div>
       </CatalogThemeBackground>
     </CatalogThemeProvider>
   )

@@ -30,13 +30,20 @@ export default function ScrollAnimationProvider({
     ease: smoothness,
     rafId: 0
   })
-  const isInitializedRef = useRef(false)
-
-  // Check if device is touch-based
+  // Check if device supports touch input
   const isTouchDevice = useCallback(() => {
     if (typeof window === 'undefined') return false
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0
   }, [])
+
+  // Disable smooth-scroll only on actual mobile contexts.
+  // Touch-enabled laptops/desktops should still get inertia.
+  const shouldDisableSmoothScroll = useCallback(() => {
+    if (typeof window === 'undefined') return false
+
+    const isSmallViewport = window.matchMedia('(max-width: 768px)').matches
+    return isSmallViewport && isTouchDevice()
+  }, [isTouchDevice])
 
   // Lerp function for smooth interpolation
   const lerp = useCallback((start: number, end: number, factor: number) => {
@@ -77,7 +84,7 @@ export default function ScrollAnimationProvider({
 
   // Initialize smooth scroll
   useEffect(() => {
-    if (typeof window === 'undefined' || isInitializedRef.current) return
+    if (typeof window === 'undefined') return
 
     const content = contentRef.current
     const wrapper = wrapperRef.current
@@ -85,15 +92,11 @@ export default function ScrollAnimationProvider({
     if (!content || !wrapper) return
 
     // Disable smooth scroll on mobile to prevent address bar issues
-    const isMobile = isTouchDevice()
-    if (isMobile) {
+    if (shouldDisableSmoothScroll()) {
       // On mobile, don't apply smooth scroll - use native scroll
       // This prevents the body height manipulation that causes address bar hiding
-      isInitializedRef.current = true
       return
     }
-
-    isInitializedRef.current = true
 
     scrollDataRef.current.ease = smoothness
 
@@ -153,7 +156,6 @@ export default function ScrollAnimationProvider({
       cancelAnimationFrame(scrollDataRef.current.rafId)
       window.removeEventListener('resize', handleResize)
       mutationObserver.disconnect()
-      isInitializedRef.current = false
 
       // Reset body height
       if (typeof document !== 'undefined') {
@@ -177,7 +179,7 @@ export default function ScrollAnimationProvider({
         content.style.transform = ''
       }
     }
-  }, [isTouchDevice, setBodyHeight, smoothScroll, smoothness])
+  }, [setBodyHeight, shouldDisableSmoothScroll, smoothScroll, smoothness])
 
   // Scroll-triggered animations (existing functionality)
   useEffect(() => {
