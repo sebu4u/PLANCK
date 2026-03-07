@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type CSSProperties } from "react"
 import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react"
 import { Problem } from "@/data/problems"
 import { supabase } from "@/lib/supabaseClient"
@@ -42,7 +42,69 @@ const problemsCache = new Map<string, { data: Problem[]; timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 const CATALOG_SELECTED_CLASS_KEY = "catalogSelectedClass"
+const CATALOG_FILTERS_KEY = "catalogFilters"
+const CATALOG_PAGE_KEY = "catalogPage"
 const PROBLEMS_BG_AVATAR_SRC = "/planck_avatar-1035b250-7b77-452e-a1e1-7a8f1d6dd4a2.png"
+
+const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
+
+function loadStoredFilters(): FilterState | null {
+  try {
+    const raw = sessionStorage.getItem(CATALOG_FILTERS_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== "object") return null
+    const o = parsed as Record<string, unknown>
+    if (
+      typeof o.search !== "string" ||
+      typeof o.category !== "string" ||
+      typeof o.difficulty !== "string" ||
+      typeof o.chapter !== "string" ||
+      typeof o.class !== "string" ||
+      !VALID_PROGRESS.includes(o.progress as FilterState["progress"])
+    ) {
+      return null
+    }
+    return {
+      search: o.search,
+      category: o.category,
+      difficulty: o.difficulty,
+      progress: o.progress as FilterState["progress"],
+      class: o.class,
+      chapter: o.chapter,
+    }
+  } catch {
+    return null
+  }
+}
+
+function loadStoredPage(): number | null {
+  try {
+    const raw = sessionStorage.getItem(CATALOG_PAGE_KEY)
+    if (raw == null) return null
+    const n = parseInt(raw, 10)
+    if (!Number.isFinite(n) || n < 1) return null
+    return n
+  } catch {
+    return null
+  }
+}
+
+function saveStoredFilters(filters: FilterState) {
+  try {
+    sessionStorage.setItem(CATALOG_FILTERS_KEY, JSON.stringify(filters))
+  } catch {
+    // ignore
+  }
+}
+
+function saveStoredPage(page: number) {
+  try {
+    sessionStorage.setItem(CATALOG_PAGE_KEY, String(page))
+  } catch {
+    // ignore
+  }
+}
 
 const getCurrentMonthKey = () => {
   const now = new Date()
@@ -104,15 +166,21 @@ export default function ProblemsCatalogClient({
 
   const normalizedInitialChapter = typeof initialChapter === "string" ? initialChapter.trim() : ""
 
-  const [filters, setFilters] = useState<FilterState>({
+  const defaultFilters: FilterState = {
     search: "",
     category: "Toate",
     difficulty: "Toate",
     progress: "Toate",
     class: "Toate",
     chapter: normalizedInitialChapter || "Toate",
-  })
+  }
+
+  const [filters, setFilters] = useState<FilterState>(defaultFilters)
   const [currentPage, setCurrentPage] = useState(initialPage)
+  const hasRestoredStoredRef = useRef(false)
+  const hasRestoredFiltersRef = useRef(false)
+  const isFirstSaveFiltersRef = useRef(true)
+  const isFirstSavePageRef = useRef(true)
   const [problems, setProblems] = useState<Problem[]>(initialProblems || [])
   const [loading, setLoading] = useState(!initialProblems || initialProblems.length === 0)
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
@@ -213,7 +281,24 @@ export default function ProblemsCatalogClient({
     }
   }, [requiresClassSelection])
 
+  // Restore filters and page from sessionStorage when returning to catalog (e.g. from a problem page)
   useEffect(() => {
+    if (hasRestoredStoredRef.current) return
+    hasRestoredStoredRef.current = true
+
+    const storedFilters = loadStoredFilters()
+    const storedPage = loadStoredPage()
+    if (storedFilters) {
+      setFilters(storedFilters)
+      hasRestoredFiltersRef.current = true
+    }
+    if (storedPage != null) {
+      setCurrentPage(storedPage)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (hasRestoredFiltersRef.current) return
     if (!requiresClassSelection || !selectedClassGate) return
     if (filters.class !== "Toate") return
 
@@ -225,6 +310,7 @@ export default function ProblemsCatalogClient({
   }, [filters.class, requiresClassSelection, selectedClassGate])
 
   useEffect(() => {
+    if (hasRestoredFiltersRef.current) return
     if (requiresClassSelection) return
     if (!profileClass) return
     if (filters.class !== "Toate") return
@@ -237,6 +323,7 @@ export default function ProblemsCatalogClient({
   }, [filters.class, normalizedInitialChapter, profileClass, requiresClassSelection])
 
   useEffect(() => {
+    if (hasRestoredFiltersRef.current) return
     if (!requiresClassSelection) return
     if (!catalogReady) return
     if (filters.class !== "Toate") return
@@ -390,7 +477,24 @@ export default function ProblemsCatalogClient({
   const handleFilterChange = useCallback((nextFilters: FilterState) => {
     setFilters(nextFilters)
     setCurrentPage(1)
+    saveStoredPage(1)
   }, [])
+
+  useEffect(() => {
+    if (isFirstSaveFiltersRef.current) {
+      isFirstSaveFiltersRef.current = false
+      return
+    }
+    saveStoredFilters(filters)
+  }, [filters])
+
+  useEffect(() => {
+    if (isFirstSavePageRef.current) {
+      isFirstSavePageRef.current = false
+      return
+    }
+    saveStoredPage(currentPage)
+  }, [currentPage])
 
   useEffect(() => {
     if (!didMountRef.current) {
@@ -482,23 +586,42 @@ export default function ProblemsCatalogClient({
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
           <SheetContent
             side="left"
-            className="w-[85vw] max-w-[340px] bg-white p-0 text-[#2c2f33]"
+            className="flex w-[85vw] max-w-[340px] flex-col bg-white p-0 text-[#2c2f33]"
+            onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            <SheetHeader className="border-b border-[#0b0c0f]/10 px-5 py-4">
+            <SheetHeader className="flex-shrink-0 border-b border-[#0b0c0f]/10 px-5 py-4">
               <SheetTitle className="text-left text-sm font-semibold text-[#0b0c0f]">Catalog probleme</SheetTitle>
             </SheetHeader>
-            <div
-              className={cn("catalog-sidebar-scroll h-[calc(100%-58px)] overflow-y-auto px-5 py-4", sidebarScrolling && "is-scrolling")}
-              onScroll={handleSidebarScroll}
-            >
-              <ProblemsCatalogSidebar
-                filters={filters}
-                onFilterChange={handleFilterChange}
-                progressByClass={progressByClass}
-                totalProblems={problems.length}
-                filteredCount={filteredProblems.length}
-                lockedClass={effectiveUserClass}
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div
+                className={cn("catalog-sidebar-scroll absolute inset-0 overflow-y-auto px-5 py-4 pb-28", sidebarScrolling && "is-scrolling")}
+                onScroll={handleSidebarScroll}
+              >
+                <ProblemsCatalogSidebar
+                  filters={filters}
+                  onFilterChange={handleFilterChange}
+                  progressByClass={progressByClass}
+                  totalProblems={problems.length}
+                  filteredCount={filteredProblems.length}
+                  lockedClass={effectiveUserClass}
+                />
+              </div>
+              <div
+                className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white/80 via-white/35 to-transparent pt-16 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+                aria-hidden
               />
+              <div
+                className="absolute bottom-0 left-0 right-0 flex flex-col items-center px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="dashboard-start-glow relative z-10 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] active:translate-y-1 active:shadow-[0_1px_0_#5b21b6]"
+                  style={{ "--start-glow-tint": "rgba(221, 211, 255, 0.84)" } as CSSProperties}
+                >
+                  Salvează
+                </button>
+              </div>
             </div>
           </SheetContent>
         </Sheet>

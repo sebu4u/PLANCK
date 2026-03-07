@@ -562,6 +562,10 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             setInsightSidebarOpen(true)
             setInitialHintMessage("Am nevoie de un hint")
           }}
+          onOpenChat={() => {
+            setOpenedInsightFromCard(false)
+            setInsightSidebarOpen(true)
+          }}
         />
       )}
 
