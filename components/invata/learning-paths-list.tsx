@@ -165,6 +165,7 @@ function ElasticLessonsScroller({ children }: { children: ReactNode }) {
 
   const onTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     if (!isMobileViewport()) return
+    if ((event.target as HTMLElement)?.closest?.("a")) return
     const container = containerRef.current
     if (!container) return
 
@@ -210,6 +211,7 @@ function ElasticLessonsScroller({ children }: { children: ReactNode }) {
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!isDesktopViewport || event.pointerType === "touch" || event.button !== 0) return
+    if ((event.target as HTMLElement)?.closest?.("a")) return
     const container = containerRef.current
     if (!container) return
 
@@ -355,7 +357,6 @@ export function LearningPathsList({ chapters, lessonsByChapter, problemsByChapte
       {chapters.map((chapter, chapterIndex) => {
         const chapterLessons = lessonsByChapter[chapter.id] || []
         const chapterProblems = problemsByChapterId[chapter.id] || []
-        const chapterHref = chapter.slug ? `/invata/${chapter.slug}` : null
         const discoverHref = chapter.problem_category
           ? `/probleme?capitol=${encodeURIComponent(chapter.problem_category)}`
           : "/probleme"
@@ -389,20 +390,16 @@ export function LearningPathsList({ chapters, lessonsByChapter, problemsByChapte
                 </div>
               </div>
 
-              {chapterHref ? (
-                <Link
-                  href={chapterHref}
-                  className="hidden shrink-0 rounded-full border border-[#d7dcf4] bg-[#f6f8ff] px-4 py-2 text-sm font-semibold text-[#3550c8] transition-colors hover:bg-[#edf2ff] sm:inline-flex"
-                >
-                  Deschide capitol
-                </Link>
-              ) : null}
             </div>
 
             <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
               {chapterLessons.length ? (
                 <ElasticLessonsScroller>
                     {chapterLessons.map((lesson, lessonIndex) => {
+                      const lessonHref =
+                        chapter.slug && lesson.slug
+                          ? `/invata/${chapter.slug}/${lesson.slug}`
+                          : `/invata/${chapter.id}/${lesson.id}`
                       const cardContent = (
                         <div className="relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]">
                         <div className="flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]">
@@ -430,16 +427,8 @@ export function LearningPathsList({ chapters, lessonsByChapter, problemsByChapte
                       </div>
                       )
 
-                      if (!chapterHref) {
-                        return (
-                          <div key={lesson.id} className="shrink-0">
-                            {cardContent}
-                          </div>
-                        )
-                      }
-
                       return (
-                        <Link key={lesson.id} href={chapterHref} className="block shrink-0">
+                        <Link key={lesson.id} href={lessonHref} className="block shrink-0">
                           {cardContent}
                         </Link>
                       )
@@ -449,17 +438,6 @@ export function LearningPathsList({ chapters, lessonsByChapter, problemsByChapte
                 <p className="text-sm text-[#7a7a7a]">Acest capitol nu are încă lecții.</p>
               )}
             </div>
-
-            {chapterHref ? (
-              <div className="mt-3 sm:hidden">
-                <Link
-                  href={chapterHref}
-                  className="inline-flex rounded-full border border-[#d7dcf4] bg-[#f6f8ff] px-4 py-2 text-sm font-semibold text-[#3550c8]"
-                >
-                  Deschide capitol
-                </Link>
-              </div>
-            ) : null}
 
             {chapterProblems.length > 0 ? (
               <div className="mt-5 rounded-2xl border border-[#ececec] bg-white p-5">

@@ -8,7 +8,6 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Bookmark,
   Share2,
   Download,
   Target,
@@ -16,12 +15,11 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { Lesson } from '@/lib/supabase-physics'
-import 'katex/dist/katex.min.css'
-import { BlockMath, InlineMath } from 'react-katex'
 import { PhysicsChatSidebar } from '@/components/physics-chat-sidebar'
 import { WorkInProgressCard } from '@/components/work-in-progress-card'
 import { ShareLessonDialog } from '@/components/share-lesson-dialog'
 import { PremiumFeatureDialog } from '@/components/premium-feature-dialog'
+import { LessonRichContent } from '@/components/lesson-rich-content'
 
 interface LessonViewerProps {
   lesson: Lesson | null
@@ -132,265 +130,6 @@ export function LessonViewer({
     document.addEventListener('mouseup', handleInteraction)
     return () => document.removeEventListener('mouseup', handleInteraction)
   }, [])
-
-  const getGradeGradient = (grade: number) => {
-    switch (grade) {
-      case 9:
-        return 'bg-gradient-to-r from-purple-600 to-pink-600'
-      case 10:
-        return 'bg-gradient-to-r from-blue-600 to-cyan-600'
-      case 11:
-        return 'bg-gradient-to-r from-green-600 to-emerald-600'
-      case 12:
-        return 'bg-gradient-to-r from-orange-600 to-red-600'
-      default:
-        return 'bg-gradient-to-r from-purple-600 to-pink-600'
-    }
-  }
-
-  const renderInlineMarkdownContent = (content: string) => {
-    let processedContent = content
-    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
-    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em class="italic text-white">$1</em>')
-    processedContent = processedContent.replace(/(?:\r?\n)+$/g, '')
-    processedContent = processedContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
-      if (url.startsWith('/probleme/') || url.includes('/probleme/')) {
-        return `<a href="${url}" class="inline-block mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-center font-bold shadow-md hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-200">${text}</a>`
-      }
-      return `<a href="${url}" class="text-blue-400 hover:text-blue-300 hover:underline">${text}</a>`
-    })
-    processedContent = processedContent.replace(/\r?\n/g, '<br />')
-    return processedContent
-  }
-
-  const renderInlineWithImages = (content: string, keyPrefix: string) => {
-    if (!content) return null
-    const imageParts = content.split(/(!\[([^\]]*)\]\(([^)]+)\))/g)
-    return imageParts.map((part, idx) => {
-      if (!part) return null
-      const imageMatch = part.match(/!\[([^\]]*)\]\(([^)]+)\)/)
-      if (imageMatch) {
-        const altText = imageMatch[1]
-        const imageUrl = imageMatch[2]
-        return (
-          <img
-            key={`img-${keyPrefix}-${idx}`}
-            src={imageUrl}
-            alt={altText}
-            className="max-w-full h-auto rounded-lg shadow-md my-4 mx-auto block"
-            onError={(e) => {
-              console.error('Image failed to load:', imageUrl, e)
-              e.currentTarget.style.display = 'none'
-            }}
-          />
-        )
-      }
-      const mathParts = part.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g)
-      return mathParts.map((mathPart, mathIdx) => {
-        if (!mathPart) return null
-        if (mathPart.startsWith('$$') && mathPart.endsWith('$$')) {
-          return (
-            <BlockMath
-              key={`display-${keyPrefix}-${idx}-${mathIdx}`}
-              math={mathPart.slice(2, -2)}
-              className="my-4 block text-center"
-            />
-          )
-        }
-        if (mathPart.startsWith('$') && mathPart.endsWith('$')) {
-          return (
-            <InlineMath key={`inline-${keyPrefix}-${idx}-${mathIdx}`} math={mathPart.slice(1, -1)} />
-          )
-        }
-        const inlineHtml = renderInlineMarkdownContent(mathPart)
-        return inlineHtml ? (
-          <span key={`text-${keyPrefix}-${idx}-${mathIdx}`} dangerouslySetInnerHTML={{ __html: inlineHtml }} />
-        ) : null
-      })
-    })
-  }
-
-  const renderInlineWithMath = (content: string, keyPrefix: string) => {
-    if (!content) return null
-    const parts = content.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g)
-    return parts.map((part, idx) => {
-      if (!part) return null
-      if (part.startsWith('$$') && part.endsWith('$$')) {
-        return (
-          <BlockMath
-            key={`display-${keyPrefix}-${idx}`}
-            math={part.slice(2, -2)}
-            className="my-4 block text-center"
-          />
-        )
-      }
-      if (part.startsWith('$') && part.endsWith('$')) {
-        return (
-          <InlineMath key={`inline-${keyPrefix}-${idx}`} math={part.slice(1, -1)} />
-        )
-      }
-      const inlineHtml = renderInlineMarkdownContent(part)
-      return inlineHtml ? (
-        <span key={`text-${keyPrefix}-${idx}`} dangerouslySetInnerHTML={{ __html: inlineHtml }} />
-      ) : null
-    })
-  }
-
-  const renderParagraphs = (content: string, keyPrefix: string) => {
-    if (!content) return null
-    const lines = content.split(/\r?\n/)
-    const blocks: React.ReactNode[] = []
-    let currentParagraph: string[] = []
-    const flushParagraph = (key: number) => {
-      if (currentParagraph.length === 0) return
-      const paragraphText = currentParagraph.join('\n').trim()
-      if (!paragraphText) {
-        currentParagraph = []
-        return
-      }
-      if (/^\$\$[\s\S]*\$\$$/m.test(paragraphText)) {
-        blocks.push(
-          <BlockMath
-            key={`paragraph-display-${keyPrefix}-${key}`}
-            math={paragraphText.replace(/^\$\$/, '').replace(/\$\$$/, '')}
-            className="my-4 block text-center"
-          />
-        )
-      } else {
-        blocks.push(
-          <div key={`paragraph-${keyPrefix}-${key}`} className="mb-4 leading-relaxed text-white">
-            {renderInlineWithImages(paragraphText, `${keyPrefix}-paragraph-${key}`)}
-          </div>
-        )
-      }
-      currentParagraph = []
-    }
-    lines.forEach((line, idx) => {
-      const trimmed = line.trim()
-      const headingMatch = line.match(/^\s*(#{1,4})\s+(.*)$/)
-      if (headingMatch) {
-        flushParagraph(idx)
-        const level = headingMatch[1].length
-        const headingContent = headingMatch[2].trim()
-        const HeadingTag = `h${level}` as any
-        const headingClasses = {
-          1: 'text-3xl font-bold mb-6 text-white mt-8',
-          2: 'text-2xl font-bold mb-4 text-white mt-6',
-          3: 'text-xl font-semibold mb-3 text-white mt-5',
-          4: 'text-lg font-semibold mb-2 text-white mt-4'
-        } as const
-        // @ts-ignore
-        blocks.push(
-          <HeadingTag key={`heading-${keyPrefix}-${idx}`} className={headingClasses[level as 1 | 2 | 3 | 4]}>
-            {renderInlineWithImages(headingContent, `${keyPrefix}-heading-${idx}`)}
-          </HeadingTag>
-        )
-        return
-      }
-      if (trimmed.startsWith('[FORMULA]')) {
-        flushParagraph(idx)
-        const inner = trimmed.replace(/\[FORMULA\]|\[\/FORMULA\]/g, '')
-        blocks.push(
-          <div key={`formula-${keyPrefix}-${idx}`} className="formula-highlight">
-            <div className="formula-content">
-              {renderInlineWithImages(inner, `${keyPrefix}-formula-${idx}`)}
-            </div>
-          </div>
-        )
-        return
-      }
-      if (trimmed.startsWith('[ENUNT]') || trimmed.startsWith('[IMPORTANT]') || trimmed.startsWith('[DEFINITIE]') || trimmed.startsWith('[EXEMPLU]') || trimmed.startsWith('[INDENT]')) {
-        flushParagraph(idx)
-        const tagMatch = trimmed.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]([\s\S]*?)\[\/\1\]$/)
-        if (tagMatch) {
-          const tagType = tagMatch[1].toLowerCase()
-          const inner = tagMatch[2].trim()
-          blocks.push(
-            <div key={`tag-${keyPrefix}-${idx}`} className={`${tagType}-highlight`}>
-              <div className={`${tagType}-content`}>
-                {renderInlineWithImages(inner, `${keyPrefix}-${tagType}-${idx}`)}
-              </div>
-            </div>
-          )
-        }
-        return
-      }
-      if (trimmed === '') {
-        flushParagraph(idx)
-        return
-      }
-      if (/^\$\$[\s\S]*\$\$$/.test(line.trim())) {
-        flushParagraph(idx)
-        blocks.push(
-          <BlockMath
-            key={`inline-display-${keyPrefix}-${idx}`}
-            math={line.trim().replace(/^\$\$|\$\$$/g, '')}
-            className="my-4 block text-center"
-          />
-        )
-        return
-      }
-      currentParagraph.push(line)
-    })
-    flushParagraph(lines.length)
-    return blocks
-  }
-
-  const renderHighlightWithMath = (content: string, type: string, keyPrefix: string) => {
-    const highlightClass = `${type}-highlight`
-    const contentClass = `${type}-content`
-    return (
-      <div className={highlightClass}>
-        <div className={contentClass}>
-          {renderParagraphs(content, `${keyPrefix}-${type}`)}
-        </div>
-      </div>
-    )
-  }
-
-  const renderContentWithMath = (content: string) => {
-    const tagPattern = /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\]|\[INDENT\][\s\S]*?\[\/INDENT\])/g
-    const segments = content.split(tagPattern)
-    return (
-      <div>
-        {segments.map((segment, idx) => {
-          if (!segment) return null
-          const tagMatch = segment.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]([\s\S]*?)\[\/\1\]$/)
-          if (tagMatch) {
-            const type = tagMatch[1].toLowerCase()
-            const innerContent = tagMatch[2]
-            return (
-              <div key={`highlight-${idx}`}>
-                {renderHighlightWithMath(innerContent, type, `highlight-${idx}`)}
-              </div>
-            )
-          }
-          const parts = segment.split(/(\$\$[^$]+\$\$)/g)
-          return (
-            <div key={`segment-${idx}`}>
-              {parts.map((part, partIdx) => {
-                if (!part) return null
-                if (part.startsWith('$$') && part.endsWith('$$')) {
-                  return (
-                    <BlockMath
-                      key={`display-${idx}-${partIdx}`}
-                      math={part.slice(2, -2)}
-                      className="my-4 block text-center"
-                    />
-                  )
-                }
-                return (
-                  <div key={`paragraphs-${idx}-${partIdx}`}>
-                    {renderParagraphs(part, `segment-${idx}-part-${partIdx}`)}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
 
   if (!lesson) {
     return (
@@ -511,7 +250,7 @@ export function LessonViewer({
             <div className="max-w-4xl mx-auto">
               <div className="lesson-content relative">
                 <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none prose-headings:break-words prose-p:break-words prose-invert">
-                  {renderContentWithMath(lesson.content)}
+                  <LessonRichContent content={lesson.content} theme="dark" />
                 </div>
               </div>
 

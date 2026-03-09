@@ -124,7 +124,13 @@ export function DashboardLearningPathsCarousel({
       <div className="-mx-4 flex w-[calc(100%+2rem)] snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 md:hidden scrollbar-hide">
         {chapters.map((chapter) => {
           const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
-          const chapterHref = chapter.slug ? `/invata/${chapter.slug}` : "/invata"
+          const firstLesson = chapterLessons[0]
+          const chapterHref =
+            chapter.slug && firstLesson?.slug
+              ? `/invata/${chapter.slug}/${firstLesson.slug}`
+              : firstLesson
+                ? `/invata/${chapter.id}/${firstLesson.id}`
+                : "/invata"
           const colors = getChapterTheme(chapter.title)
 
           return (
@@ -216,7 +222,13 @@ export function DashboardLearningPathsCarousel({
       >
         {chapters.map((chapter, index) => {
           const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
-          const chapterHref = chapter.slug ? `/invata/${chapter.slug}` : "/invata"
+          const firstLesson = chapterLessons[0]
+          const chapterHref =
+            chapter.slug && firstLesson?.slug
+              ? `/invata/${chapter.slug}/${firstLesson.slug}`
+              : firstLesson
+                ? `/invata/${chapter.id}/${firstLesson.id}`
+                : "/invata"
 
           const offset = ((index - activeIndex + count) % count)
           const normalizedOffset = offset > Math.floor(count / 2) ? offset - count : offset

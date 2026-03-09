@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import { slugify } from '@/lib/slug'
 
 // Tipuri pentru baza de date
 export interface Grade {
@@ -176,6 +177,28 @@ export async function getLessonById(id: string): Promise<Lesson | null> {
   }
 
   return data
+}
+
+export async function getLessonBySlug(slug: string): Promise<Lesson | null> {
+  const normalizedSlug = slug.trim()
+  if (!normalizedSlug) return null
+
+  const grades = await getAllGrades()
+
+  for (const grade of grades) {
+    const chapters = await getChaptersByGradeId(grade.id)
+
+    for (const chapter of chapters) {
+      const summaries = await getLessonSummariesByChapterId(chapter.id)
+      const matchedLesson = summaries.find((lesson) => slugify(lesson.title) === normalizedSlug)
+
+      if (matchedLesson) {
+        return getLessonById(matchedLesson.id)
+      }
+    }
+  }
+
+  return null
 }
 
 // Funcții pentru a obține datele complete cu relații

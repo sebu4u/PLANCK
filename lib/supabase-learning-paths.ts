@@ -19,9 +19,26 @@ export interface LearningPathChapter {
 export interface LearningPathLesson {
   id: string
   chapter_id: string
+  slug: string | null
   title: string
+  description: string | null
   image_url: string | null
   lesson_type: LearningPathLessonType
+  cursuri_lesson_slug: string | null
+  youtube_url: string | null
+  quiz_question_id: string | null
+  problem_id: string | null
+  order_index: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LearningPathLessonItem {
+  id: string
+  lesson_id: string
+  item_type: LearningPathLessonType
+  title: string | null
   cursuri_lesson_slug: string | null
   youtube_url: string | null
   quiz_question_id: string | null
@@ -47,6 +64,12 @@ export async function getLearningPathChapters(): Promise<LearningPathChapter[]> 
   return data || []
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUuid(value: string): boolean {
+  return UUID_REGEX.test((value || "").trim())
+}
+
 export async function getLearningPathChapterBySlug(slug: string): Promise<LearningPathChapter | null> {
   const normalizedSlug = slug.trim()
   if (!normalizedSlug) return null
@@ -66,6 +89,25 @@ export async function getLearningPathChapterBySlug(slug: string): Promise<Learni
   return data || null
 }
 
+export async function getLearningPathChapterById(id: string): Promise<LearningPathChapter | null> {
+  const normalizedId = id.trim()
+  if (!normalizedId) return null
+
+  const { data, error } = await supabase
+    .from("learning_path_chapters")
+    .select("*")
+    .eq("id", normalizedId)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (error) {
+    console.error(`Error fetching learning path chapter with id ${normalizedId}:`, error)
+    return null
+  }
+
+  return data || null
+}
+
 export async function getLearningPathLessonsByChapterId(chapterId: string): Promise<LearningPathLesson[]> {
   const { data, error } = await supabase
     .from("learning_path_lessons")
@@ -76,6 +118,71 @@ export async function getLearningPathLessonsByChapterId(chapterId: string): Prom
 
   if (error) {
     console.error(`Error fetching lessons for chapter ${chapterId}:`, error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function getLearningPathLessonBySlug(
+  chapterSlug: string,
+  lessonSlug: string
+): Promise<LearningPathLesson | null> {
+  const chapter = await getLearningPathChapterBySlug(chapterSlug)
+  const normalizedLessonSlug = lessonSlug.trim()
+
+  if (!chapter || !normalizedLessonSlug) {
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from("learning_path_lessons")
+    .select("*")
+    .eq("chapter_id", chapter.id)
+    .eq("slug", normalizedLessonSlug)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (error) {
+    console.error(
+      `Error fetching learning path lesson with slug ${normalizedLessonSlug} from chapter ${chapter.id}:`,
+      error
+    )
+    return null
+  }
+
+  return data || null
+}
+
+export async function getLearningPathLessonById(lessonId: string): Promise<LearningPathLesson | null> {
+  const normalizedId = lessonId.trim()
+  if (!normalizedId) return null
+
+  const { data, error } = await supabase
+    .from("learning_path_lessons")
+    .select("*")
+    .eq("id", normalizedId)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (error) {
+    console.error(`Error fetching learning path lesson with id ${normalizedId}:`, error)
+    return null
+  }
+
+  return data || null
+}
+
+export async function getLearningPathLessonItems(lessonId: string): Promise<LearningPathLessonItem[]> {
+  const { data, error } = await supabase
+    .from("learning_path_lesson_items")
+    .select("*")
+    .eq("lesson_id", lessonId)
+    .eq("is_active", true)
+    .order("order_index")
+
+  if (error) {
+    console.error(`Error fetching learning path lesson items for lesson ${lessonId}:`, error)
     return []
   }
 

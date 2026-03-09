@@ -25,7 +25,7 @@ export function MobileViewportFix() {
         // Check for common modal indicators
         const hasRadixDialog = document.querySelector('[data-state="open"][role="dialog"]')
         const hasRadixSheet = document.querySelector('[data-state="open"][data-radix-popper-content-wrapper]')
-        const hasFixedOverlay = document.querySelector('.fixed.inset-0.z-\\[9999\\]') // ProfileCompletionCard
+        const hasFixedOverlay = document.querySelector('.fixed.inset-0.z-\\[9999\\]')
         return hasRadixDialog || hasRadixSheet || hasFixedOverlay
       }
       
