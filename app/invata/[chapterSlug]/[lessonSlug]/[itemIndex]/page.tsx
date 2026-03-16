@@ -9,6 +9,7 @@ import {
   LearningPathItemBody,
   getItemIcon,
 } from "@/components/invata/learning-path-item-body"
+import { ProblemSection } from "@/components/invata/problem-section"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import {
   getLearningPathChapterById,
@@ -107,6 +108,14 @@ export default async function InvataLessonItemPage({
       : null
   const ItemIcon = getItemIcon(item.item_type)
   const lessonBaseHref = `/invata/${chapter.slug ?? chapter.id}/${lesson.slug ?? lesson.id}`
+  const nextItemHref =
+    parsedIndex < items.length ? `${lessonBaseHref}/${parsedIndex + 1}` : lessonBaseHref
+
+  const isPoll = item.item_type === "poll"
+  const isProblem = item.item_type === "problem" && !!sourceProblem
+  const problemHasAnswer =
+    sourceProblem &&
+    (sourceProblem.answer_type === "value" || sourceProblem.answer_type === "grila")
 
   return (
     <LessonItemShell
@@ -116,37 +125,53 @@ export default async function InvataLessonItemPage({
       items={items}
       lessonBaseHref={lessonBaseHref}
       isTextLesson={item.item_type === "text"}
+      hideBottomCta={isPoll || (isProblem && !!problemHasAnswer)}
+      overflowHidden={isProblem}
+      fullWidth={isProblem}
     >
-      <section className="mt-6 overflow-hidden rounded-[30px] border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
-        <header className="border-b border-[#eee7f3] bg-[linear-gradient(180deg,#fcfbfe_0%,#f7f4fb_100%)] px-5 py-5 sm:px-7">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_8px_16px_rgba(124,58,237,0.24)]">
-              <ItemIcon className="h-5 w-5" />
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6fac]">
-                Pasul {parsedIndex} din {items.length}
-              </p>
-              <h1 className="mt-2 text-2xl font-bold leading-tight text-[#111111] sm:text-3xl">
-                {item.title || (sourceProblem?.title ?? ITEM_TYPE_LABEL[item.item_type])}
-              </h1>
-              <p className="mt-2 text-sm text-[#6f657b]">
-                {ITEM_TYPE_LABEL[item.item_type]} din lecția {lesson.title}
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <div className="px-5 py-6 sm:px-7">
-          <LearningPathItemBody
+      {isPoll ? (
+        <LearningPathItemBody
           item={item}
           sourceLesson={sourceLesson}
           sourceProblem={sourceProblem}
           sourceQuizQuestion={sourceQuizQuestion}
+          nextItemHref={nextItemHref}
         />
-        </div>
-      </section>
+      ) : isProblem && sourceProblem ? (
+        <ProblemSection problem={sourceProblem} nextItemHref={nextItemHref} itemIndex={parsedIndex} />
+      ) : (
+        <section className="mt-6 overflow-hidden rounded-[30px] border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
+          <header className="border-b border-[#eee7f3] bg-[linear-gradient(180deg,#fcfbfe_0%,#f7f4fb_100%)] px-5 py-5 sm:px-7">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_8px_16px_rgba(124,58,237,0.24)]">
+                <ItemIcon className="h-5 w-5" />
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6fac]">
+                  Pasul {parsedIndex} din {items.length}
+                </p>
+                <h1 className="mt-2 text-2xl font-bold leading-tight text-[#111111] sm:text-3xl">
+                  {item.title || (sourceProblem?.title ?? ITEM_TYPE_LABEL[item.item_type])}
+                </h1>
+                <p className="mt-2 text-sm text-[#6f657b]">
+                  {ITEM_TYPE_LABEL[item.item_type]} din lecția {lesson.title}
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <div className="px-5 py-6 sm:px-7">
+            <LearningPathItemBody
+              item={item}
+              sourceLesson={sourceLesson}
+              sourceProblem={sourceProblem}
+              sourceQuizQuestion={sourceQuizQuestion}
+              nextItemHref={nextItemHref}
+            />
+          </div>
+        </section>
+      )}
     </LessonItemShell>
   )
 }

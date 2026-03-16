@@ -157,14 +157,6 @@ export function ConcursContent() {
 
                     {/* CTA Buttons */}
                     <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <Link href="/concurs/inscriere">
-                            <Button
-                                size="lg"
-                                className="bg-white text-gray-900 hover:bg-gray-100 transition-all duration-300 rounded-full px-8 py-6 text-lg font-semibold shadow-lg hover:shadow-xl border-0"
-                            >
-                                Vreau să particip
-                            </Button>
-                        </Link>
                         <Link href="/concurs/regulament">
                             <Button
                                 variant="outline"
@@ -507,21 +499,16 @@ export function ConcursContent() {
 
                     {/* CTA Section */}
                     <div className="scroll-animate-fade-up animate-delay-400 pt-12 border-t border-gray-200">
-                        <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-8">
-                            Ești gata să te testezi?
+                        <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+                            Înscrierile sunt închise
                         </h3>
 
-                        <Link href="/concurs/inscriere">
-                            <Button
-                                size="lg"
-                                className="scroll-animate-scale animate-delay-600 bg-gradient-to-r from-orange-500 to-orange-400 text-white hover:from-orange-600 hover:to-orange-500 transition-all duration-300 rounded-full px-10 py-7 text-lg font-semibold shadow-xl hover:shadow-2xl hover:scale-105"
-                            >
-                                🔵 Rezervă-ți locul în concurs
-                            </Button>
-                        </Link>
+                        <p className="text-lg text-gray-700 mb-6">
+                            Înscrierile pentru ediția curentă a concursului PLANCK s-au încheiat. Te așteptăm la următoarea ediție.
+                        </p>
 
-                        <p className="text-gray-500 text-sm mt-6">
-                            Concursul se va desfășura <span className="font-semibold text-gray-900">Duminică, 22 martie, de la ora 12:00</span>. Vei primi toate detaliile pe email după înscriere.
+                        <p className="text-gray-500 text-sm">
+                            Poți în continuare să consulți regulamentul și materialele de pregătire disponibile pe această pagină.
                         </p>
                     </div>
                 </div>

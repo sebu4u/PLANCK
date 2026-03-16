@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabaseClient"
 import type { Problem } from "@/data/problems"
 
-export type LearningPathLessonType = "text" | "video" | "grila" | "problem"
+export type LearningPathLessonType = "text" | "video" | "grila" | "problem" | "poll"
 
 export interface LearningPathChapter {
   id: string
@@ -47,6 +47,7 @@ export interface LearningPathLessonItem {
   is_active: boolean
   created_at: string
   updated_at: string
+  content_json?: Record<string, unknown> | null
 }
 
 export async function getLearningPathChapters(): Promise<LearningPathChapter[]> {

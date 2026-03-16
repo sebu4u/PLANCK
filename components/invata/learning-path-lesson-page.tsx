@@ -40,7 +40,7 @@ export function LearningPathLessonPage({
       </Link>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="rounded-[24px] border border-[#e8e2ee] bg-white p-3 shadow-[0_12px_32px_rgba(82,44,111,0.08)] overflow-hidden sm:p-5">
+        <aside className="lg:self-start lg:max-h-[calc(100vh-8rem)] rounded-[24px] border border-[#e8e2ee] bg-white p-3 shadow-[0_12px_32px_rgba(82,44,111,0.08)] overflow-hidden sm:p-5">
           <div className="flex items-start justify-start bg-white">
             {lesson.image_url ? (
               <img
@@ -124,23 +124,27 @@ export function LearningPathLessonPage({
               </div>
 
               {selectedItem ? (
-                <div className="mt-6 flex w-full justify-center">
-                  <div className="w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)] lg:w-1/2 lg:min-w-[200px] lg:max-w-sm">
-                    <p className="text-center text-xl font-bold text-[#111111]">
-                      {selectedItem.title || ITEM_TYPE_LABEL[selectedItem.item_type]}
-                    </p>
-                    <Link
-                      href={selectedItemHref || lessonBaseHref}
-                      className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-3 py-2.5 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
-                      style={{ "--start-glow-tint": CTA_GLOW_TINT } as CSSProperties}
-                    >
-                      <span className="relative z-[1] inline-flex items-center gap-2">
-                        Continuă
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </span>
-                    </Link>
+                <>
+                  {/* Spacer păstrează layout-ul; cardul real e fixed mai jos */}
+                  <div className="mt-6 h-[140px] w-full shrink-0 lg:w-1/2 lg:min-w-[200px] lg:max-w-sm" aria-hidden="true" />
+                  <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:left-[calc(360px+2rem)] lg:right-8 lg:justify-center xl:left-[calc(400px+2rem)]">
+                    <div className="w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)] lg:w-[min(100%,320px)]">
+                      <p className="text-center text-xl font-bold text-[#111111]">
+                        {selectedItem.title || ITEM_TYPE_LABEL[selectedItem.item_type]}
+                      </p>
+                      <Link
+                        href={selectedItemHref || lessonBaseHref}
+                        className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-3 py-2.5 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
+                        style={{ "--start-glow-tint": CTA_GLOW_TINT } as CSSProperties}
+                      >
+                        <span className="relative z-[1] inline-flex items-center gap-2">
+                          Continuă
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </span>
+                      </Link>
+                    </div>
                   </div>
-                </div>
+                </>
               ) : null}
             </>
           ) : (

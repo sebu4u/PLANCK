@@ -1,8 +1,10 @@
 import Link from "next/link"
-import { CirclePlay, FileText, ListChecks, PenSquare } from "lucide-react"
+import { BarChart2, CirclePlay, FileText, ListChecks, PenSquare } from "lucide-react"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { EmbeddedProblemContent } from "@/components/invata/embedded-problem-content"
 import { EmbeddedGrilaContent } from "@/components/invata/embedded-grila-content"
+import { LessonPollClientWrapper } from "@/components/invata/lesson-poll-client-wrapper"
+import { PollSection } from "@/components/invata/poll-section"
 import type { LearningPathLessonItem, LearningPathLessonType } from "@/lib/supabase-learning-paths"
 import type { Lesson as PhysicsLesson } from "@/lib/supabase-physics"
 import type { Problem } from "@/data/problems"
@@ -14,6 +16,7 @@ export const ITEM_TYPE_LABEL: Record<LearningPathLessonType, string> = {
   video: "Lecție video",
   grila: "Exercițiu grilă",
   problem: "Exercițiu problemă",
+  poll: "Sondaj",
 }
 
 export function getItemIcon(type: LearningPathLessonType) {
@@ -24,6 +27,8 @@ export function getItemIcon(type: LearningPathLessonType) {
       return ListChecks
     case "problem":
       return PenSquare
+    case "poll":
+      return BarChart2
     case "text":
     default:
       return FileText
@@ -37,9 +42,55 @@ interface LearningPathItemBodyProps {
   sourceLesson: PhysicsLesson | null
   sourceProblem?: Problem | null
   sourceQuizQuestion?: QuizQuestion | null
+  nextItemHref?: string
 }
 
-export function LearningPathItemBody({ item, sourceLesson, sourceProblem, sourceQuizQuestion }: LearningPathItemBodyProps) {
+function parsePollContent(content: Record<string, unknown> | null | undefined): {
+  imageSrc: string
+  imageAlt: string
+  question: string
+  correctAnswerId: string
+  options: { id: string; label: string; feedback: string }[]
+} | null {
+  if (!content || typeof content !== "object") return null
+  const imageSrc = content.imageSrc
+  const imageAlt = content.imageAlt
+  const question = content.question
+  const correctAnswerId = content.correctAnswerId
+  const options = content.options
+  if (
+    typeof imageSrc !== "string" ||
+    typeof imageAlt !== "string" ||
+    typeof question !== "string" ||
+    typeof correctAnswerId !== "string" ||
+    !Array.isArray(options) ||
+    options.length === 0
+  ) {
+    return null
+  }
+  const parsedOptions: { id: string; label: string; feedback: string }[] = []
+  for (const opt of options) {
+    if (
+      opt &&
+      typeof opt === "object" &&
+      typeof (opt as { id?: unknown }).id === "string" &&
+      typeof (opt as { label?: unknown }).label === "string" &&
+      typeof (opt as { feedback?: unknown }).feedback === "string"
+    ) {
+      parsedOptions.push({
+        id: (opt as { id: string }).id,
+        label: (opt as { label: string }).label,
+        feedback: (opt as { feedback: string }).feedback,
+      })
+    }
+  }
+  if (parsedOptions.length === 0) return null
+  const hasCorrectId = parsedOptions.some((o) => o.id === correctAnswerId)
+  if (!hasCorrectId) return null
+  return { imageSrc, imageAlt, question, correctAnswerId, options: parsedOptions }
+}
+
+export function LearningPathItemBody({ item, sourceLesson, sourceProblem, sourceQuizQuestion, nextItemHref }: LearningPathItemBodyProps) {
   if (item.item_type === "text") {
     if (!sourceLesson) {
       return <p className="text-sm text-[#777777]">Lecția text nu este încă disponibilă.</p>
@@ -96,6 +147,28 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
           Deschide grila
         </Link>
       </div>
+    )
+  }
+
+  if (item.item_type === "poll") {
+    const pollData = parsePollContent(item.content_json ?? null)
+    if (!pollData || !nextItemHref) {
+      return <p className="text-sm text-[#777777]">Sondajul nu este configurat încă.</p>
+    }
+    return (
+      <PollSection
+        question={pollData.question}
+        correctAnswerId={pollData.correctAnswerId}
+        options={pollData.options}
+        nextItemHref={nextItemHref}
+      >
+        <LessonPollClientWrapper
+          imageSrc={pollData.imageSrc}
+          imageAlt={pollData.imageAlt}
+          correctAnswerId={pollData.correctAnswerId}
+          options={pollData.options}
+        />
+      </PollSection>
     )
   }
 

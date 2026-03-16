@@ -32,7 +32,7 @@ type PageState =
 
 function ContestShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-orange-50/50 to-white">
+    <div className="min-h-screen bg-white">
       <header className="border-b border-orange-100 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-gray-900">

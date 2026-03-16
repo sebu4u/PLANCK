@@ -80,66 +80,11 @@ export default function ContestRegistrationPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!fullName.trim() || !school.trim() || !grade) {
-            toast({
-                title: "Date incomplete",
-                description: "Te rugăm să completezi toate câmpurile",
-                variant: "destructive"
-            })
-            return
-        }
-
-        setLoading(true)
-
-        try {
-            const { data: sessionData } = await supabase.auth.getSession()
-            const accessToken = sessionData.session?.access_token
-
-            if (!accessToken) {
-                toast({
-                    title: "Eroare",
-                    description: "Sesiune expirată. Te rugăm să te autentifici din nou.",
-                    variant: "destructive"
-                })
-                setLoading(false)
-                return
-            }
-
-            const response = await fetch('/api/contest/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
-                },
-                body: JSON.stringify({
-                    full_name: fullName,
-                    school,
-                    grade
-                })
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Eroare la înregistrare')
-            }
-
-            if (data.success) {
-                setNewContestCode(data.contest_code)
-                toast({
-                    title: "Felicitări! 🎉",
-                    description: "Te-ai înscris cu succes la concurs!"
-                })
-            }
-        } catch (error: any) {
-            toast({
-                title: "Eroare",
-                description: error.message || "Eroare la înregistrare. Te rugăm să încerci din nou.",
-                variant: "destructive"
-            })
-        } finally {
-            setLoading(false)
-        }
+        toast({
+            title: "Înscrierile sunt închise",
+            description: "Înscrierile pentru ediția curentă a concursului PLANCK s-au încheiat.",
+            variant: "destructive"
+        })
     }
 
     const copyCode = (code: string) => {
@@ -253,101 +198,32 @@ export default function ContestRegistrationPage() {
                             </div>
                         </div>
                     ) : (
-                        /* Registration Form */
+                        /* Registrations closed */
                         <div className="animate-in slide-in-from-bottom-4 fade-in duration-300">
                             <div className="text-center mb-10">
-                                <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <GraduationCap className="w-8 h-8 text-orange-600" />
+                                <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <GraduationCap className="w-8 h-8 text-gray-600" />
                                 </div>
                                 <h1 className="text-3xl font-bold text-gray-900 mb-3">
-                                    Înscrie-te la concurs
+                                    Înscrierile sunt închise
                                 </h1>
                                 <p className="text-gray-600">
-                                    Concursul Național de Fizică PLANCK - Ediția 2026
+                                    Înscrierile pentru ediția curentă a Concursului Național de Fizică PLANCK s-au încheiat.
                                 </p>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-5">
-                                {/* Full Name */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Nume complet
-                                    </label>
-                                    <div className="relative">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <Input
-                                            type="text"
-                                            value={fullName}
-                                            onChange={(e) => setFullName(e.target.value)}
-                                            placeholder="Ex: Popescu Ion"
-                                            className="pl-12 h-12 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-orange-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* School */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Școala
-                                    </label>
-                                    <div className="relative">
-                                        <School className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <Input
-                                            type="text"
-                                            value={school}
-                                            onChange={(e) => setSchool(e.target.value)}
-                                            placeholder="Ex: Colegiul Național ..."
-                                            className="pl-12 h-12 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-orange-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Grade */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Clasa
-                                    </label>
-                                    <div className="grid grid-cols-4 gap-3">
-                                        {['IX', 'X', 'XI', 'XII'].map((g) => (
-                                            <button
-                                                key={g}
-                                                type="button"
-                                                onClick={() => setGrade(g)}
-                                                className={`py-3 px-4 rounded-xl font-semibold transition-all ${grade === g
-                                                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                            >
-                                                {g}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Submit Button */}
-                                <Button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full h-14 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all mt-6"
-                                >
-                                    {loading ? (
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            <span>Se procesează...</span>
-                                        </div>
-                                    ) : (
-                                        "Înscrie-mă la concurs"
-                                    )}
-                                </Button>
-                            </form>
-
-                            <p className="text-center text-sm text-gray-500 mt-6">
-                                Prin înscrierea la concurs, ești de acord cu{" "}
-                                <Link href="/termeni" className="text-orange-600 hover:underline">
-                                    regulamentul concursului
-                                </Link>
-                                .
-                            </p>
+                            <div className="space-y-4 text-center text-gray-600">
+                                <p>
+                                    Dacă te-ai înscris deja, poți vedea codul tău de concurs mai sus sau în pagina{" "}
+                                    <Link href="/profil" className="text-orange-600 hover:underline">
+                                        profilului tău
+                                    </Link>
+                                    , dacă este disponibil acolo.
+                                </p>
+                                <p>
+                                    Te așteptăm la următoarea ediție a concursului și te încurajăm să folosești în continuare materialele de pregătire de pe PLANCK.
+                                </p>
+                            </div>
                         </div>
                     )}
                 </div>

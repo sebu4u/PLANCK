@@ -4,6 +4,12 @@ import { isJwtExpired } from '@/lib/auth-validate'
 
 export async function POST(request: NextRequest) {
     try {
+        // Registrations are closed for the current contest edition
+        return NextResponse.json(
+            { error: 'Înscrierile pentru ediția curentă a concursului PLANCK sunt închise.' },
+            { status: 403 }
+        )
+
         // Get access token from Authorization header
         const authHeader = request.headers.get('authorization') || ''
         const tokenMatch = authHeader.match(/^Bearer (.+)$/i)

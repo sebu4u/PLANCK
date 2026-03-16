@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import type { LearningPathLessonItem } from "@/lib/supabase-learning-paths"
 
@@ -41,6 +42,9 @@ interface LessonItemShellProps {
   items: LearningPathLessonItem[]
   lessonBaseHref: string
   isTextLesson: boolean
+  hideBottomCta?: boolean
+  overflowHidden?: boolean
+  fullWidth?: boolean
   children: React.ReactNode
 }
 
@@ -51,6 +55,9 @@ export function LessonItemShell({
   items,
   lessonBaseHref,
   isTextLesson,
+  hideBottomCta = false,
+  overflowHidden = false,
+  fullWidth = false,
   children,
 }: LessonItemShellProps) {
   const { user } = useAuth()
@@ -149,34 +156,44 @@ export function LessonItemShell({
       </nav>
 
       <main
-        className="min-h-screen bg-[#ffffff] pt-14"
+        className={cn("min-h-screen bg-[#ffffff] pt-14", overflowHidden && "overflow-hidden")}
         style={{
-          paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))",
+          paddingBottom: hideBottomCta
+            ? "max(16px, env(safe-area-inset-bottom, 0px))"
+            : "calc(6rem + env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div ref={contentRef} className="mx-auto w-full max-w-5xl px-5 sm:px-8 lg:px-12">
+        <div
+          ref={contentRef}
+          className={cn(
+            "mx-auto w-full px-5 sm:px-8 lg:px-12",
+            !fullWidth && "max-w-5xl",
+          )}
+        >
           {children}
         </div>
       </main>
 
-      <div
-        className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
-        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div className="mx-auto flex max-w-5xl justify-center">
-          <Link
-            href={nextItemHref}
-            onClick={playClickSound}
-            className="dashboard-start-glow inline-flex w-full max-w-sm items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
-            style={{ "--start-glow-tint": CTA_GLOW_TINT } as CSSProperties}
-          >
-            <span className="relative z-[1] inline-flex items-center gap-2">
-              Continuă
-              <ChevronRight className="h-3.5 w-3.5" />
-            </span>
-          </Link>
+      {!hideBottomCta && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
+          style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
+        >
+          <div className="mx-auto flex max-w-5xl justify-center">
+            <Link
+              href={nextItemHref}
+              onClick={playClickSound}
+              className="dashboard-start-glow inline-flex w-full max-w-sm items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
+              style={{ "--start-glow-tint": CTA_GLOW_TINT } as CSSProperties}
+            >
+              <span className="relative z-[1] inline-flex items-center gap-2">
+                Continuă
+                <ChevronRight className="h-3.5 w-3.5" />
+              </span>
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
 
       <Dialog open={showQuitDialog} onOpenChange={setShowQuitDialog}>
         <DialogContent
