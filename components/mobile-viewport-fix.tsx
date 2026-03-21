@@ -6,7 +6,8 @@ import { useEffect } from 'react'
  * Component to fix mobile viewport issues
  * 
  * On Android: Adds a safety mechanism to prevent body.overflow from getting stuck as "hidden"
- * On iOS: Uses preventDefault on touchmove at boundaries to prevent overscroll
+ * On iOS: Uses preventDefault on touchmove at window scroll boundaries to reduce overscroll,
+ * but skips when the gesture targets a nested overflow scroll container (window.scrollY is not authoritative there).
  */
 export function MobileViewportFix() {
   useEffect(() => {
@@ -62,7 +63,23 @@ export function MobileViewportFix() {
     // iOS-only: prevent overscroll at page boundaries
     if (isIOS) {
       let lastTouchY = 0
-      
+
+      const getScrollableOverflowAncestor = (start: Element | null): Element | null => {
+        let el: Element | null = start
+        while (el) {
+          const style = window.getComputedStyle(el)
+          const oy = style.overflowY
+          if (
+            (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+            el.scrollHeight > el.clientHeight + 1
+          ) {
+            return el
+          }
+          el = el.parentElement
+        }
+        return null
+      }
+
       const handleTouchStart = (e: TouchEvent) => {
         lastTouchY = e.touches[0].clientY
       }
@@ -74,8 +91,17 @@ export function MobileViewportFix() {
         const currentTouchY = e.touches[0].clientY
         const isScrollingUp = currentTouchY > lastTouchY
         const isScrollingDown = currentTouchY < lastTouchY
-        
-        // Only prevent default at the very top or bottom of the page
+
+        const touchTarget = e.target instanceof Element ? e.target : null
+        const scrollableAnc = getScrollableOverflowAncestor(touchTarget)
+
+        // Window scrollY stays 0 when the real scroll is inside overflow-y-auto; do not steal those gestures.
+        if (scrollableAnc) {
+          lastTouchY = currentTouchY
+          return
+        }
+
+        // Only prevent default at the very top or bottom of the *window* scroll
         if (e.cancelable) {
           if (scrollTop <= 0 && isScrollingUp) {
             e.preventDefault()
@@ -83,7 +109,7 @@ export function MobileViewportFix() {
             e.preventDefault()
           }
         }
-        
+
         lastTouchY = currentTouchY
       }
 
