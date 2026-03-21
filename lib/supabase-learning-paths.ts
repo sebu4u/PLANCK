@@ -214,7 +214,7 @@ export async function getRandomProblemsByCategory(category: string, limit = 3): 
   return problems.slice(0, Math.max(1, limit))
 }
 
-function toGradeNumber(grade: string | number | null | undefined): number | null {
+export function toGradeNumber(grade: string | number | null | undefined): number | null {
   if (grade == null) return null
   if (typeof grade === "number") return Number.isFinite(grade) ? grade : null
 

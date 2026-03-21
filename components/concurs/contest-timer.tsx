@@ -18,8 +18,12 @@ export function ContestTimer({ initialSeconds, label, onExpire, className }: Con
   const hasExpiredRef = useRef(false)
 
   useEffect(() => {
-    setSecondsLeft(Math.max(0, initialSeconds))
-    hasExpiredRef.current = false
+    const next = Math.max(0, initialSeconds)
+    setSecondsLeft(next)
+    // Nu reseta flag-ul dacă timpul e deja 0 (sincronizare repetată de la server)
+    if (next > 0) {
+      hasExpiredRef.current = false
+    }
   }, [initialSeconds])
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CheckCircle2, ChevronLeft, ChevronRight, ShieldCheck, TimerOff } from "lucide-react"
 
 import { ContestProblem } from "@/components/concurs/contest-problem"
+import { PostContestRetentionCard } from "@/components/concurs/post-contest-retention-card"
 import { ContestSidebar } from "@/components/concurs/contest-sidebar"
 import { ContestTimer } from "@/components/concurs/contest-timer"
 import { Badge } from "@/components/ui/badge"
@@ -51,14 +52,96 @@ export function ContestInterface({
   )
   const [savingProblemIds, setSavingProblemIds] = useState<string[]>([])
   const [isTimeUp, setIsTimeUp] = useState(initialRemainingSeconds <= 0)
+  const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState(
+    Math.max(0, initialRemainingSeconds)
+  )
+  const [showPostContestRetention, setShowPostContestRetention] = useState(false)
   const saveTimersRef = useRef<Record<string, number>>({})
   const timeUpToastShownRef = useRef(false)
+  /** O singură dată: încheiere concurs (cronometru local sau verdict server) */
+  const contestEndedRef = useRef(false)
+
+  const endContestSession = useCallback(() => {
+    if (contestEndedRef.current) {
+      return
+    }
+    contestEndedRef.current = true
+    setIsTimeUp(true)
+    setDisplayRemainingSeconds(0)
+    setShowPostContestRetention(true)
+    if (!timeUpToastShownRef.current) {
+      timeUpToastShownRef.current = true
+      toast({
+        title: "Timpul a expirat",
+        description: "Nu mai poți trimite alte răspunsuri. Poți doar să revezi ce ai completat."
+      })
+    }
+  }, [toast])
 
   useEffect(() => {
     return () => {
       Object.values(saveTimersRef.current).forEach((timer) => window.clearTimeout(timer))
     }
   }, [])
+
+  /** Sincronizare cu serverul: când concursul activ se oprește, toți userii sunt blocați + card retenție */
+  useEffect(() => {
+    if (isTimeUp) {
+      return
+    }
+
+    let cancelled = false
+
+    const pollContest = async () => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken || cancelled) {
+        return
+      }
+
+      const response = await fetch("/api/contest/problems", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+
+      const data = (await response.json()) as {
+        contest_status?: string
+        remaining_seconds?: number
+      }
+
+      if (cancelled) {
+        return
+      }
+
+      if (response.status === 409 && data.contest_status === "ended") {
+        endContestSession()
+        return
+      }
+
+      if (response.ok && typeof data.remaining_seconds === "number") {
+        setDisplayRemainingSeconds(data.remaining_seconds)
+        if (data.remaining_seconds <= 0) {
+          endContestSession()
+        }
+      }
+    }
+
+    void pollContest()
+    const intervalId = window.setInterval(() => void pollContest(), 8000)
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void pollContest()
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
+  }, [isTimeUp, endContestSession])
 
   const currentProblem = initialProblems[currentIndex]
   const answeredCount = useMemo(
@@ -109,7 +192,8 @@ export function ContestInterface({
 
         if (!response.ok) {
           if (data.code === "CONTEST_NOT_ACTIVE") {
-            setIsTimeUp(true)
+            endContestSession()
+            return
           }
 
           throw new Error(data.error || "Nu am putut salva răspunsul.")
@@ -130,7 +214,7 @@ export function ContestInterface({
         markProblemSaving(problemId, false)
       }
     },
-    [contest.id, isTimeUp, toast]
+    [contest.id, endContestSession, isTimeUp, toast]
   )
 
   const handleAnswerChange = (answer: ContestAnswer) => {
@@ -151,18 +235,6 @@ export function ContestInterface({
     saveTimersRef.current[currentProblem.id] = window.setTimeout(() => {
       void saveAnswer(currentProblem.id, answer)
     }, 450)
-  }
-
-  const handleExpire = () => {
-    setIsTimeUp(true)
-
-    if (!timeUpToastShownRef.current) {
-      timeUpToastShownRef.current = true
-      toast({
-        title: "Timpul a expirat",
-        description: "Nu mai poți trimite alte răspunsuri. Poți doar să revezi ce ai completat."
-      })
-    }
   }
 
   const goToProblemById = (problemId: string) => {
@@ -189,6 +261,7 @@ export function ContestInterface({
   }
 
   return (
+    <>
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -210,9 +283,9 @@ export function ContestInterface({
           </div>
 
           <ContestTimer
-            initialSeconds={initialRemainingSeconds}
+            initialSeconds={displayRemainingSeconds}
             label="Timp rămas"
-            onExpire={handleExpire}
+            onExpire={endContestSession}
             className="w-full justify-center lg:w-auto"
           />
         </div>
@@ -287,5 +360,14 @@ export function ContestInterface({
         </div>
       </div>
     </div>
+
+    {showPostContestRetention ? (
+      <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div className="w-full max-w-[520px]" onClick={(event) => event.stopPropagation()} role="presentation">
+          <PostContestRetentionCard />
+        </div>
+      </div>
+    ) : null}
+    </>
   )
 }
