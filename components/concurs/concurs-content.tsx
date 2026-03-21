@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
-import { Target, Layers, Users, BookOpen, ChevronDown, CheckCircle2, XCircle, Clock, FileText, Award } from "lucide-react"
+import { Target, Layers, Users, BookOpen, ChevronDown, CheckCircle2, XCircle, Clock, FileText, Award, ArrowRight } from "lucide-react"
 
 // Accordion component for grade sections
 function GradeAccordion({
@@ -157,6 +157,15 @@ export function ConcursContent() {
 
                     {/* CTA Buttons */}
                     <div className="scroll-animate-fade-up animate-delay-400 flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <Link href="/concurs/proba" prefetch={false}>
+                            <Button
+                                size="lg"
+                                className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/25 border-0 transition-all duration-300 rounded-full px-8 py-6 text-lg font-semibold"
+                            >
+                                Intră la probă
+                                <ArrowRight className="h-5 w-5" aria-hidden />
+                            </Button>
+                        </Link>
                         <Link href="/concurs/regulament">
                             <Button
                                 variant="outline"

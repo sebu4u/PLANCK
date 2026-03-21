@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState, useMemo } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
@@ -39,9 +38,7 @@ import {
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
-import { ArrowUpRight } from "lucide-react"
-
-const PHYSICS_CONTEST_DATE_LABEL = "22 martie 2026"
+import { ContestDashboardPromo } from "@/components/dashboard/contest-dashboard-promo"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -422,22 +419,10 @@ export function DashboardAuth() {
 
         {/* Content Wrapper - takes remaining width */}
         <div className="flex-1 lg:ml-[250px] h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
-          {/* Mobile-only: banner lipit de navbar, shadow-ul navbar-ului cade peste el */}
-          <Link
-            href="/concurs"
-            className="lg:hidden flex-shrink-0 block border-b border-[#d4c8e0] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-3 py-2.5"
-          >
-            <div className="flex w-full items-center justify-center gap-1.5 text-center text-[12px] font-medium text-[#4a4656] sm:text-sm">
-              <span className="font-semibold text-[#2f2a3c]">Concurs de Fizică</span>
-              <span className="text-[#8f889e]">•</span>
-              <span>{PHYSICS_CONTEST_DATE_LABEL}</span>
-              <span className="text-[#8f889e]">•</span>
-              <span className="underline decoration-[#c9bfd8] underline-offset-4 transition-colors group-hover:text-[#2f2a3c]">
-                Vezi detalii
-              </span>
-              <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </div>
-          </Link>
+          {/* Mobile-only: card concurs → /concurs/proba (fără logică de înscriere) */}
+          <div className="lg:hidden flex-shrink-0 border-b border-[#e8e8e8] bg-[#f8f9fa] p-0">
+            <ContestDashboardPromo variant="mobile" />
+          </div>
 
           {/* Floating Card Container */}
           <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-[3px]">
@@ -446,22 +431,8 @@ export function DashboardAuth() {
             <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa]">
               <main className="p-4 md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="max-w-[1000px] mx-auto">
-                  {/* Desktop: banner în zona cardurilor */}
-                  <Link
-                    href="/concurs"
-                    className="hidden lg:block group mb-4 rounded-xl border border-[#d4c8e0] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-3 py-2.5 md:mb-6 md:px-5"
-                  >
-                    <div className="flex w-full items-center justify-center gap-1.5 text-center text-[12px] font-medium text-[#4a4656] sm:text-sm">
-                      <span className="font-semibold text-[#2f2a3c]">Concurs de Fizică</span>
-                      <span className="text-[#8f889e]">•</span>
-                      <span>{PHYSICS_CONTEST_DATE_LABEL}</span>
-                      <span className="text-[#8f889e]">•</span>
-                      <span className="underline decoration-[#c9bfd8] underline-offset-4 transition-colors group-hover:text-[#2f2a3c]">
-                        Vezi detalii
-                      </span>
-                      <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                    </div>
-                  </Link>
+                  {/* Desktop: card concurs → /concurs/proba (fără logică de înscriere) */}
+                  <ContestDashboardPromo variant="desktop" />
 
                   {/* Mobile welcome */}
                   <div className="mb-4 pt-3 md:hidden">
