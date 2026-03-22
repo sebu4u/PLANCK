@@ -58,6 +58,7 @@ export function ContestInterface({
   const [showPostContestRetention, setShowPostContestRetention] = useState(false)
   const saveTimersRef = useRef<Record<string, number>>({})
   const timeUpToastShownRef = useRef(false)
+  const statusPollInFlightRef = useRef(false)
   /** O singură dată: încheiere concurs (cronometru local sau verdict server) */
   const contestEndedRef = useRef(false)
 
@@ -84,7 +85,7 @@ export function ContestInterface({
     }
   }, [])
 
-  /** Sincronizare cu serverul: când concursul activ se oprește, toți userii sunt blocați + card retenție */
+  /** Sincronizare ușoară cu serverul: verificăm doar starea concursului, nu reîncărcăm toate problemele. */
   useEffect(() => {
     if (isTimeUp) {
       return
@@ -93,41 +94,53 @@ export function ContestInterface({
     let cancelled = false
 
     const pollContest = async () => {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token
-      if (!accessToken || cancelled) {
+      if (cancelled || statusPollInFlightRef.current) {
         return
       }
 
-      const response = await fetch("/api/contest/problems", {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
+      statusPollInFlightRef.current = true
 
-      const data = (await response.json()) as {
-        contest_status?: string
-        remaining_seconds?: number
-      }
+      try {
+        const response = await fetch("/api/contest/active", {
+          cache: "no-store"
+        })
 
-      if (cancelled) {
-        return
-      }
-
-      if (response.status === 409 && data.contest_status === "ended") {
-        endContestSession()
-        return
-      }
-
-      if (response.ok && typeof data.remaining_seconds === "number") {
-        setDisplayRemainingSeconds(data.remaining_seconds)
-        if (data.remaining_seconds <= 0) {
-          endContestSession()
+        if (!response.ok || cancelled) {
+          return
         }
+
+        const data = (await response.json()) as {
+          contest?: { id?: string } | null
+          status?: string
+          remaining_seconds?: number
+        }
+
+        if (cancelled) {
+          return
+        }
+
+        const isSameContest = data.contest?.id === contest.id
+
+        if (data.status !== "active" || !isSameContest) {
+          endContestSession()
+          return
+        }
+
+        if (typeof data.remaining_seconds === "number") {
+          setDisplayRemainingSeconds(data.remaining_seconds)
+          if (data.remaining_seconds <= 0) {
+            endContestSession()
+          }
+        }
+      } catch {
+        // Lăsăm cronometrul local să continue; următoarea sincronizare va încerca din nou.
+      } finally {
+        statusPollInFlightRef.current = false
       }
     }
 
     void pollContest()
-    const intervalId = window.setInterval(() => void pollContest(), 8000)
+    const intervalId = window.setInterval(() => void pollContest(), 30000)
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -141,7 +154,7 @@ export function ContestInterface({
       window.clearInterval(intervalId)
       document.removeEventListener("visibilitychange", onVisibility)
     }
-  }, [isTimeUp, endContestSession])
+  }, [contest.id, isTimeUp, endContestSession])
 
   const currentProblem = initialProblems[currentIndex]
   const answeredCount = useMemo(
