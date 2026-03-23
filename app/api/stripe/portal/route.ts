@@ -4,7 +4,7 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getStripeClient } from "@/lib/stripe"
 import { getStripeConfig } from "@/lib/stripe-config"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
-import { findStripeCustomerIdForUser } from "@/lib/stripe-subscription"
+import { findStripeCustomerIdForUser, isStripeMissingCustomerError } from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
 
@@ -28,13 +28,50 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     const stripe = getStripeClient()
-    const recoveredCustomerId =
-      profile?.stripe_customer_id ??
-      (await findStripeCustomerIdForUser({
+    let recoveredCustomerId = profile?.stripe_customer_id ?? null
+    let hadInvalidStoredCustomer = false
+    if (recoveredCustomerId) {
+      try {
+        const customer = await stripe.customers.retrieve(recoveredCustomerId)
+        if ("deleted" in customer && customer.deleted) {
+          recoveredCustomerId = null
+          hadInvalidStoredCustomer = true
+        }
+      } catch (error) {
+        if (isStripeMissingCustomerError(error)) {
+          recoveredCustomerId = null
+          hadInvalidStoredCustomer = true
+        } else {
+          throw error
+        }
+      }
+    }
+
+    if (!recoveredCustomerId) {
+      recoveredCustomerId = await findStripeCustomerIdForUser({
         stripe,
         userId: userData.user.id,
         email: userData.user.email,
-      }))
+      })
+    }
+
+    if (hadInvalidStoredCustomer && !recoveredCustomerId) {
+      const { error: cleanupError } = await supabase
+        .from("profiles")
+        .update({
+          plan: "free",
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          stripe_subscription_status: null,
+          stripe_current_period_end: null,
+        })
+        .eq("user_id", userData.user.id)
+
+      if (cleanupError) {
+        console.warn("[stripe/portal] Failed to clear stale Stripe references:", cleanupError.message)
+      }
+    }
 
     if (!recoveredCustomerId) {
       return NextResponse.json({ error: "Nu există abonament activ." }, { status: 400 })

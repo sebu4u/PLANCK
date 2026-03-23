@@ -42,6 +42,11 @@ export const hasPortalManagedSubscription = (status: string | null | undefined) 
   return PORTAL_MANAGED_SUBSCRIPTION_STATUSES.has(status)
 }
 
+export const isStripeMissingCustomerError = (error: unknown): boolean => {
+  const message = typeof error === "object" && error && "message" in error ? String(error.message) : ""
+  return /no such customer/i.test(message)
+}
+
 export const findStripeCustomerIdForUser = async ({
   stripe,
   userId,
@@ -73,7 +78,18 @@ export const getOrCreateStripeCustomerId = async ({
   existingCustomerId?: string | null
 }) => {
   if (existingCustomerId) {
-    return existingCustomerId
+    try {
+      const customer = await stripe.customers.retrieve(existingCustomerId)
+      if ("deleted" in customer && customer.deleted) {
+        // Deleted customers cannot be used for new checkout sessions.
+      } else {
+        return existingCustomerId
+      }
+    } catch (error) {
+      if (!isStripeMissingCustomerError(error)) {
+        throw error
+      }
+    }
   }
 
   const matchedCustomerId = await findStripeCustomerIdForUser({

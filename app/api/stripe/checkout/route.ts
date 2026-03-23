@@ -6,7 +6,11 @@ import { getStripeConfig } from "@/lib/stripe-config"
 import { normalizeSubscriptionPlan } from "@/lib/subscription-plan"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
-import { getOrCreateStripeCustomerId, hasPortalManagedSubscription } from "@/lib/stripe-subscription"
+import {
+  getOrCreateStripeCustomerId,
+  hasPortalManagedSubscription,
+  isStripeMissingCustomerError,
+} from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
 
@@ -100,27 +104,55 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle()
 
+    let existingCustomerId = profile?.stripe_customer_id ?? null
     const existingStatus = profile?.stripe_subscription_status ?? null
-    if (profile?.stripe_customer_id && hasPortalManagedSubscription(existingStatus)) {
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: profile.stripe_customer_id,
-        return_url: `${siteUrl}/pricing`,
-      })
+    if (existingCustomerId && hasPortalManagedSubscription(existingStatus)) {
+      try {
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: existingCustomerId,
+          return_url: `${siteUrl}/pricing`,
+        })
 
-      return NextResponse.json({
-        url: portalSession.url,
-        flow: "portal",
-      })
+        return NextResponse.json({
+          url: portalSession.url,
+          flow: "portal",
+        })
+      } catch (error) {
+        if (!isStripeMissingCustomerError(error)) {
+          throw error
+        }
+
+        console.warn(
+          `[stripe/checkout] Stored customer ${existingCustomerId} not found in current mode; recreating customer.`
+        )
+        existingCustomerId = null
+
+        const { error: cleanupError } = await supabase
+          .from("profiles")
+          .update({
+            plan: "free",
+            stripe_customer_id: null,
+            stripe_subscription_id: null,
+            stripe_price_id: null,
+            stripe_subscription_status: null,
+            stripe_current_period_end: null,
+          })
+          .eq("user_id", user.id)
+
+        if (cleanupError) {
+          console.warn("[stripe/checkout] Failed to clear stale Stripe references:", cleanupError.message)
+        }
+      }
     }
 
     const stripeCustomerId = await getOrCreateStripeCustomerId({
       stripe,
       userId: user.id,
       email: user.email,
-      existingCustomerId: profile?.stripe_customer_id ?? null,
+      existingCustomerId,
     })
 
-    if (stripeCustomerId !== profile?.stripe_customer_id) {
+    if (stripeCustomerId !== existingCustomerId) {
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ stripe_customer_id: stripeCustomerId })
