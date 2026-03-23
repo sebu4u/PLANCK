@@ -124,11 +124,14 @@ export default function InsightChatSidebar({
   const abortControllerRef = useRef<AbortController | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+  const [followStreamToLatest, setFollowStreamToLatest] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
   const [problemContext, setProblemContext] = useState<string | null>(null)
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
   const [limitResetTime, setLimitResetTime] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const pendingStreamAnchorRef = useRef(false)
+  const streamingAssistantRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
@@ -199,6 +202,14 @@ export default function InsightChatSidebar({
       }
     }
   }, [isMobile, isOpen])
+
+  useEffect(() => {
+    if (isOpen) return
+    pendingStreamAnchorRef.current = false
+    streamingAssistantRef.current = null
+    setShouldAutoScroll(true)
+    setFollowStreamToLatest(false)
+  }, [isOpen])
 
 
   const markdownComponents = useMemo(
@@ -312,8 +323,37 @@ export default function InsightChatSidebar({
     }
   }
 
-  // Check if chat has messages (excluding system message)
-  const hasMessages = messages.filter((m) => m.role !== 'system').length > 0
+  const visibleMessages = useMemo(
+    () => messages.filter((m) => m.role !== 'system'),
+    [messages]
+  )
+  const hasMessages = visibleMessages.length > 0
+  const userMessagesCount = visibleMessages.filter((m) => m.role === 'user').length
+  const hasSolutionRequest = visibleMessages.some(
+    (m) => m.role === 'user' && m.content === "Vreau să văd soluția completă."
+  )
+  const lastVisibleMessage = visibleMessages.length > 0
+    ? visibleMessages[visibleMessages.length - 1]
+    : null
+  const lastAssistantMessageIndex = useMemo(() => {
+    for (let i = visibleMessages.length - 1; i >= 0; i--) {
+      if (visibleMessages[i]?.role === 'assistant') return i
+    }
+    return -1
+  }, [visibleMessages])
+  const canShowSuggestions =
+    !busy &&
+    suggestedQuestions.length > 0 &&
+    lastVisibleMessage?.role === 'assistant' &&
+    !hasSolutionRequest
+  const canShowSolutionButton =
+    persona === 'problem_tutor' &&
+    userMessagesCount >= 3 &&
+    !hasSolutionRequest &&
+    !busy
+  const shouldShowJumpToLatest =
+    hasMessages &&
+    ((isStreaming && !followStreamToLatest) || (!isStreaming && !shouldAutoScroll))
 
   // Initialize session when sidebar opens
   useEffect(() => {
@@ -430,14 +470,52 @@ export default function InsightChatSidebar({
   const handleScroll = useCallback(() => {
     const isAtBottom = checkIfAtBottom()
     setShouldAutoScroll(isAtBottom)
-  }, [checkIfAtBottom])
+    // During streaming, follow mode should only be user-explicit (jump button),
+    // not re-enabled implicitly by intermediate scroll events.
+    if (isStreaming && followStreamToLatest && !isAtBottom) {
+      setFollowStreamToLatest(false)
+    }
+  }, [checkIfAtBottom, isStreaming, followStreamToLatest])
+
+  const scrollToLatest = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      const container = messagesContainerRef.current
+      if (!container) return
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior,
+      })
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (!isOpen || !isStreaming || !pendingStreamAnchorRef.current) return
+
+    const container = messagesContainerRef.current
+    const anchorElement = streamingAssistantRef.current
+    if (!container || !anchorElement) return
+
+    const containerRect = container.getBoundingClientRect()
+    const anchorRect = anchorElement.getBoundingClientRect()
+    const targetScrollTop = container.scrollTop + (anchorRect.top - containerRect.top) - 8
+
+    container.scrollTo({
+      top: Math.max(0, targetScrollTop),
+      behavior: 'auto',
+    })
+    setShouldAutoScroll(false)
+    setFollowStreamToLatest(false)
+    pendingStreamAnchorRef.current = false
+  }, [isOpen, isStreaming, messages])
 
   // Auto-scroll to bottom only when user is already at bottom
   useEffect(() => {
-    if (isOpen && shouldAutoScroll) {
-      endRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages, busy, isOpen, shouldAutoScroll])
+    if (!isOpen || !shouldAutoScroll) return
+    if (isStreaming && !followStreamToLatest) return
+
+    scrollToLatest(isStreaming ? 'auto' : 'smooth')
+  }, [messages, busy, isOpen, shouldAutoScroll, isStreaming, followStreamToLatest, scrollToLatest])
 
   // Function to adjust textarea height
   const adjustTextareaHeight = useCallback(() => {
@@ -538,7 +616,8 @@ export default function InsightChatSidebar({
       setMessages((prev) => [...prev, newUserMsg])
       if (!textOverride) setInput('')
       setProblemContext(null) // Clear context after it's sent
-      setShouldAutoScroll(true) // Ensure we auto-scroll for the new response
+      setShouldAutoScroll(true)
+      setFollowStreamToLatest(false)
 
       // If no session, create one with problem title
       let currentSessionId = sessionId
@@ -565,6 +644,8 @@ export default function InsightChatSidebar({
       }
 
       // Add empty assistant message that will be updated incrementally
+      streamingAssistantRef.current = null
+      pendingStreamAnchorRef.current = true
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
       // Set random loading message
@@ -596,6 +677,7 @@ export default function InsightChatSidebar({
         // Remove the empty assistant message we added tentatively
         setMessages((prev) => prev.slice(0, -1))
 
+        pendingStreamAnchorRef.current = false
         setBusy(false)
         setIsStreaming(false)
         return
@@ -728,8 +810,10 @@ export default function InsightChatSidebar({
       })
     } finally {
       abortControllerRef.current = null
+      pendingStreamAnchorRef.current = false
       setBusy(false)
       setIsStreaming(false)
+      setFollowStreamToLatest(false)
     }
   }
 
@@ -794,8 +878,10 @@ export default function InsightChatSidebar({
     }
 
     setIsStreaming(false)
+    setFollowStreamToLatest(false)
     setBusy(false)
     setLoadingMessage(null)
+    pendingStreamAnchorRef.current = false
 
     if (!user) return
 
@@ -882,7 +968,7 @@ export default function InsightChatSidebar({
         <div
           ref={messagesContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 py-6 overscroll-contain"
+          className="insight-chat-scroll flex-1 overflow-y-auto px-3 py-5 pb-36 sm:px-4 sm:py-6 sm:pb-40 lg:px-5 overscroll-contain"
         >
           {!user ? (
             <div className="flex flex-col items-center justify-center h-full">
@@ -930,48 +1016,37 @@ export default function InsightChatSidebar({
               </div>
             </div>
           ) : hasMessages ? (
-            <div className="space-y-4">
-              {messages
-                .filter((m) => m.role !== 'system')
-                .map((m, i) => {
-                  const isAssistant = m.role === 'assistant'
-                  return (
-                    <div
-                      key={i}
-                      className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
-                    >
-                      {isAssistant ? (
-                        <div className="w-full py-2">
-                          <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">
-                            {m.content === '' && loadingMessage ? (
-                              <span className="flex items-center gap-2">
-                                <span className="shimmer-text">{loadingMessage}</span>
-                                <span className="flex gap-1">
-                                  <span className="animate-pulse">●</span>
-                                  <span className="animate-pulse delay-75">●</span>
-                                  <span className="animate-pulse delay-150">●</span>
-                                </span>
+            <div className="space-y-5">
+              {visibleMessages.map((m, i) => {
+                const isAssistant = m.role === 'assistant'
+                const isStreamingAssistant = isAssistant && i === lastAssistantMessageIndex
+                return (
+                  <div
+                    key={i}
+                    className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
+                  >
+                    {isAssistant ? (
+                      <div
+                        ref={isStreamingAssistant ? (node) => {
+                          streamingAssistantRef.current = node
+                        } : undefined}
+                        className="w-full py-1.5"
+                      >
+                        <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                          {m.content === '' && loadingMessage ? (
+                            <span className="flex items-center gap-2">
+                              <span className="shimmer-text">{loadingMessage}</span>
+                              <span className="flex gap-1">
+                                <span className="animate-pulse">●</span>
+                                <span className="animate-pulse delay-75">●</span>
+                                <span className="animate-pulse delay-150">●</span>
                               </span>
-                            ) : (
-                              'Insight'
-                            )}
-                          </div>
-                          {m.content && (
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm, remarkMath]}
-                              rehypePlugins={[rehypeKatex]}
-                              components={markdownComponents}
-                              className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
-                            >
-                              {m.content}
-                            </ReactMarkdown>
+                            </span>
+                          ) : (
+                            'Insight'
                           )}
                         </div>
-                      ) : (
-                        <div className="max-w-[70%] rounded-2xl bg-[#212121] text-white px-4 py-3 shadow-sm">
-                          <div className="text-xs uppercase tracking-wide text-gray-400 mb-2 opacity-70">
-                            Tu
-                          </div>
+                        {m.content && (
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm, remarkMath]}
                             rehypePlugins={[rehypeKatex]}
@@ -980,19 +1055,30 @@ export default function InsightChatSidebar({
                           >
                             {m.content}
                           </ReactMarkdown>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="max-w-[82%] lg:max-w-[74%] rounded-2xl bg-[#212121] text-white px-4 py-3.5 shadow-sm">
+                        <div className="text-xs uppercase tracking-wide text-gray-400 mb-2 opacity-70">
+                          Tu
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
+                          components={markdownComponents}
+                          className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
               <div ref={endRef} />
 
               {/* Show suggestions if available and not busy */}
-              {!busy &&
-                suggestedQuestions.length > 0 &&
-                messages.filter(m => m.role !== 'system').length > 0 &&
-                messages.filter(m => m.role !== 'system')[messages.filter(m => m.role !== 'system').length - 1]?.role === 'assistant' &&
-                !messages.some(m => m.role === 'user' && m.content === "Vreau să văd soluția completă.") && (
+              {canShowSuggestions && (
                   <SuggestedQuestions
                     questions={suggestedQuestions}
                     onSelect={handleSuggestionSelect}
@@ -1013,20 +1099,39 @@ export default function InsightChatSidebar({
 
         {/* Error message */}
         {error && (
-          <div className="px-4 pb-2">
-            <div className="bg-red-900/20 border border-red-800 text-red-300 rounded p-2 text-sm">
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 px-4">
+            <div className="pointer-events-auto bg-red-900/20 border border-red-800 text-red-300 rounded p-2 text-sm">
               {error}
             </div>
           </div>
         )}
 
-        {/* Chatbox Area */}
-        <div className="p-4">
-          <div className="flex flex-col relative w-full">
+        {/* Chatbox Area — single bottom fade: must use black/alpha so it’s visible over #101010 */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 isolate p-4">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-44 sm:h-52 bg-gradient-to-t from-black/90 via-black/50 to-transparent"
+          />
+          <div className="pointer-events-auto relative z-10 flex w-full flex-col">
             {limitResetTime ? (
               <LimitReachedBanner resetTime={limitResetTime} />
             ) : (
               <>
+                {shouldShowJumpToLatest && (
+                  <div className="pointer-events-none absolute -top-12 right-0 z-20">
+                    <button
+                      onClick={() => {
+                        setShouldAutoScroll(true)
+                        setFollowStreamToLatest(true)
+                        scrollToLatest(isStreaming ? 'auto' : 'smooth')
+                      }}
+                      className="pointer-events-auto rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                      Vezi ultimele mesaje
+                    </button>
+                  </div>
+                )}
+
                 {/* Context Card */}
                 {problemContext && !busy && (
                   <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -1047,10 +1152,7 @@ export default function InsightChatSidebar({
                 )}
 
                 {/* Solution Request Button */}
-                {persona === 'problem_tutor' &&
-                  messages.filter(m => m.role === 'user').length >= 3 &&
-                  !messages.some(m => m.role === 'user' && m.content === "Vreau să văd soluția completă.") &&
-                  !busy && (
+                {canShowSolutionButton && (
                     <div className="flex justify-end mb-0">
                       <button
                         onClick={() => submitMessage("Vreau să văd soluția completă.")}
@@ -1062,9 +1164,9 @@ export default function InsightChatSidebar({
                   )}
 
                 {/* Input Area */}
-                <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-3 shadow-lg transition-all duration-200 ${problemContext
+                <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-2.5 sm:p-3 shadow-lg transition-all duration-200 ${problemContext
                   ? 'rounded-b-2xl rounded-t-none border-t-0'
-                  : (persona === 'problem_tutor' && messages.filter(m => m.role === 'user').length >= 3 && !messages.some(m => m.role === 'user' && m.content === "Vreau să văd soluția completă.") && !busy)
+                  : canShowSolutionButton
                     ? 'rounded-b-2xl rounded-tr-none rounded-tl-2xl border-t-0'
                     : 'rounded-2xl'
                   }`}>

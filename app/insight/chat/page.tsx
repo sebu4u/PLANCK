@@ -1219,21 +1219,21 @@ function InsightChatPageContent() {
     <div className="h-screen-mobile bg-[#141414] text-white flex overflow-hidden">
       <style dangerouslySetInnerHTML={{__html: `
         .sidebar-scrollable::-webkit-scrollbar {
-          width: 6px;
+          width: 3px;
         }
         .sidebar-scrollable::-webkit-scrollbar-track {
           background: transparent;
         }
         .sidebar-scrollable::-webkit-scrollbar-thumb {
-          background: #2f2f2f;
-          border-radius: 3px;
+          background: rgba(255, 255, 255, 0.14);
+          border-radius: 9999px;
         }
         .sidebar-scrollable::-webkit-scrollbar-thumb:hover {
-          background: #3f3f3f;
+          background: rgba(255, 255, 255, 0.28);
         }
         .sidebar-scrollable {
           scrollbar-width: thin;
-          scrollbar-color: #2f2f2f transparent;
+          scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
         }
       `}} />
       {/* Sidebar */}
@@ -1585,7 +1585,10 @@ function InsightChatPageContent() {
         )}
 
         {/* Messages */}
-        <div className={`flex-1 overflow-y-auto ${hasMessages ? 'px-8 py-6' : 'px-8'}`} style={{ minHeight: 0 }}>
+        <div
+          className={`insight-chat-scroll flex-1 overflow-y-auto ${hasMessages ? 'px-8 py-6' : 'px-8'}`}
+          style={{ minHeight: 0 }}
+        >
           {hasMessages ? (
             <div className="max-w-3xl mx-auto space-y-4">
               {messages
