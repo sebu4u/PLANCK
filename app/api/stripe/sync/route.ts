@@ -58,11 +58,19 @@ export async function POST(req: NextRequest) {
 
     const customerId = resolveCustomerId(session.customer)
     const stripeMode = resolveStripeModeFromLivemode(session.livemode)
-    await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
+    await updateProfileFromSubscription(subscription, customerId, userId, stripeMode, supabase)
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {
     console.error("[stripe/sync] Error:", error)
-    return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
+    const message = String(error?.message || "")
+    if (message.toLowerCase().includes("missing supabase service role configuration")) {
+      return NextResponse.json(
+        { error: "Configurare server incompletă: lipsește SUPABASE_SERVICE_ROLE_KEY." },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ error: "Eroare internă la sincronizarea abonamentului." }, { status: 500 })
   }
 }

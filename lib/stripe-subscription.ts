@@ -1,7 +1,7 @@
 import "server-only"
 
 import type Stripe from "stripe"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
 import {
   getStripePrices,
@@ -122,9 +122,22 @@ export const updateProfileFromSubscription = async (
   subscription: Stripe.Subscription,
   customerId: string | null,
   userId?: string | null,
-  mode?: StripeMode
+  mode?: StripeMode,
+  fallbackSupabase?: SupabaseClient
 ) => {
-  const supabase = getSupabaseAdmin()
+  let supabase: SupabaseClient
+  try {
+    supabase = getSupabaseAdmin()
+  } catch (error) {
+    if (!fallbackSupabase) {
+      throw error
+    }
+    // Fallback for post-checkout sync when service role is missing.
+    // Webhooks still require service role and should be fixed in env config.
+    console.warn("[stripe] Falling back to authenticated Supabase client for profile sync.")
+    supabase = fallbackSupabase
+  }
+
   const effectiveMode = mode ?? resolveStripeModeFromLivemode(subscription.livemode)
   const prices = getStripePrices(effectiveMode)
   const priceId = subscription.items.data[0]?.price?.id ?? null
@@ -155,11 +168,25 @@ export const updateProfileFromSubscription = async (
   }
 
   if (userId) {
-    await supabase.from("profiles").update(updatePayload).eq("user_id", userId)
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          user_id: userId,
+          ...updatePayload,
+        },
+        { onConflict: "user_id" }
+      )
+    if (error) {
+      throw new Error(`[stripe] Failed to update profile by user ID: ${error.message}`)
+    }
     return
   }
 
   if (customerId) {
-    await supabase.from("profiles").update(updatePayload).eq("stripe_customer_id", customerId)
+    const { error } = await supabase.from("profiles").update(updatePayload).eq("stripe_customer_id", customerId)
+    if (error) {
+      throw new Error(`[stripe] Failed to update profile by customer ID: ${error.message}`)
+    }
   }
 }
