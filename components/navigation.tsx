@@ -432,8 +432,9 @@ export function Navigation() {
   const navHoverBg = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
-  const showBanner = !isHomepage && !isSpaceRoute && !isDashboard && !isProblemsCatalog && !isPlanckCodeRoute && !isProblemPage
+  const showBanner = !isHomepage && !isSpaceRoute && !isDashboard && !isProblemsCatalog && !isPlanckCodeRoute && !isProblemPage && !isCoursePage
   const navDropShadowOnDesktop = pathname?.startsWith('/invata') || (isProblemPage && !isProblemsCatalog)
+  const showGoPremiumCta = subscriptionPlan !== "plus" && subscriptionPlan !== "premium"
 
   return (
     <>
@@ -483,6 +484,11 @@ export function Navigation() {
                       <DropdownMenuItem asChild>
                         <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
                       </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                          Abonament
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
                       {user ? (
                         <DropdownMenuItem asChild>
@@ -520,8 +526,8 @@ export function Navigation() {
 
                 <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
                   <Link
-                    href="/invata"
-                    className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    href="/cursuri"
+                    className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${pathname?.startsWith('/cursuri') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                   >
                     <BookOpen size={16} />
                     Învață
@@ -573,11 +579,13 @@ export function Navigation() {
                   <kbd className={`px-1.5 py-0.5 text-xs ${useLightNav ? 'bg-gray-200 border-gray-300' : 'bg-white/10 border-white/10'} border rounded`}>/</kbd>
                 </button>
 
-                <Link href="/pricing" className="group inline-flex rounded-full bg-gradient-to-r from-[#9a7bff] via-[#d77bff] to-[#ffb56b] p-[1px]">
-                  <span className="inline-flex h-9 items-center rounded-full bg-white px-5 text-sm font-semibold text-[#2f236f] transition-colors group-hover:bg-[#f8f5ff]">
-                    Go Premium
-                  </span>
-                </Link>
+                {showGoPremiumCta && (
+                  <Link href="/pricing" className="group inline-flex rounded-full bg-gradient-to-r from-[#9a7bff] via-[#d77bff] to-[#ffb56b] p-[1px]">
+                    <span className="inline-flex h-9 items-center rounded-full bg-white px-5 text-sm font-semibold text-[#2f236f] transition-colors group-hover:bg-[#f8f5ff]">
+                      Go Premium
+                    </span>
+                  </Link>
+                )}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -591,6 +599,11 @@ export function Navigation() {
                   <DropdownMenuContent align="end" sideOffset={12} className={`z-[400] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                     <DropdownMenuItem asChild>
                       <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                        Abonament
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
                     {user ? (
