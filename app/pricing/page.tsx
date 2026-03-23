@@ -34,6 +34,9 @@ function PricingPageContent() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
   const purchasesEnabled = canPurchaseSubscriptions()
+  const hasPaidSubscription = subscriptionPlan === "plus" || subscriptionPlan === "premium"
+  const currentPlanRank =
+    subscriptionPlan === "premium" ? 2 : subscriptionPlan === "plus" ? 1 : 0
 
   // Generate stable star positions only on client
   const stars = useMemo(() => {
@@ -394,7 +397,7 @@ function PricingPageContent() {
 
         {/* Content Area */}
         <div className="w-full max-w-7xl mx-auto">
-          {user && subscriptionPlan !== "free" && (
+          {user && hasPaidSubscription && (
             <div className="flex justify-center mb-8">
               <button
                 onClick={openBillingPortal}
@@ -421,7 +424,12 @@ function PricingPageContent() {
                     const isCurrentPlan = subscriptionPlan === plan.id
                     const isPaidPlan = plan.id === "plus" || plan.id === "premium"
                     const isCheckoutLoading = checkoutLoadingPlan === plan.id
-                    const isPaidPlanPurchaseDisabled = isPaidPlan && !purchasesEnabled
+                    const planRank =
+                      plan.id === "premium" ? 2 : plan.id === "plus" ? 1 : 0
+                    const shouldManageInPortal = isPaidPlan && hasPaidSubscription
+                    const isHigherTierThanCurrent = planRank > currentPlanRank
+                    const isPaidPlanPurchaseDisabled = isPaidPlan && !purchasesEnabled && !hasPaidSubscription
+                    const isActionLoading = isCheckoutLoading || (shouldManageInPortal && portalLoading)
 
                     return (
                       <div
@@ -474,15 +482,20 @@ function PricingPageContent() {
                         </ul>
 
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (isPaidPlanPurchaseDisabled) return
                             if (plan.id === "plus" || plan.id === "premium") {
-                              startCheckout(plan.id as "plus" | "premium")
+                              if (shouldManageInPortal) {
+                                await openBillingPortal()
+                                return
+                              }
+
+                              await startCheckout(plan.id as "plus" | "premium")
                             } else if (plan.id === "free") {
                               router.push('/probleme')
                             }
                           }}
-                          disabled={isCurrentPlan || isCheckoutLoading || isPaidPlanPurchaseDisabled}
+                          disabled={(plan.id === "free" && isCurrentPlan) || isActionLoading || isPaidPlanPurchaseDisabled}
                           className={cn(
                             "w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                             plan.highlight
@@ -490,17 +503,34 @@ function PricingPageContent() {
                               : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
                           )}
                         >
-                          {isCheckoutLoading ? (
+                          {isActionLoading ? (
                             <span className="inline-flex items-center gap-2">
                               <Loader2 className="w-4 h-4 animate-spin" />
                               Se deschide...
                             </span>
-                          ) : isPaidPlan && isPaidPlanPurchaseDisabled ? "Indisponibil momentan" : isPaidPlan && isCurrentPlan ? "Planul tău curent" : plan.cta}
+                          ) : isPaidPlan && isPaidPlanPurchaseDisabled ? (
+                            "Indisponibil momentan"
+                          ) : isPaidPlan && shouldManageInPortal && isCurrentPlan ? (
+                            "Gestionează planul"
+                          ) : isPaidPlan && shouldManageInPortal && isHigherTierThanCurrent ? (
+                            "Upgrade din portal"
+                          ) : isPaidPlan && shouldManageInPortal ? (
+                            "Schimbă din portal"
+                          ) : isCurrentPlan ? (
+                            "Planul tău curent"
+                          ) : (
+                            plan.cta
+                          )}
                         </button>
                       </div>
                     )
                   })}
                 </div>
+
+                <p className="text-center text-sm text-gray-400 mb-8 max-w-2xl">
+                  Achiziția inițială se face prin Stripe Checkout, iar upgrade-ul, downgrade-ul și anularea
+                  abonamentului se gestionează securizat din portalul Stripe.
+                </p>
 
                 {/* Slider Section - Below Cards */}
                 <div className="flex items-center gap-4 bg-[#151619] px-6 py-3 rounded-full border border-white/5 shadow-xl">

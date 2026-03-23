@@ -6,6 +6,7 @@ import { getStripeConfig } from "@/lib/stripe-config"
 import { normalizeSubscriptionPlan } from "@/lib/subscription-plan"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
+import { getOrCreateStripeCustomerId, hasPortalManagedSubscription } from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
 
@@ -95,19 +96,31 @@ export async function POST(req: NextRequest) {
     const user = userData.user
     const { data: profile } = await supabase
       .from("profiles")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, stripe_subscription_status")
       .eq("user_id", user.id)
       .maybeSingle()
 
-    let stripeCustomerId = profile?.stripe_customer_id ?? null
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: user.email || undefined,
-        metadata: {
-          user_id: user.id,
-        },
+    const existingStatus = profile?.stripe_subscription_status ?? null
+    if (profile?.stripe_customer_id && hasPortalManagedSubscription(existingStatus)) {
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: profile.stripe_customer_id,
+        return_url: `${siteUrl}/pricing`,
       })
-      stripeCustomerId = customer.id
+
+      return NextResponse.json({
+        url: portalSession.url,
+        flow: "portal",
+      })
+    }
+
+    const stripeCustomerId = await getOrCreateStripeCustomerId({
+      stripe,
+      userId: user.id,
+      email: user.email,
+      existingCustomerId: profile?.stripe_customer_id ?? null,
+    })
+
+    if (stripeCustomerId !== profile?.stripe_customer_id) {
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ stripe_customer_id: stripeCustomerId })

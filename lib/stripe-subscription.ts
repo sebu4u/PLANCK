@@ -3,9 +3,23 @@ import "server-only"
 import type Stripe from "stripe"
 import { createClient } from "@supabase/supabase-js"
 
-import { getStripeConfig, resolvePlanFromPriceId } from "@/lib/stripe-config"
+import {
+  getStripePrices,
+  resolvePlanFromPriceId,
+  resolveStripeModeFromLivemode,
+  type StripeMode,
+} from "@/lib/stripe-config"
 
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"])
+const ENTITLED_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"])
+const PORTAL_MANAGED_SUBSCRIPTION_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+  "paused",
+  "incomplete",
+  "incomplete_expired",
+])
 
 export const getSupabaseAdmin = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -23,18 +37,87 @@ export const resolveCustomerId = (
   return typeof customer === "string" ? customer : customer.id
 }
 
+export const hasPortalManagedSubscription = (status: string | null | undefined) => {
+  if (!status) return false
+  return PORTAL_MANAGED_SUBSCRIPTION_STATUSES.has(status)
+}
+
+export const findStripeCustomerIdForUser = async ({
+  stripe,
+  userId,
+  email,
+}: {
+  stripe: Stripe
+  userId: string
+  email?: string | null
+}) => {
+  if (!email) return null
+
+  const customers = await stripe.customers.list({
+    email,
+    limit: 10,
+  })
+
+  return customers.data.find((customer) => customer.metadata?.user_id === userId)?.id ?? customers.data[0]?.id ?? null
+}
+
+export const getOrCreateStripeCustomerId = async ({
+  stripe,
+  userId,
+  email,
+  existingCustomerId,
+}: {
+  stripe: Stripe
+  userId: string
+  email?: string | null
+  existingCustomerId?: string | null
+}) => {
+  if (existingCustomerId) {
+    return existingCustomerId
+  }
+
+  const matchedCustomerId = await findStripeCustomerIdForUser({
+    stripe,
+    userId,
+    email,
+  })
+
+  if (matchedCustomerId) {
+    await stripe.customers.update(matchedCustomerId, {
+      email: email || undefined,
+      metadata: {
+        user_id: userId,
+      },
+    })
+    return matchedCustomerId
+  }
+
+  const customer = await stripe.customers.create({
+    email: email || undefined,
+    metadata: {
+      user_id: userId,
+    },
+  })
+
+  return customer.id
+}
+
 export const updateProfileFromSubscription = async (
   subscription: Stripe.Subscription,
   customerId: string | null,
-  userId?: string | null
+  userId?: string | null,
+  mode?: StripeMode
 ) => {
   const supabase = getSupabaseAdmin()
-  const { prices } = getStripeConfig()
+  const effectiveMode = mode ?? resolveStripeModeFromLivemode(subscription.livemode)
+  const prices = getStripePrices(effectiveMode)
   const priceId = subscription.items.data[0]?.price?.id ?? null
   const plan = resolvePlanFromPriceId(priceId, prices)
   const status = subscription.status
-  const currentPeriodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
+  const rawCurrentPeriodEnd =
+    (subscription as Stripe.Subscription & { current_period_end?: number | null }).current_period_end ?? null
+  const currentPeriodEnd = rawCurrentPeriodEnd
+    ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
     : null
 
   const updatePayload: Record<string, any> = {
@@ -45,7 +128,7 @@ export const updateProfileFromSubscription = async (
     stripe_current_period_end: currentPeriodEnd,
   }
 
-  if (ACTIVE_SUBSCRIPTION_STATUSES.has(status)) {
+  if (ENTITLED_SUBSCRIPTION_STATUSES.has(status)) {
     if (plan) {
       updatePayload.plan = plan
     } else {

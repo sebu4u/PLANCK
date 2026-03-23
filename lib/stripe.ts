@@ -2,17 +2,22 @@ import "server-only"
 
 import Stripe from "stripe"
 
-import { getStripeSecretKey } from "@/lib/stripe-config"
+import { getStripeMode, getStripeSecretKey, type StripeMode } from "@/lib/stripe-config"
 
-let stripeClient: Stripe | null = null
+const stripeClients = new Map<StripeMode, Stripe>()
 
-export const getStripeClient = () => {
-  if (stripeClient) return stripeClient
-  const secretKey = getStripeSecretKey()
+export const getStripeClient = (mode?: StripeMode) => {
+  const resolvedMode = mode ?? getStripeMode()
+  const cachedClient = stripeClients.get(resolvedMode)
+  if (cachedClient) return cachedClient
+
+  const secretKey = getStripeSecretKey(resolvedMode)
   // Server client is used for Checkout/Billing orchestration only.
   // Raw card details must never be handled by this API.
-  stripeClient = new Stripe(secretKey, {
+  const stripeClient = new Stripe(secretKey, {
     typescript: true,
   })
+
+  stripeClients.set(resolvedMode, stripeClient)
   return stripeClient
 }

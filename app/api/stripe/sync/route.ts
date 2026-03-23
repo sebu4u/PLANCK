@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
 import { getStripeClient } from "@/lib/stripe"
+import { resolveStripeModeFromLivemode } from "@/lib/stripe-config"
 import { updateProfileFromSubscription, resolveCustomerId } from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
@@ -40,6 +41,10 @@ export async function POST(req: NextRequest) {
       expand: ["subscription", "subscription.items.data.price"],
     })
 
+    if (session.mode !== "subscription") {
+      return NextResponse.json({ error: "Sesiunea nu este pentru abonament." }, { status: 400 })
+    }
+
     const userId = userData.user.id
     const sessionUserId = session.metadata?.user_id || session.client_reference_id
     if (sessionUserId && sessionUserId !== userId) {
@@ -52,7 +57,8 @@ export async function POST(req: NextRequest) {
     }
 
     const customerId = resolveCustomerId(session.customer)
-    await updateProfileFromSubscription(subscription, customerId, userId)
+    const stripeMode = resolveStripeModeFromLivemode(session.livemode)
+    await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {

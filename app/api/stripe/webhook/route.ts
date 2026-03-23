@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type Stripe from "stripe"
 
 import { getStripeClient } from "@/lib/stripe"
-import { getStripeWebhookSecrets } from "@/lib/stripe-config"
+import { getStripeWebhookSecretEntries, type StripeMode } from "@/lib/stripe-config"
 import {
   getSupabaseAdmin,
   resolveCustomerId,
@@ -27,14 +27,26 @@ const recordWebhookEvent = async (eventId: string) => {
   throw error
 }
 
-const resolveSubscriptionId = (value: Stripe.Checkout.Session["subscription"] | Stripe.Invoice["subscription"]) => {
+const resolveSubscriptionId = (value: unknown) => {
   if (!value) return null
-  return typeof value === "string" ? value : value.id
+  if (typeof value === "string") return value
+  if (typeof value === "object" && "id" in value && typeof value.id === "string") {
+    return value.id
+  }
+  return null
+}
+
+const resolveInvoiceSubscriptionId = (invoice: Stripe.Invoice) => {
+  const legacySubscription = (invoice as Stripe.Invoice & { subscription?: unknown }).subscription
+  const nestedSubscription = (invoice as Stripe.Invoice & {
+    parent?: { subscription_details?: { subscription?: unknown } | null } | null
+  }).parent?.subscription_details?.subscription
+
+  return resolveSubscriptionId(legacySubscription ?? nestedSubscription ?? null)
 }
 
 export async function POST(req: NextRequest) {
-  const stripe = getStripeClient()
-  const webhookSecrets = getStripeWebhookSecrets()
+  const webhookSecretEntries = getStripeWebhookSecretEntries()
 
   const signature = req.headers.get("stripe-signature")
   if (!signature) {
@@ -43,11 +55,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.text()
   let event: Stripe.Event | null = null
+  let verifiedMode: StripeMode | null = null
   let signatureError: unknown = null
 
-  for (const secret of webhookSecrets) {
+  for (const entry of webhookSecretEntries) {
     try {
-      event = stripe.webhooks.constructEvent(body, signature, secret)
+      const stripe = getStripeClient(entry.mode)
+      event = stripe.webhooks.constructEvent(body, signature, entry.secret)
+      verifiedMode = entry.mode
       signatureError = null
       break
     } catch (err) {
@@ -60,6 +75,9 @@ export async function POST(req: NextRequest) {
     console.error("[stripe/webhook] Signature error:", err?.message || err)
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 })
   }
+
+  const stripeMode = verifiedMode ?? (event.livemode ? "live" : "test")
+  const stripe = getStripeClient(stripeMode)
 
   try {
     const shouldProcess = await recordWebhookEvent(event.id)
@@ -80,7 +98,7 @@ export async function POST(req: NextRequest) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
             expand: ["items.data.price"],
           })
-          await updateProfileFromSubscription(subscription, customerId, userId)
+          await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
         } else if (userId && customerId) {
           const supabase = getSupabaseAdmin()
           await supabase
@@ -96,19 +114,20 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = resolveCustomerId(subscription.customer)
         const userId = subscription.metadata?.user_id || null
-        await updateProfileFromSubscription(subscription, customerId, userId)
+        await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
         break
       }
+      case "invoice.paid":
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = resolveSubscriptionId(invoice.subscription)
+        const subscriptionId = resolveInvoiceSubscriptionId(invoice)
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
             expand: ["items.data.price"],
           })
           const customerId = resolveCustomerId(subscription.customer)
           const userId = subscription.metadata?.user_id || null
-          await updateProfileFromSubscription(subscription, customerId, userId)
+          await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
         }
         break
       }

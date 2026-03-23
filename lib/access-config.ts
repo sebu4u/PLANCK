@@ -50,7 +50,7 @@ export const ALLOW_ALL_CODING_PROBLEMS = true
  * TO RE-ENABLE PURCHASES:
  * Set this flag to `true` and redeploy.
  */
-export const ALLOW_SUBSCRIPTION_PURCHASES = false
+export const ALLOW_SUBSCRIPTION_PURCHASES = true
 
 // ============================================================================
 // HELPER FUNCTIONS

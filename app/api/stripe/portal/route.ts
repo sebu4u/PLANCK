@@ -4,6 +4,7 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getStripeClient } from "@/lib/stripe"
 import { getStripeConfig } from "@/lib/stripe-config"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
+import { findStripeCustomerIdForUser } from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
 
@@ -26,15 +27,33 @@ export async function POST(req: NextRequest) {
       .eq("user_id", userData.user.id)
       .maybeSingle()
 
-    if (!profile?.stripe_customer_id) {
+    const stripe = getStripeClient()
+    const recoveredCustomerId =
+      profile?.stripe_customer_id ??
+      (await findStripeCustomerIdForUser({
+        stripe,
+        userId: userData.user.id,
+        email: userData.user.email,
+      }))
+
+    if (!recoveredCustomerId) {
       return NextResponse.json({ error: "Nu există abonament activ." }, { status: 400 })
     }
-
-    const stripe = getStripeClient()
     const { siteUrl } = getStripeConfig()
 
+    if (recoveredCustomerId !== profile?.stripe_customer_id) {
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ stripe_customer_id: recoveredCustomerId })
+        .eq("user_id", userData.user.id)
+
+      if (updateError) {
+        console.warn("[stripe/portal] Failed to persist recovered customer ID:", updateError.message)
+      }
+    }
+
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
+      customer: recoveredCustomerId,
       return_url: `${siteUrl}/pricing`,
     })
 

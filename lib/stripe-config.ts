@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SubscriptionPlan } from "@/lib/subscription-plan"
 
-type StripeMode = "test" | "live"
+export type StripeMode = "test" | "live"
 
 type StripePriceMap = {
   plus: {
@@ -24,10 +24,12 @@ type StripeConfig = {
   prices: StripePriceMap
 }
 
-const getStripeMode = (): StripeMode => {
+export const getStripeMode = (): StripeMode => {
   const raw = (process.env.STRIPE_MODE || "test").toLowerCase()
   return raw === "live" ? "live" : "test"
 }
+
+const getStripeModeSuffix = (mode: StripeMode) => (mode === "live" ? "_LIVE" : "")
 
 const requireEnv = (name: string, value?: string) => {
   if (!value || value.trim().length === 0) {
@@ -48,7 +50,7 @@ const resolveSiteUrl = () => {
 }
 
 const resolvePriceMap = (mode: StripeMode): StripePriceMap => {
-  const suffix = mode === "live" ? "_LIVE" : ""
+  const suffix = getStripeModeSuffix(mode)
   return {
     plus: {
       monthly: requireEnv(`STRIPE_PRICE_PLUS_MONTHLY${suffix}`, process.env[`STRIPE_PRICE_PLUS_MONTHLY${suffix}`]),
@@ -61,44 +63,39 @@ const resolvePriceMap = (mode: StripeMode): StripePriceMap => {
   }
 }
 
-export const getStripeConfig = (): StripeConfig => {
+export const getStripePrices = (mode: StripeMode = getStripeMode()): StripePriceMap => {
+  return resolvePriceMap(mode)
+}
+
+export const getStripeSecretKey = (mode: StripeMode = getStripeMode()): string => {
+  const suffix = getStripeModeSuffix(mode)
+  return requireEnv(`STRIPE_SECRET_KEY${suffix}`, process.env[`STRIPE_SECRET_KEY${suffix}`])
+}
+
+export const getStripeWebhookSecret = (mode: StripeMode = getStripeMode()): string => {
+  const suffix = getStripeModeSuffix(mode)
+  return requireEnv(`STRIPE_WEBHOOK_SECRET${suffix}`, process.env[`STRIPE_WEBHOOK_SECRET${suffix}`])
+}
+
+export const getStripeConfig = (mode: StripeMode = getStripeMode()): StripeConfig => {
   // This project uses Stripe-hosted Checkout + Billing Portal flows.
   // Backend requests should only carry plan/subscription metadata.
-  const mode = getStripeMode()
   const isLive = mode === "live"
+  const suffix = getStripeModeSuffix(mode)
 
   const publishableKey = requireEnv(
-    isLive ? "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE" : "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY${suffix}`,
     isLive ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  )
-
-  const secretKey = requireEnv(
-    isLive ? "STRIPE_SECRET_KEY_LIVE" : "STRIPE_SECRET_KEY",
-    isLive ? process.env.STRIPE_SECRET_KEY_LIVE : process.env.STRIPE_SECRET_KEY
-  )
-
-  const webhookSecret = requireEnv(
-    isLive ? "STRIPE_WEBHOOK_SECRET_LIVE" : "STRIPE_WEBHOOK_SECRET",
-    isLive ? process.env.STRIPE_WEBHOOK_SECRET_LIVE : process.env.STRIPE_WEBHOOK_SECRET
   )
 
   return {
     mode,
     siteUrl: resolveSiteUrl(),
     publishableKey,
-    secretKey,
-    webhookSecret,
-    prices: resolvePriceMap(mode),
+    secretKey: getStripeSecretKey(mode),
+    webhookSecret: getStripeWebhookSecret(mode),
+    prices: getStripePrices(mode),
   }
-}
-
-export const getStripeSecretKey = (): string => {
-  const mode = getStripeMode()
-  const isLive = mode === "live"
-  return requireEnv(
-    isLive ? "STRIPE_SECRET_KEY_LIVE" : "STRIPE_SECRET_KEY",
-    isLive ? process.env.STRIPE_SECRET_KEY_LIVE : process.env.STRIPE_SECRET_KEY
-  )
 }
 
 export const resolvePlanFromPriceId = (
@@ -115,15 +112,19 @@ export const resolvePlanFromPriceId = (
   return null
 }
 
-export const getStripeWebhookSecrets = (): string[] => {
-  const secrets = [
-    optionalEnv(process.env.STRIPE_WEBHOOK_SECRET),
-    optionalEnv(process.env.STRIPE_WEBHOOK_SECRET_LIVE),
-  ].filter((value): value is string => Boolean(value))
+export const getStripeWebhookSecretEntries = (): Array<{ mode: StripeMode; secret: string }> => {
+  const entries = [
+    { mode: "test" as const, secret: optionalEnv(process.env.STRIPE_WEBHOOK_SECRET) },
+    { mode: "live" as const, secret: optionalEnv(process.env.STRIPE_WEBHOOK_SECRET_LIVE) },
+  ].filter((entry): entry is { mode: StripeMode; secret: string } => Boolean(entry.secret))
 
-  if (secrets.length === 0) {
+  if (entries.length === 0) {
     throw new Error("Missing required env var: STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET_LIVE")
   }
 
-  return [...new Set(secrets)]
+  return entries
+}
+
+export const resolveStripeModeFromLivemode = (livemode: boolean): StripeMode => {
+  return livemode ? "live" : "test"
 }
