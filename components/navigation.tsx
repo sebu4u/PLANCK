@@ -434,11 +434,17 @@ export function Navigation() {
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const showBanner = !isHomepage && !isSpaceRoute && !isDashboard && !isProblemsCatalog && !isPlanckCodeRoute && !isProblemPage && !isCoursePage
   const navDropShadowOnDesktop = pathname?.startsWith('/invata') || (isProblemPage && !isProblemsCatalog)
+  /** Single-problem page uses a fixed white outline under the bar; shadow is applied there so it sits below that outline */
+  const isProblemDetailPage =
+    Boolean(pathname && /^\/probleme\/[^/]+$/.test(pathname) && !pathname.startsWith('/probleme/pagina'))
+  const navbarElevationClass = isProblemDetailPage
+    ? 'shadow-none'
+    : `shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? 'burger:shadow-none' : ''}`
   const showGoPremiumCta = subscriptionPlan !== "plus" && subscriptionPlan !== "premium"
 
   return (
     <>
-      <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? 'burger:shadow-none' : ''}`}>
+      <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} ${navbarElevationClass}`}>
         {showBanner && (
           <div className="hidden lg:flex w-full bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white py-2 px-4 text-center text-sm font-medium z-[301] shadow-sm items-center justify-center relative">
             <Link href="/concurs" className="hover:opacity-90 transition-opacity flex items-center gap-2 group">

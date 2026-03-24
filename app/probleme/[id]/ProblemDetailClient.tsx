@@ -335,7 +335,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f5f4] text-[#2C2F33] flex flex-col">
+    <div className="min-h-screen bg-[#f6f5f4] lg:bg-white text-[#2C2F33] flex flex-col">
       <Navigation />
 
       {/* Upgrade Banner for Free Users */}
@@ -351,8 +351,13 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         </div>
       )}
 
-      <div className="flex-1">
-        <div className={cn("px-4 sm:px-6 lg:px-12 pt-20 lg:pt-20 pb-16", isMobile && "pb-28")}>
+      <div className="flex-1 lg:fixed lg:top-16 lg:left-0 lg:right-[25vw] lg:bottom-0 lg:pb-[6px] lg:pl-[6px] lg:pt-0 lg:pr-0">
+        <div className="relative z-[1] lg:rounded-xl lg:bg-[#f6f5f4] lg:h-full lg:overflow-hidden lg:shadow-md">
+        <div className="lg:h-full lg:overflow-y-auto lg:overflow-x-hidden lg:rounded-xl problem-page-scrollbar">
+        <div className={cn(
+          "px-4 sm:px-6 lg:px-12 pt-20 lg:pt-8 pb-16",
+          isMobile && "pb-28"
+        )}>
           <div className="mx-auto max-w-[1600px] space-y-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
@@ -391,7 +396,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
               </div>
             </div>
 
-            <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.58fr)_minmax(0,0.42fr)] 2xl:grid-cols-[minmax(0,0.6fr)_minmax(0,0.4fr)]">
+            <div className="grid items-start gap-8">
               <section className="space-y-8">
                 <div className="flex flex-col gap-6">
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-[#0b0d10]">
@@ -457,6 +462,19 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         {hasVideo ? "Rezolvare video" : "Video în curând"}
                       </Button>
                     </div>
+                    <div className="hidden lg:grid grid-cols-2 gap-6 xl:gap-8">
+                      {hasAnswerCard ? (
+                        <ProblemAnswerCard
+                          problem={problem}
+                          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                          onSolvedCorrectly={handleMarkSolved}
+                          isSolved={isSolved}
+                        />
+                      ) : (
+                        <NoAnswerCard />
+                      )}
+                      <RecommendedProblemCard currentProblem={problem} />
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -475,26 +493,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                 </div>
               </section>
 
-              <aside className="hidden lg:block space-y-6">
-                {hasAnswerCard ? (
-                  <div className="mx-auto max-w-md">
-                    <ProblemAnswerCard
-                      problem={problem}
-                      onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-                      onSolvedCorrectly={handleMarkSolved}
-                      isSolved={isSolved}
-                    />
-                  </div>
-                ) : (
-                  <div className="mx-auto max-w-md">
-                    <NoAnswerCard />
-                  </div>
-                )}
-                <div className="mx-auto max-w-md">
-                  <RecommendedProblemCard currentProblem={problem} />
-                </div>
-              </aside>
-
               {/* Pe mobil: card problema recomandată sub datele problemei, înainte de footer */}
               <div className="lg:hidden w-full">
                 <RecommendedProblemCard currentProblem={problem} />
@@ -502,12 +500,14 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             </div>
           </div>
         </div>
+        <Footer
+          theme="light"
+          backgroundColor="bg-[#f6f5f4]"
+          borderColor="border-[#0b0d10]/10"
+        />
+        </div>
+        </div>
       </div>
-      <Footer
-        theme="light"
-        backgroundColor="bg-[#f6f5f4]"
-        borderColor="border-[#0b0d10]/10"
-      />
 
       <Suspense fallback={null}>
         <ProblemsSidebar
@@ -518,7 +518,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       </Suspense>
 
       {congratulationMessage && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[550] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-3xl border border-[#0b0d10]/10 bg-white p-8 text-center shadow-2xl">
             <div className="mb-4 text-6xl">🎉</div>
             <h3 className="mb-3 text-2xl font-bold text-[#0b0d10]">Felicitări!</h3>
@@ -581,6 +581,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       <Suspense fallback={null}>
         <InsightChatSidebar
           isOpen={insightSidebarOpen}
+          embedOnDesktop
+          problemLightTheme
           onClose={() => {
             setInsightSidebarOpen(false)
             setOpenedInsightFromCard(false)
@@ -598,7 +600,11 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       </Suspense>
 
       <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
-        <DialogContent hideClose className="max-w-4xl border border-white/10 bg-[#141414] text-white top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]">
+        <DialogContent
+          hideClose
+          overlayClassName="z-[590]"
+          className="z-[600] max-w-4xl border border-white/10 bg-[#141414] text-white top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]"
+        >
           <DialogTitle className="sr-only">Rezolvare video</DialogTitle>
           <DialogDescription className="sr-only">
             Modal cu rezolvarea video pentru problema curentă.

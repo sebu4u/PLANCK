@@ -1,7 +1,14 @@
 import { supabase } from "@/lib/supabaseClient"
 import type { Problem } from "@/data/problems"
 
-export type LearningPathLessonType = "text" | "video" | "grila" | "problem" | "poll"
+export type LearningPathLessonType =
+  | "text"
+  | "video"
+  | "grila"
+  | "problem"
+  | "poll"
+  | "custom_text"
+  | "simulation"
 
 export interface LearningPathChapter {
   id: string

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { BarChart2, CirclePlay, FileText, ListChecks, PenSquare } from "lucide-react"
+import { BarChart2, CirclePlay, FileText, ListChecks, Orbit, PenSquare, Type } from "lucide-react"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { EmbeddedProblemContent } from "@/components/invata/embedded-problem-content"
 import { EmbeddedGrilaContent } from "@/components/invata/embedded-grila-content"
@@ -17,10 +17,14 @@ export const ITEM_TYPE_LABEL: Record<LearningPathLessonType, string> = {
   grila: "Exercițiu grilă",
   problem: "Exercițiu problemă",
   poll: "Sondaj",
+  custom_text: "Text personalizat",
+  simulation: "Simulare interactivă",
 }
 
 export function getItemIcon(type: LearningPathLessonType) {
   switch (type) {
+    case "custom_text":
+      return Type
     case "video":
       return CirclePlay
     case "grila":
@@ -29,6 +33,8 @@ export function getItemIcon(type: LearningPathLessonType) {
       return PenSquare
     case "poll":
       return BarChart2
+    case "simulation":
+      return Orbit
     case "text":
     default:
       return FileText
@@ -43,6 +49,60 @@ interface LearningPathItemBodyProps {
   sourceProblem?: Problem | null
   sourceQuizQuestion?: QuizQuestion | null
   nextItemHref?: string
+}
+
+function parseCustomTextContent(content: Record<string, unknown> | null | undefined): { body: string } | null {
+  if (!content || typeof content !== "object") return null
+
+  const body = content.body
+  if (typeof body !== "string" || !body.trim()) {
+    return null
+  }
+
+  return { body }
+}
+
+function parseAspectRatio(value: unknown): string {
+  if (typeof value !== "string") return "16 / 9"
+
+  const normalized = value.trim()
+  if (!/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(normalized)) {
+    return "16 / 9"
+  }
+
+  return normalized
+}
+
+function parseHttpsUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null
+
+  try {
+    const parsedUrl = new URL(value)
+    if (parsedUrl.protocol !== "https:") return null
+    return parsedUrl.toString()
+  } catch {
+    return null
+  }
+}
+
+function parseSimulationContent(content: Record<string, unknown> | null | undefined): {
+  embedUrl: string
+  introMarkdown: string | null
+  aspectRatio: string
+} | null {
+  if (!content || typeof content !== "object") return null
+
+  const embedUrl = parseHttpsUrl(content.embedUrl)
+  if (!embedUrl) return null
+
+  const introMarkdown =
+    typeof content.introMarkdown === "string" && content.introMarkdown.trim() ? content.introMarkdown : null
+
+  return {
+    embedUrl,
+    introMarkdown,
+    aspectRatio: parseAspectRatio(content.aspectRatio),
+  }
 }
 
 function parsePollContent(content: Record<string, unknown> | null | undefined): {
@@ -99,6 +159,19 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
     return (
       <div className="prose prose-sm max-w-none sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
         <LessonRichContent content={sourceLesson.content} theme="light" />
+      </div>
+    )
+  }
+
+  if (item.item_type === "custom_text") {
+    const customTextData = parseCustomTextContent(item.content_json ?? null)
+    if (!customTextData) {
+      return <p className="text-sm text-[#777777]">Textul personalizat nu este configurat încă.</p>
+    }
+
+    return (
+      <div className="prose prose-sm max-w-none sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
+        <LessonRichContent content={customTextData.body} theme="light" />
       </div>
     )
   }
@@ -169,6 +242,36 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
           options={pollData.options}
         />
       </PollSection>
+    )
+  }
+
+  if (item.item_type === "simulation") {
+    const simulationData = parseSimulationContent(item.content_json ?? null)
+    if (!simulationData) {
+      return <p className="text-sm text-[#777777]">Simularea nu este configurată corect încă.</p>
+    }
+
+    return (
+      <div className="space-y-6">
+        {simulationData.introMarkdown ? (
+          <div className="prose prose-sm max-w-none sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
+            <LessonRichContent content={simulationData.introMarkdown} theme="light" />
+          </div>
+        ) : null}
+
+        <div className="overflow-hidden rounded-2xl border border-[#e8e8e8] bg-black">
+          <div className="w-full" style={{ aspectRatio: simulationData.aspectRatio }}>
+            <iframe
+              src={simulationData.embedUrl}
+              title={item.title || "Simulare interactivă"}
+              className="h-full w-full"
+              referrerPolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-presentation allow-popups"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      </div>
     )
   }
 

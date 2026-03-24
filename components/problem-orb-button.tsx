@@ -65,7 +65,7 @@ export default function ProblemOrbButton({ onOpenSidebar }: ProblemOrbButtonProp
 
   return (
     <div 
-      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50"
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 lg:hidden"
       style={{
         opacity: orbVisible ? 1 : 0,
         transition: "opacity 0.5s ease-in-out",

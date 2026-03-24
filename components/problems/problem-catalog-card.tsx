@@ -4,11 +4,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Problem } from "@/data/problems"
 import "katex/dist/katex.min.css"
-import React, { useEffect, useState, lazy, Suspense } from "react"
+import React, { useEffect, useState, lazy, Suspense, useTransition } from "react"
 import { useAnalytics } from "@/lib/analytics"
 import { cn } from "@/lib/utils"
 import {
   ArrowRight,
+  Loader2,
   Atom,
   BookOpen,
   CircleDot,
@@ -150,6 +151,7 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
   const ProblemIcon = getProblemIcon(problem.id)
   const analytics = useAnalytics()
   const router = useRouter()
+  const [isNavigating, startTransition] = useTransition()
 
   const primaryStatement = problem.statement?.trim() ? problem.statement : problem.title
   const statementPreview = createStatementPreview(primaryStatement, 15)
@@ -176,19 +178,27 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
     router.push("/pricing")
   }
 
+  const navigateToProblem = () => {
+    startTransition(() => {
+      handleProblemClick()
+      router.push(`/probleme/${problem.id}`)
+    })
+  }
+
   const handleUnlockedCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
     if (target.closest("a") || target.closest("button")) return
-    handleProblemClick()
-    router.push(`/probleme/${problem.id}`)
+    navigateToProblem()
   }
 
   return (
     <Card
       onClick={isLocked ? handleLockedCardClick : handleUnlockedCardClick}
+      aria-busy={isNavigating}
       className={cn(
         "group relative flex h-full w-full cursor-pointer flex-col gap-4 rounded-2xl border border-[#0b0c0f]/10 bg-white p-5 shadow-[0px_16px_34px_-28px_rgba(11,12,15,0.65)] transition-all duration-200",
         "hover:-translate-y-0.5 hover:border-[#0b0c0f]/20 hover:shadow-[0px_20px_40px_-28px_rgba(11,12,15,0.55)]",
+        isNavigating && "cursor-wait pointer-events-none",
       )}
     >
       {isLocked && (
@@ -237,11 +247,19 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
           <Link
             href={`/probleme/${problem.id}`}
             prefetch
-            onClick={handleProblemClick}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+              e.preventDefault()
+              navigateToProblem()
+            }}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#2a2a2a] px-4 py-2 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] sm:w-auto"
           >
             Încearcă problema
-            <ArrowRight className="h-4 w-4" />
+            {isNavigating ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            ) : (
+              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+            )}
           </Link>
         )}
 

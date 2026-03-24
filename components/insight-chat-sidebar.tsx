@@ -13,6 +13,7 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { LimitReachedBanner } from './limit-reached-banner'
+import { cn } from '@/lib/utils'
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'system'
@@ -25,6 +26,8 @@ interface InsightChatSidebarProps {
   problemId: string
   problemStatement: string
   persona?: string
+  embedOnDesktop?: boolean
+  problemLightTheme?: boolean
   onFreePlanMessage?: () => void
   onMobileUpgradePrompt?: () => void
   /** When set, send this as the first user message as soon as the sidebar is ready (e.g. from Hint). */
@@ -38,21 +41,27 @@ interface InsightChatSidebarProps {
 interface SuggestedQuestionsProps {
   questions: string[]
   onSelect: (question: string) => void
+  isLightTheme?: boolean
 }
 
-function SuggestedQuestions({ questions, onSelect }: SuggestedQuestionsProps) {
+function SuggestedQuestions({ questions, onSelect, isLightTheme = false }: SuggestedQuestionsProps) {
   if (!questions || questions.length === 0) return null
 
   return (
     <div className="flex flex-col gap-2 mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <p className="text-xs font-semibold uppercase tracking-wider text-white/40 ml-1 mb-1">
+      <p className={cn("text-xs font-semibold uppercase tracking-wider ml-1 mb-1", isLightTheme ? "text-[#4b5563]" : "text-white/40")}>
         Sugestii de întrebări
       </p>
       {questions.map((q, i) => (
         <button
           key={i}
           onClick={() => onSelect(q)}
-          className="text-left text-sm bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/90 p-3 rounded-xl transition-all duration-200 shadow-sm active:scale-[0.98]"
+          className={cn(
+            "text-left text-sm p-3 rounded-xl transition-all duration-200 shadow-sm active:scale-[0.98]",
+            isLightTheme
+              ? "bg-white hover:bg-[#f8fafc] border border-[#0b0d10]/12 hover:border-[#0b0d10]/20 text-[#111827]"
+              : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/90"
+          )}
         >
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkMath]}
@@ -60,7 +69,16 @@ function SuggestedQuestions({ questions, onSelect }: SuggestedQuestionsProps) {
             components={{
               p: ({ node, ...props }: any) => <span {...props} />,
               code: ({ node, inline, className, children, ...props }: any) => (
-                <code className={`bg-white/10 rounded px-1 ${className || ''}`} {...props}>{children}</code>
+                <code
+                  className={cn(
+                    "rounded px-1",
+                    isLightTheme ? "bg-[#eef2f7] text-[#1f2937]" : "bg-white/10 text-white",
+                    className || ''
+                  )}
+                  {...props}
+                >
+                  {children}
+                </code>
               )
             }}
           >
@@ -71,6 +89,9 @@ function SuggestedQuestions({ questions, onSelect }: SuggestedQuestionsProps) {
     </div>
   )
 }
+
+/** Same asset as dashboard streak card (mobile) — transparent PNG */
+const INSIGHT_CHAT_ILLUSTRATION_SRC = '/streak-icon.png'
 
 // Loading messages shown while AI is thinking
 const loadingMessages = [
@@ -94,6 +115,8 @@ export default function InsightChatSidebar({
   problemId,
   problemStatement,
   persona = 'problem_tutor',
+  embedOnDesktop = false,
+  problemLightTheme = false,
   onFreePlanMessage,
   onMobileUpgradePrompt,
   initialUserMessage,
@@ -130,15 +153,21 @@ export default function InsightChatSidebar({
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
   const [limitResetTime, setLimitResetTime] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [viewportModeResolved, setViewportModeResolved] = useState(false)
   const pendingStreamAnchorRef = useRef(false)
   const streamingAssistantRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
     checkMobile()
+    setViewportModeResolved(true)
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  const isDesktopEmbedded = embedOnDesktop && viewportModeResolved && !isMobile
+  const effectiveOpen = isOpen || isDesktopEmbedded
+  const isProblemLightTheme = problemLightTheme && isDesktopEmbedded
 
   // Handle mobile keyboard resizing and prevent body scroll
   const [viewportHeight, setViewportHeight] = useState<string | undefined>(undefined)
@@ -204,39 +233,45 @@ export default function InsightChatSidebar({
   }, [isMobile, isOpen])
 
   useEffect(() => {
-    if (isOpen) return
+    if (effectiveOpen) return
     pendingStreamAnchorRef.current = false
     streamingAssistantRef.current = null
     setShouldAutoScroll(true)
     setFollowStreamToLatest(false)
-  }, [isOpen])
+  }, [effectiveOpen])
 
 
   const markdownComponents = useMemo(
     () => ({
       p: ({ node, ...props }: any) => (
-        <p className="whitespace-pre-wrap break-words text-gray-200 leading-relaxed" {...props} />
+        <p
+          className={cn(
+            "whitespace-pre-wrap break-words leading-relaxed",
+            isProblemLightTheme ? "text-[#111827]" : "text-gray-200"
+          )}
+          {...props}
+        />
       ),
       strong: ({ node, ...props }: any) => (
-        <strong className="text-white" {...props} />
+        <strong className={cn(isProblemLightTheme ? "text-[#0b0d10]" : "text-white")} {...props} />
       ),
       em: ({ node, ...props }: any) => (
-        <em className="text-gray-300" {...props} />
+        <em className={cn(isProblemLightTheme ? "text-[#374151]" : "text-gray-300")} {...props} />
       ),
       h1: ({ node, ...props }: any) => (
-        <h1 className="text-xl font-semibold text-white" {...props} />
+        <h1 className={cn("text-xl font-semibold", isProblemLightTheme ? "text-[#0b0d10]" : "text-white")} {...props} />
       ),
       h2: ({ node, ...props }: any) => (
-        <h2 className="text-lg font-semibold text-white" {...props} />
+        <h2 className={cn("text-lg font-semibold", isProblemLightTheme ? "text-[#0b0d10]" : "text-white")} {...props} />
       ),
       h3: ({ node, ...props }: any) => (
-        <h3 className="text-base font-semibold text-white" {...props} />
+        <h3 className={cn("text-base font-semibold", isProblemLightTheme ? "text-[#0b0d10]" : "text-white")} {...props} />
       ),
       ul: ({ node, ordered, ...props }: any) => (
-        <ul className="list-disc pl-5 space-y-1 text-gray-200" {...props} />
+        <ul className={cn("list-disc pl-5 space-y-1", isProblemLightTheme ? "text-[#1f2937]" : "text-gray-200")} {...props} />
       ),
       ol: ({ node, ordered, ...props }: any) => (
-        <ol className="list-decimal pl-5 space-y-1 text-gray-200" {...props} />
+        <ol className={cn("list-decimal pl-5 space-y-1", isProblemLightTheme ? "text-[#1f2937]" : "text-gray-200")} {...props} />
       ),
       li: ({ node, ...props }: any) => (
         <li className="leading-relaxed" {...props} />
@@ -249,14 +284,18 @@ export default function InsightChatSidebar({
         ...props
       }: any) => (
         <code
-          className={`rounded bg-white/5 px-1.5 py-0.5 font-mono text-[13px] text-gray-100 ${className ?? ''}`}
+          className={cn(
+            "rounded px-1.5 py-0.5 font-mono text-[13px]",
+            isProblemLightTheme ? "bg-[#eef2f7] text-[#1f2937]" : "bg-white/5 text-gray-100",
+            className ?? ''
+          )}
           {...props}
         >
           {children}
         </code>
       ),
     }),
-    [],
+    [isProblemLightTheme],
   )
 
   // Load session for this problem
@@ -357,7 +396,7 @@ export default function InsightChatSidebar({
 
   // Initialize session when sidebar opens
   useEffect(() => {
-    if (!isOpen || !user) return
+    if (!effectiveOpen || !user) return
 
     // If we already have messages or a session active, don't re-initialize
     if (hasMessages || sessionId) {
@@ -407,7 +446,7 @@ export default function InsightChatSidebar({
     }
 
     initializeSession()
-  }, [isOpen, user, problemId]) // Dependencies kept, but logic guards against re-run
+  }, [effectiveOpen, user, problemId]) // Dependencies kept, but logic guards against re-run
 
   // Reset state when problem changes
   useEffect(() => {
@@ -490,7 +529,7 @@ export default function InsightChatSidebar({
   )
 
   useEffect(() => {
-    if (!isOpen || !isStreaming || !pendingStreamAnchorRef.current) return
+    if (!effectiveOpen || !isStreaming || !pendingStreamAnchorRef.current) return
 
     const container = messagesContainerRef.current
     const anchorElement = streamingAssistantRef.current
@@ -507,15 +546,15 @@ export default function InsightChatSidebar({
     setShouldAutoScroll(false)
     setFollowStreamToLatest(false)
     pendingStreamAnchorRef.current = false
-  }, [isOpen, isStreaming, messages])
+  }, [effectiveOpen, isStreaming, messages])
 
   // Auto-scroll to bottom only when user is already at bottom
   useEffect(() => {
-    if (!isOpen || !shouldAutoScroll) return
+    if (!effectiveOpen || !shouldAutoScroll) return
     if (isStreaming && !followStreamToLatest) return
 
     scrollToLatest(isStreaming ? 'auto' : 'smooth')
-  }, [messages, busy, isOpen, shouldAutoScroll, isStreaming, followStreamToLatest, scrollToLatest])
+  }, [messages, busy, effectiveOpen, shouldAutoScroll, isStreaming, followStreamToLatest, scrollToLatest])
 
   // Function to adjust textarea height
   const adjustTextareaHeight = useCallback(() => {
@@ -826,7 +865,7 @@ export default function InsightChatSidebar({
 
   const initialMessageSentRef = useRef(false)
   useEffect(() => {
-    if (!isOpen) {
+    if (!effectiveOpen) {
       initialMessageSentRef.current = false
       return
     }
@@ -837,7 +876,7 @@ export default function InsightChatSidebar({
       : initialUserMessage.trim()
     submitMessage(initialUserMessage.trim(), display)
     onInitialMessageSent?.()
-  }, [isOpen, initialUserMessage, initialUserMessageDisplay, loadingSession, busy])
+  }, [effectiveOpen, initialUserMessage, initialUserMessageDisplay, loadingSession, busy])
 
   const handleGoogleLogin = async () => {
     setLoginLoading('google')
@@ -908,7 +947,7 @@ export default function InsightChatSidebar({
 
   // Prevent page scroll when hovering over sidebar
   useEffect(() => {
-    if (!isOpen || !sidebarRef.current) return
+    if (!effectiveOpen || !sidebarRef.current || isDesktopEmbedded) return
 
     const handleMouseEnter = () => {
       document.body.style.overflow = 'hidden'
@@ -927,7 +966,7 @@ export default function InsightChatSidebar({
       sidebarElement.removeEventListener('mouseleave', handleMouseLeave)
       document.body.style.overflow = ''
     }
-  }, [isOpen])
+  }, [effectiveOpen, isDesktopEmbedded])
 
   return (
     <>
@@ -943,25 +982,72 @@ export default function InsightChatSidebar({
       {/* Sidebar: on desktop (lg) full height and above navbar (z-[500] > navbar z-[300]); on mobile unchanged */}
       <div
         ref={sidebarRef}
-        className={`fixed top-0 right-0 h-dvh lg:h-dvh w-[90vw] lg:w-[33vw] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out overscroll-contain ${isOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
-        style={{
-          maxWidth: '90vw',
-          ...(isMobile && viewportHeight ? {
-            height: viewportHeight,
-            top: `${viewportOffset}px`,
-          } : {})
-        }}
+        className={`fixed right-0 ${
+          isProblemLightTheme
+            ? isDesktopEmbedded
+              ? "bg-white"
+              : "bg-white border-l border-[#0b0d10]/10"
+            : "bg-[#101010] border-l border-white/10"
+        } z-[500] flex flex-col overscroll-contain ${
+          isDesktopEmbedded
+            ? 'top-16 bottom-0 h-[calc(100dvh-4rem)] w-[25vw] translate-x-0 transition-none rounded-tl-xl rounded-bl-xl overflow-hidden'
+            : `top-0 h-dvh lg:h-dvh w-[90vw] lg:w-[25vw] transition-transform duration-300 ease-in-out ${
+                isOpen ? 'translate-x-0' : 'translate-x-full'
+              }`
+        }`}
+        style={
+          isDesktopEmbedded
+            ? undefined
+            : {
+                maxWidth: '90vw',
+                ...(isMobile && viewportHeight
+                  ? {
+                      height: viewportHeight,
+                      top: `${viewportOffset}px`,
+                    }
+                  : {}),
+              }
+        }
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-white font-semibold">Insight Chat</h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded hover:bg-white/10 transition-colors"
+        <div
+          className={cn(
+            'flex items-center gap-3 p-4 border-b',
+            isProblemLightTheme ? 'border-[#0b0d10]/10' : 'border-white/10',
+            isDesktopEmbedded ? 'justify-start' : 'justify-between'
+          )}
+        >
+          <div
+            className={cn(
+              'flex items-center gap-3',
+              !isDesktopEmbedded && 'min-w-0 flex-1'
+            )}
           >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
+            <h2 className={cn('shrink-0 font-semibold', isProblemLightTheme ? 'text-[#0b0d10]' : 'text-white')}>
+              Insight Chat
+            </h2>
+            {userMessagesCount > 0 && (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden bg-transparent">
+                <img
+                  src={INSIGHT_CHAT_ILLUSTRATION_SRC}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  loading="lazy"
+                />
+              </div>
+            )}
+          </div>
+          {!isDesktopEmbedded && (
+            <button
+              onClick={onClose}
+              className={cn(
+                'shrink-0 p-2 rounded transition-colors',
+                isProblemLightTheme ? 'hover:bg-[#e5e7eb]' : 'hover:bg-white/10'
+              )}
+            >
+              <X className={cn('w-5 h-5', isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400')} />
+            </button>
+          )}
         </div>
 
         {/* Messages Area */}
@@ -972,15 +1058,23 @@ export default function InsightChatSidebar({
         >
           {!user ? (
             <div className="flex flex-col items-center justify-center h-full">
-              <div className="text-center max-w-sm">
-                <p className="text-gray-300 text-lg mb-6">
+              <div className={cn(
+                "text-center max-w-sm rounded-2xl px-6 py-6",
+                isProblemLightTheme ? "bg-white text-[#0b0d10] border border-[#0b0d10]/10 shadow-sm" : ""
+              )}>
+                <p className={cn("text-lg mb-6", isProblemLightTheme ? "text-[#0b0d10]" : "text-gray-300")}>
                   Ai nevoie de un cont pentru a continua cu Insight
                 </p>
                 <div className="flex gap-3 justify-center">
                   <Button
                     onClick={handleGoogleLogin}
                     disabled={loginLoading !== null}
-                    className="flex-1 h-11 bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20 transition-all duration-200"
+                    className={cn(
+                      "flex-1 h-11 transition-all duration-200",
+                      isProblemLightTheme
+                        ? "bg-white hover:bg-[#f8fafc] text-[#111827] border border-[#0b0d10]/15 hover:border-[#0b0d10]/25"
+                        : "bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20"
+                    )}
                   >
                     {loginLoading === 'google' ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -994,7 +1088,12 @@ export default function InsightChatSidebar({
                   <Button
                     onClick={handleGitHubLogin}
                     disabled={loginLoading !== null}
-                    className="flex-1 h-11 bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20 transition-all duration-200"
+                    className={cn(
+                      "flex-1 h-11 transition-all duration-200",
+                      isProblemLightTheme
+                        ? "bg-white hover:bg-[#f8fafc] text-[#111827] border border-[#0b0d10]/15 hover:border-[#0b0d10]/25"
+                        : "bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20"
+                    )}
                   >
                     {loginLoading === 'github' ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1010,8 +1109,11 @@ export default function InsightChatSidebar({
             </div>
           ) : loadingSession ? (
             <div className="flex h-full items-center justify-center">
-              <div className="flex flex-col items-center gap-3 text-gray-400">
-                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <div className={cn(
+                "flex flex-col items-center gap-3 rounded-2xl px-6 py-6",
+                isProblemLightTheme ? "bg-white border border-[#0b0d10]/10 shadow-sm text-[#4b5563]" : "text-gray-400"
+              )}>
+                <Loader2 className={cn("h-8 w-8 animate-spin", isProblemLightTheme ? "text-[#111827]" : "text-white")} />
                 <p className="text-sm">Se încarcă sesiunea Insight...</p>
               </div>
             </div>
@@ -1030,9 +1132,12 @@ export default function InsightChatSidebar({
                         ref={isStreamingAssistant ? (node) => {
                           streamingAssistantRef.current = node
                         } : undefined}
-                        className="w-full py-1.5"
+                        className={cn(
+                          "w-full py-1.5",
+                          isProblemLightTheme && "rounded-2xl border border-[#0b0d10]/10 bg-white px-4 py-3.5 shadow-sm"
+                        )}
                       >
-                        <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                        <div className={cn("text-xs uppercase tracking-wide mb-2", isProblemLightTheme ? "text-[#6b7280]" : "text-gray-500")}>
                           {m.content === '' && loadingMessage ? (
                             <span className="flex items-center gap-2">
                               <span className="shimmer-text">{loadingMessage}</span>
@@ -1058,8 +1163,20 @@ export default function InsightChatSidebar({
                         )}
                       </div>
                     ) : (
-                      <div className="max-w-[82%] lg:max-w-[74%] rounded-2xl bg-[#212121] text-white px-4 py-3.5 shadow-sm">
-                        <div className="text-xs uppercase tracking-wide text-gray-400 mb-2 opacity-70">
+                      <div
+                        className={cn(
+                          "max-w-[82%] lg:max-w-[74%] rounded-2xl px-4 py-3.5 shadow-sm",
+                          isProblemLightTheme
+                            ? "bg-[#edf1f6] border border-[#0b0d10]/10 text-[#0f172a]"
+                            : "bg-[#212121] text-white"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "text-xs uppercase tracking-wide mb-2 opacity-70",
+                            isProblemLightTheme ? "text-[#6b7280]" : "text-gray-400"
+                          )}
+                        >
                           Tu
                         </div>
                         <ReactMarkdown
@@ -1082,17 +1199,28 @@ export default function InsightChatSidebar({
                   <SuggestedQuestions
                     questions={suggestedQuestions}
                     onSelect={handleSuggestionSelect}
+                    isLightTheme={isProblemLightTheme}
                   />
                 )}
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-gray-500 text-center">
-                <p className="text-lg mb-2">Bunaa, eu sunt Insight, asistentul tau!</p>
-                <p className="text-sm">
-                  Cu ce te pot ajuta azi, {profile?.nickname || profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'tu'}?
-                </p>
+            <div className="flex h-full flex-col items-center justify-center px-4">
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden bg-transparent sm:h-32 sm:w-32">
+                <img
+                  src={INSIGHT_CHAT_ILLUSTRATION_SRC}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  loading="lazy"
+                />
               </div>
+              <p
+                className={cn(
+                  'mt-3 text-center text-base font-bold',
+                  isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400'
+                )}
+              >
+                Ai nevoie de un sfat?
+              </p>
             </div>
           )}
         </div>
@@ -1100,17 +1228,27 @@ export default function InsightChatSidebar({
         {/* Error message */}
         {error && (
           <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 px-4">
-            <div className="pointer-events-auto bg-red-900/20 border border-red-800 text-red-300 rounded p-2 text-sm">
+            <div className={cn(
+              "pointer-events-auto rounded p-2 text-sm",
+              isProblemLightTheme
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-red-900/20 border border-red-800 text-red-300"
+            )}>
               {error}
             </div>
           </div>
         )}
 
-        {/* Chatbox Area — single bottom fade: must use black/alpha so it’s visible over #101010 */}
+        {/* Chatbox Area */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 isolate p-4">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-44 sm:h-52 bg-gradient-to-t from-black/90 via-black/50 to-transparent"
+            className={cn(
+              "pointer-events-none absolute inset-x-0 bottom-0 z-0 h-44 sm:h-52",
+              isProblemLightTheme
+                ? "bg-gradient-to-t from-white via-white/95 to-transparent"
+                : "bg-gradient-to-t from-black/90 via-black/50 to-transparent"
+            )}
           />
           <div className="pointer-events-auto relative z-10 flex w-full flex-col">
             {limitResetTime ? (
@@ -1125,7 +1263,12 @@ export default function InsightChatSidebar({
                         setFollowStreamToLatest(true)
                         scrollToLatest(isStreaming ? 'auto' : 'smooth')
                       }}
-                      className="pointer-events-auto rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                      className={cn(
+                        "pointer-events-auto rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                        isProblemLightTheme
+                          ? "border border-[#0b0d10]/15 bg-white text-[#111827] hover:bg-[#f8fafc]"
+                          : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
+                      )}
                     >
                       Vezi ultimele mesaje
                     </button>
@@ -1134,19 +1277,27 @@ export default function InsightChatSidebar({
 
                 {/* Context Card */}
                 {problemContext && !busy && (
-                  <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className={cn(
+                    "flex items-center justify-between border border-b-0 rounded-t-2xl p-3 text-sm animate-in fade-in slide-in-from-bottom-2 duration-200",
+                    isProblemLightTheme
+                      ? "bg-white border-[#0b0d10]/12 text-[#4b5563]"
+                      : "bg-[#1a1a1a] border-white/10 text-gray-300"
+                  )}>
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="text-xs font-medium uppercase text-blue-400 flex-shrink-0">Context:</span>
+                      <span className={cn("text-xs font-medium uppercase flex-shrink-0", isProblemLightTheme ? "text-[#2563eb]" : "text-blue-400")}>Context:</span>
                       <p className="truncate opacity-80 text-xs">
                         {problemContext.slice(0, 50)}...
                       </p>
                     </div>
                     <button
                       onClick={() => setProblemContext(null)}
-                      className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0"
+                      className={cn(
+                        "p-1 rounded-full transition-colors ml-2 flex-shrink-0",
+                        isProblemLightTheme ? "hover:bg-[#f3f4f6]" : "hover:bg-white/10"
+                      )}
                       title="Șterge contextul"
                     >
-                      <X className="w-3 h-3 text-white/50" />
+                      <X className={cn("w-3 h-3", isProblemLightTheme ? "text-[#6b7280]" : "text-white/50")} />
                     </button>
                   </div>
                 )}
@@ -1156,7 +1307,12 @@ export default function InsightChatSidebar({
                     <div className="flex justify-end mb-0">
                       <button
                         onClick={() => submitMessage("Vreau să văd soluția completă.")}
-                        className="bg-[#212121] border border-white/10 border-b-0 rounded-t-xl px-4 py-1.5 text-xs font-semibold text-orange-500 hover:text-orange-400 hover:bg-[#2a2a2a] transition-all ml-auto mr-0 shadow-lg translate-y-[1px] z-10"
+                        className={cn(
+                          "border border-b-0 rounded-t-xl px-4 py-1.5 text-xs font-semibold transition-all ml-auto mr-0 shadow-lg translate-y-[1px] z-10",
+                          isProblemLightTheme
+                            ? "bg-white border-[#0b0d10]/12 text-[#b45309] hover:text-[#92400e] hover:bg-[#f8fafc]"
+                            : "bg-[#212121] border-white/10 text-orange-500 hover:text-orange-400 hover:bg-[#2a2a2a]"
+                        )}
                       >
                         Vezi soluția
                       </button>
@@ -1164,18 +1320,21 @@ export default function InsightChatSidebar({
                   )}
 
                 {/* Input Area */}
-                <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-2.5 sm:p-3 shadow-lg transition-all duration-200 ${problemContext
+                <div className={`relative flex items-end gap-2 ${isProblemLightTheme ? "bg-white border border-[#0b0d10]/12" : "bg-[#212121] border border-white/10"} p-2.5 sm:p-3 shadow-lg transition-all duration-200 ${problemContext
                   ? 'rounded-b-2xl rounded-t-none border-t-0'
                   : canShowSolutionButton
                     ? 'rounded-b-2xl rounded-tr-none rounded-tl-2xl border-t-0'
                     : 'rounded-2xl'
                   }`}>
                   <button
-                    className="h-10 w-10 rounded hover:bg-gray-700 transition-colors flex items-center justify-center flex-shrink-0 self-end"
+                    className={cn(
+                      "h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end",
+                      isProblemLightTheme ? "hover:bg-[#f3f4f6]" : "hover:bg-gray-700"
+                    )}
                     disabled
                     title="Atașează fișier (în curând)"
                   >
-                    <Paperclip className="w-5 h-5 text-gray-400" />
+                    <Paperclip className={cn("w-5 h-5", isProblemLightTheme ? "text-[#6b7280]" : "text-gray-400")} />
                   </button>
                   <Textarea
                     ref={textareaRef}
@@ -1184,7 +1343,10 @@ export default function InsightChatSidebar({
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     rows={1}
-                    className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] py-2"
+                    className={cn(
+                      "flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] py-2",
+                      isProblemLightTheme ? "text-[#111827] placeholder:text-[#6b7280]" : "text-white placeholder:text-gray-400"
+                    )}
                     disabled={isInputDisabled}
                     style={{
                       height: `${textareaHeight}px`,
@@ -1198,8 +1360,8 @@ export default function InsightChatSidebar({
                       title="Oprește răspunsul"
                     >
                       <span className="flex items-center justify-center w-5 h-5">
-                        <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
-                          <span className="w-2 h-2 bg-black" />
+                        <span className={cn("flex items-center justify-center w-4 h-4 rounded-full", isProblemLightTheme ? "bg-[#0f172a]" : "bg-white")}>
+                          <span className={cn("w-2 h-2", isProblemLightTheme ? "bg-white" : "bg-black")} />
                         </span>
                       </span>
                     </button>
@@ -1207,9 +1369,12 @@ export default function InsightChatSidebar({
                     <button
                       onClick={send}
                       disabled={isInputDisabled || (!input.trim() && !problemContext)}
-                      className="h-10 w-10 rounded hover:bg-gray-700 transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end"
+                      className={cn(
+                        "h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end",
+                        isProblemLightTheme ? "hover:bg-[#f3f4f6]" : "hover:bg-gray-700"
+                      )}
                     >
-                      <Send className="w-5 h-5 text-gray-400" />
+                      <Send className={cn("w-5 h-5", isProblemLightTheme ? "text-[#6b7280]" : "text-gray-400")} />
                     </button>
                   )}
                 </div>

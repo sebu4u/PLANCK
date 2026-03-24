@@ -94,8 +94,10 @@ export default async function InvataLessonItemPage({
     notFound()
   }
 
+  const isLinkedTextItem = item.item_type === "text"
+  const isCustomTextItem = item.item_type === "custom_text"
   const sourceLesson =
-    item.item_type === "text" && item.cursuri_lesson_slug ? await getLessonBySlug(item.cursuri_lesson_slug) : null
+    isLinkedTextItem && item.cursuri_lesson_slug ? await getLessonBySlug(item.cursuri_lesson_slug) : null
   let sourceProblem: Problem | null = null
   if (item.item_type === "problem" && item.problem_id) {
     const { data } = await supabase.from("problems").select("*").eq("id", item.problem_id).single()
@@ -124,7 +126,7 @@ export default async function InvataLessonItemPage({
       itemIndex={parsedIndex}
       items={items}
       lessonBaseHref={lessonBaseHref}
-      isTextLesson={item.item_type === "text"}
+      isTextLesson={isLinkedTextItem || isCustomTextItem}
       hideBottomCta={isPoll || (isProblem && !!problemHasAnswer)}
       overflowHidden={isProblem}
       fullWidth={isProblem}
