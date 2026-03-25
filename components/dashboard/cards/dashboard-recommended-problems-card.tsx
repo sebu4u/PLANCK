@@ -2,7 +2,8 @@
 
 import { type CSSProperties, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Sparkles } from "lucide-react"
+import { ArrowRight } from "lucide-react"
+import AutoHeight from "embla-carousel-auto-height"
 import {
   Carousel,
   CarouselApi,
@@ -52,6 +53,16 @@ export function DashboardRecommendedProblemsCard({
     }
   }, [api])
 
+  useEffect(() => {
+    if (!api || problems.length <= 1) return
+
+    const id = window.setInterval(() => {
+      api.scrollNext()
+    }, 10_000)
+
+    return () => window.clearInterval(id)
+  }, [api, problems.length])
+
   if (!problems.length) {
     return (
       <section className="rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
@@ -66,26 +77,19 @@ export function DashboardRecommendedProblemsCard({
   }
 
   return (
-    <section className="rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Problema recomandata</p>
-          <h3 className="mt-1 text-xl font-semibold text-[#141414]">Antreneaza-te cu swipe</h3>
-        </div>
-        <Sparkles className="h-5 w-5 text-[#8b5cf6]" />
-      </div>
-
+    <section>
       <Carousel
         setApi={setApi}
         opts={{ align: "start", loop: problems.length > 1 }}
-        className="w-full"
+        plugins={[AutoHeight()]}
+        className="w-full [&>*]:px-1 [&>*]:pb-4"
       >
-        <CarouselContent>
+        <CarouselContent className="items-start">
           {problems.map((problem) => {
             const classLabel = toClassLabel(problem)
             return (
-              <CarouselItem key={problem.id}>
-                <div className="rounded-2xl border border-[#ececec] bg-[#fbfbfb] p-4">
+              <CarouselItem key={problem.id} className="self-start">
+                <div className="rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="rounded-full bg-[#f0ebff] px-2.5 py-1 font-semibold text-[#6f43db]">
                       {problem.difficulty || "Nivel mixt"}
@@ -118,7 +122,7 @@ export function DashboardRecommendedProblemsCard({
       </Carousel>
 
       {problems.length > 1 ? (
-        <div className="mt-4 flex items-center justify-center gap-2">
+        <div className="mt-2 flex items-center justify-center gap-2">
           {problems.map((problem, index) => (
             <button
               key={problem.id}

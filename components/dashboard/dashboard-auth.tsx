@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState, useMemo } from "react"
+import { type CSSProperties, useEffect, useRef, useState, useMemo } from "react"
+import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
@@ -38,12 +40,11 @@ import {
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
-import { ContestDashboardPromo } from "@/components/dashboard/contest-dashboard-promo"
 
 export function DashboardAuth() {
   const router = useRouter()
   const { user, loading: authLoading, profile } = useAuth()
-  const { isFree } = useSubscriptionPlan()
+  const { isFree, isPaid } = useSubscriptionPlan()
   const [loading, setLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
   const isFetchingRef = useRef(false)
@@ -419,21 +420,35 @@ export function DashboardAuth() {
 
         {/* Content Wrapper - takes remaining width */}
         <div className="flex-1 lg:ml-[250px] h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
-          {/* Mobile-only: card concurs → /concurs/proba (fără logică de înscriere) */}
-          <div className="lg:hidden flex-shrink-0 border-b border-[#e8e8e8] bg-[#f8f9fa] p-0">
-            <ContestDashboardPromo variant="mobile" />
-          </div>
-
           {/* Floating Card Container */}
-          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-[3px]">
+          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa]">
+              {!isPaid ? (
+                <div className="bg-[#f7f9fa]">
+                  <Link
+                    href="/pricing"
+                    className="group flex w-full items-center justify-center gap-2 border-y border-[#e8e8e8] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-4 py-[8.5px] text-center"
+                  >
+                    <span className="relative hidden h-9 w-9 flex-shrink-0 items-center justify-center lg:inline-flex">
+                      <Image
+                        src="/streak-icon.png"
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="h-9 w-9 object-contain"
+                      />
+                    </span>
+                    <span className="text-xs font-semibold text-[#2f2a3c] sm:text-sm">
+                      Treci la Premium și accesează Insight fără limite.{" "}
+                      <span className="underline-offset-2 group-hover:underline">Go Premium →</span>
+                    </span>
+                  </Link>
+                </div>
+              ) : null}
               <main className="p-4 md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="max-w-[1000px] mx-auto">
-                  {/* Desktop: card concurs → /concurs/proba (fără logică de înscriere) */}
-                  <ContestDashboardPromo variant="desktop" />
-
                   {/* Mobile welcome */}
                   <div className="mb-4 pt-3 md:hidden">
                     <p className="text-2xl font-extrabold text-gray-900">
@@ -456,7 +471,7 @@ export function DashboardAuth() {
                     <p className="text-gray-600">Here's your learning progress today</p>
                   </div>
 
-                  <div className="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6">
+                  <div className={`grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6 ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
                     <div className="order-1 xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
                         currentStreak={dashboardData.stats.current_streak}
@@ -464,6 +479,38 @@ export function DashboardAuth() {
                         streakDays={dashboardData.streakDays}
                         streakImageSrc="/streak-icon.png"
                       />
+
+                      {!isPaid ? (
+                        <div className="mt-4 hidden lg:block rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                          <div className="flex items-center gap-3">
+                            <div className="relative h-11 w-11 flex-shrink-0">
+                              <Image
+                                src="/streak-icon.png"
+                                alt="Premium"
+                                fill
+                                className="object-contain"
+                                sizes="44px"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[15px] leading-tight font-extrabold tracking-tight text-[#0f0f10]">
+                                Deblochează învățarea cu Premium
+                              </p>
+                              <p className="mt-1 text-[15px] leading-tight text-[#111215]">
+                                ca să înveți mai rapid, mai bine
+                              </p>
+                            </div>
+                          </div>
+
+                          <Link
+                            href="/pricing"
+                            className="dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-3 text-base font-bold text-[#101117] shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#9a5aa8] active:translate-y-1 active:shadow-[0_1px_0_#9a5aa8]"
+                            style={{ "--start-glow-tint": "rgba(248, 220, 228, 0.88)" } as CSSProperties}
+                          >
+                            Explorează Premium
+                          </Link>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="order-2 md:order-3 xl:order-none overflow-visible xl:col-start-2 xl:row-span-2">
