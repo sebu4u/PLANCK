@@ -40,6 +40,7 @@ import {
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
+import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -51,6 +52,8 @@ export function DashboardAuth() {
   const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const trialModalCheckedRef = useRef(false)
   const [showTrialModal, setShowTrialModal] = useState(false)
+  const [showWelcomeBack, setShowWelcomeBack] = useState(false)
+  const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -344,7 +347,80 @@ export function DashboardAuth() {
   }, [user?.id, authLoading, router, profile?.grade])
 
   useEffect(() => {
+    if (authLoading || loading || !dashboardData || !user) return
+
+    try {
+      const lastVisitKey = `planck_last_dashboard_visit_${user.id}`
+      const activityAckKey = `welcome_back_ack_activity_${user.id}`
+      const today = new Date()
+      const lastVisitRaw = localStorage.getItem(lastVisitKey)
+
+      if (!lastVisitRaw) {
+        localStorage.setItem(lastVisitKey, String(Date.now()))
+        setShowWelcomeBack(false)
+        return
+      }
+
+      const lastVisitDate = parseStoredDate(lastVisitRaw)
+      const visitInactive = lastVisitDate ? getCalendarDayDiff(lastVisitDate, today) > 3 : false
+
+      const lastActivityRaw = dashboardData.stats.last_activity_date
+      const activityDate = parseIsoDateOnly(lastActivityRaw)
+      const activityInactive = activityDate ? getCalendarDayDiff(activityDate, today) > 3 : false
+
+      const acknowledgedActivity = localStorage.getItem(activityAckKey)
+      const activitySuppressed =
+        Boolean(lastActivityRaw) &&
+        Boolean(acknowledgedActivity) &&
+        lastActivityRaw === acknowledgedActivity
+
+      setShowWelcomeBack(visitInactive || (activityInactive && !activitySuppressed))
+    } catch {
+      setShowWelcomeBack(false)
+    }
+  }, [authLoading, loading, dashboardData, user?.id])
+
+  const dismissWelcomeBack = () => {
+    if (!user) {
+      setShowWelcomeBack(false)
+      return
+    }
+
+    try {
+      const lastVisitKey = `planck_last_dashboard_visit_${user.id}`
+      const activityAckKey = `welcome_back_ack_activity_${user.id}`
+      localStorage.setItem(lastVisitKey, String(Date.now()))
+
+      const lastActivityDate = dashboardData?.stats.last_activity_date
+      if (lastActivityDate) {
+        localStorage.setItem(activityAckKey, lastActivityDate)
+      } else {
+        localStorage.removeItem(activityAckKey)
+      }
+    } catch {
+      // Ignore storage errors silently
+    }
+
+    setShowWelcomeBack(false)
+  }
+
+  const handleWelcomeCtaClick = async () => {
+    if (welcomeCtaLoading) return
+
+    setWelcomeCtaLoading(true)
+    try {
+      const scopedProblems = await getProblemsByClass(profile?.grade, 1)
+      const targetHref = scopedProblems[0] ? `/probleme/${scopedProblems[0].id}` : "/probleme"
+      dismissWelcomeBack()
+      router.push(targetHref)
+    } finally {
+      setWelcomeCtaLoading(false)
+    }
+  }
+
+  useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || !isFree) return
+    if (showWelcomeBack) return
     if (trialModalCheckedRef.current) return
     trialModalCheckedRef.current = true
 
@@ -374,7 +450,7 @@ export function DashboardAuth() {
     } catch {
       // Ignore storage errors silently
     }
-  }, [authLoading, loading, dashboardData, user?.id, isFree])
+  }, [authLoading, loading, dashboardData, user?.id, isFree, showWelcomeBack])
 
 
   // Memoize userData to prevent recreation on every render
@@ -552,8 +628,47 @@ export function DashboardAuth() {
         </div>
       )}
 
+      {showWelcomeBack && (
+        <WelcomeBackOverlay
+          username={userData.username}
+          onBackdropClick={dismissWelcomeBack}
+          onCtaClick={handleWelcomeCtaClick}
+          ctaLoading={welcomeCtaLoading}
+        />
+      )}
+
     </DashboardSidebarProvider>
   )
+}
+
+function parseStoredDate(value: string | null): Date | null {
+  if (!value) return null
+
+  const numeric = Number(value)
+  if (Number.isFinite(numeric)) {
+    const date = new Date(numeric)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number)
+    if (!year || !month || !day) return null
+    return new Date(year, month - 1, day)
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function parseIsoDateOnly(value: string | null): Date | null {
+  if (!value) return null
+  return parseStoredDate(value)
+}
+
+function getCalendarDayDiff(from: Date, to: Date): number {
+  const fromMidnight = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  const toMidnight = new Date(to.getFullYear(), to.getMonth(), to.getDate())
+  return Math.floor((toMidnight.getTime() - fromMidnight.getTime()) / 86400000)
 }
 
 // Helper functions for client-side data fetching
