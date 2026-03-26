@@ -11,20 +11,48 @@ import {
 
 export const runtime = "nodejs"
 
-const recordWebhookEvent = async (eventId: string) => {
+type WebhookEventClaim = {
+  shouldProcess: boolean
+  releaseOnFailure: boolean
+}
+
+const claimWebhookEvent = async (eventId: string): Promise<WebhookEventClaim> => {
   const supabase = getSupabaseAdmin()
   const { error } = await supabase
     .from("stripe_webhook_events")
     .insert({ event_id: eventId })
-  if (!error) return true
+  if (!error) {
+    return {
+      shouldProcess: true,
+      releaseOnFailure: true,
+    }
+  }
   if (error.code === "23505" || error.message?.toLowerCase().includes("duplicate")) {
-    return false
+    return {
+      shouldProcess: false,
+      releaseOnFailure: false,
+    }
   }
   if (error.code === "42P01") {
     console.warn("[stripe/webhook] stripe_webhook_events table missing; processing without idempotency.")
-    return true
+    return {
+      shouldProcess: true,
+      releaseOnFailure: false,
+    }
   }
   throw error
+}
+
+const releaseWebhookEventClaim = async (eventId: string) => {
+  try {
+    const supabase = getSupabaseAdmin()
+    const { error } = await supabase.from("stripe_webhook_events").delete().eq("event_id", eventId)
+    if (error && error.code !== "42P01") {
+      console.warn("[stripe/webhook] Failed to release webhook event claim:", error.message)
+    }
+  } catch (error) {
+    console.warn("[stripe/webhook] Failed to release webhook event claim:", error)
+  }
 }
 
 const resolveSubscriptionId = (value: unknown) => {
@@ -79,9 +107,11 @@ export async function POST(req: NextRequest) {
   const stripeMode = verifiedMode ?? (event.livemode ? "live" : "test")
   const stripe = getStripeClient(stripeMode)
 
+  let claim: WebhookEventClaim | null = null
+
   try {
-    const shouldProcess = await recordWebhookEvent(event.id)
-    if (!shouldProcess) {
+    claim = await claimWebhookEvent(event.id)
+    if (!claim.shouldProcess) {
       return NextResponse.json({ received: true, duplicate: true })
     }
 
@@ -137,6 +167,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error: any) {
+    if (claim?.releaseOnFailure) {
+      await releaseWebhookEventClaim(event.id)
+    }
     console.error("[stripe/webhook] Handler error:", error)
     return NextResponse.json({ error: "Webhook handler failed." }, { status: 500 })
   }

@@ -25,6 +25,12 @@ export function CursuriPageClient({
 
   useEffect(() => {
     try {
+      const isDesktop = window.matchMedia('(min-width: 768px)').matches
+      if (!isDesktop) {
+        setShowWelcome(false)
+        return
+      }
+
       const hasSeenWelcome = localStorage.getItem(WELCOME_STORAGE_KEY) === '1'
       setShowWelcome(!hasSeenWelcome)
     } catch {

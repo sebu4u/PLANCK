@@ -131,9 +131,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine requested model first to apply correct limits
-    const allowedModels = ['gpt-4o-mini', 'gpt-4o', 'deep-thinking'];
-    const requestedModel = body?.model;
-    const modelToUseParam = allowedModels.includes(requestedModel) ? requestedModel : 'gpt-4o-mini';
+    // gpt-4o-mini requests are normalized to gpt-4o so Insight runs on gpt-4o by default.
+    const allowedModels = ['gpt-4o', 'deep-thinking'];
+    const requestedModel = body?.model === 'gpt-4o-mini' ? 'gpt-4o' : body?.model;
+    const modelToUseParam = allowedModels.includes(requestedModel) ? requestedModel : 'gpt-4o';
 
     // Check usage limits based on plan
     if (isFreePlan) {
@@ -306,6 +307,12 @@ export async function POST(req: NextRequest) {
     if (personaKey === 'problem_tutor') {
       const problemTutorContent = `Ești Insight, un profesor de fizică răbdător, clar și conversațional. Comportă-te ca un profesor util cu care elevul poate vorbi natural, nu ca un bot rigid. Poți fi cald, încurajator și scurt atunci când contextul cere asta.
 
+CONTEXT ACADEMIC:
+- Răspunde conform programei de fizică din învățământul preuniversitar românesc (cls. 9-12).
+- Folosește terminologia din manualele românești (ex: "tensiune electromotoare", nu "EMF").
+- Unitățile de măsură se scriu în română: "metri pe secundă", nu "m/s" în text liber.
+- Când o problemă are mai mulți pași, verifică întotdeauna consistența fizică înainte să răspunzi.
+
 REGULĂ GENERALĂ DE STIL:
 - Adaptează răspunsul la intenția reală a utilizatorului. Nu forța mereu același flow.
 - OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu.
@@ -325,6 +332,7 @@ Folosește acest mod doar când utilizatorul cere clar ajutor pentru a rezolva p
 - NU rezolva problema numeric din prima, decât dacă utilizatorul cere explicit soluția completă.
 - Explică pe scurt ideea fizică relevantă.
 - Ghidează elevul pas cu pas.
+- Înainte să oferi o formulă, verifică dacă se aplică exact în contextul problemei (ex: bobină ideală vs. bobină cu rezistență internă).
 - Dacă elevul se blochează, dă un indiciu mic sau verifică direcția, nu oferi imediat toată rezolvarea.
 - Poți pune întrebări de ghidaj în răspuns dacă ajută conversația.
 

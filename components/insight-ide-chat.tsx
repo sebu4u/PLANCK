@@ -64,7 +64,6 @@ interface InsightIdeChatProps {
 
 const INSIGHT_SESSION_TITLE = "PlanckCode IDE"
 const MODEL_OPTIONS = [
-  { id: "gpt-4o-mini", label: "Raptor1 (fast)", selectable: true },
   { id: "gpt-4o", label: "Raptor1", selectable: true },
   { id: "deep-thinking", label: "Raptor1 heavy", selectable: true },
 ]
@@ -430,7 +429,7 @@ export function InsightIdeChat({
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [shouldSendContext, setShouldSendContext] = useState(false)
   const [mode, setMode] = useState<"agent" | "ask">("agent")
-  const [selectedModel, setSelectedModel] = useState("gpt-4o-mini")
+  const [selectedModel, setSelectedModel] = useState("gpt-4o")
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasPendingCodeChange, setHasPendingCodeChange] = useState(false)
   const codeGeneratedRef = useRef(false)
@@ -586,7 +585,7 @@ export function InsightIdeChat({
         setSessionId(currentSessionId)
       }
 
-      const activeModelId = mode === "ask" ? "gpt-4o-mini" : selectedModel
+      const activeModelId = mode === "ask" ? "gpt-4o" : selectedModel
       setMessages((prev) => [...prev, { role: "assistant", content: "", model: activeModelId }])
 
       const contextMessages =
@@ -621,7 +620,7 @@ export function InsightIdeChat({
           input: newUserMessage.content,
           persona: "ide",
           mode, // hint server to avoid JSON in Ask mode
-          model: mode === "ask" ? "gpt-4o-mini" : selectedModel,
+          model: mode === "ask" ? "gpt-4o" : selectedModel,
           contextMessages,
         }),
         signal: controller.signal,

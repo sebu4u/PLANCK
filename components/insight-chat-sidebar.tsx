@@ -82,7 +82,7 @@ function SuggestedQuestions({ questions, onSelect, isLightTheme = false }: Sugge
               )
             }}
           >
-            {q}
+            {normalizeLatexDelimiters(q)}
           </ReactMarkdown>
         </button>
       ))}
@@ -107,6 +107,25 @@ const loadingMessages = [
 
 const getRandomLoadingMessage = () => {
   return loadingMessages[Math.floor(Math.random() * loadingMessages.length)]
+}
+
+// Keep $$...$$ as primary format, but also accept \[...\] and \(...\).
+const normalizeLatexDelimiters = (text: string): string => {
+  if (!text) return text
+
+  const segments = text.split(/(```[\s\S]*?```)/g)
+
+  return segments
+    .map((segment) => {
+      if (segment.startsWith('```') && segment.endsWith('```')) {
+        return segment
+      }
+
+      return segment
+        .replace(/\\\[([\s\S]*?)\\\]/g, (_match, math) => `$$${String(math).trim()}$$`)
+        .replace(/\\\(([\s\S]*?)\\\)/g, (_match, math) => `$${String(math).trim()}$`)
+    })
+    .join('')
 }
 
 export default function InsightChatSidebar({
@@ -1158,7 +1177,7 @@ export default function InsightChatSidebar({
                             components={markdownComponents}
                             className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
                           >
-                            {m.content}
+                            {normalizeLatexDelimiters(m.content)}
                           </ReactMarkdown>
                         )}
                       </div>
@@ -1185,7 +1204,7 @@ export default function InsightChatSidebar({
                           components={markdownComponents}
                           className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
                         >
-                          {m.content}
+                          {normalizeLatexDelimiters(m.content)}
                         </ReactMarkdown>
                       </div>
                     )}
