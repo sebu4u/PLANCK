@@ -175,6 +175,15 @@ export function ConcursContent() {
                                 Regulament concurs
                             </Button>
                         </Link>
+                        <Link href="/concurs/rezultate">
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                className="bg-transparent border-2 border-orange-500 text-orange-600 hover:bg-orange-50 transition-all duration-300 rounded-full px-8 py-6 text-lg font-semibold"
+                            >
+                                Rezultate concurs
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </section>

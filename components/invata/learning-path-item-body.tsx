@@ -73,12 +73,15 @@ function parseAspectRatio(value: unknown): string {
   return normalized
 }
 
-function parseHttpsUrl(value: unknown): string | null {
+function parseSimulationUrl(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null
 
   try {
     const parsedUrl = new URL(value)
-    if (parsedUrl.protocol !== "https:") return null
+    if (parsedUrl.protocol === "https:") return parsedUrl.toString()
+    const isLocalDev = process.env.NODE_ENV !== "production"
+    const isLocalHost = parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1"
+    if (!(isLocalDev && isLocalHost && parsedUrl.protocol === "http:")) return null
     return parsedUrl.toString()
   } catch {
     return null
@@ -92,7 +95,7 @@ function parseSimulationContent(content: Record<string, unknown> | null | undefi
 } | null {
   if (!content || typeof content !== "object") return null
 
-  const embedUrl = parseHttpsUrl(content.embedUrl)
+  const embedUrl = parseSimulationUrl(content.embedUrl)
   if (!embedUrl) return null
 
   const introMarkdown =
@@ -252,15 +255,25 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-3 sm:space-y-6">
         {simulationData.introMarkdown ? (
-          <div className="prose prose-sm max-w-none sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
+          <div className="prose prose-sm max-w-none px-1 sm:px-0 sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
             <LessonRichContent content={simulationData.introMarkdown} theme="light" />
           </div>
         ) : null}
 
-        <div className="overflow-hidden rounded-2xl border border-[#e8e8e8] bg-black">
-          <div className="w-full" style={{ aspectRatio: simulationData.aspectRatio }}>
+        <div className="-mx-5 overflow-hidden rounded-none border-y border-[#e8e8e8] bg-white sm:mx-0 sm:rounded-2xl sm:border sm:bg-black">
+          <div className="w-full aspect-[9/16] sm:hidden">
+            <iframe
+              src={simulationData.embedUrl}
+              title={item.title || "Simulare interactivă"}
+              className="h-full w-full"
+              referrerPolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-presentation allow-popups"
+              allowFullScreen
+            />
+          </div>
+          <div className="hidden w-full sm:block" style={{ aspectRatio: simulationData.aspectRatio }}>
             <iframe
               src={simulationData.embedUrl}
               title={item.title || "Simulare interactivă"}

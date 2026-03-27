@@ -178,7 +178,10 @@ function normalizeNullable(value: string): string | null {
 function validateSimulationUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
-    return parsed.protocol === "https:"
+    if (parsed.protocol === "https:") return true
+    const isLocalDev = process.env.NODE_ENV !== "production"
+    const isLocalHost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
+    return isLocalDev && isLocalHost && parsed.protocol === "http:"
   } catch {
     return false
   }
@@ -399,7 +402,7 @@ export function LearningPathsManager() {
       case "simulation":
         if (!currentForm.simulation_embed_url.trim()) return "Embed URL este obligatoriu pentru simulare."
         if (!validateSimulationUrl(currentForm.simulation_embed_url.trim())) {
-          return "Embed URL pentru simulare trebuie să fie HTTPS valid."
+          return "Embed URL pentru simulare trebuie să fie HTTPS valid (sau http://localhost în development)."
         }
         break
     }

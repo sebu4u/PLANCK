@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Tipuri de Traiectorii — Planck</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #fafafa;
+      --surface-2: #f4f4f4;
+      --line: #ececec;
+      --text: #121212;
+      --muted: #6e6e73;
+      --accent: #7e41f0;
+      --radius: 14px;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: "DM Sans", sans-serif;
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .shell {
+      width: 100%;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+      gap: 8px;
+      padding: 8px;
+      overflow: hidden;
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 2px 2px 0;
+    }
+
+    .logo {
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .header-title {
+      font-size: clamp(12px, 1.8vw, 14px);
+      color: #2e2e2e;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 4px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .tab {
+      border: 0;
+      border-radius: 999px;
+      min-height: 36px;
+      padding: 0 12px;
+      background: transparent;
+      color: var(--muted);
+      font: 500 13px/1 "DM Sans", sans-serif;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+      touch-action: manipulation;
+    }
+
+    .tab:hover {
+      background: #efefef;
+      color: #1f1f1f;
+    }
+
+    .tab:active { transform: scale(0.985); }
+
+    .tab.active {
+      background: #121212;
+      color: #ffffff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    }
+
+    .tab-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .canvas-wrap {
+      min-height: 0;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: #fcfcfc;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .legend {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 3;
+      font-family: "DM Mono", monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #5a5a5a;
+      background: rgba(255,255,255,0.88);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      pointer-events: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .info-panel {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      padding: 9px 12px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: start;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .info-badge {
+      font-family: "DM Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 4px 8px;
+      line-height: 1;
+      margin-top: 1px;
+      white-space: nowrap;
+    }
+
+    .info-text {
+      font-size: 13px;
+      line-height: 1.45;
+      color: #323232;
+    }
+
+    .info-text strong {
+      color: #121212;
+      font-weight: 700;
+    }
+
+    .controls {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .ctrl-btn {
+      border: 1px solid #dcdcdc;
+      background: #ffffff;
+      color: #222;
+      min-height: 36px;
+      border-radius: 10px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font: 600 13px/1 "DM Sans", sans-serif;
+      cursor: pointer;
+      transition: border-color 0.18s ease, color 0.18s ease;
+      touch-action: manipulation;
+    }
+
+    .ctrl-btn:hover {
+      border-color: #c5b2ec;
+      color: #5e30b9;
+    }
+
+    .speed-wrap {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #565656;
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 110px;
+      height: 5px;
+      background: #e6e6e6;
+      border-radius: 999px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #d7c8f8;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #d7c8f8;
+      cursor: pointer;
+    }
+
+    .speed-label {
+      width: 31px;
+      text-align: right;
+      color: #121212;
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+    }
+
+    .hint {
+      text-align: center;
+      font-size: 10px;
+      color: #7a7a7a;
+      line-height: 1.3;
+      padding-bottom: 1px;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        gap: 7px;
+        padding: 7px;
+      }
+      .tab { min-width: 120px; }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+      }
+      .header { display: none; }
+      .tabs { padding: 3px; gap: 5px; }
+      .tab {
+        min-height: 44px;
+        min-width: 132px;
+        font-size: 14px;
+        padding: 0 14px;
+      }
+      .tab-dot { width: 10px; height: 10px; }
+      .info-panel {
+        grid-template-columns: 1fr;
+        gap: 5px;
+        padding: 8px 10px;
+      }
+      .info-text {
+        font-size: 12px;
+        line-height: 1.38;
+      }
+      .controls {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px;
+      }
+      .ctrl-btn {
+        flex: 1 1 calc(50% - 3px);
+        min-width: 0;
+        min-height: 46px;
+        font-size: 15px;
+        gap: 8px;
+      }
+      .speed-wrap {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+        gap: 10px;
+        font-size: 13px;
+      }
+      input[type="range"] {
+        width: min(56vw, 220px);
+        height: 8px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        width: 20px;
+        height: 20px;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+      }
+      .speed-label {
+        width: 38px;
+        font-size: 12px;
+      }
+      .hint { display: none; }
+    }
+
+    @media (max-height: 720px) and (min-width: 641px) {
+      .shell { gap: 6px; padding: 6px; }
+      .header-title { font-size: 12px; }
+      .tab { min-height: 34px; font-size: 12px; }
+      .info-panel { padding: 8px 10px; }
+      .info-text { font-size: 12px; line-height: 1.35; }
+      .controls { padding: 6px; }
+      .ctrl-btn { min-height: 34px; font-size: 12px; }
+      .hint { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tab, .ctrl-btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <span class="logo">PLANCK · Cinematică</span>
+      <span class="header-title">Tipuri de traiectorii în mișcarea mecanică</span>
+    </header>
+
+    <nav class="tabs" id="tabs" aria-label="Tipuri de traiectorii">
+      <button class="tab active" data-type="rectilinear">
+        <span class="tab-dot" style="color:#5ea2ff;background:#5ea2ff"></span>Rectilinie
+      </button>
+      <button class="tab" data-type="parabolic">
+        <span class="tab-dot" style="color:#ff9b45;background:#ff9b45"></span>Parabolică
+      </button>
+      <button class="tab" data-type="circular">
+        <span class="tab-dot" style="color:#4cd38d;background:#4cd38d"></span>Circulară
+      </button>
+      <button class="tab" data-type="helicoidal">
+        <span class="tab-dot" style="color:#bb7dff;background:#bb7dff"></span>Elicoidală
+      </button>
+    </nav>
+
+    <section class="canvas-wrap">
+      <div class="legend">sistem Oxy</div>
+      <canvas id="c"></canvas>
+    </section>
+
+    <section class="info-panel">
+      <span class="info-badge" id="info-badge">TIP</span>
+      <p class="info-text" id="info-text"></p>
+    </section>
+
+    <section class="controls">
+      <button class="ctrl-btn" id="btn-pause">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="2" y="1" width="4" height="12" rx="1"/><rect x="8" y="1" width="4" height="12" rx="1"/></svg>
+        Pauză
+      </button>
+      <button class="ctrl-btn" id="btn-reset">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 7a5 5 0 1 0 1-3"/><path d="M2 2v3h3"/></svg>
+        Reset
+      </button>
+      <label class="speed-wrap" for="speed">
+        Viteză
+        <input type="range" id="speed" min="0.3" max="3" step="0.1" value="1">
+        <span class="speed-label" id="speed-val">1.0×</span>
+      </label>
+    </section>
+
+    <p class="hint">Tip: pe mobil, glisează pe tab-uri dacă nu încap toate pe un singur rând.</p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const pauseBtn = document.getElementById("btn-pause");
+    const resetBtn = document.getElementById("btn-reset");
+    const speedInput = document.getElementById("speed");
+    const speedLabel = document.getElementById("speed-val");
+    const infoBadge = document.getElementById("info-badge");
+    const infoText = document.getElementById("info-text");
+
+    const INFO = {
+      rectilinear: {
+        badge: "RECTILINIE",
+        text: "<strong>Direcția nu se schimbă.</strong> Corpul urmează o linie dreaptă. Viteza poate varia ca modul, dar vectorul viteză rămâne coliniar cu traiectoria.",
+        color: "#121212",
+        trail: "rgba(90,90,90,0.42)"
+      },
+      parabolic: {
+        badge: "PARABOLICĂ",
+        text: "<strong>Mișcare curbilinie în plan.</strong> Specifică proiectilelor: componenta orizontală este aproape uniformă, iar componenta verticală este influențată de gravitație.",
+        color: "#7e41f0",
+        trail: "rgba(126,65,240,0.48)"
+      },
+      circular: {
+        badge: "CIRCULARĂ",
+        text: "<strong>Traiectorie cu rază constantă.</strong> Modulul vitezei poate fi constant, însă direcția vitezei se schimbă permanent prin accelerația centripetă.",
+        color: "#9b74ea",
+        trail: "rgba(155,116,234,0.42)"
+      },
+      helicoidal: {
+        badge: "ELICOIDALĂ",
+        text: "<strong>Combină rotația cu translația.</strong> Corpul avansează pe o axă în timp ce oscilează/circularizează, generând o curbă elicoidală.",
+        color: "#5e35b1",
+        trail: "rgba(94,53,177,0.4)"
+      }
+    };
+
+    let type = "rectilinear";
+    let t = 0;
+    let speed = 1;
+    let paused = false;
+    let trail = [];
+    let animId = null;
+    let dpr = 1;
+    let cssW = 0;
+    let cssH = 0;
+
+    function getTrailCap() {
+      if (cssW < 560) return 120;
+      if (cssW < 900) return 170;
+      return 230;
+    }
+
+    function getGridStep() {
+      if (cssW < 460) return 34;
+      if (cssW < 720) return 42;
+      return 52;
+    }
+
+    function resize() {
+      const wrap = canvas.parentElement;
+      cssW = wrap.clientWidth;
+      cssH = wrap.clientHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 1.7);
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      trail = [];
+    }
+
+    function getPos(kind, time, W, H) {
+      const cx = W * 0.5;
+      const cy = H * 0.5;
+      switch (kind) {
+        case "rectilinear": {
+          const margin = 20;
+          const span = W - margin * 2;
+          const x = margin + ((time * 0.26 * span) % span);
+          return { x, y: cy };
+        }
+        case "parabolic": {
+          const p = (time * 0.21) % 1;
+          const margin = 20;
+          const x = margin + p * (W - margin * 2);
+          const a = Math.min(H * 0.46, 165);
+          const y = cy + a * 0.53 - a * 4 * p * (1 - p);
+          return { x, y };
+        }
+        case "circular": {
+          const r = Math.min(W, H) * 0.31;
+          const angle = time * 1.18;
+          return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+        }
+        case "helicoidal": {
+          const r = Math.min(H * 0.24, 90);
+          const angle = time * 2.1;
+          const margin = 20;
+          const x = margin + ((time * 0.22 * (W - margin * 2)) % (W - margin * 2));
+          const y = cy + r * Math.sin(angle);
+          return { x, y };
+        }
+        default:
+          return { x: cx, y: cy };
+      }
+    }
+
+    function drawBackground(W, H) {
+      const grd = ctx.createLinearGradient(0, 0, 0, H);
+      grd.addColorStop(0, "#ffffff");
+      grd.addColorStop(1, "#fbfbfb");
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawGrid(W, H) {
+      const step = getGridStep();
+      ctx.strokeStyle = "rgba(34, 34, 34, 0.08)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= H; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+    }
+
+    function drawAxes(W, H) {
+      const cx = W * 0.5;
+      const cy = H * 0.5;
+      ctx.strokeStyle = "rgba(18, 18, 18, 0.25)";
+      ctx.lineWidth = 1.35;
+      ctx.setLineDash([4, 5]);
+      ctx.beginPath();
+      ctx.moveTo(12, cy);
+      ctx.lineTo(W - 12, cy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, 12);
+      ctx.lineTo(cx, H - 12);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawTrail() {
+      const cap = getTrailCap();
+      while (trail.length > cap) trail.shift();
+      if (trail.length < 2) return;
+      for (let i = 0; i < trail.length - 1; i += 1) {
+        const p = trail[i];
+        const q = trail[i + 1];
+        const alpha = Math.max(0.08, i / trail.length);
+        ctx.globalAlpha = alpha * 0.72;
+        ctx.strokeStyle = INFO[type].trail;
+        ctx.lineWidth = cssW < 640 ? 2 : 2.6;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawBody(pos) {
+      const glowSize = cssW < 640 ? 20 : 26;
+      const bodySize = cssW < 640 ? 6 : 7;
+
+      const glow = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowSize);
+      glow.addColorStop(0, INFO[type].trail);
+      glow.addColorStop(1, "transparent");
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, glowSize, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, bodySize, 0, Math.PI * 2);
+      ctx.fillStyle = INFO[type].color;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, Math.max(2.4, bodySize * 0.43), 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+    }
+
+    function frame() {
+      if (!paused) t += 0.012 * speed;
+
+      ctx.clearRect(0, 0, cssW, cssH);
+      drawBackground(cssW, cssH);
+      drawGrid(cssW, cssH);
+      drawAxes(cssW, cssH);
+
+      const pos = getPos(type, t, cssW, cssH);
+      trail.push(pos);
+      drawTrail();
+      drawBody(pos);
+
+      animId = requestAnimationFrame(frame);
+    }
+
+    function setType(nextType) {
+      type = nextType;
+      t = 0;
+      trail = [];
+      document.querySelectorAll(".tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.type === type);
+      });
+      infoBadge.textContent = INFO[type].badge;
+      infoBadge.style.background = INFO[type].color;
+      infoText.innerHTML = INFO[type].text;
+    }
+
+    function setPaused(nextPaused) {
+      paused = nextPaused;
+      pauseBtn.innerHTML = paused
+        ? '<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><polygon points="2,1 12,7 2,13"/></svg> Redă'
+        : '<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="2" y="1" width="4" height="12" rx="1"/><rect x="8" y="1" width="4" height="12" rx="1"/></svg> Pauză';
+    }
+
+    document.getElementById("tabs").addEventListener("click", (event) => {
+      const btn = event.target.closest(".tab");
+      if (btn) setType(btn.dataset.type);
+    });
+
+    pauseBtn.addEventListener("click", () => setPaused(!paused));
+    resetBtn.addEventListener("click", () => { t = 0; trail = []; });
+    speedInput.addEventListener("input", (event) => {
+      speed = parseFloat(event.target.value);
+      speedLabel.textContent = `${speed.toFixed(1)}×`;
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (animId) cancelAnimationFrame(animId);
+        animId = null;
+      } else if (!animId) {
+        animId = requestAnimationFrame(frame);
+      }
+    });
+
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas.parentElement);
+
+    resize();
+    setType("rectilinear");
+    setPaused(false);
+    frame();
+  </script>
+</body>
+</html>
