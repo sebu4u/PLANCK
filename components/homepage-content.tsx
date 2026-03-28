@@ -29,7 +29,6 @@ import { CoursesSectionHomepage } from "@/components/courses-section-homepage"
 
 import { ReviewsSection } from "@/components/homepage-reviews"
 import { FAQSection } from "@/components/faq-section"
-import { ConcursBanner } from "@/components/concurs-banner"
 
 // Lazy load heavy Three.js components to reduce initial bundle size
 
@@ -42,7 +41,6 @@ const HowItWorksSection = dynamic(() => import("@/components/how-it-works-sectio
 
 const HOME_SECTION_IDS = [
   "home-hero",
-  "home-concurs",
   "home-video",
   "home-ai-demo",
   "home-courses",
@@ -172,11 +170,6 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
       {/* Hero Section cu temă spațială */}
       <section id="home-hero">
         <HomePageHeroRedesign isMobile={isMobile} />
-      </section>
-
-      {/* Concurs Banner */}
-      <section id="home-concurs">
-        <ConcursBanner />
       </section>
 
       {/* Video Cards Section */}

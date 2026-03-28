@@ -1,15 +1,31 @@
 "use client"
 
-import React, { Suspense, useState, useEffect, useMemo } from "react"
+import Image from "next/image"
+import React, { type CSSProperties, Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Home, Check, Loader2, Rocket, X } from "lucide-react"
-import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion"
+import { ArrowRight, Loader2, X } from "lucide-react"
+import { motion, useSpring, useTransform } from "framer-motion"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
+
+type PlanId = "free" | "plus" | "premium"
+
+type IndividualPlan = {
+  id: PlanId
+  name: string
+  priceLabel?: string
+  priceValue?: number
+  currency?: string
+  period?: string
+  description: string
+  popular?: boolean
+  /** Economii față de 12× lunar, afișate lângă preț la facturare anuală */
+  yearlySavingsRon?: number
+}
 
 function AnimatedPrice({ value }: { value: number }) {
   const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 })
@@ -27,9 +43,8 @@ function PricingPageContent() {
   const searchParams = useSearchParams()
   const { user, subscriptionPlan, refreshProfile } = useAuth()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<"individual" | "schools">("individual")
   const [isYearly, setIsYearly] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>("plus")
   const [checkoutLoadingPlan, setCheckoutLoadingPlan] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
@@ -37,37 +52,6 @@ function PricingPageContent() {
   const hasPaidSubscription = subscriptionPlan === "plus" || subscriptionPlan === "premium"
   const currentPlanRank =
     subscriptionPlan === "premium" ? 2 : subscriptionPlan === "plus" ? 1 : 0
-
-  // Generate stable star positions only on client
-  const stars = useMemo(() => {
-    if (!mounted) return []
-    const width = typeof window !== 'undefined' ? window.innerWidth : 1000
-    return Array.from({ length: 20 }, (_, i) => {
-      // Use a seeded random based on index for consistency
-      const seed = i * 0.618033988749895 // Golden ratio for better distribution
-      const random = (seed: number) => {
-        const x = Math.sin(seed) * 10000
-        return x - Math.floor(x)
-      }
-      
-      return {
-        id: i,
-        x: random(seed) * width,
-        y: random(seed + 1) * 400,
-        opacity: random(seed + 2) * 0.5 + 0.3,
-        scale: random(seed + 3) * 0.5 + 0.5,
-        width: random(seed + 4) * 2 + 1,
-        height: random(seed + 5) * 2 + 1,
-        animateY: random(seed + 6) * -20,
-        animateOpacity: random(seed + 7) * 0.3 + 0.2,
-        duration: random(seed + 8) * 5 + 5,
-      }
-    })
-  }, [mounted])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     const status = searchParams?.get("checkout")
@@ -212,402 +196,371 @@ function PricingPageContent() {
     }
   }
 
-  // Individual Plans Data
-  const individualPlans = [
-    {
-      id: "free",
-      name: "Free",
-      priceLabel: "Gratuit",
-      description: "Pentru cei care vor să exploreze",
-      features: [
-        "3 prompt-uri gratuite pe zi",
-        "Acces limitat la fișiere",
-        "Acces limitat la learning roadmaps",
-      ],
-      missingFeatures: [
-        "Learning roadmaps complete",
-        "Acces la toate modelele",
-        "Memorie îmbunătățită",
-        "Acces nelimitat la PlanckCode",
-      ],
-      cta: "Începe acum",
-      popular: false,
-    },
-    {
-      id: "plus",
-      name: "Plus",
-      priceValue: isYearly ? 290 : 29,
-      currency: "RON",
-      period: isYearly ? "/an" : "/lună",
-      description: "Cel mai popular pentru elevi",
-      features: [
-        "Tot ce conține planul Free",
-        "800 prompt-uri pe lună",
-        "Upload de 10 fișiere pe zi",
-        "Learning roadmaps",
-        "Acces la toate modelele",
-        "Memorie îmbunătățită",
-      ],
-      missingFeatures: ["Acces nelimitat la PlanckCode"],
-      cta: "Alege planul",
-      popular: true,
-      highlight: true,
-      yearlyDiscountVal: "Economisești 58 RON",
-    },
-    {
-      id: "premium",
-      name: "Premium",
-      priceValue: isYearly ? 590 : 59,
-      currency: "RON",
-      period: isYearly ? "/an" : "/lună",
-      description: "Putere maximă pentru performanță",
-      features: [
-        "Tot ce conține planul Free și Plus",
-        "Prompt-uri nelimitate",
-        "Acces nelimitat la PlanckCode",
-      ],
-      cta: "Alege planul",
-      popular: false,
-      yearlyDiscountVal: "Economisești 118 RON",
-    },
-  ]
+  const individualPlans = useMemo<IndividualPlan[]>(
+    () => [
+      {
+        id: "free",
+        name: "Free",
+        priceLabel: "Gratuit",
+        description: "Pentru a descoperi Planck",
+      },
+      {
+        id: "plus",
+        name: "Plus+",
+        priceValue: isYearly ? 290 : 29,
+        currency: "RON",
+        period: isYearly ? "/an" : "/lună",
+        description: "Doar 0.93 lei/zi",
+        popular: true,
+        yearlySavingsRon: 58,
+      },
+      {
+        id: "premium",
+        name: "Premium",
+        priceValue: isYearly ? 590 : 59,
+        currency: "RON",
+        period: isYearly ? "/an" : "/lună",
+        description: "Pentru elevul care vrea să ajungă primul",
+        yearlySavingsRon: 118,
+      },
+    ],
+    [isYearly]
+  )
 
-  // Schools Plans Data
-  const schoolPlans = [
-    {
-      id: "trial",
-      name: "School Trial Package",
-      subtitle: "Testați Planck cu o clasă înainte de adoptarea completă.",
-      features: [
-        "Acces complet la Planck Code, Planck Sketch, Insight AI",
-        "Peste 500+ probleme de fizică cu rezolvări video",
-        "Acces pentru o clasă întreagă (max. 30 elevi)",
-        "Panou de administrare pentru profesori",
-        "Asistență tehnică prioritară în timpul trialului",
-        "Training rapid pentru profesori (video + call)",
-      ],
-      cta: "Start School Trial",
-      note: "Trialul durează 14 zile și poate fi prelungit la cerere.",
-      gradient: "from-white/10 to-gray-400/10",
-      border: "border-white/40",
-    },
-    {
-      id: "custom",
-      name: "Custom School Plans",
-      subtitle: "Planuri flexibile pentru licee, colegii și rețele de școli.",
-      features: [
-        "Licențe pentru întreg liceul sau doar pentru clase selectate",
-        "Acces complet pentru elevi + profesori",
-        "Dashboard pentru profesori: progres, rapoarte, teme",
-        "Integrare în orarul și resursele școlii",
-        "Training complet pentru profesori",
-        "Suport tehnic dedicat",
-        "Posibilitatea de a activa module extra",
-      ],
-      cta: "Contact us for a personalized offer",
-      note: "Reduceri pentru implementări pe termen lung și parteneriate.",
-      gradient: "from-white/10 to-gray-400/10",
-      border: "border-white/40",
-    },
-  ]
+  const selectedPlanData =
+    individualPlans.find((plan) => plan.id === selectedPlan) ?? individualPlans[1]
+
+  const selectedConversionBlurb = useMemo(() => {
+    switch (selectedPlan) {
+      case "free":
+        return "Încearcă gratuit Insight și problemele Planck—fără card, fără obligații. Treci la un plan plătit când vezi că îți crește nota și îți scade timpul la teme."
+      case "plus":
+        return isYearly
+          ? "Un singur plătit pe an: mai puțin pe lună decât o ședință de meditații, cu Insight și resurse pentru tot anul școlar. Ideal dacă vrei continuitate fără surprize la facturare."
+          : "Cel mai bun raport preț–rezultate: suficient Insight și materiale pentru meditații, cu flexibilitate lunară și anulare oricând din cont."
+      case "premium":
+        return isYearly
+          ? "Acces nelimitat la Insight și PlanckCode pentru tot anul—pregătire pentru concursuri și admitere, cu cost lunar echivalent mai mic decât la abonamentul lunar."
+          : "Fără limite la Insight și PlanckCode: pentru concurs, olimpiadă și admitere, cu abonament lunar—îl oprești când vrei."
+      default:
+        return ""
+    }
+  }, [selectedPlan, isYearly])
+
+  const getPlanUiState = (planId: PlanId) => {
+    const isCurrentPlan = subscriptionPlan === planId
+    const isPaidPlan = planId === "plus" || planId === "premium"
+    const isCheckoutLoading = checkoutLoadingPlan === planId
+    const planRank = planId === "premium" ? 2 : planId === "plus" ? 1 : 0
+    const shouldManageInPortal = isPaidPlan && hasPaidSubscription
+    const isHigherTierThanCurrent = planRank > currentPlanRank
+    const isPaidPlanPurchaseDisabled = isPaidPlan && !purchasesEnabled && !hasPaidSubscription
+    const isActionLoading = isCheckoutLoading || (shouldManageInPortal && portalLoading)
+    const isDisabled = (planId === "free" && isCurrentPlan) || isActionLoading || isPaidPlanPurchaseDisabled
+
+    let buttonLabel = "Începe acum"
+    if (isActionLoading) {
+      buttonLabel = "Se deschide..."
+    } else if (isPaidPlan && isPaidPlanPurchaseDisabled) {
+      buttonLabel = "Indisponibil momentan"
+    } else if (isPaidPlan && shouldManageInPortal && isCurrentPlan) {
+      buttonLabel = "Gestionează planul"
+    } else if (isPaidPlan && shouldManageInPortal && isHigherTierThanCurrent) {
+      buttonLabel = "Upgrade din portal"
+    } else if (isPaidPlan && shouldManageInPortal) {
+      buttonLabel = "Schimbă din portal"
+    } else if (isCurrentPlan) {
+      buttonLabel = "Planul tău curent"
+    }
+
+    return {
+      isCurrentPlan,
+      isPaidPlan,
+      isCheckoutLoading,
+      shouldManageInPortal,
+      isPaidPlanPurchaseDisabled,
+      isActionLoading,
+      isDisabled,
+      buttonLabel,
+    }
+  }
+
+  const selectedPlanUi = getPlanUiState(selectedPlan)
+
+  const handlePrimaryCta = async () => {
+    if (selectedPlanUi.isDisabled) return
+
+    if (selectedPlan === "plus" || selectedPlan === "premium") {
+      if (selectedPlanUi.shouldManageInPortal) {
+        await openBillingPortal()
+        return
+      }
+
+      await startCheckout(selectedPlan)
+      return
+    }
+
+    router.push("/probleme")
+  }
 
   return (
-    <div className="relative min-h-screen w-full bg-[#101113] text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30">
-      {/* Top Glow Effect */}
-      <div className="absolute -top-[300px] left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/10 blur-[120px] rounded-[100%] pointer-events-none z-0" />
-      
-      {/* Stars Background */}
-      <div className="absolute top-0 left-0 right-0 h-[600px] overflow-hidden pointer-events-none z-0 opacity-60">
-        {stars.map((star) => (
-          <motion.div
-            key={star.id}
-            className="absolute bg-white rounded-full"
-            initial={{
-              x: star.x,
-              y: star.y,
-              opacity: star.opacity,
-              scale: star.scale,
-            }}
-            animate={{
-              y: [null, star.animateY],
-              opacity: [null, star.animateOpacity],
-            }}
-            transition={{
-              duration: star.duration,
-              repeat: Infinity,
-              repeatType: "reverse",
-              ease: "easeInOut",
-            }}
-            style={{
-              width: `${star.width}px`,
-              height: `${star.height}px`,
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Back Home Button */}
+    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-white text-[#111111] selection:bg-sky-200/70">
+      {/* Gradient orizontal + fade lung spre alb (fără „tăietură” la granița cu fundalul alb) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[min(78vh,820px)] max-h-[90vh]"
+        style={{
+          backgroundImage: [
+            // de sus în jos: lasă culorile vizibile sus, tranziție lină spre #fff
+            "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.04) 38%, rgba(255,255,255,0.22) 52%, rgba(255,255,255,0.58) 68%, rgba(255,255,255,0.92) 82%, #ffffff 92%, #ffffff 100%)",
+            "linear-gradient(90deg, #b9ddff 0%, #f7f0ff 50%, #ffd8bd 100%)",
+          ].join(", "),
+        }}
+      />
+      <div className="pointer-events-none absolute left-[-8%] top-[-80px] h-[260px] w-[320px] rounded-full bg-sky-300/35 blur-3xl" />
+      <div className="pointer-events-none absolute right-[-6%] top-[-70px] h-[260px] w-[320px] rounded-full bg-orange-300/35 blur-3xl" />
+
       <button
-        onClick={() => router.push('/')}
-        className="absolute top-4 right-8 max-[600px]:right-4 z-50 flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white transition-colors"
+        type="button"
+        onClick={() => router.push("/")}
+        className="absolute right-3 top-3 z-30 inline-flex items-center justify-center rounded-md p-1.5 text-gray-800 transition hover:opacity-75 active:opacity-60 sm:right-5 sm:top-5"
+        aria-label="Înapoi acasă"
         title="Înapoi acasă"
       >
-        <Home className="w-4 h-4" />
-        <span className="text-sm font-medium">Înapoi acasă</span>
+        <X className="h-4 w-4 drop-shadow-sm" strokeWidth={2.25} strokeLinecap="round" />
       </button>
 
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-start pt-32 p-4 sm:p-6 lg:p-8">
-        
-        {/* Header */}
-        <div className="flex flex-col items-center mb-12 z-20 mt-8">
-          <div className="flex items-center gap-3 text-3xl font-bold text-white title-font mb-3">
-            <Rocket className="w-8 h-8 text-white" />
-            <span className="tracking-tight">PLANCK</span>
+      <main
+        className="relative z-10 mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col px-4 pb-[calc(8.25rem+env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))] sm:px-6 lg:px-8"
+      >
+        <section className="mx-auto flex w-full max-w-4xl shrink-0 flex-col items-center text-center">
+          <div className="-mt-0.5 mb-3 flex justify-center sm:mb-4">
+            <Image
+              src="/streak-icon.png"
+              alt="Planck streak icon"
+              width={240}
+              height={240}
+              priority
+              className="h-[168px] w-[168px] object-contain sm:h-[188px] sm:w-[188px]"
+            />
           </div>
-          <p className="text-gray-400 text-lg tracking-wide font-light">
-            Simple. Transparent. Flexible.
+
+          <h1 className="max-w-3xl text-[1.65rem] font-semibold leading-[1.15] tracking-[-0.04em] text-[#171717] sm:text-4xl sm:leading-tight">
+            Colegii tăi deja folosesc Insight. Tu?
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-600 sm:mt-2.5 sm:text-base sm:leading-relaxed">
+            Mai puțin decât o oră de meditații. Fără contracte, fără riscuri.
           </p>
-        </div>
 
-        {/* Tabs */}
-        <div className="flex items-center justify-center p-1 mb-8 sm:mb-12 bg-white/5 backdrop-blur-sm rounded-full border border-white/10">
-          <button
-            onClick={() => setActiveTab("individual")}
-            className={cn(
-              "px-6 py-2 rounded-full text-sm font-medium transition-all duration-300",
-              activeTab === "individual" 
-                ? "bg-white text-black shadow-lg scale-105" 
-                : "text-gray-400 hover:text-white"
-            )}
-          >
-            Individual
-          </button>
-          <button
-            onClick={() => setActiveTab("schools")}
-            className={cn(
-              "px-6 py-2 rounded-full text-sm font-medium transition-all duration-300",
-              activeTab === "schools" 
-                ? "bg-white text-black shadow-lg scale-105" 
-                : "text-gray-400 hover:text-white"
-            )}
-          >
-            Schools
-          </button>
-        </div>
-
-        {/* Content Area */}
-        <div className="w-full max-w-7xl mx-auto">
           {user && hasPaidSubscription && (
-            <div className="flex justify-center mb-8">
-              <button
-                onClick={openBillingPortal}
-                disabled={portalLoading}
-                className="px-6 py-2 rounded-full bg-white/10 text-white border border-white/20 hover:bg-white/20 transition-colors text-sm font-medium"
-              >
-                {portalLoading ? "Se deschide portalul..." : "Gestionează abonamentul"}
-              </button>
-            </div>
+            <button
+              onClick={openBillingPortal}
+              disabled={portalLoading}
+              className="mt-3 inline-flex items-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-xs font-medium text-gray-800 shadow-sm backdrop-blur transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm"
+            >
+              {portalLoading ? "Se deschide portalul..." : "Gestionează abonamentul"}
+            </button>
           )}
-          <AnimatePresence mode="wait">
-            {activeTab === "individual" ? (
-              <motion.div
-                key="individual"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="flex flex-col items-center"
-              >
-                {/* Cards Grid - Individual */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-10 px-2">
-                  {individualPlans.map((plan) => {
-                    const isCurrentPlan = subscriptionPlan === plan.id
-                    const isPaidPlan = plan.id === "plus" || plan.id === "premium"
-                    const isCheckoutLoading = checkoutLoadingPlan === plan.id
-                    const planRank =
-                      plan.id === "premium" ? 2 : plan.id === "plus" ? 1 : 0
-                    const shouldManageInPortal = isPaidPlan && hasPaidSubscription
-                    const isHigherTierThanCurrent = planRank > currentPlanRank
-                    const isPaidPlanPurchaseDisabled = isPaidPlan && !purchasesEnabled && !hasPaidSubscription
-                    const isActionLoading = isCheckoutLoading || (shouldManageInPortal && portalLoading)
+        </section>
 
-                    return (
-                      <div
-                        key={plan.id}
-                        className={cn(
-                          "relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 group hover:-translate-y-1",
-                          plan.highlight
-                            ? "bg-[#1A1B1E]/80 border-white/40 shadow-[0_0_40px_-10px_rgba(255,255,255,0.2)]"
-                            : "bg-[#151619]/60 border-white/10 hover:border-white/20 hover:bg-[#1A1B1E]/80"
-                        )}
-                      >
-                        {plan.yearlyDiscountVal && isYearly && (
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-lg whitespace-nowrap">
-                            {plan.yearlyDiscountVal}
-                          </div>
-                        )}
-                        
-                        <div className="mb-5">
-                          <h3 className="text-lg font-medium text-gray-200 mb-1">{plan.name}</h3>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-3xl sm:text-4xl font-bold text-white">
-                              {plan.priceValue ? (
-                                <>
-                                  <AnimatedPrice value={plan.priceValue} /> {plan.currency}
-                                </>
-                              ) : (
-                                plan.priceLabel
-                              )}
-                            </span>
-                            {plan.priceLabel !== "Gratuit" && (
-                              <span className="text-gray-500 text-sm">{plan.period}</span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-400 mt-2 min-h-[20px]">{plan.description}</p>
-                        </div>
+        <div className="flex min-h-0 w-full flex-1 flex-col justify-end pt-2 pb-1 sm:pt-3 sm:pb-2">
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="w-full mt-8 sm:mt-0"
+        >
+          <div className="grid items-stretch gap-5 md:grid-cols-3 md:gap-4">
+            {individualPlans.map((plan) => {
+              const ui = getPlanUiState(plan.id)
+              const isSelected = selectedPlan === plan.id
 
-                        <ul className="space-y-3 mb-8 flex-1">
-                          {plan.features.map((feature, i) => (
-                            <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
-                              <Check className="w-4 h-4 text-white shrink-0 mt-0.5" />
-                              <span className="leading-tight">{feature}</span>
-                            </li>
-                          ))}
-                          {plan.missingFeatures?.map((feature, i) => (
-                            <li key={`missing-${i}`} className="flex items-start gap-3 text-sm text-gray-600">
-                              <X className="w-4 h-4 text-gray-700 shrink-0 mt-0.5" />
-                              <span className="leading-tight">{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
+              return (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "relative h-full rounded-[28px] p-[1.5px] transition duration-200",
+                    plan.id === "free" && "order-2 md:order-1",
+                    plan.id === "plus" && "order-1 md:order-2",
+                    plan.id === "premium" && "order-3 md:order-3",
+                    plan.popular
+                      ? "bg-gradient-to-r from-[#7aaeff] via-[#d39bff] to-[#ffb35c] shadow-[0_18px_45px_rgba(124,58,237,0.16)]"
+                      : isSelected
+                        ? "bg-gradient-to-r from-sky-300/80 to-orange-300/80 shadow-[0_18px_45px_rgba(15,23,42,0.1)]"
+                        : "bg-gray-200"
+                  )}
+                >
+                  {plan.popular && (
+                    <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70 bg-white px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-700 shadow-md sm:px-4 sm:py-1 sm:text-xs sm:tracking-[0.18em]">
+                      Cel mai popular
+                    </div>
+                  )}
 
-                        <button
-                          onClick={async () => {
-                            if (isPaidPlanPurchaseDisabled) return
-                            if (plan.id === "plus" || plan.id === "premium") {
-                              if (shouldManageInPortal) {
-                                await openBillingPortal()
-                                return
-                              }
-
-                              await startCheckout(plan.id as "plus" | "premium")
-                            } else if (plan.id === "free") {
-                              router.push('/probleme')
-                            }
-                          }}
-                          disabled={(plan.id === "free" && isCurrentPlan) || isActionLoading || isPaidPlanPurchaseDisabled}
-                          className={cn(
-                            "w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                            plan.highlight
-                              ? "bg-white text-black hover:bg-gray-200 shadow-lg shadow-white/10"
-                              : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
-                          )}
-                        >
-                          {isActionLoading ? (
-                            <span className="inline-flex items-center gap-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Se deschide...
-                            </span>
-                          ) : isPaidPlan && isPaidPlanPurchaseDisabled ? (
-                            "Indisponibil momentan"
-                          ) : isPaidPlan && shouldManageInPortal && isCurrentPlan ? (
-                            "Gestionează planul"
-                          ) : isPaidPlan && shouldManageInPortal && isHigherTierThanCurrent ? (
-                            "Upgrade din portal"
-                          ) : isPaidPlan && shouldManageInPortal ? (
-                            "Schimbă din portal"
-                          ) : isCurrentPlan ? (
-                            "Planul tău curent"
-                          ) : (
-                            plan.cta
-                          )}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <p className="text-center text-sm text-gray-400 mb-8 max-w-2xl">
-                  Achiziția inițială se face prin Stripe Checkout, iar upgrade-ul, downgrade-ul și anularea
-                  abonamentului se gestionează securizat din portalul Stripe.
-                </p>
-
-                {/* Slider Section - Below Cards */}
-                <div className="flex items-center gap-4 bg-[#151619] px-6 py-3 rounded-full border border-white/5 shadow-xl">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-white">Save with yearly billing</span>
-                    <Switch
-                      checked={isYearly}
-                      onCheckedChange={setIsYearly}
-                      className="data-[state=checked]:bg-[#4A4B4E] data-[state=unchecked]:bg-[#2A2B2E]"
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="schools"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto px-2"
-              >
-                {schoolPlans.map((plan) => (
-                  <div
-                    key={plan.id}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPlan(plan.id)}
+                    aria-pressed={isSelected}
                     className={cn(
-                      "relative flex flex-col p-8 rounded-2xl border backdrop-blur-sm transition-all duration-300 bg-[#151619]/60 hover:bg-[#1A1B1E]/80",
-                      plan.border
+                      "relative flex h-full w-full flex-col rounded-[24px] bg-white p-3 text-left transition duration-200 sm:rounded-[27px] sm:p-5",
+                      isSelected ? "shadow-[0_18px_40px_rgba(15,23,42,0.12)]" : "shadow-[0_10px_30px_rgba(15,23,42,0.06)]",
+                      "min-h-[128px] sm:min-h-[168px]"
                     )}
                   >
-                    {/* Background Gradient Hint */}
-                    <div className={cn("absolute inset-0 rounded-2xl bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none", plan.gradient)} />
-
-                    <div className="relative z-10">
-                      <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
-                      <p className="text-gray-400 mb-8 text-sm leading-relaxed">{plan.subtitle}</p>
-
-                      <ul className="space-y-4 mb-8">
-                        {plan.features.map((feature, i) => (
-                          <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
-                            <div className="mt-1 w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                            <span className="leading-tight">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      <div className="mt-auto pt-6 border-t border-white/5">
-                        <button 
-                          onClick={() => router.push("/contact")}
-                          className="w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group"
-                        >
-                          {plan.cta}
-                          <span className="group-hover:translate-x-1 transition-transform">→</span>
-                        </button>
-                        <p className="text-xs text-gray-500 mt-3 text-center">
-                          {plan.note}
-                        </p>
+                    <div className="flex flex-1 flex-col">
+                      <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4">
+                        <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#171717] sm:text-2xl">
+                          {plan.name}
+                        </h2>
+                        {ui.isCurrentPlan && (
+                          <span className="rounded-full bg-[#f3f4f6] px-3 py-1 text-xs font-medium text-gray-600">
+                            Planul tău
+                          </span>
+                        )}
                       </div>
+
+                      <div className="flex items-end justify-between gap-2">
+                        <div className="flex min-w-0 items-end gap-1.5">
+                          <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
+                            {plan.priceValue ? (
+                              <>
+                                <AnimatedPrice value={plan.priceValue} /> {plan.currency}
+                              </>
+                            ) : (
+                              plan.priceLabel
+                            )}
+                          </span>
+                          {plan.priceLabel !== "Gratuit" && (
+                            <span className="pb-0.5 text-xs font-medium text-gray-500 sm:pb-1 sm:text-sm">
+                              {plan.period}
+                            </span>
+                          )}
+                        </div>
+                        {plan.yearlySavingsRon != null && (
+                          <span
+                            className={cn(
+                              "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
+                              isYearly ? "text-red-600" : "invisible"
+                            )}
+                            aria-hidden={!isYearly}
+                          >
+                            -{plan.yearlySavingsRon}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                        {plan.description}
+                      </p>
                     </div>
-                  </div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          <p
+            className="mx-auto mt-5 max-w-2xl text-center text-xs leading-relaxed text-gray-600 sm:mt-4 sm:text-sm sm:leading-6"
+            aria-live="polite"
+          >
+            {selectedConversionBlurb}
+          </p>
+        </motion.section>
         </div>
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/85 backdrop-blur-xl">
+        <div
+          className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-end md:justify-between md:gap-6 md:py-4 sm:px-6 lg:px-8"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+              Plan selectat
+            </p>
+            <div className="mt-1 flex flex-row items-center justify-between gap-2 sm:gap-4">
+              <div className="flex min-w-0 flex-1 flex-wrap items-end gap-x-2 gap-y-0.5 pr-1">
+                <span className="text-base font-semibold tracking-[-0.03em] text-[#171717] sm:text-lg">
+                  {selectedPlanData.name}
+                </span>
+                <span className="text-xs text-gray-500 sm:text-sm">
+                  {selectedPlanData.priceValue
+                    ? `${selectedPlanData.priceValue} ${selectedPlanData.currency}${selectedPlanData.period}`
+                    : selectedPlanData.priceLabel}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+                <span
+                  className={cn(
+                    "text-right text-xs transition-colors sm:min-w-[2.75rem] sm:text-sm",
+                    !isYearly ? "font-semibold text-[#171717]" : "text-gray-400"
+                  )}
+                >
+                  Lunar
+                </span>
+                <Switch
+                  checked={isYearly}
+                  onCheckedChange={setIsYearly}
+                  aria-label="Alege facturare lunară sau anuală"
+                  className="data-[state=checked]:bg-[#111111] data-[state=unchecked]:bg-gray-300"
+                />
+                <span
+                  className={cn(
+                    "text-left text-xs transition-colors sm:min-w-[2.75rem] sm:text-sm",
+                    isYearly ? "font-semibold text-[#171717]" : "text-gray-400"
+                  )}
+                >
+                  Anual
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handlePrimaryCta}
+            disabled={selectedPlanUi.isDisabled}
+            className={cn(
+              "inline-flex min-h-14 w-full shrink-0 items-center justify-center rounded-full px-8 text-base font-semibold md:w-auto md:min-w-[220px]",
+              selectedPlanUi.isDisabled
+                ? "cursor-not-allowed bg-gray-200 text-gray-500"
+                : "dashboard-start-glow bg-[#333333] text-white shadow-[0_4px_0_#0a0a0a] transition-[transform,box-shadow,opacity] hover:translate-y-1 hover:shadow-[0_1px_0_#0a0a0a] active:translate-y-1 active:shadow-[0_1px_0_#0a0a0a]"
+            )}
+            style={
+              !selectedPlanUi.isDisabled
+                ? ({ "--start-glow-tint": "rgba(255, 255, 255, 0.42)" } as CSSProperties)
+                : undefined
+            }
+          >
+            <span className="relative z-[1] inline-flex items-center justify-center gap-2">
+              {selectedPlanUi.isActionLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Se deschide...
+                </>
+              ) : (
+                <>
+                  {selectedPlanUi.buttonLabel}
+                  {!selectedPlanUi.isDisabled && (
+                    <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+                  )}
+                </>
+              )}
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
 export default function PricingPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen w-full bg-[#101113] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-white" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen w-full items-center justify-center bg-white">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-700" />
+        </div>
+      }
+    >
       <PricingPageContent />
     </Suspense>
   )

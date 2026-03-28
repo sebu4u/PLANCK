@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, ChevronRight } from "lucide-react"
+import { BookOpen, ChevronRight } from "lucide-react"
 import type { LearningPathChapter, LearningPathLesson, LearningPathLessonItem } from "@/lib/supabase-learning-paths"
 import { ITEM_TYPE_LABEL, getItemIcon } from "@/components/invata/learning-path-item-body"
 
@@ -31,37 +31,29 @@ export function LearningPathLessonPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-5 pb-10 pt-28 sm:px-8 lg:px-12">
-      <Link
-        href="/invata"
-        className="inline-flex items-center gap-2 text-sm font-medium text-[#4d4d4d] transition-colors hover:text-[#111111]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Înapoi la capitole
-      </Link>
-
-      <div className="mt-6 grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="lg:self-start lg:max-h-[calc(100vh-8rem)] rounded-[24px] border border-[#e8e2ee] bg-white p-3 shadow-[0_12px_32px_rgba(82,44,111,0.08)] overflow-hidden sm:p-5">
-          <div className="flex items-start justify-start bg-white">
+      <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
+        <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
+          <div className="flex w-full justify-center bg-transparent lg:justify-start">
             {lesson.image_url ? (
               <img
                 src={lesson.image_url}
                 alt={lesson.title}
-                className="h-20 w-auto object-contain object-left sm:h-32 lg:h-36"
+                className="mx-auto h-36 w-auto max-w-full object-contain sm:h-40 lg:mx-0 lg:h-36 lg:object-left"
                 loading="lazy"
               />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center bg-white text-[#8a8a95] sm:h-32 sm:w-32 lg:h-36 lg:w-36">
-                <BookOpen className="h-6 w-6 sm:h-10 sm:w-10" />
+              <div className="flex h-36 w-36 items-center justify-center text-[#8a8a95] sm:h-40 sm:w-40 lg:h-36 lg:w-36">
+                <BookOpen className="h-9 w-9 sm:h-10 sm:w-10 lg:h-10 lg:w-10" />
               </div>
             )}
           </div>
-          <div className="mt-3 sm:mt-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6fac] sm:text-xs">Level 1</p>
-            <h1 className="mt-1 text-base font-bold leading-tight text-[#111111] sm:mt-2 sm:text-xl">{lesson.title}</h1>
-            <p className="mt-2 text-xs leading-snug text-[#6f657b] sm:mt-3 sm:text-sm">
+          <div className="mt-5 w-full text-center lg:mt-4 lg:text-left">
+            <p className="mb-0 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6fac] sm:text-xs lg:mb-2 lg:block">Level 1</p>
+            <h1 className="text-xl font-bold leading-tight text-[#111111] sm:text-2xl lg:mt-1">{lesson.title}</h1>
+            <p className="mt-3 text-sm leading-snug text-[#6f657b] lg:mt-3 lg:text-sm">
               {lesson.description || "Construiește pas cu pas această lecție."}
             </p>
-            <p className="mt-2 text-xs font-semibold text-[#22192d] sm:mt-4 sm:text-sm">
+            <p className="mt-3 text-sm font-semibold text-[#22192d] lg:mt-4">
               {items.length} {items.length === 1 ? "lecție" : "lecții"}
             </p>
           </div>

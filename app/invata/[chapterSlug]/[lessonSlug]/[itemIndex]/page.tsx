@@ -1,9 +1,12 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import type { Problem } from "@/data/problems"
+import { Navigation } from "@/components/navigation"
 import { LessonItemShell } from "@/components/invata/lesson-item-shell"
+import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { supabase } from "@/lib/supabaseClient"
 import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
+import { canViewLearningPathContent } from "@/lib/learning-path-access"
 import {
   ITEM_TYPE_LABEL,
   LearningPathItemBody,
@@ -46,6 +49,11 @@ export async function generateMetadata({
 }: {
   params: Promise<{ chapterSlug: string; lessonSlug: string; itemIndex: string }>
 }): Promise<Metadata> {
+  const canViewLearningPathsContent = await canViewLearningPathContent()
+  if (!canViewLearningPathsContent) {
+    return generatePageMetadata("learning-paths")
+  }
+
   const { chapterSlug, lessonSlug, itemIndex } = await params
   const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
 
@@ -75,6 +83,7 @@ export default async function InvataLessonItemPage({
 }: {
   params: Promise<{ chapterSlug: string; lessonSlug: string; itemIndex: string }>
 }) {
+  const canViewLearningPathsContent = await canViewLearningPathContent()
   const { chapterSlug, lessonSlug, itemIndex } = await params
   const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
 
@@ -85,6 +94,17 @@ export default async function InvataLessonItemPage({
   const parsedIndex = Number.parseInt(itemIndex, 10)
   if (!Number.isFinite(parsedIndex) || parsedIndex < 1) {
     notFound()
+  }
+
+  if (!canViewLearningPathsContent) {
+    return (
+      <>
+        <Navigation />
+        <main className="min-h-screen bg-[#ffffff]">
+          <LearningPathLessonLockedPreview chapter={chapter} lesson={lesson} />
+        </main>
+      </>
+    )
   }
 
   const items = await getLearningPathLessonItems(lesson.id)

@@ -2,7 +2,9 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { LearningPathLessonPage } from "@/components/invata/learning-path-lesson-page"
+import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
+import { canViewLearningPathContent } from "@/lib/learning-path-access"
 import {
   getLearningPathChapterById,
   getLearningPathChapterBySlug,
@@ -46,6 +48,7 @@ export default async function InvataLessonDetailPage({
   params: Promise<{ chapterSlug: string; lessonSlug: string }>
 }) {
   const { chapterSlug, lessonSlug } = await params
+  const canViewLearningPathsContent = await canViewLearningPathContent()
 
   const chapter = isUuid(chapterSlug)
     ? await getLearningPathChapterById(chapterSlug)
@@ -63,13 +66,17 @@ export default async function InvataLessonDetailPage({
     notFound()
   }
 
-  const items = await getLearningPathLessonItems(lesson.id)
+  const items = canViewLearningPathsContent ? await getLearningPathLessonItems(lesson.id) : []
 
   return (
     <>
       <Navigation />
       <main className="min-h-screen bg-[#ffffff]">
-        <LearningPathLessonPage chapter={chapter} lesson={lesson} items={items} />
+        {canViewLearningPathsContent ? (
+          <LearningPathLessonPage chapter={chapter} lesson={lesson} items={items} />
+        ) : (
+          <LearningPathLessonLockedPreview chapter={chapter} lesson={lesson} />
+        )}
       </main>
     </>
   )

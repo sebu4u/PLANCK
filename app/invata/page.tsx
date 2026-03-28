@@ -10,11 +10,13 @@ import {
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import type { Problem } from "@/data/problems"
+import { canViewLearningPathContent } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
 export const revalidate = 21600
 
 export default async function InvataPage() {
+  const canViewLearningPathsContent = await canViewLearningPathContent()
   const chapters = await getLearningPathChapters()
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
   const problemsByChapterId: Record<string, Problem[]> = {}
@@ -51,6 +53,7 @@ export default async function InvataPage() {
             chapters={chapters}
             lessonsByChapter={lessonsByChapter}
             problemsByChapterId={problemsByChapterId}
+            showComingSoonBadge={!canViewLearningPathsContent}
           />
         </div>
       </main>
