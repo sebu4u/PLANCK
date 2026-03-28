@@ -6,23 +6,23 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/private/'],
+        disallow: ['/dashboard/', '/api/', '/admin/'],
       },
       {
         userAgent: 'GPTBot',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/private/'],
+        disallow: ['/dashboard/', '/api/', '/admin/'],
       },
       {
         userAgent: 'ClaudeBot',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/private/'],
+        disallow: ['/dashboard/', '/api/', '/admin/'],
       },
       {
-        userAgent: 'CCBot',
+        userAgent: 'PerplexityBot',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/private/'],
-      }
+        disallow: ['/dashboard/', '/api/', '/admin/'],
+      },
     ],
     sitemap: 'https://www.planck.academy/sitemap.xml',
   }

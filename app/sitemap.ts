@@ -1,137 +1,112 @@
-import { MetadataRoute } from 'next'
-import {
-  getAllGrades,
-  getChaptersByGradeId
-} from '@/lib/supabase-physics'
-import { slugify } from '@/lib/slug'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from "@supabase/supabase-js"
+import { MetadataRoute } from "next"
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://www.planck.academy'
+const BASE_URL = "https://www.planck.academy"
+const SITEMAP_PAGE_SIZE = 1000
 
-  // Get all lessons for dynamic sitemap with updated_at
-  const grades = await getAllGrades()
-  const allLessons: Array<{ title: string; id: string; updated_at: string }> = []
+type ProblemSitemapRow = {
+  id: string
+  updated_at?: string | null
+  topic?: string | null
+  grade?: string | number | null
+  category?: string | null
+  class?: number | null
+}
 
-  for (const grade of grades) {
-    const chapters = await getChaptersByGradeId(grade.id)
-    for (const chapter of chapters) {
-      // Fetch lessons with updated_at field directly from Supabase
-      const { data: lessons, error } = await supabase
-        .from('lessons')
-        .select('id, title, updated_at')
-        .eq('chapter_id', chapter.id)
-        .eq('is_active', true)
-        .order('order_index')
+function getServerSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+  return createClient(supabaseUrl, supabaseAnonKey)
+}
 
-      if (!error && lessons) {
-        allLessons.push(...lessons.map(l => ({
-          title: l.title,
-          id: l.id,
-          updated_at: l.updated_at || new Date().toISOString()
-        })))
-      }
-    }
+async function getProblemCount(): Promise<number> {
+  const serverSupabase = getServerSupabaseClient()
+  const { count } = await serverSupabase
+    .from("problems")
+    .select("id", { count: "exact", head: true })
+
+  return count ?? 0
+}
+
+async function getProblemsRange(start: number, end: number): Promise<ProblemSitemapRow[]> {
+  const serverSupabase = getServerSupabaseClient()
+
+  // First, try requested SEO columns.
+  const primaryQuery = await serverSupabase
+    .from("problems")
+    .select("id, updated_at, topic, grade")
+    .order("id", { ascending: true })
+    .range(start, end)
+
+  if (!primaryQuery.error) {
+    return (primaryQuery.data || []) as ProblemSitemapRow[]
   }
 
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1,
-    },
-    // Paginated problems pages (first 10)
-    ...Array.from({ length: 10 }, (_, i) => ({
-      url: `${baseUrl}/probleme/pagina/${i + 1}`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
-      priority: 0.7 as const,
-    })),
-    {
-      url: `${baseUrl}/cursuri`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/probleme`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/sketch`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/insight`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/planckcode`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/planckcode/ide`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/pricing`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/despre`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
+  // Fallback to existing schema fields used in this codebase.
+  const fallbackQuery = await serverSupabase
+    .from("problems")
+    .select("id, updated_at, category, class")
+    .order("id", { ascending: true })
+    .range(start, end)
+
+  if (fallbackQuery.error || !fallbackQuery.data) return []
+  return fallbackQuery.data as ProblemSitemapRow[]
+}
+
+export async function generateSitemaps() {
+  const totalProblems = await getProblemCount()
+  const numberOfSitemaps = Math.max(1, Math.ceil(totalProblems / SITEMAP_PAGE_SIZE))
+
+  return Array.from({ length: numberOfSitemaps }, (_, id) => ({ id }))
+}
+
+export default async function sitemap({
+  id = 0,
+}: {
+  id?: number
+} = {}): Promise<MetadataRoute.Sitemap> {
+  const start = id * SITEMAP_PAGE_SIZE
+  const end = start + SITEMAP_PAGE_SIZE - 1
+  const problems = await getProblemsRange(start, end)
+
+  const staticEntries: MetadataRoute.Sitemap =
+    id === 0
+      ? [
+          {
+            url: `${BASE_URL}/`,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 1,
+          },
+          {
+            url: `${BASE_URL}/catalog`,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 1,
+          },
+          {
+            url: `${BASE_URL}/probleme`,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 1,
+          },
+          {
+            url: `${BASE_URL}/invata`,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 1,
+          },
+        ]
+      : []
+
+  const problemEntries: MetadataRoute.Sitemap = problems.map((problem) => {
+    return {
+      url: `${BASE_URL}/probleme/${encodeURIComponent(problem.id)}`,
+      lastModified: problem.updated_at ? new Date(problem.updated_at) : new Date(),
+      changeFrequency: "monthly",
       priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/contact`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/ajutor`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/cookie-policy`,
-      lastModified: new Date(),
-      changeFrequency: 'yearly',
-      priority: 0.4,
-    },
-    {
-      url: `${baseUrl}/termeni`,
-      lastModified: new Date(),
-      changeFrequency: 'yearly',
-      priority: 0.3,
-    },
-    {
-      url: `${baseUrl}/register`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    // Dynamic lesson URLs
-    ...allLessons.map(lesson => ({
-      url: `${baseUrl}/cursuri/${slugify(lesson.title)}`,
-      lastModified: new Date(lesson.updated_at),
-      changeFrequency: 'weekly' as const,
-      priority: 0.8,
-    })),
-  ]
+    }
+  })
+
+  return [...staticEntries, ...problemEntries]
 }
