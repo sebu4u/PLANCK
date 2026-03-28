@@ -3,7 +3,7 @@ import { ArrowLeft, Trophy } from "lucide-react"
 
 import { ConcursNavbar } from "@/components/concurs/concurs-navbar"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 type GradeKey = "IX" | "X" | "XI" | "XII"
 
@@ -66,28 +66,33 @@ export function RezultatePublicContent({ results }: RezultatePublicContentProps)
                     Nu există rezultate publicate momentan pentru această clasă.
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[80px]">Nr.</TableHead>
-                        <TableHead>Nume</TableHead>
-                        <TableHead>Școală</TableHead>
-                        <TableHead className="w-[140px]">Punctaj</TableHead>
-                        <TableHead className="w-[180px]">Premiu</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {classRows.map((row, index) => (
-                        <TableRow key={row.id}>
-                          <TableCell className="font-medium">{row.position ?? index + 1}</TableCell>
-                          <TableCell>{row.student_name}</TableCell>
-                          <TableCell>{row.school}</TableCell>
-                          <TableCell>{row.score}</TableCell>
-                          <TableCell>{row.prize}</TableCell>
+                  /* Wrapper local (nu <Table> din ui): pe mobil, overflow-auto pe wrapper-ul implicit
+                     blochează scroll-ul vertical al paginii peste tabel; pan-x lasă swipe-ul vertical
+                     pentru document și păstrează scroll orizontal când tabelul e mai lat decât ecranul. */
+                  <div className="relative w-full overflow-x-auto max-md:[touch-action:pan-x]">
+                    <table className="w-full caption-bottom text-sm">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[80px]">Nr.</TableHead>
+                          <TableHead>Nume</TableHead>
+                          <TableHead>Școală</TableHead>
+                          <TableHead className="w-[140px]">Punctaj</TableHead>
+                          <TableHead className="w-[180px]">Premiu</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {classRows.map((row, index) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="font-medium">{row.position ?? index + 1}</TableCell>
+                            <TableCell>{row.student_name}</TableCell>
+                            <TableCell>{row.school}</TableCell>
+                            <TableCell>{row.score}</TableCell>
+                            <TableCell>{row.prize}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </table>
+                  </div>
                 )}
               </section>
             )
