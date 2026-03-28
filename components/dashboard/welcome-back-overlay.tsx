@@ -2,7 +2,7 @@
 
 import { type CSSProperties } from "react"
 import Image from "next/image"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Loader2 } from "lucide-react"
 
 type WelcomeBackOverlayProps = {
   username?: string
@@ -22,7 +22,7 @@ export function WelcomeBackOverlay({
   return (
     <div
       className="fixed inset-0 z-[540] bg-white"
-      onClick={onBackdropClick}
+      onClick={ctaLoading ? undefined : onBackdropClick}
       role="presentation"
     >
       <div
@@ -55,12 +55,22 @@ export function WelcomeBackOverlay({
           type="button"
           onClick={onCtaClick}
           disabled={ctaLoading}
+          aria-busy={ctaLoading}
           className="dashboard-start-glow inline-flex min-h-12 w-full max-w-[260px] items-center justify-center rounded-full bg-[#383838] px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_0_#282828] transition-[transform,box-shadow,opacity] hover:translate-y-1 hover:shadow-[0_1px_0_#282828] active:translate-y-1 active:shadow-[0_1px_0_#282828] disabled:cursor-not-allowed disabled:opacity-70"
           style={{ "--start-glow-tint": "rgba(255, 255, 255, 0.78)" } as CSSProperties}
         >
           <span className="relative z-[1] inline-flex items-center gap-2">
-            {ctaLoading ? "Se deschide..." : "Rezolvă o problemă"}
-            <ArrowRight className="h-4 w-4" />
+            {ctaLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                Se încarcă...
+              </>
+            ) : (
+              <>
+                Rezolvă o problemă
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
           </span>
         </button>
         </div>

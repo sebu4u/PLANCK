@@ -380,11 +380,8 @@ export function DashboardAuth() {
     }
   }, [authLoading, loading, dashboardData, user?.id])
 
-  const dismissWelcomeBack = () => {
-    if (!user) {
-      setShowWelcomeBack(false)
-      return
-    }
+  const persistWelcomeBackDismissState = () => {
+    if (!user) return
 
     try {
       const lastVisitKey = `planck_last_dashboard_visit_${user.id}`
@@ -400,7 +397,15 @@ export function DashboardAuth() {
     } catch {
       // Ignore storage errors silently
     }
+  }
 
+  const dismissWelcomeBack = () => {
+    if (!user) {
+      setShowWelcomeBack(false)
+      return
+    }
+
+    persistWelcomeBackDismissState()
     setShowWelcomeBack(false)
   }
 
@@ -411,9 +416,11 @@ export function DashboardAuth() {
     try {
       const scopedProblems = await getProblemsByClass(profile?.grade, 1)
       const targetHref = scopedProblems[0] ? `/probleme/${scopedProblems[0].id}` : "/probleme"
-      dismissWelcomeBack()
+      persistWelcomeBackDismissState()
+      router.prefetch(targetHref)
       router.push(targetHref)
-    } finally {
+      // Nu resetăm loading: overlay-ul rămâne până la navigare (unmount); la succes nu mai e nevoie de setState
+    } catch {
       setWelcomeCtaLoading(false)
     }
   }

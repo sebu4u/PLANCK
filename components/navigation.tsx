@@ -432,7 +432,6 @@ export function Navigation() {
   const navHoverBg = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
-  const showBanner = !isHomepage && !isSpaceRoute && !isDashboard && !isProblemsCatalog && !isPlanckCodeRoute && !isProblemPage && !isCoursePage
   const navDropShadowOnDesktop = pathname?.startsWith('/invata') || (isProblemPage && !isProblemsCatalog)
   /** Single-problem page uses a fixed white outline under the bar; shadow is applied there so it sits below that outline */
   const isProblemDetailPage =
@@ -445,18 +444,6 @@ export function Navigation() {
   return (
     <>
       <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} ${navbarElevationClass}`}>
-        {showBanner && (
-          <div className="hidden lg:flex w-full bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white py-2 px-4 text-center text-sm font-medium z-[301] shadow-sm items-center justify-center relative">
-            <Link href="/concurs" className="hover:opacity-90 transition-opacity flex items-center gap-2 group">
-              <span className="hidden sm:inline">🏆</span>
-              <span className="font-semibold">Concurs online de Fizică</span>
-              <span className="hidden sm:inline">•</span>
-              <span>în curând pe PLANCK</span>
-              <ArrowUpRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              <span className="underline decoration-white/50 hover:decoration-white font-semibold">Află detalii</span>
-            </Link>
-          </div>
-        )}
         <nav className={`w-full ${isHomepage && isScrolled ? 'backdrop-blur-md' : !isHomepage ? 'backdrop-blur-md' : ''} transition-all duration-300 ${navTheme.background} ${navTheme.border}`}>
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="relative h-16 flex items-center justify-between gap-4">
@@ -797,7 +784,6 @@ export function Navigation() {
 
         </nav>
       </div>
-      {showBanner && !isTransparentRoute && !isSpaceRoute && <div className="hidden lg:block h-9 w-full" />}
     </>
   )
 }
