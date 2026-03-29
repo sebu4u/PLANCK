@@ -66,10 +66,9 @@ export function RezultatePublicContent({ results }: RezultatePublicContentProps)
                     Nu există rezultate publicate momentan pentru această clasă.
                   </div>
                 ) : (
-                  /* Wrapper local (nu <Table> din ui): pe mobil, overflow-auto pe wrapper-ul implicit
-                     blochează scroll-ul vertical al paginii peste tabel; pan-x lasă swipe-ul vertical
-                     pentru document și păstrează scroll orizontal când tabelul e mai lat decât ecranul. */
-                  <div className="relative w-full overflow-x-auto max-md:[touch-action:pan-x]">
+                  /* Pe mobile, tabelul rămâne scrollabil pe orizontală, dar nu mai blochează
+                     scroll-ul vertical al paginii când gesture-ul începe direct pe tabel. */
+                  <div className="relative w-full overflow-x-auto overflow-y-visible max-md:[touch-action:pan-y]">
                     <table className="w-full caption-bottom text-sm">
                       <TableHeader>
                         <TableRow>

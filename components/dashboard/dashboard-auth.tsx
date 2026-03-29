@@ -40,6 +40,7 @@ import {
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
+import { DashboardRezultateCard } from "@/components/dashboard/cards/dashboard-rezultate-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 
 export function DashboardAuth() {
@@ -553,6 +554,8 @@ export function DashboardAuth() {
                     </h1>
                     <p className="text-gray-600">Here's your learning progress today</p>
                   </div>
+
+                  <DashboardRezultateCard />
 
                   <div className={`grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6 ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
                     <div className="order-1 xl:col-start-1 xl:row-start-1">
