@@ -64,6 +64,7 @@ interface InsightIdeChatProps {
 
 const INSIGHT_SESSION_TITLE = "PlanckCode IDE"
 const MODEL_OPTIONS = [
+  { id: "gpt-4o-mini", label: "Raptor1 fast", selectable: true },
   { id: "gpt-4o", label: "Raptor1", selectable: true },
   { id: "deep-thinking", label: "Raptor1 heavy", selectable: true },
 ]
@@ -433,6 +434,7 @@ export function InsightIdeChat({
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasPendingCodeChange, setHasPendingCodeChange] = useState(false)
   const codeGeneratedRef = useRef(false)
+  const didApplyFreeDefaultModelRef = useRef(false)
 
   const handleAcceptChanges = useCallback(() => {
     setHasPendingCodeChange(false)
@@ -521,13 +523,52 @@ export function InsightIdeChat({
     }
   }, [isOpen, activeFileContent, activeFileName, activeFileLanguage])
 
-  const stopStreaming = useCallback(() => {
+  useEffect(() => {
+    if (didApplyFreeDefaultModelRef.current) return
+    if (subscriptionPlan !== "free") {
+      didApplyFreeDefaultModelRef.current = true
+      return
+    }
+
+    setSelectedModel("gpt-4o-mini")
+    didApplyFreeDefaultModelRef.current = true
+  }, [subscriptionPlan])
+
+  useEffect(() => {
+    if (subscriptionPlan === "free" && selectedModel === "deep-thinking") {
+      setSelectedModel("gpt-4o-mini")
+    }
+  }, [selectedModel, subscriptionPlan])
+
+  const stopStreaming = useCallback(async () => {
     if (!isStreaming) return
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     setIsStreaming(false)
     setBusy(false)
-  }, [isStreaming])
+
+    if (!user) return
+
+    try {
+      const { data } = await supabase.auth.getSession()
+      const accessToken = data.session?.access_token
+      if (!accessToken) return
+
+      await fetch("/api/insight/increment", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          persona: "ide",
+          model: mode === "ask" ? "gpt-4o" : selectedModel,
+        }),
+      })
+    } catch (error) {
+      console.error("Failed to increment usage after manual stop:", error)
+    }
+  }, [isStreaming, mode, selectedModel, supabase, user])
 
   const sendMessage = useCallback(async () => {
     if (!user || !input.trim() || busy) return

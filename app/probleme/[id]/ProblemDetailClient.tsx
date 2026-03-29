@@ -194,8 +194,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const { isFree } = useSubscriptionPlan()
   const isMobile = useIsMobile()
   const problemIcon = getProblemIcon(problem.id);
-  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
-
   const [showMobileUpgradeModal, setShowMobileUpgradeModal] = useState(false)
   const [openedInsightFromCard, setOpenedInsightFromCard] = useState(false)
   const [canMarkSolvedByAnswer, setCanMarkSolvedByAnswer] = useState(false)
@@ -337,19 +335,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   return (
     <div className="min-h-screen bg-[#f6f5f4] lg:bg-white text-[#2C2F33] flex flex-col">
       <Navigation />
-
-      {/* Upgrade Banner for Free Users */}
-      {showUpgradeBanner && (
-        <div className="fixed top-[72px] left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300">
-          <Link
-            href="/pricing"
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500/90 to-amber-500/90 hover:from-orange-500 hover:to-amber-500 text-white text-sm font-medium rounded-full shadow-lg transition-all hover:scale-105"
-          >
-            <span>Upgrade to Plus</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-          </Link>
-        </div>
-      )}
 
       <div className="flex-1 lg:fixed lg:top-16 lg:left-0 lg:right-[25vw] lg:bottom-0 lg:pb-[6px] lg:pl-[6px] lg:pt-0 lg:pr-0">
         <div className="relative z-[1] lg:rounded-xl lg:bg-[#f6f5f4] lg:h-full lg:overflow-hidden lg:shadow-md">
@@ -591,7 +576,6 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           problemId={problem.id}
           problemStatement={problem.statement || ''}
           persona="problem_tutor"
-          onFreePlanMessage={() => setShowUpgradeBanner(true)}
           onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
           initialUserMessage={initialHintMessage}
           initialUserMessageDisplay={initialHintMessage}

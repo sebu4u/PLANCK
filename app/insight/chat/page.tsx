@@ -938,6 +938,9 @@ function InsightChatPageContent() {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          persona: 'general_insight',
+        }),
       });
       await loadSessions(accessToken);
     } catch (err) {

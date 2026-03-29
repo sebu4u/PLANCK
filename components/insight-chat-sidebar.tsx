@@ -105,9 +105,22 @@ const loadingMessages = [
   'Să vedem dacă pot face fizica să sune simplu.',
 ]
 
+const starterInsightCards = [
+  'Explică-mi de unde să încep',
+  'Ce formulă trebuie să aplic?',
+  'Arată-mi rezolvarea completă',
+]
+
+const fullSolutionRequests = [
+  'Vreau să văd soluția completă.',
+  'Arată-mi rezolvarea completă',
+]
+
 const getRandomLoadingMessage = () => {
   return loadingMessages[Math.floor(Math.random() * loadingMessages.length)]
 }
+
+const normalizeUserPrompt = (text: string) => text.trim().toLocaleLowerCase().replace(/[.!?]+$/g, '')
 
 // Keep $$...$$ as primary format, but also accept \[...\] and \(...\).
 const normalizeLatexDelimiters = (text: string): string => {
@@ -387,9 +400,17 @@ export default function InsightChatSidebar({
   )
   const hasMessages = visibleMessages.length > 0
   const userMessagesCount = visibleMessages.filter((m) => m.role === 'user').length
+  const normalizedFullSolutionRequests = new Set(fullSolutionRequests.map(normalizeUserPrompt))
   const hasSolutionRequest = visibleMessages.some(
-    (m) => m.role === 'user' && m.content === "Vreau să văd soluția completă."
+    (m) => m.role === 'user' && normalizedFullSolutionRequests.has(normalizeUserPrompt(m.content))
   )
+  const canShowStarterCards =
+    persona === 'problem_tutor' &&
+    userMessagesCount === 0 &&
+    !loadingSession &&
+    !busy &&
+    effectiveOpen &&
+    !initialUserMessage?.trim()
   const lastVisibleMessage = visibleMessages.length > 0
     ? visibleMessages[visibleMessages.length - 1]
     : null
@@ -609,6 +630,10 @@ export default function InsightChatSidebar({
   // Handle suggested question selection
   const handleSuggestionSelect = (question: string) => {
     submitMessage(question)
+  }
+
+  const handleStarterCardSelect = (question: string) => {
+    submitMessage(question, question)
   }
 
   const submitMessage = async (textOverride?: string, displayContentOverride?: string) => {
@@ -955,6 +980,9 @@ export default function InsightChatSidebar({
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          persona,
+        }),
       })
     } catch (err) {
       console.error('Failed to increment usage after manual stop:', err)
@@ -1223,23 +1251,28 @@ export default function InsightChatSidebar({
                 )}
             </div>
           ) : (
-            <div className="flex h-full flex-col items-center justify-center px-4">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden bg-transparent sm:h-32 sm:w-32">
-                <img
-                  src={INSIGHT_CHAT_ILLUSTRATION_SRC}
-                  alt=""
-                  className="h-full w-full object-contain"
-                  loading="lazy"
-                />
+            <div className="flex h-full min-h-0 flex-col px-4">
+              {/* Spacer flex: content sits in the upper part of the free area (above composer), centered horizontally */}
+              <div className="min-h-0 flex-[0.55]" aria-hidden />
+              <div className="flex shrink-0 flex-col items-center justify-center">
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden bg-transparent sm:h-32 sm:w-32">
+                  <img
+                    src={INSIGHT_CHAT_ILLUSTRATION_SRC}
+                    alt=""
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+                <p
+                  className={cn(
+                    'mt-0 text-center text-base font-bold leading-tight',
+                    isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400'
+                  )}
+                >
+                  Ai nevoie de un sfat?
+                </p>
               </div>
-              <p
-                className={cn(
-                  'mt-3 text-center text-base font-bold',
-                  isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400'
-                )}
-              >
-                Ai nevoie de un sfat?
-              </p>
+              <div className="min-h-0 flex-[1]" aria-hidden />
             </div>
           )}
         </div>
@@ -1291,6 +1324,25 @@ export default function InsightChatSidebar({
                     >
                       Vezi ultimele mesaje
                     </button>
+                  </div>
+                )}
+
+                {canShowStarterCards && (
+                  <div className="mb-2 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {starterInsightCards.map((cardText) => (
+                      <button
+                        key={cardText}
+                        onClick={() => handleStarterCardSelect(cardText)}
+                        className={cn(
+                          "text-left text-sm rounded-xl px-3.5 py-3 transition-all duration-200 shadow-sm active:scale-[0.98]",
+                          isProblemLightTheme
+                            ? "bg-white hover:bg-[#f8fafc] border border-[#0b0d10]/12 hover:border-[#0b0d10]/20 text-[#111827]"
+                            : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/90"
+                        )}
+                      >
+                        {cardText}
+                      </button>
+                    ))}
                   </div>
                 )}
 

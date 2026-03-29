@@ -3,6 +3,14 @@ import OpenAI from 'openai';
 import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
 import { estimateCostUSD } from '@/lib/insight-cost';
+import {
+  FREE_DAILY_LIMIT,
+  FREE_RAPTOR1_MONTHLY_LIMIT,
+  PLUS_MONTHLY_LIMIT,
+  isInsightIdeFastModel,
+  resolveInsightModel,
+  shouldUseRaptorFreeTierLimits,
+} from '@/lib/insight-limits';
 import { logger } from '@/lib/logger';
 import { resolvePlanForRequest, parseAccessToken } from '@/lib/subscription-plan-server';
 import type { SubscriptionPlan } from '@/lib/subscription-plan';
@@ -17,13 +25,6 @@ function getOpenAIClient() {
     apiKey,
   });
 }
-
-// Maximum prompts per day for Free plan (Raptor1 Fast)
-const FREE_DAILY_LIMIT = 3;
-// Maximum prompts per month for Free plan (Raptor1)
-const FREE_RAPTOR1_MONTHLY_LIMIT = 10;
-// Maximum prompts per month for Plus plan (combined Insight + AI Agent)
-const PLUS_MONTHLY_LIMIT = 800;
 
 /**
  * Converts messages to OpenAI Chat Completions format
@@ -111,6 +112,9 @@ export async function POST(req: NextRequest) {
 
     // Check if this is from IDE - IDE messages should not be saved to chat history
     const isIdeRequest = persona === 'ide';
+    // Raptor1 free-tier rules (monthly gpt-4o vs daily mini) apply only in PlanckCode IDE.
+    // Insight on problem pages, lessons, and /insight/chat uses the general daily Insight limit, not the Raptor1 monthly bucket.
+    const useRaptorFreeTierLimits = shouldUseRaptorFreeTierLimits(persona);
 
     // Support legacy format (messages array) for backward compatibility
     let userInput: string;
@@ -130,11 +134,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mesajul utilizatorului este necesar.' }, { status: 400 });
     }
 
-    // Determine requested model first to apply correct limits
-    // gpt-4o-mini requests are normalized to gpt-4o so Insight runs on gpt-4o by default.
-    const allowedModels = ['gpt-4o', 'deep-thinking'];
-    const requestedModel = body?.model === 'gpt-4o-mini' ? 'gpt-4o' : body?.model;
-    const modelToUseParam = allowedModels.includes(requestedModel) ? requestedModel : 'gpt-4o';
+    // Model selection: deep-thinking uses gpt-4o with extra instructions; gpt-4o-mini is IDE "Raptor1 fast" (distinct free-tier bucket from gpt-4o).
+    const modelToUseParam = resolveInsightModel(body?.model);
+    const isIdeFastModel = isInsightIdeFastModel(modelToUseParam);
 
     // Check usage limits based on plan
     if (isFreePlan) {
@@ -146,29 +148,55 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (modelToUseParam === 'gpt-4o') {
-        // Free plan + Raptor1 (gpt-4o): Monthly limit check (10/month)
-        const now = new Date();
-        const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
+      if (useRaptorFreeTierLimits) {
+        if (!isIdeFastModel) {
+          // IDE + Raptor1 (gpt-4o): Monthly limit check (10/month)
+          const now = new Date();
+          const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+          const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
 
-        const { data: monthlyUsageRow } = await supabase
-          .from('ai_monthly_usage')
-          .select('prompts_count')
-          .eq('user_id', user.id)
-          .eq('usage_month', monthKey)
-          .maybeSingle();
+          const { data: monthlyUsageRow } = await supabase
+            .from('ai_monthly_usage')
+            .select('prompts_count')
+            .eq('user_id', user.id)
+            .eq('usage_month', monthKey)
+            .maybeSingle();
 
-        const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
-        if (currentMonthlyCount >= FREE_RAPTOR1_MONTHLY_LIMIT) {
-          return NextResponse.json(
-            { error: 'Ai atins limita lunară pentru Raptor1 (10 solicitări/lună) pe planul Free. Treci la Raptor1 fast sau fă upgrade.' },
-            { status: 429 }
-          );
+          const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
+          if (currentMonthlyCount >= FREE_RAPTOR1_MONTHLY_LIMIT) {
+            return NextResponse.json(
+              { error: 'Ai atins limita lunară pentru Raptor1 (10 solicitări/lună) pe planul Free. Treci la Raptor1 fast sau fă upgrade.' },
+              { status: 429 }
+            );
+          }
+        } else {
+          // IDE + Raptor1 fast (gpt-4o-mini): Daily limit check (3/day)
+          const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
+          const { data: usageRow } = await supabase
+            .from('insight_usage')
+            .select('prompts_count')
+            .eq('user_id', user.id)
+            .eq('usage_date', usageDate)
+            .maybeSingle();
+
+          const currentCount = usageRow?.prompts_count ?? 0;
+          if (currentCount >= FREE_DAILY_LIMIT) {
+            const now = new Date();
+            const nextReset = new Date(now);
+            nextReset.setUTCHours(24, 0, 0, 0); // Next midnight UTC
+
+            return NextResponse.json(
+              {
+                error: 'Ai atins limita zilnică pentru Raptor1 fast (3 solicitări/zi).',
+                resetTime: nextReset.toISOString()
+              },
+              { status: 429 }
+            );
+          }
         }
       } else {
-        // Free plan + Raptor1 fast (gpt-4o-mini): Daily limit check (3/day)
-        const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
+        // Insight (problemă, lecție, /insight/chat): daily limit only — same bucket as pre-Raptor general Insight
+        const usageDate = new Date().toISOString().split('T')[0];
         const { data: usageRow } = await supabase
           .from('insight_usage')
           .select('prompts_count')
@@ -180,11 +208,11 @@ export async function POST(req: NextRequest) {
         if (currentCount >= FREE_DAILY_LIMIT) {
           const now = new Date();
           const nextReset = new Date(now);
-          nextReset.setUTCHours(24, 0, 0, 0); // Next midnight UTC
+          nextReset.setUTCHours(24, 0, 0, 0);
 
           return NextResponse.json(
             {
-              error: 'Ai atins limita zilnică pentru Raptor1 fast (3 solicitări/zi).',
+              error: 'Ai atins limita zilnică pentru Insight (3 solicitări/zi) pe planul Free. Încearcă mâine sau fă upgrade.',
               resetTime: nextReset.toISOString()
             },
             { status: 429 }
@@ -366,7 +394,7 @@ Folosește acest mod când utilizatorul pune o întrebare care nu cere ghidare p
 - NU genera blocul ---SUGGESTIONS---.
 
 EXCEPTIE - SOLUȚIA COMPLETĂ:
-Dacă utilizatorul cere explicit "Vreau să văd soluția completă" sau ceva similar:
+Dacă utilizatorul cere explicit "Vreau să văd soluția completă", "Arată-mi rezolvarea completă" sau ceva similar:
 1. Oferă rezolvarea completă, pas cu pas, cu calcule numerice.
 2. NU mai genera întrebări de ghidaj.
 3. NU mai genera blocul ---SUGGESTIONS--- la final.
@@ -447,7 +475,6 @@ Asigură-te că JSON-ul este valid.`;
       );
     }
 
-    // activeModel was determined earlier for logic check:
     const activeModel = modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
 
     // For "deep-thinking" mode, inject Chain of Thought instructions
@@ -601,23 +628,40 @@ Asigură-te că JSON-ul este valid.`;
             // Only increment counter after successful OpenAI call
             // Use appropriate tracking based on plan
             if (isFreePlan) {
-              if (modelToUseParam === 'gpt-4o') {
-                // Raptor1 (gpt-4o) on Free plan: increment monthly usage
-                const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-                  'ai_check_and_increment_monthly',
-                  {
-                    p_user_id: user.id,
-                    p_monthly_limit: FREE_RAPTOR1_MONTHLY_LIMIT,
-                  }
-                );
+              if (useRaptorFreeTierLimits) {
+                if (!isIdeFastModel) {
+                  // IDE Raptor1 (gpt-4o): increment monthly usage
+                  const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
+                    'ai_check_and_increment_monthly',
+                    {
+                      p_user_id: user.id,
+                      p_monthly_limit: FREE_RAPTOR1_MONTHLY_LIMIT,
+                    }
+                  );
 
-                if (rpcErr) {
-                  logger.error('RPC error after OpenAI success (Raptor1 monthly)', rpcErr);
-                } else if (!incrementAllowed) {
-                  logger.warn('Monthly counter increment failed for Raptor1 after success');
+                  if (rpcErr) {
+                    logger.error('RPC error after OpenAI success (Raptor1 monthly)', rpcErr);
+                  } else if (!incrementAllowed) {
+                    logger.warn('Monthly counter increment failed for Raptor1 after success');
+                  }
+                } else {
+                  // IDE Raptor1 fast (gpt-4o-mini): increment daily usage
+                  const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
+                    'insight_check_and_increment',
+                    {
+                      p_user_id: user.id,
+                      p_daily_limit: FREE_DAILY_LIMIT,
+                    }
+                  );
+
+                  if (rpcErr) {
+                    logger.error('RPC error after OpenAI success', rpcErr);
+                  } else if (!incrementAllowed) {
+                    logger.warn('Counter increment failed after OpenAI success - race condition?');
+                  }
                 }
               } else {
-                // Raptor1 fast (gpt-4o-mini): increment daily usage
+                // General Insight (non-IDE): daily usage only
                 const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
                   'insight_check_and_increment',
                   {
@@ -627,9 +671,9 @@ Asigură-te că JSON-ul este valid.`;
                 );
 
                 if (rpcErr) {
-                  logger.error('RPC error after OpenAI success', rpcErr);
+                  logger.error('RPC error after OpenAI success (Insight daily)', rpcErr);
                 } else if (!incrementAllowed) {
-                  logger.warn('Counter increment failed after OpenAI success - race condition?');
+                  logger.warn('Daily counter increment failed after OpenAI success - race condition?');
                 }
               }
             } else if (isPlusPlan) {

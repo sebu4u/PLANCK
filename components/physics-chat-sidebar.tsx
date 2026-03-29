@@ -517,7 +517,29 @@ export function PhysicsChatSidebar({
         setIsStreaming(false)
         setBusy(false)
         setLoadingMessage(null)
-    }, [isStreaming])
+
+        if (!user) return
+
+        try {
+            const { data: sessionData } = await supabase.auth.getSession()
+            const accessToken = sessionData.session?.access_token
+
+            if (!accessToken) return
+
+            await fetch('/api/insight/increment', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    persona: 'lesson_tutor',
+                }),
+            })
+        } catch (err) {
+            console.error('Failed to increment usage after manual stop:', err)
+        }
+    }, [isStreaming, supabase, user])
 
     const send = () => submitMessage()
 
