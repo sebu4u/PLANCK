@@ -65,21 +65,28 @@ class PlanckAnalytics {
     }
 
     try {
-      // Load Google Analytics script
-      const script = document.createElement('script')
-      script.async = true
-      script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`
-      document.head.appendChild(script)
+      const existingScript = document.querySelector<HTMLScriptElement>(
+        `script[src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"]`
+      )
+
+      if (!existingScript) {
+        const script = document.createElement('script')
+        script.async = true
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`
+        document.head.appendChild(script)
+      }
 
       // Initialize gtag
       window.dataLayer = window.dataLayer || []
-      function gtag(...args: any[]) {
-        window.dataLayer.push(args)
-      }
-      window.gtag = gtag
 
-      gtag('js', new Date())
-      gtag('config', measurementId, {
+      if (typeof window.gtag !== 'function') {
+        window.gtag = (...args: any[]) => {
+          window.dataLayer.push(args)
+        }
+      }
+
+      window.gtag('js', new Date())
+      window.gtag('config', measurementId, {
         anonymize_ip: true,
         cookie_flags: 'SameSite=None;Secure',
         send_page_view: false // Vom trimite manual page views
@@ -100,9 +107,13 @@ class PlanckAnalytics {
            typeof window.gtag === 'function'
   }
 
+  isReady(): boolean {
+    return this.isInitialized
+  }
+
   // Helper pentru a verifica dacă poate face tracking
   private canTrackSafely(): boolean {
-    return this.canTrack() && typeof window !== 'undefined' && window.gtag
+    return this.canTrack() && typeof window !== 'undefined' && typeof window.gtag === 'function'
   }
 
   // Tracking de bază
@@ -350,60 +361,62 @@ class PlanckAnalytics {
 // Hook pentru a folosi analytics în componente React
 export function useAnalytics() {
   const analytics = PlanckAnalytics.getInstance()
-  const cookieManager = CookieManager.getInstance()
 
-  return {
-    // Verificări
-    canTrack: analytics.canTrack(),
-    isInitialized: analytics.isInitialized,
-    
+  return React.useMemo(() => ({
+    get canTrack() {
+      return analytics.canTrack()
+    },
+    get isInitialized() {
+      return analytics.isReady()
+    },
+
     // Initialize
     initialize: () => analytics.initialize(),
-    
+
     // Tracking de bază
     trackPageView: (url: string, title?: string) => analytics.trackPageView(url, title),
-    
+
     // Cursuri
     trackCourseView: (course: CourseEvent) => analytics.trackCourseView(course),
     trackCourseStart: (course: CourseEvent) => analytics.trackCourseStart(course),
     trackChapterComplete: (course: CourseEvent) => analytics.trackChapterComplete(course),
     trackCourseComplete: (course: CourseEvent) => analytics.trackCourseComplete(course),
-    
+
     // Probleme
     trackProblemView: (problem: ProblemEvent) => analytics.trackProblemView(problem),
     trackProblemAttempt: (problem: ProblemEvent) => analytics.trackProblemAttempt(problem),
     trackProblemSolved: (problem: ProblemEvent) => analytics.trackProblemSolved(problem),
     trackHintUsed: (problem: ProblemEvent) => analytics.trackHintUsed(problem),
     trackSolutionViewed: (problem: ProblemEvent) => analytics.trackSolutionViewed(problem),
-    
+
     // Progres utilizator
     trackBadgeEarned: (user: UserEvent) => analytics.trackBadgeEarned(user),
     trackLevelUp: (user: UserEvent) => analytics.trackLevelUp(user),
     trackStreakAchieved: (days: number, user: UserEvent) => analytics.trackStreakAchieved(days, user),
-    
+
     // Conținut educațional
     trackVideoPlay: (engagement: EngagementEvent) => analytics.trackVideoPlay(engagement),
     trackVideoComplete: (engagement: EngagementEvent) => analytics.trackVideoComplete(engagement),
     trackContentInteraction: (engagement: EngagementEvent) => analytics.trackContentInteraction(engagement),
-    
+
     // Business/Conversie
     trackNewsletterSignup: () => analytics.trackNewsletterSignup(),
     trackUserRegistration: (user: UserEvent) => analytics.trackUserRegistration(user),
     trackProfileComplete: (user: UserEvent) => analytics.trackProfileComplete(user),
-    
+
     // Căutare și filtrare
     trackSearchPerformed: (query: string, resultsCount: number) => analytics.trackSearchPerformed(query, resultsCount),
     trackFilterApplied: (filterType: string, filterValue: string) => analytics.trackFilterApplied(filterType, filterValue),
-    
+
     // Feedback
     trackFeedbackSubmitted: (rating: number, category: string) => analytics.trackFeedbackSubmitted(rating, category),
-    
+
     // Utilizator
     setUserProperties: (user: UserEvent) => analytics.setUserProperties(user),
-    
+
     // Custom
     trackCustomEvent: (eventName: string, parameters: Record<string, any>) => analytics.trackCustomEvent(eventName, parameters)
-  }
+  }), [analytics])
 }
 
 // Declarăm gtag global pentru TypeScript

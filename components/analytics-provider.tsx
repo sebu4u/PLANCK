@@ -10,19 +10,28 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const analytics = useAnalytics()
   const cookieManager = useCookieManager()
 
-  // Initializează analytics când se schimbă consimțământul
+  // Inițializează analytics și trimite page_view după ce consimțământul devine disponibil.
   useEffect(() => {
-    if (cookieManager.hasAnalyticsConsent) {
-      analytics.initialize().catch(console.error)
-    }
-  }, [cookieManager.hasAnalyticsConsent])
+    let isCancelled = false
 
-  // Track page views automat
-  useEffect(() => {
-    if (typeof window !== 'undefined' && analytics.canTrack) {
-      analytics.trackPageView(window.location.href, document.title)
+    const syncAnalytics = async () => {
+      if (typeof window === 'undefined' || !cookieManager.hasAnalyticsConsent) {
+        return
+      }
+
+      await analytics.initialize()
+
+      if (!isCancelled) {
+        analytics.trackPageView(window.location.href, document.title)
+      }
     }
-  }, [pathname, analytics])
+
+    syncAnalytics().catch(console.error)
+
+    return () => {
+      isCancelled = true
+    }
+  }, [pathname, cookieManager.hasAnalyticsConsent, analytics])
 
   return <>{children}</>
 }

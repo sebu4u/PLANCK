@@ -48,10 +48,14 @@ export function PrivacySettings() {
     
     // Reinitializează analytics dacă este necesar
     if (key === 'analytics' && value) {
-      analytics.trackCustomEvent('analytics_consent_given', {
-        consent_type: 'analytics',
-        timestamp: new Date().toISOString()
-      })
+      analytics.initialize()
+        .then(() => {
+          analytics.trackCustomEvent('analytics_consent_given', {
+            consent_type: 'analytics',
+            timestamp: new Date().toISOString()
+          })
+        })
+        .catch(console.error)
     }
 
     toast({
@@ -66,8 +70,8 @@ export function PrivacySettings() {
       // Simulează exportul datelor (în realitate ar trebui să faci o cerere la API)
       const userData = {
         preferences: preferences,
-        analytics_consent: cookieManager.hasAnalyticsConsent(),
-        marketing_consent: cookieManager.hasMarketingConsent(),
+        analytics_consent: cookieManager.hasAnalyticsConsent,
+        marketing_consent: cookieManager.hasMarketingConsent,
         export_date: new Date().toISOString(),
         platform: 'PLANCK'
       }

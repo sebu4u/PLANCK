@@ -9,9 +9,13 @@ export function usePageTracking() {
   const analytics = useAnalytics()
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && analytics.canTrack) {
-      analytics.trackPageView(window.location.href, document.title)
-    }
+    if (typeof window === 'undefined') return
+
+    analytics.initialize()
+      .then(() => {
+        analytics.trackPageView(window.location.href, document.title)
+      })
+      .catch(console.error)
   }, [pathname, analytics])
 
   return analytics
