@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { clearSupabaseAuthStorage, supabase } from "@/lib/supabaseClient"
 
 interface AuthContextType {
   user: any
@@ -38,11 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleInvalidAuthSession = async (message?: string) => {
     console.warn("Invalid auth session detected:", message)
-    try {
-      await supabase.auth.signOut()
-    } catch {
-      // Ignore sign out errors
-    }
+    clearSupabaseAuthStorage()
     setUser(null)
     setProfile(null)
     setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
@@ -79,7 +75,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle token refresh errors
-      if (event === 'TOKEN_REFRESHED') {
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        // Token refresh failed - clear local auth state without global sign-out
+        await handleInvalidAuthSession('Token refresh failed')
+      } else if (event === 'TOKEN_REFRESHED') {
         // Token refreshed successfully, update user
         setUser(session?.user ?? null)
       } else if (event === 'SIGNED_OUT') {
@@ -89,9 +88,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
         setUserElo(null)
         setIsAdmin(false)
-      } else if (event === 'TOKEN_REFRESHED' && !session) {
-        // Token refresh failed - handle invalid refresh token
-        await handleInvalidAuthSession('Token refresh failed');
       } else {
         // Other events (SIGNED_IN, USER_UPDATED, etc.)
         setUser(session?.user ?? null)
@@ -233,7 +229,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     setLoading(true)
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: "local" })
+    clearSupabaseAuthStorage()
     setUser(null)
     if (typeof window !== "undefined") {
       localStorage.removeItem("planck_register_onboarding")

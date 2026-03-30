@@ -54,7 +54,7 @@ function DashboardSidebarComponent({
 
   const handleSignOut = async () => {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: "local" })
     router.refresh()
   }
 

@@ -148,16 +148,24 @@ export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean 
                                 </Button>
                             </Link>
                             <Link href="/probleme" className="group relative inline-flex">
-                                <span className="absolute -inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
-                                <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
-                                <span className="absolute inset-[1px] rounded-full bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
+                                <span className="hidden sm:block absolute -inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
+                                <span className="hidden sm:block absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
+                                <span className="hidden sm:block absolute inset-[1px] rounded-full bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
 
                                 <Button
                                     variant="outline"
                                     size="lg"
-                                    className="border-white text-white hover:border-transparent transition-all duration-300 flex items-center gap-2 bg-transparent relative z-10 rounded-full"
+                                    className="relative z-10 flex items-center gap-2 rounded-full transition-all duration-300 border-transparent bg-white text-black hover:bg-white hover:text-black focus-visible:bg-white active:bg-white isolate overflow-hidden sm:border-white sm:text-white sm:bg-transparent sm:hover:border-transparent sm:hover:bg-transparent sm:overflow-visible"
                                 >
-                                    <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300">
+                                    <span
+                                        aria-hidden="true"
+                                        className="shimmer-sweep pointer-events-none absolute inset-0 -translate-x-[170%] opacity-0 bg-[linear-gradient(115deg,transparent_28%,rgba(168,85,247,0.14)_40%,rgba(59,130,246,0.5)_48%,rgba(255,255,255,0.98)_52%,rgba(59,130,246,0.5)_56%,rgba(168,85,247,0.14)_64%,transparent_74%)] sm:hidden"
+                                    />
+                                    <span
+                                        aria-hidden="true"
+                                        className="shimmer-sweep-glow pointer-events-none absolute -inset-2 -translate-x-[170%] opacity-0 blur-md bg-[linear-gradient(115deg,transparent_34%,rgba(168,85,247,0.35)_48%,rgba(59,130,246,0.45)_52%,transparent_66%)] sm:hidden"
+                                    />
+                                    <span className="relative z-10 text-black sm:bg-gradient-to-r sm:from-white sm:to-white sm:bg-clip-text sm:text-transparent sm:group-hover:from-purple-400 sm:group-hover:to-blue-400 sm:group-hover:text-transparent transition-all duration-300">
                                         Explorează problemele
                                     </span>
                                 </Button>

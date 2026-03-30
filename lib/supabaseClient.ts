@@ -13,7 +13,7 @@ const supabaseHost = new URL(supabaseUrl).host;
 const supabaseProjectRef = supabaseHost?.split('.')[0] ?? '';
 const SUPABASE_AUTH_STORAGE_KEY = supabaseProjectRef ? `sb-${supabaseProjectRef}-auth-token` : null;
 
-const clearSupabaseAuthStorage = () => {
+export const clearSupabaseAuthStorage = () => {
 	if (!SUPABASE_AUTH_STORAGE_KEY) return;
 	try {
 		// Clear localStorage
@@ -40,6 +40,47 @@ const clearSupabaseAuthStorage = () => {
 		// Ignore storage errors
 	}
 };
+
+const readStoredAuthPayload = () => {
+	if (!SUPABASE_AUTH_STORAGE_KEY || typeof window === 'undefined') return null;
+
+	const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY);
+	if (!raw) return null;
+
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return null;
+	}
+};
+
+const extractRefreshToken = (payload: any): string | null => {
+	if (!payload || typeof payload !== 'object') return null;
+
+	if (typeof payload.refresh_token === 'string' && payload.refresh_token.length > 0) {
+		return payload.refresh_token;
+	}
+
+	const currentSession = payload.currentSession;
+	if (
+		currentSession &&
+		typeof currentSession === 'object' &&
+		typeof currentSession.refresh_token === 'string' &&
+		currentSession.refresh_token.length > 0
+	) {
+		return currentSession.refresh_token;
+	}
+
+	return null;
+};
+
+// Defensive cleanup for malformed/corrupt persisted sessions.
+if (typeof window !== 'undefined') {
+	const payload = readStoredAuthPayload();
+	if (payload && !extractRefreshToken(payload)) {
+		clearSupabaseAuthStorage();
+	}
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 	auth: {
@@ -97,10 +138,7 @@ if (typeof window !== 'undefined') {
 			console.warn('Unhandled auth error - Invalid refresh token:', error.message);
 			// Prevent the error from being logged to console as unhandled
 			event.preventDefault();
-			// Clear the invalid session silently
-			supabase.auth.signOut().catch(() => {
-				// Ignore sign out errors
-			});
+			// Clear local stale auth payload; avoid global signOut side-effects.
 			clearSupabaseAuthStorage();
 		}
 	});
@@ -110,10 +148,7 @@ if (typeof window !== 'undefined') {
 	const handleAuthError = (error: any) => {
 		if (isRefreshTokenError(error)) {
 			console.warn('Auth error detected - Invalid refresh token:', error.message);
-			// Clear the invalid session silently
-			supabase.auth.signOut().catch(() => {
-				// Ignore sign out errors
-			});
+			// Clear local stale auth payload; avoid global signOut side-effects.
 			clearSupabaseAuthStorage();
 			return true; // Error was handled
 		}
