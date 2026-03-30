@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition, type CSSProperties } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, Code, Github, Chrome, Trophy } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, Code, Github, Chrome, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -18,6 +18,11 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
+
+/** Desktop: ca butonul „Start” din dashboard (gradient + glow). */
+const GUEST_REGISTER_CTA_CLASS =
+  "dashboard-start-glow inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-2 py-1.5 text-[11px] font-semibold leading-tight text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6] active:translate-y-0.5 active:shadow-[0_1px_0_#5b21b6] sm:px-2.5 sm:py-2 sm:text-xs"
+const GUEST_REGISTER_GLOW_STYLE = { "--start-glow-tint": "rgba(221, 211, 255, 0.84)" } as CSSProperties
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -369,6 +374,10 @@ export function Navigation() {
   const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
   const useLightNav = isDashboard || isProblemsCatalog || isProblemPage
   const isCoursePage = pathname?.startsWith('/cursuri') ?? false
+  /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
+  const isGuestProblemeOrCursuri =
+    !user &&
+    ((pathname?.startsWith("/probleme") ?? false) || (pathname?.startsWith("/cursuri") ?? false))
   const isBacSimulationsPage = pathname?.startsWith('/simulari-bac') ?? false
   // On mobile, navbar should never be transparent when at the top of the screen
   const isSpaceRoute = pathname === '/space'
@@ -448,17 +457,40 @@ export function Navigation() {
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="relative h-16 flex items-center justify-between gap-4">
               <div className={`burger:hidden flex w-full items-center justify-between ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
-                <div className="flex items-center gap-2">
-                  <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                    <Home className="h-5 w-5" />
-                  </Link>
-                  <Link href="/cursuri" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/cursuri') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                    <BookOpen className="h-5 w-5" />
-                  </Link>
-                  <Link href="/probleme" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                    <Calculator className="h-5 w-5" />
-                  </Link>
-                </div>
+                {isGuestProblemeOrCursuri ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-2 pr-1">
+                    <Link
+                      href="/"
+                      className={`flex min-w-0 items-center gap-1.5 text-base font-bold sm:gap-2 sm:text-lg ${navPrimaryText} title-font`}
+                    >
+                      <Rocket className="h-5 w-5 shrink-0" />
+                      <span className="min-w-0 truncate font-black">PLANCK</span>
+                    </Link>
+                    <Link
+                      href="/register"
+                      className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold transition-colors ${
+                        useLightNav
+                          ? "text-[#7c3aed] hover:text-[#6d28d9]"
+                          : "text-violet-400 hover:text-violet-300"
+                      }`}
+                    >
+                      <span className="whitespace-nowrap">Începe gratuit</span>
+                      <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                      <Home className="h-5 w-5" />
+                    </Link>
+                    <Link href="/cursuri" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/cursuri') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                      <BookOpen className="h-5 w-5" />
+                    </Link>
+                    <Link href="/probleme" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                      <Calculator className="h-5 w-5" />
+                    </Link>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium ${navSecondaryText}`}>
                     <Trophy className="h-3.5 w-3.5" />
@@ -517,39 +549,54 @@ export function Navigation() {
                   <span className="hidden logo:block font-black whitespace-nowrap">PLANCK</span>
                 </Link>
 
-                <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
-                  <Link
-                    href="/cursuri"
-                    className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${pathname?.startsWith('/cursuri') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
-                  >
-                    <BookOpen size={16} />
-                    Învață
-                  </Link>
+                {isGuestProblemeOrCursuri ? (
+                  <div className={`flex items-center self-stretch animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                    <Link
+                      href="/register"
+                      className={GUEST_REGISTER_CTA_CLASS}
+                      style={GUEST_REGISTER_GLOW_STYLE}
+                    >
+                      <span className="relative z-[1] inline-flex items-center gap-1">
+                        Începe gratuit
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      </span>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                    <Link
+                      href="/cursuri"
+                      className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${pathname?.startsWith('/cursuri') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <BookOpen size={16} />
+                      Învață
+                    </Link>
 
-                  <Link
-                    href="/probleme"
-                    className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
-                  >
-                    <Calculator size={16} />
-                    Exersează
-                  </Link>
+                    <Link
+                      href="/probleme"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <Calculator size={16} />
+                      Exersează
+                    </Link>
 
-                  <Link
-                    href="/planckcode/ide"
-                    className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPlanckCodeRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
-                  >
-                    <Code size={16} />
-                    Code
-                  </Link>
+                    <Link
+                      href="/planckcode/ide"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPlanckCodeRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <Code size={16} />
+                      Code
+                    </Link>
 
-                  <button
-                    type="button"
-                    disabled
-                    className={`h-full border-b-2 border-transparent ${useLightNav ? 'text-gray-700 font-semibold' : `${navSubtleText} font-medium`} px-3 py-0 text-sm transition-all duration-300 rounded-lg cursor-not-allowed opacity-70 flex items-center ${useLightNav ? 'hover:border-gray-700' : 'hover:border-gray-500'}`}
-                  >
-                    Clasa mea
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      disabled
+                      className={`h-full border-b-2 border-transparent ${useLightNav ? 'text-gray-700 font-semibold' : `${navSubtleText} font-medium`} px-3 py-0 text-sm transition-all duration-300 rounded-lg cursor-not-allowed opacity-70 flex items-center ${useLightNav ? 'hover:border-gray-700' : 'hover:border-gray-500'}`}
+                    >
+                      Clasa mea
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className={`hidden burger:flex items-center animate-fade-in-delay-2 justify-end gap-3 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
