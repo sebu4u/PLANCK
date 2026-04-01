@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, X, Lock, Play } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, X, Lock, Play, ChevronRight } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -198,6 +198,8 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
   const [openedInsightFromCard, setOpenedInsightFromCard] = useState(false)
   const [canMarkSolvedByAnswer, setCanMarkSolvedByAnswer] = useState(false)
   const [initialHintMessage, setInitialHintMessage] = useState<string | null>(null)
+  /** When set, overrides bubble text for the initial auto-sent message (e.g. bracketed label on card). */
+  const [initialInsightDisplayOverride, setInitialInsightDisplayOverride] = useState<string | null>(null)
   const [showCongratulationCloseButton, setShowCongratulationCloseButton] = useState(false)
 
   const hasVideo = useMemo(() => {
@@ -435,7 +437,7 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         />
                       </div>
                     )}
-                    <div className="pt-1">
+                    <div className="pt-1 space-y-3">
                       <Button
                         type="button"
                         variant="outline"
@@ -446,6 +448,38 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         <Play className="mr-2 h-4 w-4" />
                         {hasVideo ? "Rezolvare video" : "Video în curând"}
                       </Button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInitialHintMessage("Explică-mi pas cu pas")
+                          setInitialInsightDisplayOverride("[Explică-mi pas cu pas]")
+                          setInsightSidebarOpen(true)
+                        }}
+                        className={cn(
+                          "lg:hidden flex w-full min-h-[56px] cursor-pointer select-none touch-manipulation items-center gap-3 rounded-2xl border border-[#0b0d10]/12 bg-white p-4 text-left shadow-[0_4px_14px_-4px_rgba(11,13,16,0.12)] transition-[transform,box-shadow,background-color,border-color] duration-150",
+                          "hover:border-[#0b0d10]/18 hover:bg-white hover:shadow-[0_8px_24px_-8px_rgba(11,13,16,0.18)]",
+                          "active:scale-[0.98] active:border-[#0b0d10]/22 active:bg-[#fafafa] active:shadow-[inset_0_2px_8px_rgba(11,13,16,0.06)]",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b0d10]/20 focus-visible:ring-offset-2"
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-base font-semibold text-[#0b0d10]">✦ Esti blocat?</p>
+                          <p className="mt-1 text-sm font-medium text-[#2C2F33]/70">[Explică-mi pas cu pas]</p>
+                        </div>
+                        <ChevronRight
+                          className="h-5 w-5 shrink-0 self-center text-[#2C2F33]/40"
+                          strokeWidth={2.25}
+                          aria-hidden
+                        />
+                        <img
+                          src="/streak-icon.png"
+                          alt=""
+                          className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
+                          width={64}
+                          height={64}
+                          aria-hidden
+                        />
+                      </button>
                     </div>
                     <div className="hidden lg:grid grid-cols-2 gap-6 xl:gap-8">
                       {hasAnswerCard ? (
@@ -572,14 +606,18 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             setInsightSidebarOpen(false)
             setOpenedInsightFromCard(false)
             setInitialHintMessage(null)
+            setInitialInsightDisplayOverride(null)
           }}
           problemId={problem.id}
           problemStatement={problem.statement || ''}
           persona="problem_tutor"
           onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
           initialUserMessage={initialHintMessage}
-          initialUserMessageDisplay={initialHintMessage}
-          onInitialMessageSent={() => setInitialHintMessage(null)}
+          initialUserMessageDisplay={initialInsightDisplayOverride ?? initialHintMessage}
+          onInitialMessageSent={() => {
+            setInitialHintMessage(null)
+            setInitialInsightDisplayOverride(null)
+          }}
         />
       </Suspense>
 
