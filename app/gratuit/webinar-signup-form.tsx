@@ -8,7 +8,7 @@ import {
   type CSSProperties,
 } from "react"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Rocket } from "lucide-react"
+import { ArrowRight, Calculator, Home, Rocket } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -146,13 +146,22 @@ export function WebinarSignupForm() {
           <Rocket className="w-6 h-6 text-black dark:text-white shrink-0" />
           <span>PLANCK</span>
         </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors text-sm font-medium"
-        >
-          <ArrowLeft className="w-4 h-4 shrink-0" />
-          <span>Acasă</span>
-        </Link>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-400 transition-colors hover:text-black dark:hover:text-white text-sm font-medium"
+          >
+            <Home className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Acasă</span>
+          </Link>
+          <Link
+            href="/probleme"
+            className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-400 transition-colors hover:text-black dark:hover:text-white text-sm font-medium"
+          >
+            <Calculator className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Exersează</span>
+          </Link>
+        </div>
       </header>
 
       <main
