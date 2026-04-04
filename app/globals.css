@@ -1144,6 +1144,31 @@
   margin-bottom: 0 !important;
 }
 
+/* Light UI (learning path cards, admin preview): dark text on tinted highlight strips */
+.lesson-rich-content--light .formula-highlight,
+.lesson-rich-content--light .formula-highlight .formula-content,
+.lesson-rich-content--light .enunt-highlight,
+.lesson-rich-content--light .enunt-highlight .enunt-content,
+.lesson-rich-content--light .important-highlight,
+.lesson-rich-content--light .important-highlight .important-content,
+.lesson-rich-content--light .definition-highlight,
+.lesson-rich-content--light .definition-highlight .definition-content,
+.lesson-rich-content--light .example-highlight,
+.lesson-rich-content--light .example-highlight .example-content,
+.lesson-rich-content--light .indent-highlight,
+.lesson-rich-content--light .indent-highlight .indent-content {
+  color: #171717;
+}
+
+.lesson-rich-content--light .formula-highlight .katex,
+.lesson-rich-content--light .enunt-highlight .katex,
+.lesson-rich-content--light .important-highlight .katex,
+.lesson-rich-content--light .definition-highlight .katex,
+.lesson-rich-content--light .example-highlight .katex,
+.lesson-rich-content--light .indent-highlight .katex {
+  color: inherit;
+}
+
 .enunt-highlight {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(96, 165, 250, 0.35) 100%);
   border-left: 4px solid #3b82f6;

@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Brain,
   Bell,
+  Users,
   User,
 } from "lucide-react"
 import { UserStats, UserTask, DashboardUpdate, ContinueLearningItem, Achievement } from "@/lib/dashboard-data"
@@ -78,6 +79,7 @@ function DashboardSidebarComponent({
     { href: null, label: "Noutati", icon: <Bell className="w-4 h-4" /> },
     { href: "/insight/chat", label: "Insight", icon: <Sparkles className="w-4 h-4" /> },
     { href: "/grile", label: "Teste Grila", icon: <ListChecks className="w-4 h-4" /> },
+    { href: "/classrooms", label: "Clasa mea", icon: <Users className="w-4 h-4" /> },
     { href: "/simulari-bac", label: "Simulari Bac", icon: <GraduationCap className="w-4 h-4" /> },
     { href: "/space", label: "Memorator", icon: <Brain className="w-4 h-4" /> },
   ]

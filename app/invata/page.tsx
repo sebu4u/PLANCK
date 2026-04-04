@@ -2,11 +2,14 @@ import type { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { generateMetadata } from "@/lib/metadata"
 import {
+  getCompletedLearningPathLessonIdsForUser,
   getLearningPathChapters,
   getLearningPathLessonsByChapterId,
+  getProblemsFromLearningPathChapterItems,
   getRandomProblemsByCategory,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
+import { createClient } from "@/lib/supabase/server"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import type { Problem } from "@/data/problems"
@@ -23,17 +26,32 @@ export default async function InvataPage() {
 
   await Promise.all(
     chapters.map(async (chapter) => {
-      const [lessons, chapterProblems] = await Promise.all([
-        getLearningPathLessonsByChapterId(chapter.id),
-        chapter.problem_category
-          ? getRandomProblemsByCategory(chapter.problem_category, 3)
-          : Promise.resolve([]),
-      ])
-
+      const lessons = await getLearningPathLessonsByChapterId(chapter.id)
       lessonsByChapter[chapter.id] = lessons
-      problemsByChapterId[chapter.id] = chapterProblems
+
+      if (canViewLearningPathsContent) {
+        const fromItems = await getProblemsFromLearningPathChapterItems(chapter.id, 3)
+        if (fromItems.length) {
+          problemsByChapterId[chapter.id] = fromItems
+          return
+        }
+      }
+
+      problemsByChapterId[chapter.id] =
+        chapter.problem_category
+          ? await getRandomProblemsByCategory(chapter.problem_category, 3)
+          : []
     })
   )
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const allLessonIds = Object.values(lessonsByChapter).flatMap((lessons) => lessons.map((l) => l.id))
+  const completedLessonIds = user
+    ? await getCompletedLearningPathLessonIdsForUser(supabase, user.id, allLessonIds)
+    : []
 
   return (
     <>
@@ -54,6 +72,7 @@ export default async function InvataPage() {
             lessonsByChapter={lessonsByChapter}
             problemsByChapterId={problemsByChapterId}
             showComingSoonBadge={!canViewLearningPathsContent}
+            completedLessonIds={completedLessonIds}
           />
         </div>
       </main>

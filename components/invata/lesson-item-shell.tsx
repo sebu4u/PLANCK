@@ -14,6 +14,12 @@ import {
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import type { LearningPathLessonItem } from "@/lib/supabase-learning-paths"
+import type { QuizQuestion } from "@/lib/types/quiz-questions"
+import {
+  GrilaLessonProvider,
+  useGrilaLesson,
+} from "@/components/invata/grila-lesson-context"
+import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -45,6 +51,8 @@ interface LessonItemShellProps {
   hideBottomCta?: boolean
   overflowHidden?: boolean
   fullWidth?: boolean
+  /** When set, bottom „Continuă” controls grila verify + navigation (learning-path grila items). */
+  grilaQuestion?: QuizQuestion | null
   children: React.ReactNode
 }
 
@@ -58,6 +66,7 @@ export function LessonItemShell({
   hideBottomCta = false,
   overflowHidden = false,
   fullWidth = false,
+  grilaQuestion = null,
   children,
 }: LessonItemShellProps) {
   const { user } = useAuth()
@@ -124,7 +133,7 @@ export function LessonItemShell({
 
   const progress = isTextLesson ? scrollProgress : stepProgress
 
-  return (
+  const shell = (
     <>
       <nav className="fixed top-0 left-0 right-0 z-[300] flex h-14 items-center justify-between gap-3 border-b border-[#e5e5e5] bg-white px-4 shadow-sm sm:px-6">
         <button
@@ -174,7 +183,9 @@ export function LessonItemShell({
         </div>
       </main>
 
-      {!hideBottomCta && (
+      {!hideBottomCta && grilaQuestion ? (
+        <GrilaLessonBottomCta nextItemHref={nextItemHref} />
+      ) : !hideBottomCta ? (
         <div
           className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
           style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
@@ -193,7 +204,7 @@ export function LessonItemShell({
             </Link>
           </div>
         </div>
-      )}
+      ) : null}
 
       <Dialog open={showQuitDialog} onOpenChange={setShowQuitDialog}>
         <DialogContent
@@ -231,5 +242,35 @@ export function LessonItemShell({
         </DialogContent>
       </Dialog>
     </>
+  )
+
+  return grilaQuestion ? (
+    <GrilaLessonProvider question={grilaQuestion}>{shell}</GrilaLessonProvider>
+  ) : (
+    shell
+  )
+}
+
+function GrilaLessonBottomCta({ nextItemHref }: { nextItemHref: string }) {
+  const ctx = useGrilaLesson()
+  if (!ctx) return null
+
+  const { selectedAnswer, isVerified, isCorrect, verify, reset } = ctx
+  const hasAnswer = selectedAnswer !== null
+  const barState = !isVerified ? "verify" : isCorrect ? "correct" : "incorrect"
+
+  return (
+    <ProblemFeedbackBar
+      state={barState}
+      hasAnswer={hasAnswer}
+      nextItemHref={nextItemHref}
+      onVerify={() => void verify()}
+      onRetry={reset}
+      answerSlot={
+        <span className="text-sm font-medium text-[#6f657b]">
+          Răspunsul se selectează în chenarele de mai sus.
+        </span>
+      }
+    />
   )
 }

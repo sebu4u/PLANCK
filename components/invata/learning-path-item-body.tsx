@@ -169,12 +169,12 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
   if (item.item_type === "custom_text") {
     const customTextData = parseCustomTextContent(item.content_json ?? null)
     if (!customTextData) {
-      return <p className="text-sm text-[#777777]">Textul personalizat nu este configurat încă.</p>
+      return <p className="text-sm font-medium text-[#777777]">Textul personalizat nu este configurat încă.</p>
     }
 
     return (
-      <div className="prose prose-sm max-w-none sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
-        <LessonRichContent content={customTextData.body} theme="light" />
+      <div className="prose prose-sm max-w-2xl sm:prose-base lg:prose-lg prose-headings:break-words prose-headings:text-[#111111] mx-auto w-full text-left">
+        <LessonRichContent content={customTextData.body} theme="light" emphasizedBody />
       </div>
     )
   }

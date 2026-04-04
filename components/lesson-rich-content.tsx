@@ -2,10 +2,13 @@
 
 import { BlockMath, InlineMath } from "react-katex"
 import "katex/dist/katex.min.css"
+import { cn } from "@/lib/utils"
 
 interface LessonRichContentProps {
   content: string
   theme?: "dark" | "light"
+  /** Body text slightly heavier (e.g. learning path custom text full-screen slides). */
+  emphasizedBody?: boolean
 }
 
 const TAG_CLASS_MAP = {
@@ -17,7 +20,7 @@ const TAG_CLASS_MAP = {
   indent: "indent",
 } as const
 
-function getThemeClasses(theme: "dark" | "light") {
+function getThemeClasses(theme: "dark" | "light", emphasizedBody: boolean) {
   if (theme === "light") {
     return {
       strongClass: "font-bold text-[#111111]",
@@ -25,7 +28,7 @@ function getThemeClasses(theme: "dark" | "light") {
       linkClass: "text-[#3550c8] hover:text-[#213899] hover:underline",
       problemLinkClass:
         "inline-block mt-4 rounded-xl bg-[#111111] px-4 py-2 text-center font-bold text-white shadow-md transition-opacity duration-200 hover:opacity-90",
-      paragraphClass: "mb-4 leading-relaxed text-[#222222]",
+      paragraphClass: cn("mb-4 leading-relaxed text-[#222222]", emphasizedBody && "font-medium"),
       headingClasses: {
         1: "mt-8 mb-6 text-3xl font-bold text-[#111111]",
         2: "mt-6 mb-4 text-2xl font-bold text-[#111111]",
@@ -41,7 +44,7 @@ function getThemeClasses(theme: "dark" | "light") {
     linkClass: "text-blue-400 hover:text-blue-300 hover:underline",
     problemLinkClass:
       "inline-block mt-4 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-center font-bold text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-pink-700",
-    paragraphClass: "mb-4 leading-relaxed text-white",
+    paragraphClass: cn("mb-4 leading-relaxed text-white", emphasizedBody && "font-medium"),
     headingClasses: {
       1: "mt-8 mb-6 text-3xl font-bold text-white",
       2: "mt-6 mb-4 text-2xl font-bold text-white",
@@ -51,8 +54,8 @@ function getThemeClasses(theme: "dark" | "light") {
   }
 }
 
-export function LessonRichContent({ content, theme = "dark" }: LessonRichContentProps) {
-  const themeClasses = getThemeClasses(theme)
+export function LessonRichContent({ content, theme = "dark", emphasizedBody = false }: LessonRichContentProps) {
+  const themeClasses = getThemeClasses(theme, emphasizedBody)
 
   const renderInlineMarkdownContent = (value: string) => {
     let processedContent = value
@@ -297,5 +300,7 @@ export function LessonRichContent({ content, theme = "dark" }: LessonRichContent
     )
   }
 
-  return renderContentWithMath(content)
+  return (
+    <div className={cn(theme === "light" && "lesson-rich-content--light")}>{renderContentWithMath(content)}</div>
+  )
 }

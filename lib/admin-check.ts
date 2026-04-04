@@ -49,9 +49,12 @@ export async function isAdminFromDB(
   supabase: SupabaseClient,
   user?: User | null
 ): Promise<boolean> {
-  // Mai întâi verifică din baza de date (sursa principală)
+  let authUser: User | null = null
   try {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const {
+      data: { user: resolved },
+    } = await supabase.auth.getUser()
+    authUser = resolved ?? null
     const userId = authUser?.id
 
     if (userId) {
@@ -69,8 +72,8 @@ export async function isAdminFromDB(
     // Dacă interogarea DB eșuează, continuă cu fallback-urile
   }
 
-  // Fallback: verifică metadata și env vars
-  const userToCheck = user ?? null
+  // Fallback: metadata, env (folosește userul din sesiune dacă nu e pasat explicit)
+  const userToCheck = user ?? authUser
   return isAdmin(userToCheck)
 }
 

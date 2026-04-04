@@ -12,6 +12,7 @@ import {
   LearningPathItemBody,
   getItemIcon,
 } from "@/components/invata/learning-path-item-body"
+import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learning-path-lesson-progress"
 import { ProblemSection } from "@/components/invata/problem-section"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import {
@@ -151,7 +152,11 @@ export default async function InvataLessonItemPage({
       hideBottomCta={isPoll || (isProblem && !!problemHasAnswer)}
       overflowHidden={isProblem}
       fullWidth={isProblem}
+      grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
     >
+      {items.length > 0 && parsedIndex === items.length ? (
+        <MarkLearningPathLessonProgress lessonId={lesson.id} />
+      ) : null}
       {isPoll ? (
         <LearningPathItemBody
           item={item}
@@ -162,6 +167,28 @@ export default async function InvataLessonItemPage({
         />
       ) : isProblem && sourceProblem ? (
         <ProblemSection problem={sourceProblem} nextItemHref={nextItemHref} itemIndex={parsedIndex} />
+      ) : isCustomTextItem ? (
+        <div className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col justify-center py-6 sm:py-10">
+          <LearningPathItemBody
+            item={item}
+            sourceLesson={sourceLesson}
+            sourceProblem={sourceProblem}
+            sourceQuizQuestion={sourceQuizQuestion}
+            nextItemHref={nextItemHref}
+          />
+        </div>
+      ) : item.item_type === "grila" ? (
+        <div className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10">
+          <div className="w-full max-w-3xl">
+            <LearningPathItemBody
+              item={item}
+              sourceLesson={sourceLesson}
+              sourceProblem={sourceProblem}
+              sourceQuizQuestion={sourceQuizQuestion}
+              nextItemHref={nextItemHref}
+            />
+          </div>
+        </div>
       ) : isSimulation ? (
         <section className="mt-4 sm:mt-6 sm:overflow-hidden sm:rounded-[30px] sm:border sm:border-[#ebe4f1] sm:bg-white sm:shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
           <header className="px-1 pb-3 sm:border-b sm:border-[#eee7f3] sm:bg-[linear-gradient(180deg,#fcfbfe_0%,#f7f4fb_100%)] sm:px-7 sm:py-5">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Navigation } from "@/components/navigation"
+import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learning-path-lesson-progress"
 import { LearningPathLessonPage } from "@/components/invata/learning-path-lesson-page"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
@@ -73,7 +74,10 @@ export default async function InvataLessonDetailPage({
       <Navigation />
       <main className="min-h-screen bg-[#ffffff]">
         {canViewLearningPathsContent ? (
-          <LearningPathLessonPage chapter={chapter} lesson={lesson} items={items} />
+          <>
+            <LearningPathLessonPage chapter={chapter} lesson={lesson} items={items} />
+            {items.length === 0 ? <MarkLearningPathLessonProgress lessonId={lesson.id} /> : null}
+          </>
         ) : (
           <LearningPathLessonLockedPreview chapter={chapter} lesson={lesson} />
         )}

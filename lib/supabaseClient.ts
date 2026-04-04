@@ -1,5 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
 
+// Browser client MUST use @supabase/ssr so the session is stored in cookies and is visible to
+// Server Components via lib/supabase/server.ts. A plain supabase-js client keeps the session in
+// localStorage only, so getUser() on the server is always null and routes that redirect to "/"
+// bounce logged-in users to /dashboard via components/dashboard-redirect.tsx.
+//
 // For client-side, NEXT_PUBLIC_* variables are replaced at build time by Next.js
 // We can safely access them directly
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
@@ -82,19 +87,13 @@ if (typeof window !== 'undefined') {
 	}
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-	auth: {
-		redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
-		autoRefreshToken: true,
-		persistSession: true,
-		detectSessionInUrl: true,
-	},
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
 	realtime: {
 		params: {
 			eventsPerSecond: 10,
 		},
 	},
-});
+})
 
 // Helper to check if error is related to refresh token
 const isRefreshTokenError = (error: any): boolean => {

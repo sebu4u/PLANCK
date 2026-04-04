@@ -1,11 +1,10 @@
 "use client"
 
-import React, { useState } from "react"
+import React from "react"
 import { BlockMath, InlineMath } from "react-katex"
 import "katex/dist/katex.min.css"
 import type { QuizQuestion, AnswerKey, QuizAnswers } from "@/lib/types/quiz-questions"
-import { difficultyLabels } from "@/lib/types/quiz-questions"
-import { markQuestionAsSolved } from "@/lib/supabase-quiz"
+import { useGrilaLesson } from "@/components/invata/grila-lesson-context"
 import { Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -14,12 +13,6 @@ interface EmbeddedGrilaContentProps {
 }
 
 const answerKeys: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
-
-const difficultyColors: Record<1 | 2 | 3, string> = {
-  1: "border-emerald-500/40 bg-emerald-50 text-emerald-700",
-  2: "border-amber-500/40 bg-amber-50 text-amber-700",
-  3: "border-rose-500/40 bg-rose-50 text-rose-700",
-}
 
 function LatexContent({ content }: { content: string }) {
   if (!content) return null
@@ -68,45 +61,22 @@ function getAnswerEntries(answers: QuizAnswers): [AnswerKey, string][] {
 }
 
 export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
-  const [selectedAnswer, setSelectedAnswer] = useState<AnswerKey | null>(null)
-  const [isVerified, setIsVerified] = useState(false)
-
-  const answerEntries = getAnswerEntries(question.answers)
-  const isCorrect = isVerified && selectedAnswer === question.correct_answer
-
-  const handleVerify = async () => {
-    if (selectedAnswer === null || isVerified) return
-    setIsVerified(true)
-    if (selectedAnswer === question.correct_answer) {
-      await markQuestionAsSolved(question.id)
-    }
+  const ctx = useGrilaLesson()
+  if (!ctx) {
+    throw new Error("EmbeddedGrilaContent must be used inside GrilaLessonProvider")
   }
 
+  const { selectedAnswer, setSelectedAnswer, isVerified } = ctx
+
+  const answerEntries = getAnswerEntries(question.answers)
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
-            difficultyColors[question.difficulty]
-          )}
-        >
-          {difficultyLabels[question.difficulty]}
-        </span>
-        {question.question_id && (
-          <span className="inline-flex rounded-full border border-[#e5e5e5] bg-[#f5f5f5] px-3 py-1 font-mono text-xs text-[#666666]">
-            {question.question_id}
-          </span>
-        )}
+    <div className="space-y-8">
+      <div className="text-lg font-bold leading-snug text-[#111111] md:text-xl md:leading-snug">
+        <LatexContent content={question.statement} />
       </div>
 
-      <div className="rounded-2xl border border-[#e8e8e8] bg-[#fafafa] p-5 sm:p-6">
-        <div className="text-base leading-relaxed text-[#2C2F33] md:text-lg">
-          <LatexContent content={question.statement} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {answerEntries.map(([key, text]) => {
           const state = !isVerified
             ? selectedAnswer === key
@@ -125,17 +95,17 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
               onClick={() => !isVerified && setSelectedAnswer(key)}
               disabled={isVerified}
               className={cn(
-                "flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all",
+                "flex w-full items-start gap-3 rounded-2xl border border-[#ececec] bg-white p-4 text-left shadow-[0_1px_0_rgba(0,0,0,0.04)] transition-all",
                 state === "default" &&
-                  "border-[#e5e5e5] bg-white hover:border-[#8b5cf6]/40 hover:bg-[#faf5ff]",
+                  "hover:border-[#8b5cf6]/45 hover:bg-[#faf8ff] hover:shadow-[0_4px_20px_rgba(124,58,237,0.08)]",
                 state === "selected" &&
-                  "border-[#8b5cf6]/60 bg-[#8b5cf6]/10",
+                  "border-[#8b5cf6]/60 bg-[#f5f0ff] shadow-[0_4px_20px_rgba(124,58,237,0.12)]",
                 state === "correct" &&
-                  "border-emerald-500/60 bg-emerald-50",
+                  "border-emerald-500/55 bg-emerald-50/90",
                 state === "incorrect" &&
-                  "border-rose-500/60 bg-rose-50",
+                  "border-rose-500/55 bg-rose-50/90",
                 state === "disabled" &&
-                  "border-[#e5e5e5] bg-[#f9f9f9] opacity-60",
+                  "border-[#ececec] bg-[#fafafa] opacity-65",
                 isVerified && "cursor-default"
               )}
             >
@@ -173,28 +143,6 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
           )
         })}
       </div>
-
-      {!isVerified && selectedAnswer !== null && (
-        <button
-          type="button"
-          onClick={handleVerify}
-          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
-        >
-          <Check className="h-4 w-4" />
-          Verifică
-        </button>
-      )}
-
-      {isVerified && (
-        <p
-          className={cn(
-            "text-sm font-semibold",
-            isCorrect ? "text-emerald-600" : "text-rose-600"
-          )}
-        >
-          {isCorrect ? "Corect! Felicitări." : "Răspuns incorect. Încearcă din nou la următoarea lecție."}
-        </p>
-      )}
     </div>
   )
 }

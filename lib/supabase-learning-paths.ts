@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabaseClient"
 import type { Problem } from "@/data/problems"
 
@@ -221,6 +222,82 @@ export async function getRandomProblemsByCategory(category: string, limit = 3): 
   return problems.slice(0, Math.max(1, limit))
 }
 
+function trimProblemId(raw: string | null | undefined): string | null {
+  const t = (raw ?? "").trim()
+  return t.length ? t : null
+}
+
+/**
+ * Probleme din `learning_path_lesson_items` (tip problem) pentru capitol, în ordinea lecțiilor/itemilor.
+ * Folosit pe /invata pentru admini; ceilalți rămân pe getRandomProblemsByCategory.
+ */
+export async function getProblemsFromLearningPathChapterItems(
+  chapterId: string,
+  limit = 3
+): Promise<Problem[]> {
+  const safeLimit = Math.max(1, limit)
+  const lessons = await getLearningPathLessonsByChapterId(chapterId)
+  if (!lessons.length) return []
+
+  const lessonIds = lessons.map((l) => l.id)
+  const lessonOrder = new Map(lessons.map((l) => [l.id, l.order_index]))
+
+  const { data: items, error } = await supabase
+    .from("learning_path_lesson_items")
+    .select("lesson_id, problem_id, order_index")
+    .in("lesson_id", lessonIds)
+    .eq("item_type", "problem")
+    .eq("is_active", true)
+
+  if (error) {
+    console.error(`Error fetching lesson problem items for chapter ${chapterId}:`, error)
+    return []
+  }
+
+  const rows: { lesson_id: string; problem_id: string; order_index: number }[] = []
+  for (const row of items || []) {
+    const pid = trimProblemId((row as { problem_id?: string | null }).problem_id)
+    if (!pid) continue
+    rows.push({
+      lesson_id: (row as { lesson_id: string }).lesson_id,
+      problem_id: pid,
+      order_index: (row as { order_index: number }).order_index,
+    })
+  }
+
+  if (!rows.length) return []
+
+  rows.sort((a, b) => {
+    const lo = (lessonOrder.get(a.lesson_id) ?? 0) - (lessonOrder.get(b.lesson_id) ?? 0)
+    if (lo !== 0) return lo
+    return a.order_index - b.order_index
+  })
+
+  const seen = new Set<string>()
+  const problemIds: string[] = []
+  for (const row of rows) {
+    if (seen.has(row.problem_id)) continue
+    seen.add(row.problem_id)
+    problemIds.push(row.problem_id)
+    if (problemIds.length >= safeLimit) break
+  }
+
+  if (!problemIds.length) return []
+
+  const { data: problems, error: problemsError } = await supabase
+    .from("problems")
+    .select("*")
+    .in("id", problemIds)
+
+  if (problemsError) {
+    console.error(`Error fetching problems for learning path chapter ${chapterId}:`, problemsError)
+    return []
+  }
+
+  const byId = new Map(((problems || []) as Problem[]).map((p) => [p.id, p]))
+  return problemIds.map((id) => byId.get(id)).filter(Boolean) as Problem[]
+}
+
 export function toGradeNumber(grade: string | number | null | undefined): number | null {
   if (grade == null) return null
   if (typeof grade === "number") return Number.isFinite(grade) ? grade : null
@@ -292,4 +369,25 @@ export async function getProblemsByClass(
   }
 
   return scopedProblems.slice(0, safeLimit)
+}
+
+export async function getCompletedLearningPathLessonIdsForUser(
+  client: SupabaseClient,
+  userId: string,
+  lessonIds: string[]
+): Promise<string[]> {
+  if (!lessonIds.length) return []
+
+  const { data, error } = await client
+    .from("user_learning_path_lesson_progress")
+    .select("lesson_id")
+    .eq("user_id", userId)
+    .in("lesson_id", lessonIds)
+
+  if (error) {
+    console.error("Error fetching learning path lesson progress:", error)
+    return []
+  }
+
+  return (data ?? []).map((row) => row.lesson_id as string)
 }

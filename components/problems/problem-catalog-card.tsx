@@ -9,6 +9,7 @@ import { useAnalytics } from "@/lib/analytics"
 import { cn } from "@/lib/utils"
 import {
   ArrowRight,
+  Check,
   Loader2,
   Atom,
   BookOpen,
@@ -30,6 +31,11 @@ interface ProblemCardProps {
   problem: Problem
   solved?: boolean
   isLocked?: boolean
+  /** Classroom assignment picker: no navigation; card toggles selection. */
+  picker?: {
+    selected: boolean
+    onToggle: () => void
+  }
 }
 
 const problemIcons: LucideIcon[] = [BookOpen, Atom, Orbit, Zap, Target, Ruler, Waves, FlaskConical, CircleDot, Gauge]
@@ -147,7 +153,7 @@ function MathContent({ content }: { content: string }) {
   )
 }
 
-export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardProps) {
+export function ProblemCard({ problem, solved, isLocked = false, picker }: ProblemCardProps) {
   const ProblemIcon = getProblemIcon(problem.id)
   const analytics = useAnalytics()
   const router = useRouter()
@@ -169,10 +175,10 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
   }
 
   useEffect(() => {
-    if (!isLocked) {
+    if (!isLocked && !picker) {
       router.prefetch(`/probleme/${problem.id}`)
     }
-  }, [isLocked, problem.id, router])
+  }, [isLocked, picker, problem.id, router])
 
   const handleLockedCardClick = () => {
     router.push("/pricing")
@@ -191,13 +197,28 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
     navigateToProblem()
   }
 
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (picker) {
+      const target = e.target as HTMLElement
+      if (target.closest("button")) return
+      picker.onToggle()
+      return
+    }
+    if (isLocked) {
+      handleLockedCardClick()
+      return
+    }
+    handleUnlockedCardClick(e)
+  }
+
   return (
     <Card
-      onClick={isLocked ? handleLockedCardClick : handleUnlockedCardClick}
+      onClick={handleCardClick}
       aria-busy={isNavigating}
       className={cn(
         "group relative flex h-full w-full cursor-pointer flex-col gap-4 rounded-2xl border border-[#0b0c0f]/10 bg-white p-5 shadow-[0px_16px_34px_-28px_rgba(11,12,15,0.65)] transition-all duration-200",
         "hover:-translate-y-0.5 hover:border-[#0b0c0f]/20 hover:shadow-[0px_20px_40px_-28px_rgba(11,12,15,0.55)]",
+        picker?.selected && "border-[#1a73e8] ring-2 ring-[#1a73e8]/25",
         isNavigating && "cursor-wait pointer-events-none",
       )}
     >
@@ -239,7 +260,33 @@ export function ProblemCard({ problem, solved, isLocked = false }: ProblemCardPr
       </div>
 
       <div className="mt-auto flex items-center gap-2">
-        {isLocked ? (
+        {picker ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              picker.onToggle()
+            }}
+            className={cn(
+              "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] sm:w-auto",
+              picker.selected
+                ? "border border-emerald-600/30 bg-emerald-50 text-emerald-900 shadow-none hover:translate-y-0"
+                : "bg-[#2a2a2a] text-[#f5f4f2]",
+            )}
+          >
+            {picker.selected ? (
+              <>
+                <Check className="h-4 w-4 shrink-0" aria-hidden />
+                Selectată pentru temă
+              </>
+            ) : (
+              <>
+                Adaugă la temă
+                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+              </>
+            )}
+          </button>
+        ) : isLocked ? (
           <span className="inline-flex w-full items-center justify-center rounded-full border border-[#0b0c0f]/15 bg-[#f5f4f2] px-4 py-2 text-xs font-semibold text-[#2c2f33]/70 sm:w-auto">
             Blocat pentru Plus+
           </span>

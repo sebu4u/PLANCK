@@ -5,15 +5,28 @@ import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
 import type { LearningPathChapter, LearningPathLesson } from "@/lib/supabase-learning-paths"
 import type { Problem } from "@/data/problems"
+import { LearningPathSegmentedProgress } from "@/components/invata/learning-path-segmented-progress"
+import {
+  InvataChapterSectionIndicator,
+  invataChapterSectionDomId,
+} from "@/components/invata/invata-chapter-section-indicator"
 
 interface LearningPathsListProps {
   chapters: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
   problemsByChapterId?: Record<string, Problem[]>
   showComingSoonBadge?: boolean
+  completedLessonIds?: string[]
 }
 
-function ElasticLessonsScroller({ children }: { children: ReactNode }) {
+function ElasticLessonsScroller({
+  children,
+  bleedMargins = true,
+}: {
+  children: ReactNode
+  /** When false, parent already breaks out to viewport edges (e.g. full-bleed section). */
+  bleedMargins?: boolean
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
   const animationFrameRef = useRef<number | null>(null)
@@ -304,7 +317,11 @@ function ElasticLessonsScroller({ children }: { children: ReactNode }) {
     <div className="relative">
       <div
         ref={containerRef}
-        className={`-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 ${isPointerDragging ? "select-none" : ""}`}
+        className={
+          bleedMargins
+            ? `-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 ${isPointerDragging ? "select-none" : ""}`
+            : `overflow-x-auto scrollbar-hide px-5 pb-2 ${isPointerDragging ? "select-none" : ""}`
+        }
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={releaseElastic}
@@ -314,7 +331,10 @@ function ElasticLessonsScroller({ children }: { children: ReactNode }) {
         onPointerUp={releasePointerDrag}
         onPointerCancel={releasePointerDrag}
       >
-        <div ref={trackRef} className="flex min-w-max items-start gap-4 pr-5 sm:gap-5 sm:pr-0">
+        <div
+          ref={trackRef}
+          className={`flex min-w-max items-start gap-4 sm:gap-5 ${bleedMargins ? "pr-5 sm:pr-0" : "pr-5"}`}
+        >
           {children}
         </div>
       </div>
@@ -346,6 +366,7 @@ export function LearningPathsList({
   lessonsByChapter,
   problemsByChapterId = {},
   showComingSoonBadge = false,
+  completedLessonIds = [],
 }: LearningPathsListProps) {
   if (!chapters.length) {
     return (
@@ -360,6 +381,7 @@ export function LearningPathsList({
 
   return (
     <div className="space-y-10 pb-14">
+      <InvataChapterSectionIndicator chapterIds={chapters.map((c) => c.id)} />
       {chapters.map((chapter, chapterIndex) => {
         const chapterLessons = lessonsByChapter[chapter.id] || []
         const chapterProblems = problemsByChapterId[chapter.id] || []
@@ -370,28 +392,35 @@ export function LearningPathsList({
         return (
           <section
             key={chapter.id}
+            id={invataChapterSectionDomId(chapter.id)}
             className={chapterIndex === 0 ? "" : "border-t border-[#ececec] pt-10"}
             aria-label={chapter.title}
           >
-            <div className="mb-5 flex items-center justify-between gap-5">
-              <div className="flex items-center gap-5">
+            <div className="mb-5 flex items-start justify-between gap-5 sm:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
                 {chapter.icon_url ? (
                   <img
                     src={chapter.icon_url}
                     alt={chapter.title}
-                    className="h-24 w-24 rounded-xl object-contain sm:h-28 sm:w-28"
+                    className="h-24 w-24 shrink-0 rounded-xl object-contain sm:h-28 sm:w-28"
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
                     <BookOpen className="h-12 w-12 sm:h-14 sm:w-14" />
                   </div>
                 )}
 
-                <div>
+                <div className="min-w-0 flex-1">
                   <h2 className="text-xl font-semibold text-[#111111]">{chapter.title}</h2>
                   {chapter.description ? (
                     <p className="mt-0.5 text-sm text-[#707070]">{chapter.description}</p>
+                  ) : null}
+                  {chapterLessons.length > 0 ? (
+                    <LearningPathSegmentedProgress
+                      lessons={chapterLessons}
+                      completedLessonIds={completedLessonIds}
+                    />
                   ) : null}
                 </div>
               </div>
@@ -451,29 +480,47 @@ export function LearningPathsList({
             </div>
 
             {chapterProblems.length > 0 ? (
-              <div className="mt-5 rounded-2xl border border-[#ececec] bg-white p-5">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {chapterProblems.map((problem) => (
-                    <Link
-                      key={problem.id}
-                      href={`/probleme/${problem.id}`}
-                      className="rounded-xl border border-[#ededed] bg-[#fafafa] p-4 transition-colors hover:border-[#dcdcdc] hover:bg-[#f4f4f4]"
-                    >
-                      <p className="text-xs font-semibold tracking-wide text-[#6d6d6d]">{problem.id}</p>
-                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#1f1f1f]">{problem.title}</p>
-                      <p className="mt-2 text-xs text-[#6d6d6d]">{problem.difficulty || "Nivel mixt"}</p>
-                    </Link>
-                  ))}
-                </div>
+              <div className="-mx-5 mt-5 sm:mx-0">
+                <div className="rounded-none border-y border-[#ececec] bg-white py-5 sm:rounded-2xl sm:border sm:p-5">
+                  <div className="sm:hidden">
+                    <ElasticLessonsScroller bleedMargins={false}>
+                      {chapterProblems.map((problem) => (
+                        <Link
+                          key={problem.id}
+                          href={`/probleme/${problem.id}`}
+                          className="block w-[272px] shrink-0 rounded-xl border border-[#ededed] bg-[#fafafa] p-4 transition-colors active:bg-[#efefef]"
+                        >
+                          <p className="text-xs font-semibold tracking-wide text-[#6d6d6d]">{problem.id}</p>
+                          <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#1f1f1f]">{problem.title}</p>
+                          <p className="mt-2 text-xs text-[#6d6d6d]">{problem.difficulty || "Nivel mixt"}</p>
+                        </Link>
+                      ))}
+                    </ElasticLessonsScroller>
+                  </div>
 
-                <div className="mt-4 flex justify-end">
-                  <Link
-                    href={discoverHref}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#111111] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                  >
-                    Descoperă mai mult
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  <div className="hidden gap-3 sm:grid sm:grid-cols-3">
+                    {chapterProblems.map((problem) => (
+                      <Link
+                        key={problem.id}
+                        href={`/probleme/${problem.id}`}
+                        className="rounded-xl border border-[#ededed] bg-[#fafafa] p-4 transition-colors hover:border-[#dcdcdc] hover:bg-[#f4f4f4]"
+                      >
+                        <p className="text-xs font-semibold tracking-wide text-[#6d6d6d]">{problem.id}</p>
+                        <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#1f1f1f]">{problem.title}</p>
+                        <p className="mt-2 text-xs text-[#6d6d6d]">{problem.difficulty || "Nivel mixt"}</p>
+                      </Link>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex justify-end px-5 sm:mt-4 sm:px-0">
+                    <Link
+                      href={discoverHref}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#111111] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                    >
+                      Descoperă mai mult
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : null}
