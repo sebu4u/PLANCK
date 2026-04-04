@@ -9,6 +9,7 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } fro
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { ALLOW_ALL_PHYSICS_PROBLEMS } from "@/lib/access-config"
+import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -44,7 +45,6 @@ const MONTHLY_FREE_PROBLEM_COUNT = 50
 const CATALOG_SELECTED_CLASS_KEY = "catalogSelectedClass"
 const CATALOG_FILTERS_KEY = "catalogFilters"
 const CATALOG_PAGE_KEY = "catalogPage"
-const PROBLEMS_BG_AVATAR_SRC = "/planck_avatar-1035b250-7b77-452e-a1e1-7a8f1d6dd4a2.png"
 
 const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
 

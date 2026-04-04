@@ -456,6 +456,46 @@ export const pageMetadata: Record<string, Metadata> = {
       follow: true,
     },
   },
+
+  gratuit: {
+    title: "Ai nevoie de ajutor la fizică? – PLANCK",
+    description:
+      "Completează formularul să vedem cum te putem ajuta. Îți ia sub 2 minute.",
+    keywords: "webinar fizica, fizica liceu, bac fizica, planck academy, gratuit, ajutor fizica",
+    alternates: {
+      canonical: "/gratuit",
+    },
+    openGraph: {
+      title: "Ai nevoie de ajutor la fizică? – PLANCK",
+      description:
+        "Completează formularul să vedem cum te putem ajuta. Îți ia sub 2 minute.",
+      url: "https://www.planck.academy/gratuit",
+    },
+    twitter: {
+      title: "Ai nevoie de ajutor la fizică? – PLANCK",
+      description:
+        "Completează formularul să vedem cum te putem ajuta. Îți ia sub 2 minute.",
+    },
+  },
+
+  "gratuit-confirmare": {
+    title: "Înscriere confirmată – Webinar PLANCK",
+    description:
+      "O să te contactăm pentru mai multe detalii despre webinar!",
+    alternates: {
+      canonical: "/gratuit/confirmare",
+    },
+    openGraph: {
+      title: "Înscriere confirmată – Webinar PLANCK",
+      description:
+        "O să te contactăm pentru mai multe detalii despre webinar!",
+      url: "https://www.planck.academy/gratuit/confirmare",
+    },
+    robots: {
+      index: false,
+      follow: true,
+    },
+  },
 }
 
 // Helper function to generate metadata for a specific page
