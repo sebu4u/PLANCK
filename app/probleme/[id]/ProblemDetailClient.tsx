@@ -176,11 +176,22 @@ function ImageSkeleton() {
 
 type DifficultyColors = Record<string, string>
 
-export default function ProblemDetailClient({ problem, categoryIcons, difficultyColors }: {
-  problem: Problem,
-  categoryIcons: any,
+export default function ProblemDetailClient({
+  problem,
+  categoryIcons,
+  difficultyColors,
+  embedVariant,
+  classroomCatalogHref,
+}: {
+  problem: Problem
+  categoryIcons: any
   difficultyColors: DifficultyColors
+  /** When set, hides Navigation/Footer and uses layout suited for embedding under classroom shell. */
+  embedVariant?: "classroomAssignment"
+  /** Link for "Înapoi la catalog" in classroom assignment flow. */
+  classroomCatalogHref?: string
 }) {
+  const isClassroomEmbed = embedVariant === "classroomAssignment"
   const [isSolved, setIsSolved] = useState(false)
   const [loadingSolved, setLoadingSolved] = useState(true)
   const [congratulationMessage, setCongratulationMessage] = useState<string | null>(null)
@@ -251,13 +262,14 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
       ? `Clasa a ${problem.class}-a`
       : null
 
-  // Add custom scrollbar class to body
+  // Add custom scrollbar class to body (skip when embedded in classroom shell — parent scrolls)
   React.useEffect(() => {
-    document.body.classList.add('problem-page-scrollbar')
+    if (isClassroomEmbed) return
+    document.body.classList.add("problem-page-scrollbar")
     return () => {
-      document.body.classList.remove('problem-page-scrollbar')
+      document.body.classList.remove("problem-page-scrollbar")
     }
-  }, [])
+  }, [isClassroomEmbed])
 
   React.useEffect(() => {
     const checkSolved = async () => {
@@ -334,17 +346,46 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
     });
   };
 
-  return (
-    <div className="min-h-screen bg-[#f6f5f4] lg:bg-white text-[#2C2F33] flex flex-col">
-      <Navigation />
+  const catalogBackHref = classroomCatalogHref ?? "/probleme"
 
-      <div className="flex-1 lg:fixed lg:top-16 lg:left-0 lg:right-[25vw] lg:bottom-0 lg:pb-[6px] lg:pl-[6px] lg:pt-0 lg:pr-0">
-        <div className="relative z-[1] lg:rounded-xl lg:bg-[#f6f5f4] lg:h-full lg:overflow-hidden lg:shadow-md">
-        <div className="lg:h-full lg:overflow-y-auto lg:overflow-x-hidden lg:rounded-xl problem-page-scrollbar">
-        <div className={cn(
-          "px-4 sm:px-6 lg:px-12 pt-20 lg:pt-8 pb-16",
-          isMobile && "pb-28"
-        )}>
+  return (
+    <div
+      className={cn(
+        "flex flex-col text-[#2C2F33]",
+        isClassroomEmbed ? "min-h-0 bg-[#f6f5f4]" : "min-h-screen bg-[#f6f5f4] lg:bg-white",
+      )}
+    >
+      {!isClassroomEmbed ? <Navigation /> : null}
+
+      <div
+        className={cn(
+          "flex-1",
+          isClassroomEmbed
+            ? "relative w-full min-h-0"
+            : "lg:fixed lg:top-16 lg:left-0 lg:right-[25vw] lg:bottom-0 lg:pb-[6px] lg:pl-[6px] lg:pt-0 lg:pr-0",
+        )}
+      >
+        <div
+          className={cn(
+            "relative z-[1]",
+            isClassroomEmbed ? "bg-[#f6f5f4]" : "lg:rounded-xl lg:bg-[#f6f5f4] lg:h-full lg:overflow-hidden lg:shadow-md",
+          )}
+        >
+        <div
+          className={cn(
+            "problem-page-scrollbar",
+            isClassroomEmbed
+              ? "overflow-x-hidden"
+              : "lg:h-full lg:overflow-y-auto lg:overflow-x-hidden lg:rounded-xl",
+          )}
+        >
+        <div
+          className={cn(
+            "px-4 sm:px-6 lg:px-12 pb-16",
+            isClassroomEmbed ? "pt-4" : "pt-20 lg:pt-8",
+            isMobile && "pb-28",
+          )}
+        >
           <div className="mx-auto max-w-[1600px] space-y-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
@@ -357,11 +398,11 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                   <span>Toate problemele</span>
                 </Button>
                 <Link
-                  href="/probleme"
+                  href={catalogBackHref}
                   className="inline-flex items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10]"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Înapoi la catalog</span>
+                  <span>{isClassroomEmbed ? "Înapoi la selectarea problemelor" : "Înapoi la catalog"}</span>
                 </Link>
               </div>
               <div className="hidden sm:flex items-center gap-3 text-sm text-[#2C2F33]/75">
@@ -448,38 +489,40 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
                         <Play className="mr-2 h-4 w-4" />
                         {hasVideo ? "Rezolvare video" : "Video în curând"}
                       </Button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInitialHintMessage("Explică-mi pas cu pas")
-                          setInitialInsightDisplayOverride("[Explică-mi pas cu pas]")
-                          setInsightSidebarOpen(true)
-                        }}
-                        className={cn(
-                          "lg:hidden flex w-full min-h-[56px] cursor-pointer select-none touch-manipulation items-center gap-3 rounded-2xl border border-[#0b0d10]/12 bg-white p-4 text-left shadow-[0_4px_14px_-4px_rgba(11,13,16,0.12)] transition-[transform,box-shadow,background-color,border-color] duration-150",
-                          "hover:border-[#0b0d10]/18 hover:bg-white hover:shadow-[0_8px_24px_-8px_rgba(11,13,16,0.18)]",
-                          "active:scale-[0.98] active:border-[#0b0d10]/22 active:bg-[#fafafa] active:shadow-[inset_0_2px_8px_rgba(11,13,16,0.06)]",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b0d10]/20 focus-visible:ring-offset-2"
-                        )}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-base font-semibold text-[#0b0d10]">✦ Esti blocat?</p>
-                          <p className="mt-1 text-sm font-medium text-[#2C2F33]/70">[Explică-mi pas cu pas]</p>
-                        </div>
-                        <ChevronRight
-                          className="h-5 w-5 shrink-0 self-center text-[#2C2F33]/40"
-                          strokeWidth={2.25}
-                          aria-hidden
-                        />
-                        <img
-                          src="/streak-icon.png"
-                          alt=""
-                          className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
-                          width={64}
-                          height={64}
-                          aria-hidden
-                        />
-                      </button>
+                      {!isClassroomEmbed && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInitialHintMessage("Explică-mi pas cu pas")
+                            setInitialInsightDisplayOverride("[Explică-mi pas cu pas]")
+                            setInsightSidebarOpen(true)
+                          }}
+                          className={cn(
+                            "lg:hidden flex w-full min-h-[56px] cursor-pointer select-none touch-manipulation items-center gap-3 rounded-2xl border border-[#0b0d10]/12 bg-white p-4 text-left shadow-[0_4px_14px_-4px_rgba(11,13,16,0.12)] transition-[transform,box-shadow,background-color,border-color] duration-150",
+                            "hover:border-[#0b0d10]/18 hover:bg-white hover:shadow-[0_8px_24px_-8px_rgba(11,13,16,0.18)]",
+                            "active:scale-[0.98] active:border-[#0b0d10]/22 active:bg-[#fafafa] active:shadow-[inset_0_2px_8px_rgba(11,13,16,0.06)]",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b0d10]/20 focus-visible:ring-offset-2"
+                          )}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-base font-semibold text-[#0b0d10]">✦ Esti blocat?</p>
+                            <p className="mt-1 text-sm font-medium text-[#2C2F33]/70">[Explică-mi pas cu pas]</p>
+                          </div>
+                          <ChevronRight
+                            className="h-5 w-5 shrink-0 self-center text-[#2C2F33]/40"
+                            strokeWidth={2.25}
+                            aria-hidden
+                          />
+                          <img
+                            src="/streak-icon.png"
+                            alt=""
+                            className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
+                            width={64}
+                            height={64}
+                            aria-hidden
+                          />
+                        </button>
+                      )}
                     </div>
                     <div className="hidden lg:grid grid-cols-2 gap-6 xl:gap-8">
                       {hasAnswerCard ? (
@@ -519,14 +562,16 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
             </div>
           </div>
         </div>
-        <Footer
-          theme="light"
-          backgroundColor="bg-[#f6f5f4]"
-          borderColor="border-[#0b0d10]/10"
-        />
+        </div>
+        {!isClassroomEmbed ? (
+          <Footer
+            theme="light"
+            backgroundColor="bg-[#f6f5f4]"
+            borderColor="border-[#0b0d10]/10"
+          />
+        ) : null}
         </div>
         </div>
-      </div>
 
       <Suspense fallback={null}>
         <ProblemsSidebar
@@ -576,19 +621,27 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
           isSolved={isSolved}
           onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
           onSolvedCorrectly={handleMarkSolved}
-          onOpenHint={() => {
-            setOpenedInsightFromCard(true)
-            setInsightSidebarOpen(true)
-            setInitialHintMessage("Am nevoie de un hint")
-          }}
-          onOpenChat={() => {
-            setOpenedInsightFromCard(false)
-            setInsightSidebarOpen(true)
-          }}
+          onOpenHint={
+            isClassroomEmbed
+              ? undefined
+              : () => {
+                  setOpenedInsightFromCard(true)
+                  setInsightSidebarOpen(true)
+                  setInitialHintMessage("Am nevoie de un hint")
+                }
+          }
+          onOpenChat={
+            isClassroomEmbed
+              ? undefined
+              : () => {
+                  setOpenedInsightFromCard(false)
+                  setInsightSidebarOpen(true)
+                }
+          }
         />
       )}
 
-      {!isMobile && (
+      {!isClassroomEmbed && !isMobile && (
         <ProblemOrbButton
           onOpenSidebar={() => {
             setOpenedInsightFromCard(false)
@@ -597,29 +650,31 @@ export default function ProblemDetailClient({ problem, categoryIcons, difficulty
         />
       )}
 
-      <Suspense fallback={null}>
-        <InsightChatSidebar
-          isOpen={insightSidebarOpen}
-          embedOnDesktop
-          problemLightTheme
-          onClose={() => {
-            setInsightSidebarOpen(false)
-            setOpenedInsightFromCard(false)
-            setInitialHintMessage(null)
-            setInitialInsightDisplayOverride(null)
-          }}
-          problemId={problem.id}
-          problemStatement={problem.statement || ''}
-          persona="problem_tutor"
-          onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
-          initialUserMessage={initialHintMessage}
-          initialUserMessageDisplay={initialInsightDisplayOverride ?? initialHintMessage}
-          onInitialMessageSent={() => {
-            setInitialHintMessage(null)
-            setInitialInsightDisplayOverride(null)
-          }}
-        />
-      </Suspense>
+      {!isClassroomEmbed && (
+        <Suspense fallback={null}>
+          <InsightChatSidebar
+            isOpen={insightSidebarOpen}
+            embedOnDesktop
+            problemLightTheme
+            onClose={() => {
+              setInsightSidebarOpen(false)
+              setOpenedInsightFromCard(false)
+              setInitialHintMessage(null)
+              setInitialInsightDisplayOverride(null)
+            }}
+            problemId={problem.id}
+            problemStatement={problem.statement || ''}
+            persona="problem_tutor"
+            onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
+            initialUserMessage={initialHintMessage}
+            initialUserMessageDisplay={initialInsightDisplayOverride ?? initialHintMessage}
+            onInitialMessageSent={() => {
+              setInitialHintMessage(null)
+              setInitialInsightDisplayOverride(null)
+            }}
+          />
+        </Suspense>
+      )}
 
       <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
         <DialogContent

@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation"
 import { AssignmentStreamPost } from "@/components/classrooms/assignment-stream-post"
-import { CreateAssignmentForm } from "@/components/classrooms/create-assignment-form"
 import {
   getClassroomAssignments,
   getClassroomDetailsForUser,
-  getProblemPool,
   requireAuthenticatedUser,
 } from "@/lib/classrooms/server"
 
+/** Error query keys from assignment create redirect (teacher flow via FAB / API). */
 const errorMessages: Record<string, string> = {
   title_and_problems_required: "Add a title and select at least one problem.",
   assignment_create_failed: "Could not create assignment.",
@@ -33,11 +32,7 @@ export default async function ClassroomAssignmentsPage({
     redirect("/classrooms")
   }
 
-  const [assignments, problems, query] = await Promise.all([
-    getClassroomAssignments(id),
-    classroom.role === "teacher" ? getProblemPool() : Promise.resolve([]),
-    searchParams,
-  ])
+  const [assignments, query] = await Promise.all([getClassroomAssignments(id), searchParams])
 
   const errorMessage = query.error
     ? (errorMessages[query.error] ?? query.error) + (query.reason ? ` (${query.reason})` : "")
@@ -45,8 +40,6 @@ export default async function ClassroomAssignmentsPage({
 
   return (
     <div className="space-y-4">
-      {classroom.role === "teacher" ? <CreateAssignmentForm classroomId={id} problems={problems} /> : null}
-
       {errorMessage ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {errorMessage}

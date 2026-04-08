@@ -1,8 +1,37 @@
 import type { ReactNode } from "react"
+import dynamic from "next/dynamic"
 import { redirect } from "next/navigation"
-import { ClassroomAssignmentFab } from "@/components/classrooms/classroom-assignment-fab"
-import { ClassroomTabsNav } from "@/components/classrooms/classroom-tabs-nav"
-import { getClassroomDetailsForUser, getProblemPool, requireAuthenticatedUser } from "@/lib/classrooms/server"
+import { getClassroomDetailsForUser, requireAuthenticatedUser } from "@/lib/classrooms/server"
+
+const ClassroomAssignmentFab = dynamic(
+  () => import("@/components/classrooms/classroom-assignment-fab").then((module) => module.ClassroomAssignmentFab),
+)
+
+const ClassroomDetailHeader = dynamic(
+  () => import("@/components/classrooms/classroom-detail-header").then((module) => module.ClassroomDetailHeader),
+  {
+    loading: () => (
+      <div className="overflow-hidden rounded-xl border border-[#d2e3fc] bg-white p-6">
+        <div className="h-8 w-64 animate-pulse rounded-md bg-[#e5e7eb]" />
+        <div className="mt-3 h-4 w-40 animate-pulse rounded-md bg-[#e5e7eb]" />
+        <div className="mt-6 h-24 w-full animate-pulse rounded-xl bg-[#e5e7eb]" />
+      </div>
+    ),
+  },
+)
+
+const ClassroomTabsNav = dynamic(
+  () => import("@/components/classrooms/classroom-tabs-nav").then((module) => module.ClassroomTabsNav),
+  {
+    loading: () => (
+      <div className="flex items-center gap-3 border-b border-[#dadce0] pb-3">
+        <div className="h-5 w-20 animate-pulse rounded-md bg-[#e5e7eb]" />
+        <div className="h-5 w-24 animate-pulse rounded-md bg-[#e5e7eb]" />
+        <div className="h-5 w-16 animate-pulse rounded-md bg-[#e5e7eb]" />
+      </div>
+    ),
+  },
+)
 
 export default async function ClassroomDetailLayout({
   children,
@@ -22,36 +51,20 @@ export default async function ClassroomDetailLayout({
     redirect("/classrooms")
   }
 
-  const problems = classroom.role === "teacher" ? await getProblemPool() : []
-
-  const coverImage = classroom.cover_image
-
   return (
     <div className="space-y-6">
       <ClassroomTabsNav classroomId={classroom.id} />
 
-      <div className="overflow-hidden rounded-xl border border-[#d2e3fc]">
-        <div
-          className="relative min-h-[180px] px-6 py-6 text-white md:min-h-[220px] md:px-8 md:py-8"
-          style={{
-            backgroundImage: coverImage
-              ? `linear-gradient(0deg, rgba(32, 33, 36, 0.12), rgba(32, 33, 36, 0.12)), url(${coverImage})`
-              : "linear-gradient(135deg, #34a853, #0f9d58 55%, #1a73e8)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-black/10" />
-          <div className="relative">
-            <h1 className="text-3xl font-semibold tracking-tight">{classroom.name}</h1>
-            <p className="mt-1 text-sm font-medium text-white/90">Join code: {classroom.join_code}</p>
-          </div>
-        </div>
-      </div>
+      <ClassroomDetailHeader
+        classroomId={classroom.id}
+        classroomName={classroom.name}
+        joinCode={classroom.join_code}
+        coverImage={classroom.cover_image}
+      />
 
-      {children}
+      <div className="min-h-[220px]">{children}</div>
 
-      {classroom.role === "teacher" ? <ClassroomAssignmentFab classroomId={id} problems={problems} /> : null}
+      {classroom.role === "teacher" ? <ClassroomAssignmentFab classroomId={id} /> : null}
     </div>
   )
 }

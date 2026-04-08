@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useClassroomAssignmentDraft } from "@/components/classrooms/classroom-assignment-draft-context"
 import { cn } from "@/lib/utils"
 
 interface ClassroomTabsNavProps {
@@ -10,6 +11,11 @@ interface ClassroomTabsNavProps {
 
 export function ClassroomTabsNav({ classroomId }: ClassroomTabsNavProps) {
   const pathname = usePathname()
+  const { isPickingForClassroom } = useClassroomAssignmentDraft()
+
+  if (isPickingForClassroom(classroomId)) {
+    return null
+  }
 
   const tabs = [
     { href: `/classrooms/${classroomId}`, label: "Stream" },

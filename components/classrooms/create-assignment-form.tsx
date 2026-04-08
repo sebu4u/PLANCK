@@ -7,7 +7,6 @@ import { useAuth } from "@/components/auth-provider"
 import { ProblemCard } from "@/components/problem-card"
 import type { FilterState } from "@/components/problems/problems-catalog-sidebar"
 import { ProblemsCatalogSidebar } from "@/components/problems/problems-catalog-sidebar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -126,86 +125,79 @@ export function CreateAssignmentForm({ classroomId, problems: pool }: CreateAssi
   }
 
   return (
-    <Card className="border-[#eceff3] bg-white">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">Create assignment</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={createAssignmentAction} className="space-y-4">
-          <input type="hidden" name="classroom_id" value={classroomId} />
-          {Array.from(selected).map((problemId) => (
-            <input key={problemId} type="hidden" name="problem_ids" value={problemId} />
-          ))}
+    <form action={createAssignmentAction} className="space-y-4">
+      <input type="hidden" name="classroom_id" value={classroomId} />
+      {Array.from(selected).map((problemId) => (
+        <input key={problemId} type="hidden" name="problem_ids" value={problemId} />
+      ))}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-[#111827]">Title</label>
-              <Input name="title" placeholder="Homework 1 - Kinematics" required maxLength={200} />
-            </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[#111827]">Title</label>
+          <Input name="title" placeholder="Homework 1 - Kinematics" required maxLength={200} />
+        </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-[#111827]">Description</label>
-              <Textarea name="description" placeholder="What should students focus on?" rows={3} />
-            </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[#111827]">Description</label>
+          <Textarea name="description" placeholder="What should students focus on?" rows={3} />
+        </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[#111827]">Deadline</label>
-              <Input name="deadline" type="datetime-local" />
-            </div>
-          </div>
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-medium text-[#111827]">Deadline</label>
+          <Input name="deadline" type="datetime-local" />
+        </div>
+      </div>
 
-          <div className="space-y-3 border-t border-[#e8eaed] pt-4">
-            <div>
-              <p className="text-sm font-medium text-[#111827]">Probleme din catalog</p>
-              <p className="mt-0.5 text-xs text-[#6b7280]">
-                Acelasi tip de filtre ca pe pagina de catalog. Cardurile sunt selectabile pentru temă.
-              </p>
-            </div>
+      <div className="space-y-3 border-t border-[#e8eaed] pt-4">
+        <div>
+          <p className="text-sm font-medium text-[#111827]">Probleme din catalog</p>
+          <p className="mt-0.5 text-xs text-[#6b7280]">
+            Acelasi tip de filtre ca pe pagina de catalog. Cardurile sunt selectabile pentru temă.
+          </p>
+        </div>
 
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-              <aside
-                className={cn(
-                  "shrink-0 rounded-2xl border border-[#0b0c0f]/10 bg-[#faf9f7] p-4 lg:w-[min(100%,320px)]",
-                  "lg:max-h-[min(70vh,620px)] lg:overflow-y-auto lg:overscroll-contain",
-                )}
-              >
-                <ProblemsCatalogSidebar
-                  filters={filters}
-                  onFilterChange={setFilters}
-                  progressByClass={progressByClass}
-                  totalProblems={catalogProblems.length}
-                  filteredCount={filteredProblems.length}
-                />
-              </aside>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <aside
+            className={cn(
+              "shrink-0 rounded-2xl border border-[#0b0c0f]/10 bg-[#faf9f7] p-4 lg:w-[min(100%,320px)]",
+              "lg:max-h-[min(70vh,620px)] lg:overflow-y-auto lg:overscroll-contain",
+            )}
+          >
+            <ProblemsCatalogSidebar
+              filters={filters}
+              onFilterChange={setFilters}
+              progressByClass={progressByClass}
+              totalProblems={catalogProblems.length}
+              filteredCount={filteredProblems.length}
+            />
+          </aside>
 
-              <div className="min-w-0 flex-1 space-y-3">
-                <p className="text-xs text-[#6b7280]">
-                  {selected.size} problem{selected.size === 1 ? "" : "e"} selectat{selected.size === 1 ? "ă" : "e"}
-                </p>
-                <div className="grid max-h-[min(70vh,620px)] gap-4 overflow-y-auto overscroll-contain sm:grid-cols-2">
-                  {filteredProblems.length === 0 ? (
-                    <p className="col-span-full text-sm text-[#6b7280]">Nicio problemă nu corespunde filtrelor.</p>
-                  ) : (
-                    filteredProblems.map((problem) => (
-                      <ProblemCard
-                        key={problem.id}
-                        problem={problem}
-                        solved={solvedProblems.includes(problem.id)}
-                        picker={{
-                          selected: selected.has(problem.id),
-                          onToggle: () => toggle(problem.id),
-                        }}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
+          <div className="min-w-0 flex-1 space-y-3">
+            <p className="text-xs text-[#6b7280]">
+              {selected.size} problem{selected.size === 1 ? "" : "e"} selectat{selected.size === 1 ? "ă" : "e"}
+            </p>
+            <div className="grid max-h-[min(70vh,620px)] gap-4 overflow-y-auto overscroll-contain sm:grid-cols-2">
+              {filteredProblems.length === 0 ? (
+                <p className="col-span-full text-sm text-[#6b7280]">Nicio problemă nu corespunde filtrelor.</p>
+              ) : (
+                filteredProblems.map((problem) => (
+                  <ProblemCard
+                    key={problem.id}
+                    problem={problem}
+                    solved={solvedProblems.includes(problem.id)}
+                    picker={{
+                      selected: selected.has(problem.id),
+                      onToggle: () => toggle(problem.id),
+                    }}
+                  />
+                ))
+              )}
             </div>
           </div>
+        </div>
+      </div>
 
-          <SubmitButton />
-        </form>
-      </CardContent>
-    </Card>
+      <SubmitButton />
+    </form>
   )
 }

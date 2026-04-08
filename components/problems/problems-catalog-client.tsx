@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type CSSProperties } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type CSSProperties, type ReactNode } from "react"
 import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react"
 import { Problem } from "@/data/problems"
 import { supabase } from "@/lib/supabaseClient"
@@ -48,9 +48,13 @@ const CATALOG_PAGE_KEY = "catalogPage"
 
 const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
 
-function loadStoredFilters(): FilterState | null {
+function getStorageKey(prefix: string, key: string) {
+  return `${prefix}:${key}`
+}
+
+function loadStoredFilters(storageKey: string): FilterState | null {
   try {
-    const raw = sessionStorage.getItem(CATALOG_FILTERS_KEY)
+    const raw = sessionStorage.getItem(storageKey)
     if (!raw) return null
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== "object") return null
@@ -78,9 +82,9 @@ function loadStoredFilters(): FilterState | null {
   }
 }
 
-function loadStoredPage(): number | null {
+function loadStoredPage(storageKey: string): number | null {
   try {
-    const raw = sessionStorage.getItem(CATALOG_PAGE_KEY)
+    const raw = sessionStorage.getItem(storageKey)
     if (raw == null) return null
     const n = parseInt(raw, 10)
     if (!Number.isFinite(n) || n < 1) return null
@@ -90,17 +94,17 @@ function loadStoredPage(): number | null {
   }
 }
 
-function saveStoredFilters(filters: FilterState) {
+function saveStoredFilters(storageKey: string, filters: FilterState) {
   try {
-    sessionStorage.setItem(CATALOG_FILTERS_KEY, JSON.stringify(filters))
+    sessionStorage.setItem(storageKey, JSON.stringify(filters))
   } catch {
     // ignore
   }
 }
 
-function saveStoredPage(page: number) {
+function saveStoredPage(storageKey: string, page: number) {
   try {
-    sessionStorage.setItem(CATALOG_PAGE_KEY, String(page))
+    sessionStorage.setItem(storageKey, String(page))
   } catch {
     // ignore
   }
@@ -151,6 +155,13 @@ interface ProblemsClientProps {
   initialPage?: number
   initialMonthlyFreeSet?: string[]
   initialChapter?: string
+  layoutVariant?: "fullPage" | "embedded"
+  storageKeyPrefix?: string
+  assignmentPicker?: {
+    selectedProblemIds: string[]
+    onAddProblem: (problemId: string) => void
+    classroomId?: string
+  }
 }
 
 export default function ProblemsCatalogClient({
@@ -158,11 +169,18 @@ export default function ProblemsCatalogClient({
   initialPage = 1,
   initialMonthlyFreeSet = [],
   initialChapter,
+  layoutVariant = "fullPage",
+  storageKeyPrefix = "catalog",
+  assignmentPicker,
 }: ProblemsClientProps) {
   const { user, profile } = useAuth()
   const { isFree, isPaid } = useSubscriptionPlan()
   const isMobile = useIsMobile()
   const didMountRef = useRef(false)
+  const isEmbedded = layoutVariant === "embedded"
+  const filtersStorageKey = getStorageKey(storageKeyPrefix, CATALOG_FILTERS_KEY)
+  const pageStorageKey = getStorageKey(storageKeyPrefix, CATALOG_PAGE_KEY)
+  const selectedClassStorageKey = getStorageKey(storageKeyPrefix, CATALOG_SELECTED_CLASS_KEY)
 
   const normalizedInitialChapter = typeof initialChapter === "string" ? initialChapter.trim() : ""
 
@@ -189,6 +207,10 @@ export default function ProblemsCatalogClient({
   const [selectedClassGate, setSelectedClassGate] = useState<string | null>(null)
   const [sidebarScrolling, setSidebarScrolling] = useState(false)
   const sidebarScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const selectedProblemIdsSet = useMemo(
+    () => new Set(assignmentPicker?.selectedProblemIds ?? []),
+    [assignmentPicker?.selectedProblemIds],
+  )
 
   const profileClass = useMemo(() => mapProfileGradeToClass(profile?.grade), [profile?.grade])
   const requiresClassSelection = !user || !profileClass
@@ -272,7 +294,7 @@ export default function ProblemsCatalogClient({
     }
 
     try {
-      const storedClass = sessionStorage.getItem(CATALOG_SELECTED_CLASS_KEY)
+      const storedClass = sessionStorage.getItem(selectedClassStorageKey)
       if (storedClass && CATALOG_CLASS_OPTIONS.includes(storedClass as (typeof CATALOG_CLASS_OPTIONS)[number])) {
         setSelectedClassGate(storedClass)
       }
@@ -286,8 +308,8 @@ export default function ProblemsCatalogClient({
     if (hasRestoredStoredRef.current) return
     hasRestoredStoredRef.current = true
 
-    const storedFilters = loadStoredFilters()
-    const storedPage = loadStoredPage()
+    const storedFilters = loadStoredFilters(filtersStorageKey)
+    const storedPage = loadStoredPage(pageStorageKey)
     if (storedFilters) {
       setFilters(storedFilters)
       hasRestoredFiltersRef.current = true
@@ -295,7 +317,7 @@ export default function ProblemsCatalogClient({
     if (storedPage != null) {
       setCurrentPage(storedPage)
     }
-  }, [])
+  }, [filtersStorageKey, pageStorageKey])
 
   useEffect(() => {
     if (hasRestoredFiltersRef.current) return
@@ -477,24 +499,24 @@ export default function ProblemsCatalogClient({
   const handleFilterChange = useCallback((nextFilters: FilterState) => {
     setFilters(nextFilters)
     setCurrentPage(1)
-    saveStoredPage(1)
-  }, [])
+    saveStoredPage(pageStorageKey, 1)
+  }, [pageStorageKey])
 
   useEffect(() => {
     if (isFirstSaveFiltersRef.current) {
       isFirstSaveFiltersRef.current = false
       return
     }
-    saveStoredFilters(filters)
-  }, [filters])
+    saveStoredFilters(filtersStorageKey, filters)
+  }, [filters, filtersStorageKey])
 
   useEffect(() => {
     if (isFirstSavePageRef.current) {
       isFirstSavePageRef.current = false
       return
     }
-    saveStoredPage(currentPage)
-  }, [currentPage])
+    saveStoredPage(pageStorageKey, currentPage)
+  }, [currentPage, pageStorageKey])
 
   useEffect(() => {
     if (!didMountRef.current) {
@@ -558,7 +580,7 @@ export default function ProblemsCatalogClient({
     setCurrentPage(1)
 
     try {
-      sessionStorage.setItem(CATALOG_SELECTED_CLASS_KEY, classValue)
+      sessionStorage.setItem(selectedClassStorageKey, classValue)
     } catch {
       // ignore storage errors
     }
@@ -627,9 +649,14 @@ export default function ProblemsCatalogClient({
         </Sheet>
       )}
 
-      <div className="h-full flex flex-row">
+      <div className={cn("flex min-h-0", isEmbedded ? "flex-col lg:flex-row" : "h-full flex-row")}>
         {catalogReady && (
-          <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] bg-white lg:block">
+          <aside
+            className={cn(
+              "hidden bg-white lg:block",
+              isEmbedded ? "w-[300px] shrink-0 rounded-2xl border border-[#e8eaed]" : "fixed bottom-0 left-0 top-16 z-30 w-[300px]",
+            )}
+          >
             <div
               className={cn("catalog-sidebar-scroll h-full overflow-y-auto px-5 py-5", sidebarScrolling && "is-scrolling")}
               onScroll={handleSidebarScroll}
@@ -646,9 +673,21 @@ export default function ProblemsCatalogClient({
           </aside>
         )}
 
-        <div className={cn("flex-1 relative h-full", catalogReady && "lg:ml-[300px]")}>
-          <div className="absolute inset-[3px] top-0 bg-[#f5f4f2] lg:rounded-xl overflow-hidden">
-            <div className="catalog-problems-scroll h-full overflow-y-auto" data-problems-scroll>
+        <div className={cn("relative min-w-0 flex-1", catalogReady && !isEmbedded && "lg:ml-[300px]", !isEmbedded && "h-full")}>
+          <div
+            className={cn(
+              "bg-[#f5f4f2]",
+              isEmbedded ? "min-h-[72vh] rounded-2xl border border-[#ece8e1]" : "absolute inset-[3px] top-0 lg:rounded-xl",
+              !isEmbedded && "overflow-hidden",
+            )}
+          >
+            <div
+              className={cn(
+                "catalog-problems-scroll",
+                isEmbedded ? "overflow-visible" : "h-full overflow-y-auto",
+              )}
+              data-problems-scroll
+            >
               <div className="pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px] pt-6 pb-12 space-y-6">
           {!catalogReady ? (
             <section className="flex min-h-[56vh] items-center justify-center py-4">
@@ -680,9 +719,13 @@ export default function ProblemsCatalogClient({
           ) : (
             <>
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">Probleme de fizica</h1>
+                <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">
+                  {assignmentPicker ? "Alege exercițiile" : "Probleme de fizica"}
+                </h1>
                 <p className="text-sm text-[#2c2f33]/75 sm:text-base">
-                  Exerseaza pe capitole, urmareste progresul si deschide rapid orice problema.
+                  {assignmentPicker
+                    ? "Catalogul rămâne complet funcțional. Adaugă rapid problemele potrivite și deschide enunțul oricărei probleme."
+                    : "Exerseaza pe capitole, urmareste progresul si deschide rapid orice problema."}
                 </p>
               </div>
 
@@ -799,6 +842,17 @@ export default function ProblemsCatalogClient({
                                 problem={problem}
                                 solved={solvedProblems.includes(problem.id)}
                                 isLocked={isLocked}
+                                assignmentActions={
+                                  assignmentPicker
+                                    ? {
+                                        selected: selectedProblemIdsSet.has(problem.id),
+                                        onAdd: () => assignmentPicker.onAddProblem(problem.id),
+                                        viewHref: assignmentPicker.classroomId
+                                          ? `/classrooms/${assignmentPicker.classroomId}/probleme/${problem.id}`
+                                          : undefined,
+                                      }
+                                    : undefined
+                                }
                               />
                             </Suspense>
                           )
@@ -821,7 +875,7 @@ export default function ProblemsCatalogClient({
                             </PaginationItem>
 
                             {(() => {
-                              const pages: JSX.Element[] = []
+                              const pages: ReactNode[] = []
                               const totalPages = paginationData.totalPages
                               const neighbor = 1
 
@@ -929,16 +983,14 @@ export default function ProblemsCatalogClient({
                     <div className="rounded-2xl border border-[#0b0c0f]/10 bg-white px-8 py-12 text-center shadow-sm">
                       <p className="text-lg text-[#0b0c0f]">Nu s-au gasit probleme pentru filtrele selectate.</p>
                       <Button
-                        onClick={() =>
-                          setFilters({
-                            search: "",
-                            category: "Toate",
-                            difficulty: "Toate",
-                            progress: "Toate",
-                            class: effectiveUserClass,
-                            chapter: "Toate",
-                          })
-                        }
+                        onClick={() => handleFilterChange({
+                          search: "",
+                          category: "Toate",
+                          difficulty: "Toate",
+                          progress: "Toate",
+                          class: effectiveUserClass,
+                          chapter: "Toate",
+                        })}
                         className="mt-6 rounded-full bg-[#0b0c0f] px-6 py-2 text-sm font-semibold text-white hover:bg-[#222428]"
                       >
                         Reseteaza filtrele

@@ -12,6 +12,7 @@ export function TopLoader() {
 	const rafRef = useRef<number | null>(null)
 	const startedRef = useRef(false)
 	const completeTimerRef = useRef<number | null>(null)
+	const hardStopTimerRef = useRef<number | null>(null)
 	const pathnameWhenStartedRef = useRef<string | null>(null)
 	const safetyTimerRef = useRef<number | null>(null)
 	const pathnameRef = useRef(pathname)
@@ -57,6 +58,12 @@ export function TopLoader() {
 				complete()
 			}
 		}, 500)
+
+		// Hard-stop timer: never leave the bar stuck (dynamic routes/loading edge-cases).
+		if (hardStopTimerRef.current) window.clearTimeout(hardStopTimerRef.current)
+		hardStopTimerRef.current = window.setTimeout(() => {
+			complete()
+		}, 4000)
 	}
 
 	const complete = () => {
@@ -64,6 +71,10 @@ export function TopLoader() {
 		if (safetyTimerRef.current) {
 			window.clearTimeout(safetyTimerRef.current)
 			safetyTimerRef.current = null
+		}
+		if (hardStopTimerRef.current) {
+			window.clearTimeout(hardStopTimerRef.current)
+			hardStopTimerRef.current = null
 		}
 		setProgress(100)
 		if (completeTimerRef.current) window.clearTimeout(completeTimerRef.current)
@@ -149,6 +160,9 @@ export function TopLoader() {
 		return () => {
 			if (safetyTimerRef.current) {
 				window.clearTimeout(safetyTimerRef.current)
+			}
+			if (hardStopTimerRef.current) {
+				window.clearTimeout(hardStopTimerRef.current)
 			}
 			if (completeTimerRef.current) {
 				window.clearTimeout(completeTimerRef.current)
