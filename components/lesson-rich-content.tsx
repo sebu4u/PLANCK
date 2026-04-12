@@ -79,7 +79,9 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
   const renderInlineWithImages = (value: string, keyPrefix: string) => {
     if (!value) return null
 
-    const imageParts = value.split(/(!\[([^\]]*)\]\(([^)]+)\))/g)
+    // Single capture group: split() would splice each group into the array, so alt+url
+    // would render as duplicate text under the image. Only capture the full ![](...) token.
+    const imageParts = value.split(/(!\[[^\]]*\]\([^)]+\))/g)
 
     return imageParts.map((part, idx) => {
       if (!part) return null
