@@ -33,24 +33,24 @@ export function StudentAnalyticsTable({ rows, problemStats }: StudentAnalyticsTa
     <div className="space-y-4">
       <Card className="border-[#eceff3] bg-white">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Student progress</CardTitle>
+          <CardTitle className="text-base font-semibold">Progres elevi</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Correct</TableHead>
+                <TableHead>Elev</TableHead>
+                <TableHead>E-mail</TableHead>
+                <TableHead className="text-right">Corecte</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Score</TableHead>
+                <TableHead className="text-right">Scor</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-[#6b7280]">
-                    No student submissions yet.
+                    Încă nu există trimiteri de la elevi.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -71,21 +71,21 @@ export function StudentAnalyticsTable({ rows, problemStats }: StudentAnalyticsTa
 
       <Card className="border-[#eceff3] bg-white">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Problem stats</CardTitle>
+          <CardTitle className="text-base font-semibold">Statistici probleme</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Problem</TableHead>
-                <TableHead className="text-right">Correct rate</TableHead>
+                <TableHead>Problemă</TableHead>
+                <TableHead className="text-right">Rată corecte</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {problemStats.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={2} className="text-center text-[#6b7280]">
-                    No stats yet.
+                    Încă nu există statistici.
                   </TableCell>
                 </TableRow>
               ) : (

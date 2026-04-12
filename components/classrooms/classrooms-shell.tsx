@@ -27,10 +27,10 @@ interface ClassroomsShellProps {
 }
 
 function formatDeadline(deadline: string) {
-  if (!deadline) return "Fără deadline"
+  if (!deadline) return "Fără termen limită"
 
   const date = new Date(deadline)
-  if (Number.isNaN(date.getTime())) return "Fără deadline"
+  if (Number.isNaN(date.getTime())) return "Fără termen limită"
   return date.toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short" })
 }
 
@@ -178,7 +178,7 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
       Boolean(pathname?.startsWith(`/classrooms/${pathClassId}/probleme/`)))
 
   return (
-    <div className="h-[100dvh] pt-16 overflow-hidden bg-[#ffffff] relative flex">
+    <div className="relative flex h-[100dvh] w-full min-w-0 overflow-hidden bg-[#ffffff] pt-16">
       {pathClassId && !isDraftPicking ? (
         <Link
           href="/classrooms"
@@ -236,7 +236,7 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
                 <div className="mt-4 rounded-xl border border-[#eef2f7] bg-[#f8fafc] px-3 py-2">
                   <div className="flex items-center gap-2 text-xs font-medium text-[#64748b]">
                     <CalendarDays className="h-4 w-4" aria-hidden />
-                    Deadline
+                    Termen limită
                   </div>
                   <p className="mt-1 text-sm font-semibold text-[#111827]">{formatDeadline(draft.deadline)}</p>
                 </div>
@@ -362,7 +362,7 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
 
       <div className="flex-1 min-w-0 flex flex-col bg-[#ffffff]">
         <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa]">
+          <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[#f8f9fa] dashboard-scrollbar">
             <main
               className={cn(
                 "p-4 md:p-8 lg:p-10",

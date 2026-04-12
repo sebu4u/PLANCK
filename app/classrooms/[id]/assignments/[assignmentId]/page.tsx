@@ -11,10 +11,10 @@ import {
 } from "@/lib/classrooms/server"
 
 const errorMessages: Record<string, string> = {
-  invalid_submission: "Please select an answer before submitting.",
-  students_only: "Only students can submit answers.",
-  submission_failed: "Could not save your answer.",
-  solve_in_catalog_first: "Open the problem in the catalog, solve it there, then sync it here.",
+  invalid_submission: "Selectează un răspuns înainte de trimitere.",
+  students_only: "Doar elevii pot trimite răspunsuri.",
+  submission_failed: "Nu am putut salva răspunsul.",
+  solve_in_catalog_first: "Deschide problema în catalog, rezolv-o acolo, apoi sincronizeaz-o aici.",
 }
 
 export default async function AssignmentDetailPage({
@@ -96,9 +96,15 @@ export default async function AssignmentDetailPage({
         <CardContent className="space-y-2 text-sm text-[#4b5563]">
           {assignment.description ? <p>{assignment.description}</p> : null}
           <p>
-            Deadline: {assignment.deadline ? new Date(assignment.deadline).toLocaleString() : "No deadline"}
+            Termen limită:{" "}
+            {assignment.deadline
+              ? new Date(assignment.deadline).toLocaleString("ro-RO")
+              : "Fără termen limită"}
           </p>
-          <p>{assignment.problems.length} problems</p>
+          <p>
+            {assignment.problems.length}{" "}
+            {assignment.problems.length === 1 ? "problemă" : "probleme"}
+          </p>
         </CardContent>
       </Card>
 
@@ -110,7 +116,7 @@ export default async function AssignmentDetailPage({
 
       {showSaved ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          Answer saved successfully.
+          Răspunsul a fost salvat.
         </div>
       ) : null}
 

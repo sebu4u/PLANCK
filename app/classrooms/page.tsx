@@ -9,9 +9,9 @@ import { getClassroomsForUser, requireAuthenticatedUser } from "@/lib/classrooms
 const EMPTY_CLASSROOMS_IMAGE_SRC = `/images/icons/${encodeURIComponent("Untitled design (48).png")}`
 
 const errorMessages: Record<string, string> = {
-  invalid_leave_request: "Could not process the leave request. Please try again.",
-  not_member: "You are no longer a member of that classroom.",
-  teacher_cannot_leave: "Teachers cannot leave their own classroom.",
+  invalid_leave_request: "Nu am putut procesa cererea de ieșire. Încearcă din nou.",
+  not_member: "Nu mai ești membru al acelei clase.",
+  teacher_cannot_leave: "Profesorul nu poate părăsi propria clasă.",
 }
 
 export default async function ClassroomsHomePage({
@@ -38,17 +38,17 @@ export default async function ClassroomsHomePage({
         )}
       >
         <div>
-          <h1 className="text-2xl font-bold text-[#111827]">Classrooms</h1>
+          <h1 className="text-2xl font-bold text-[#111827]">Clase</h1>
           <p className="mt-1 text-sm text-[#6b7280]">
-            Manage your classes, assignments, and announcements in one place.
+            Gestionează clasele, temele și anunțurile într-un singur loc.
           </p>
         </div>
         <div className="hidden gap-2 md:flex">
           <Button asChild variant="outline">
-            <Link href="/classrooms/join">Join classroom</Link>
+            <Link href="/classrooms/join">Intră într-o clasă</Link>
           </Button>
           <Button asChild>
-            <Link href="/classrooms/new">Create classroom</Link>
+            <Link href="/classrooms/new">Creează o clasă</Link>
           </Button>
         </div>
       </div>

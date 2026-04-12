@@ -32,7 +32,7 @@ export function ClassroomCardActions({ classroomId, isTeacher }: ClassroomCardAc
     <div ref={menuRef} className="relative flex items-center gap-1.5">
       <Link
         href={`/classrooms/${classroomId}/students`}
-        aria-label="Open classroom students"
+        aria-label="Deschide lista de elevi din clasă"
         className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#4f4f4f] transition hover:bg-[#f1f3f4] hover:text-[#1f1f1f]"
       >
         <Users className="h-[18px] w-[18px]" />
@@ -40,37 +40,34 @@ export function ClassroomCardActions({ classroomId, isTeacher }: ClassroomCardAc
 
       <button
         type="button"
-        aria-label="Open classroom actions"
+        aria-label="Deschide acțiunile clasei"
         onClick={() => setIsMenuOpen((value) => !value)}
         className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#4f4f4f] transition hover:bg-[#f1f3f4] hover:text-[#1f1f1f]"
       >
         <MoreVertical className="h-[18px] w-[18px]" />
       </button>
 
-      <div
-        className={cn(
-          "absolute bottom-10 right-0 z-20 min-w-[180px] translate-x-[calc(100%+8px)] rounded-xl border border-[#dadce0] bg-white p-2 shadow-lg transition",
-          isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        )}
-      >
-        <form action={leaveClassroomAction}>
-          <input type="hidden" name="classroom_id" value={classroomId} />
-          <button
-            type="submit"
-            disabled={isTeacher}
-            title={isTeacher ? "The teacher cannot leave this classroom." : "Leave this classroom"}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition",
-              isTeacher
-                ? "cursor-not-allowed text-[#9aa0a6]"
-                : "text-[#d93025] hover:bg-[#fce8e6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f28b82]"
-            )}
-          >
-            <LogOut className="h-4 w-4" />
-            Leave classroom
-          </button>
-        </form>
-      </div>
+      {isMenuOpen ? (
+        <div className="absolute bottom-10 right-0 z-20 min-w-[180px] translate-x-[calc(100%+8px)] rounded-xl border border-[#dadce0] bg-white p-2 shadow-lg">
+          <form action={leaveClassroomAction}>
+            <input type="hidden" name="classroom_id" value={classroomId} />
+            <button
+              type="submit"
+              disabled={isTeacher}
+              title={isTeacher ? "Profesorul nu poate părăsi această clasă." : "Părăsește clasa"}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition",
+                isTeacher
+                  ? "cursor-not-allowed text-[#9aa0a6]"
+                  : "text-[#d93025] hover:bg-[#fce8e6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f28b82]"
+              )}
+            >
+              <LogOut className="h-4 w-4" />
+              Părăsește clasa
+            </button>
+          </form>
+        </div>
+      ) : null}
     </div>
   )
 }

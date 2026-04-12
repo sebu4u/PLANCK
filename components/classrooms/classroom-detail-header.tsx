@@ -34,7 +34,7 @@ export function ClassroomDetailHeader({
         <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-black/10" />
         <div className="relative">
           <h1 className="text-3xl font-semibold tracking-tight">{classroomName}</h1>
-          <p className="mt-1 text-sm font-medium text-white/90">Join code: {joinCode}</p>
+          <p className="mt-1 text-sm font-medium text-white/90">Cod de intrare: {joinCode}</p>
         </div>
       </div>
     </div>

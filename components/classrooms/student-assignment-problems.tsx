@@ -81,14 +81,14 @@ export function StudentAssignmentProblems({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button type="submit">{existing ? "Update answer" : "Submit answer"}</Button>
+                    <Button type="submit">{existing ? "Actualizează răspunsul" : "Trimite răspunsul"}</Button>
                     {existing ? (
                       <span
                         className={`text-sm font-medium ${
                           existing.is_correct ? "text-emerald-600" : "text-rose-600"
                         }`}
                       >
-                        {existing.is_correct ? "Correct answer" : "Incorrect answer"}
+                        {existing.is_correct ? "Răspuns corect" : "Răspuns greșit"}
                       </span>
                     ) : null}
                   </div>
@@ -132,14 +132,14 @@ export function StudentAssignmentProblems({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button type="submit">{existing ? "Update answer" : "Submit answer"}</Button>
+                    <Button type="submit">{existing ? "Actualizează răspunsul" : "Trimite răspunsul"}</Button>
                     {existing ? (
                       <span
                         className={`text-sm font-medium ${
                           existing.is_correct ? "text-emerald-600" : "text-rose-600"
                         }`}
                       >
-                        {existing.is_correct ? "Correct answer" : "Incorrect answer"}
+                        {existing.is_correct ? "Răspuns corect" : "Răspuns greșit"}
                       </span>
                     ) : null}
                   </div>
@@ -149,12 +149,12 @@ export function StudentAssignmentProblems({
               {!isGrila && !isValue ? (
                 <div className="space-y-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] p-4">
                   <p className="text-sm text-[#4b5563]">
-                    This problem is solved in the main catalog page. Open it, solve it there, then sync it back to
-                    this assignment.
+                    Această problemă se rezolvă în catalogul principal. Deschide-o acolo, rezolv-o, apoi
+                    sincronizează rezultatul cu această temă.
                   </p>
                   <div className="flex flex-wrap items-center gap-3">
                     <Button asChild variant="outline">
-                      <Link href={`/probleme/${problem.id}`}>Open in catalog</Link>
+                      <Link href={`/probleme/${problem.id}`}>Deschide în catalog</Link>
                     </Button>
                     <form action={syncCatalogSolvedProblemAction}>
                       <input type="hidden" name="classroom_id" value={classroomId} />
@@ -165,11 +165,11 @@ export function StudentAssignmentProblems({
                         name="redirect_to"
                         value={`/classrooms/${classroomId}/assignments/${assignmentId}`}
                       />
-                      <Button type="submit">Sync solved status</Button>
+                      <Button type="submit">Sincronizează statusul</Button>
                     </form>
                     {existing ? (
                       <span className="text-sm font-medium text-emerald-600">
-                        {existing.is_correct ? "Synced from catalog" : "Submission saved"}
+                        {existing.is_correct ? "Sincronizat din catalog" : "Trimitere salvată"}
                       </span>
                     ) : null}
                   </div>

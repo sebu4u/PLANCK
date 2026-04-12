@@ -27,7 +27,7 @@ export function ClassroomCard({ classroom }: ClassroomCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-black/20" />
         <div className="relative z-10">
           <h3 className="line-clamp-2 text-2xl font-semibold tracking-tight">{classroom.name}</h3>
-          <p className="mt-1 text-sm font-medium text-white/90">Created by {classroom.teacher_name}</p>
+          <p className="mt-1 text-sm font-medium text-white/90">Creată de {classroom.teacher_name}</p>
         </div>
       </Link>
 
@@ -37,12 +37,14 @@ export function ClassroomCard({ classroom }: ClassroomCardProps) {
 
       <CardContent className="flex min-h-[130px] items-end justify-between px-4 py-3">
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#5f6368]">Code: {classroom.join_code}</p>
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#5f6368]">Cod: {classroom.join_code}</p>
           <p className="inline-flex items-center gap-1.5 text-sm text-[#5f6368]">
             <Users className="h-4 w-4" />
-            {classroom.student_count} members
+            {classroom.student_count} membri
           </p>
-          <p className="text-xs text-[#80868b]">{new Date(classroom.created_at).toLocaleDateString()}</p>
+          <p className="text-xs text-[#80868b]">
+            {new Date(classroom.created_at).toLocaleDateString("ro-RO")}
+          </p>
         </div>
 
         <div className="pb-1">

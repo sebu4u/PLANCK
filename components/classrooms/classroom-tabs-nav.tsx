@@ -18,9 +18,9 @@ export function ClassroomTabsNav({ classroomId }: ClassroomTabsNavProps) {
   }
 
   const tabs = [
-    { href: `/classrooms/${classroomId}`, label: "Stream" },
-    { href: `/classrooms/${classroomId}/assignments`, label: "Assignments" },
-    { href: `/classrooms/${classroomId}/students`, label: "People" },
+    { href: `/classrooms/${classroomId}`, label: "Flux" },
+    { href: `/classrooms/${classroomId}/assignments`, label: "Teme" },
+    { href: `/classrooms/${classroomId}/students`, label: "Persoane" },
   ]
 
   return (

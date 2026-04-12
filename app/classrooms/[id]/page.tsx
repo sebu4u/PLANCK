@@ -34,9 +34,9 @@ const ClassroomStreamGate = dynamic(
 )
 
 const errorMessages: Record<string, string> = {
-  file_upload_failed: "The file could not be uploaded. Please try again.",
-  announcement_failed: "Could not publish announcement. Please verify all fields.",
-  teacher_only: "Only the classroom teacher can post announcements.",
+  file_upload_failed: "Fișierul nu a putut fi încărcat. Încearcă din nou.",
+  announcement_failed: "Nu am putut publica anunțul. Verifică toate câmpurile.",
+  teacher_only: "Doar profesorul clasei poate publica anunțuri.",
 }
 
 export default async function ClassroomStreamPage({
@@ -109,9 +109,9 @@ export default async function ClassroomStreamPage({
     >
       <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
         <aside className="rounded-xl border border-[#dadce0] bg-white p-4">
-          <h2 className="text-sm font-semibold text-[#202124]">Upcoming</h2>
+          <h2 className="text-sm font-semibold text-[#202124]">Urmează</h2>
           {nextDeadlines.length === 0 ? (
-            <p className="mt-3 text-xs text-[#5f6368]">Woohoo, no work due soon!</p>
+            <p className="mt-3 text-xs text-[#5f6368]">Nimic de predat curând.</p>
           ) : (
             <div className="mt-3 space-y-2">
               {nextDeadlines.map((assignment) => (
@@ -120,7 +120,7 @@ export default async function ClassroomStreamPage({
                   <p className="mt-1 text-xs text-[#5f6368]">
                     {assignment.deadline
                       ? new Date(assignment.deadline).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" })
-                      : "No deadline"}
+                      : "Fără termen limită"}
                   </p>
                 </div>
               ))}
@@ -142,7 +142,7 @@ export default async function ClassroomStreamPage({
           <div className="space-y-3">
             {feedItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#d1d5db] bg-white p-8 text-center text-sm text-[#6b7280]">
-                No posts yet.
+                Încă nu există postări.
               </div>
             ) : (
               feedItems.map((item) =>

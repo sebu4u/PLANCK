@@ -18,7 +18,7 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
   })
   const deadlineLabel = deadline
     ? new Date(deadline).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short" })
-    : "No deadline"
+    : "Fără termen limită"
 
   return (
     <Card className="border-[#dfe3ea] bg-white shadow-sm">
@@ -32,7 +32,7 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
             </div>
           </div>
           <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4338ca]">
-            Stream
+            Anunț
           </span>
         </div>
       </CardHeader>
@@ -43,7 +43,7 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
           <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
             <Image
               src={announcement.signed_file_url}
-              alt="Announcement image"
+              alt="Imagine anunț"
               width={1200}
               height={800}
               className="h-auto w-full object-cover"
@@ -59,7 +59,7 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
             className="inline-flex items-center gap-2 rounded-lg border border-[#d1d5db] px-3 py-2 text-sm font-medium text-[#111827] hover:bg-[#f9fafb]"
           >
             <FileText className="h-4 w-4" />
-            Open file
+            Deschide fișierul
           </a>
         ) : null}
 
@@ -68,14 +68,14 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
             href={`/cursuri/${announcement.lesson_slug}`}
             className="inline-flex items-center rounded-lg bg-[#111827] px-3 py-2 text-sm font-medium text-white hover:bg-[#1f2937]"
           >
-            Open lesson
+            Deschide lecția
           </Link>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#eef2f7] pt-3">
           <span className="inline-flex items-center gap-1 text-xs text-[#6b7280]">
             <CalendarDays className="h-3.5 w-3.5" />
-            Deadline: {deadlineLabel}
+            Termen: {deadlineLabel}
           </span>
           <DeadlineTimer deadline={deadline} />
         </div>

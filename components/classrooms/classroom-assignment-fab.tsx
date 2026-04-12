@@ -66,7 +66,7 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
     <>
       <button
         type="button"
-        aria-label="Creează assignment"
+        aria-label="Creează temă"
         onClick={() => setOpen(true)}
         className={cn(
           "pointer-events-auto fixed bottom-6 right-6 z-[200] flex h-14 w-14 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-lg",
@@ -86,7 +86,7 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
         >
           <div className="relative flex shrink-0 items-start gap-3 border-b border-[#e8eaed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 pr-14 md:px-5 md:py-4 md:pr-14">
             <div className="min-w-0 space-y-1">
-              <DialogTitle className="text-left text-lg font-semibold text-[#111827]">Assignment nou</DialogTitle>
+              <DialogTitle className="text-left text-lg font-semibold text-[#111827]">Temă nouă</DialogTitle>
               <p className="hidden text-sm text-[#5f6368] md:block">
                 Completează detaliile temei, apoi mergi în catalog ca să alegi exercițiile.
               </p>
@@ -131,7 +131,7 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
 
               <div className="space-y-2">
                 <label htmlFor="assignment-deadline" className="text-sm font-medium text-[#111827]">
-                  Deadline
+                  Termen limită
                 </label>
                 <Input
                   id="assignment-deadline"

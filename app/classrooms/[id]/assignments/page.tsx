@@ -8,10 +8,10 @@ import {
 
 /** Error query keys from assignment create redirect (teacher flow via FAB / API). */
 const errorMessages: Record<string, string> = {
-  title_and_problems_required: "Add a title and select at least one problem.",
-  assignment_create_failed: "Could not create assignment.",
-  assignment_problem_link_failed: "Assignment created, but problems could not be linked.",
-  teacher_only: "Only the classroom teacher can create assignments.",
+  title_and_problems_required: "Adaugă un titlu și selectează cel puțin o problemă.",
+  assignment_create_failed: "Nu am putut crea tema.",
+  assignment_problem_link_failed: "Tema a fost creată, dar problemele nu au putut fi legate.",
+  teacher_only: "Doar profesorul clasei poate crea teme.",
 }
 
 export default async function ClassroomAssignmentsPage({
@@ -49,7 +49,7 @@ export default async function ClassroomAssignmentsPage({
       <div className="space-y-3">
         {assignments.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#d1d5db] bg-white p-8 text-center text-sm text-[#6b7280]">
-            No assignments yet.
+            Încă nu există teme.
           </div>
         ) : (
           assignments.map((assignment) => (

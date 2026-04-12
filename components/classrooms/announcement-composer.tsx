@@ -21,19 +21,30 @@ function SubmitButton() {
   const { pending } = useFormStatus()
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? "Posting..." : "Post"}
+      {pending ? "Se publică..." : "Publică"}
     </Button>
   )
 }
 
+const TYPE_LABELS: Record<AnnouncementType, string> = {
+  text: "Text",
+  image: "Imagine",
+  file: "Fișier",
+  lesson: "Lecție",
+}
+
 export function AnnouncementComposer({ classroomId, lessons }: AnnouncementComposerProps) {
   const [type, setType] = useState<AnnouncementType>("text")
-  const selectedTypeLabel = useMemo(() => type.charAt(0).toUpperCase() + type.slice(1), [type])
+  const messageFieldLabel = useMemo(() => {
+    if (type === "text") return "Mesaj"
+    if (type === "image") return "Mesaj / descriere"
+    return "Mesaj / descriere"
+  }, [type])
 
   return (
     <Card className="border-[#eceff3] bg-white">
       <CardHeader>
-        <CardTitle className="text-base font-semibold">Share something with your class...</CardTitle>
+        <CardTitle className="text-base font-semibold">Distribuie ceva clasei tale…</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
@@ -49,7 +60,7 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
                   : "border-[#d1d5db] text-[#374151] hover:bg-[#f3f4f6]"
               )}
             >
-              {option.charAt(0).toUpperCase() + option.slice(1)}
+              {TYPE_LABELS[option]}
             </button>
           ))}
         </div>
@@ -60,11 +71,11 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
 
           {(type === "text" || type === "image" || type === "file") && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#111827]">{selectedTypeLabel} message</label>
+              <label className="text-sm font-medium text-[#111827]">{messageFieldLabel}</label>
               <Textarea
                 name="content"
                 rows={4}
-                placeholder="Write your announcement..."
+                placeholder="Scrie anunțul…"
                 required={type === "text"}
               />
             </div>
@@ -72,7 +83,7 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
 
           {type === "lesson" && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#111827]">Lesson</label>
+              <label className="text-sm font-medium text-[#111827]">Lecție</label>
               <select
                 name="lesson_slug"
                 className="h-10 w-full rounded-md border border-[#d1d5db] bg-white px-3 text-sm"
@@ -80,7 +91,7 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
                 defaultValue=""
               >
                 <option value="" disabled>
-                  Select lesson
+                  Alege lecția
                 </option>
                 {lessons.map((lesson) => (
                   <option key={lesson.id} value={lesson.slug}>
@@ -94,7 +105,7 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
           {(type === "image" || type === "file") && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-[#111827]">
-                {type === "image" ? "Image" : "File (PDF or document)"}
+                {type === "image" ? "Imagine" : "Fișier (PDF sau document)"}
               </label>
               <Input
                 name="file"

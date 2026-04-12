@@ -18,7 +18,7 @@ export function CopyJoinCodeButton({ joinCode }: CopyJoinCodeButtonProps) {
 
   return (
     <Button type="button" variant="outline" onClick={onCopy}>
-      {copied ? "Copied" : "Copy code"}
+      {copied ? "Copiat" : "Copiază codul"}
     </Button>
   )
 }

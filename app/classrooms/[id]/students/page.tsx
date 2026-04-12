@@ -38,11 +38,11 @@ export default async function ClassroomStudentsPage({
       {classroom.role === "teacher" ? (
         <Card className="border-[#eceff3] bg-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Join code</CardTitle>
+            <CardTitle className="text-base font-semibold">Cod de intrare</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-[#4b5563]">
-              Students join with this code: <span className="font-semibold text-[#111827]">{classroom.join_code}</span>
+              Elevii intră cu acest cod: <span className="font-semibold text-[#111827]">{classroom.join_code}</span>
             </p>
             <CopyJoinCodeButton joinCode={classroom.join_code} />
           </CardContent>
@@ -51,11 +51,11 @@ export default async function ClassroomStudentsPage({
 
       <Card className="border-[#eceff3] bg-white">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">People</CardTitle>
+          <CardTitle className="text-base font-semibold">Persoane</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {students.length === 0 ? (
-            <p className="text-sm text-[#6b7280]">No students joined yet.</p>
+            <p className="text-sm text-[#6b7280]">Niciun elev nu s-a alăturat încă.</p>
           ) : (
             students.map((student) => (
               <div
@@ -64,9 +64,9 @@ export default async function ClassroomStudentsPage({
               >
                 <div>
                   <p className="text-sm font-medium text-[#111827]">{student.name}</p>
-                  <p className="text-xs text-[#6b7280]">{student.email || "No email available"}</p>
+                  <p className="text-xs text-[#6b7280]">{student.email || "Fără adresă de e-mail"}</p>
                   <p className="text-xs text-[#9ca3af]">
-                    Joined {new Date(student.joined_at).toLocaleDateString()}
+                    Înscris la {new Date(student.joined_at).toLocaleDateString("ro-RO")}
                   </p>
                 </div>
                 {classroom.role === "teacher" ? (
@@ -74,7 +74,7 @@ export default async function ClassroomStudentsPage({
                     <input type="hidden" name="classroom_id" value={classroomId} />
                     <input type="hidden" name="member_id" value={student.member_id} />
                     <Button type="submit" variant="outline" className="text-rose-600 hover:text-rose-700">
-                      Remove
+                      Elimină
                     </Button>
                   </form>
                 ) : null}
@@ -86,11 +86,11 @@ export default async function ClassroomStudentsPage({
 
       <Card className="border-[#eceff3] bg-white">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Leaderboard</CardTitle>
+          <CardTitle className="text-base font-semibold">Clasament</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {leaderboard.length === 0 ? (
-            <p className="text-sm text-[#6b7280]">No data yet.</p>
+            <p className="text-sm text-[#6b7280]">Încă nu există date.</p>
           ) : (
             leaderboard.map((row, index) => (
               <div
@@ -101,7 +101,7 @@ export default async function ClassroomStudentsPage({
                   <span className="mr-2 font-semibold">#{index + 1}</span>
                   {row.name}
                 </p>
-                <p className="text-sm font-medium text-[#4b5563]">{row.solved} solved</p>
+                <p className="text-sm font-medium text-[#4b5563]">{row.solved} rezolvate</p>
               </div>
             ))
           )}

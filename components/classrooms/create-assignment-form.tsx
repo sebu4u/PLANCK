@@ -66,7 +66,7 @@ function SubmitButton() {
   const { pending } = useFormStatus()
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? "Creating..." : "Create assignment"}
+      {pending ? "Se creează…" : "Creează tema"}
     </Button>
   )
 }
@@ -133,17 +133,17 @@ export function CreateAssignmentForm({ classroomId, problems: pool }: CreateAssi
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[#111827]">Title</label>
-          <Input name="title" placeholder="Homework 1 - Kinematics" required maxLength={200} />
+          <label className="text-sm font-medium text-[#111827]">Titlu</label>
+          <Input name="title" placeholder="Tema 1 - Cinematică" required maxLength={200} />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[#111827]">Description</label>
-          <Textarea name="description" placeholder="What should students focus on?" rows={3} />
+          <label className="text-sm font-medium text-[#111827]">Descriere</label>
+          <Textarea name="description" placeholder="La ce ar trebui să se concentreze elevii?" rows={3} />
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <label className="text-sm font-medium text-[#111827]">Deadline</label>
+          <label className="text-sm font-medium text-[#111827]">Termen limită</label>
           <Input name="deadline" type="datetime-local" />
         </div>
       </div>
@@ -152,7 +152,7 @@ export function CreateAssignmentForm({ classroomId, problems: pool }: CreateAssi
         <div>
           <p className="text-sm font-medium text-[#111827]">Probleme din catalog</p>
           <p className="mt-0.5 text-xs text-[#6b7280]">
-            Acelasi tip de filtre ca pe pagina de catalog. Cardurile sunt selectabile pentru temă.
+            Același tip de filtre ca pe pagina de catalog. Cardurile sunt selectabile pentru temă.
           </p>
         </div>
 
@@ -174,7 +174,11 @@ export function CreateAssignmentForm({ classroomId, problems: pool }: CreateAssi
 
           <div className="min-w-0 flex-1 space-y-3">
             <p className="text-xs text-[#6b7280]">
-              {selected.size} problem{selected.size === 1 ? "" : "e"} selectat{selected.size === 1 ? "ă" : "e"}
+              {selected.size === 0
+                ? "0 probleme selectate"
+                : selected.size === 1
+                  ? "1 problemă selectată"
+                  : `${selected.size} probleme selectate`}
             </p>
             <div className="grid max-h-[min(70vh,620px)] gap-4 overflow-y-auto overscroll-contain sm:grid-cols-2">
               {filteredProblems.length === 0 ? (
