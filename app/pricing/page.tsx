@@ -304,7 +304,7 @@ function PricingPageContent() {
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-white text-[#111111] selection:bg-sky-200/70">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-white text-[#111111] selection:bg-sky-200/70">
       {/* Gradient orizontal + fade lung spre alb (fără „tăietură” la granița cu fundalul alb) */}
       <div
         aria-hidden
@@ -331,7 +331,7 @@ function PricingPageContent() {
       </button>
 
       <main
-        className="relative z-10 mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col px-4 pb-[calc(8.25rem+env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))] sm:px-6 lg:px-8"
+        className="relative z-10 mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col px-4 pb-[calc(14rem+env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))] sm:px-6 md:pb-[calc(8.75rem+env(safe-area-inset-bottom))] lg:px-8"
       >
         <section className="mx-auto flex w-full max-w-4xl shrink-0 flex-col items-center text-center">
           <div className="-mt-0.5 mb-3 flex justify-center sm:mb-4">
@@ -363,7 +363,7 @@ function PricingPageContent() {
           )}
         </section>
 
-        <div className="flex min-h-0 w-full flex-1 flex-col justify-end pt-2 pb-1 sm:pt-3 sm:pb-2">
+        <div className="flex min-h-0 w-full flex-1 flex-col justify-start pt-2 pb-1 sm:pt-3 sm:pb-2 lg:justify-end">
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -379,7 +379,7 @@ function PricingPageContent() {
                 <div
                   key={plan.id}
                   className={cn(
-                    "relative h-full rounded-[28px] p-[1.5px] transition duration-200",
+                    "relative h-full rounded-[28px] p-[3px] sm:p-[1.5px] transition duration-200",
                     plan.id === "free" && "order-2 md:order-1",
                     plan.id === "plus" && "order-1 md:order-2",
                     plan.id === "premium" && "order-3 md:order-3",
@@ -401,7 +401,7 @@ function PricingPageContent() {
                     onClick={() => setSelectedPlan(plan.id)}
                     aria-pressed={isSelected}
                     className={cn(
-                      "relative flex h-full w-full flex-col rounded-[24px] bg-white p-3 text-left transition duration-200 sm:rounded-[27px] sm:p-5",
+                      "relative flex h-full w-full flex-col rounded-[25px] bg-white p-3 text-left transition duration-200 sm:rounded-[26.5px] sm:p-5",
                       isSelected ? "shadow-[0_18px_40px_rgba(15,23,42,0.12)]" : "shadow-[0_10px_30px_rgba(15,23,42,0.06)]",
                       "min-h-[128px] sm:min-h-[168px]"
                     )}
@@ -418,39 +418,76 @@ function PricingPageContent() {
                         )}
                       </div>
 
-                      <div className="flex items-end justify-between gap-2">
-                        <div className="flex min-w-0 items-end gap-1.5">
-                          <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
-                            {plan.priceValue ? (
+                      {plan.id === "plus" ? (
+                        <>
+                          <div className="flex items-end justify-between gap-2">
+                            <div className="flex min-w-0 items-end gap-1.5">
+                              <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
+                                {isYearly && plan.priceValue != null
+                                  ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
+                                  : plan.description}
+                              </span>
+                            </div>
+                            {plan.yearlySavingsRon != null && (
+                              <span
+                                className={cn(
+                                  "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
+                                  isYearly ? "text-red-600" : "invisible"
+                                )}
+                                aria-hidden={!isYearly}
+                              >
+                                -{plan.yearlySavingsRon}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-2 max-w-[18rem] text-xs font-normal leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                            {plan.priceValue != null ? (
                               <>
-                                <AnimatedPrice value={plan.priceValue} /> {plan.currency}
+                                <AnimatedPrice value={plan.priceValue} /> {plan.currency} {plan.period}
                               </>
                             ) : (
                               plan.priceLabel
                             )}
-                          </span>
-                          {plan.priceLabel !== "Gratuit" && (
-                            <span className="pb-0.5 text-xs font-medium text-gray-500 sm:pb-1 sm:text-sm">
-                              {plan.period}
-                            </span>
-                          )}
-                        </div>
-                        {plan.yearlySavingsRon != null && (
-                          <span
-                            className={cn(
-                              "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
-                              isYearly ? "text-red-600" : "invisible"
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-end justify-between gap-2">
+                            <div className="flex min-w-0 items-end gap-1.5">
+                              <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
+                                {plan.priceValue ? (
+                                  <>
+                                    <AnimatedPrice value={plan.priceValue} /> {plan.currency}
+                                  </>
+                                ) : (
+                                  plan.priceLabel
+                                )}
+                              </span>
+                              {plan.priceLabel !== "Gratuit" && (
+                                <span className="pb-0.5 text-xs font-medium text-gray-500 sm:pb-1 sm:text-sm">
+                                  {plan.period}
+                                </span>
+                              )}
+                            </div>
+                            {plan.yearlySavingsRon != null && (
+                              <span
+                                className={cn(
+                                  "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
+                                  isYearly ? "text-red-600" : "invisible"
+                                )}
+                                aria-hidden={!isYearly}
+                              >
+                                -{plan.yearlySavingsRon}
+                              </span>
                             )}
-                            aria-hidden={!isYearly}
-                          >
-                            -{plan.yearlySavingsRon}
-                          </span>
-                        )}
-                      </div>
+                          </div>
 
-                      <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
-                        {plan.description}
-                      </p>
+                          <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                            {plan.description}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </button>
                 </div>
