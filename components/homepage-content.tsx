@@ -21,11 +21,14 @@ import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
 import { ScrollToTopButton } from "@/components/scroll-to-top-button"
 import { HomePageHeroRedesign } from "@/components/homepage-hero-redesign"
-import { VideoCardsSection } from "@/components/video-cards-section"
+import { HomePageScrollNavbar } from "@/components/homepage-scroll-navbar"
 import { AIDemoSection } from "@/components/ai-demo-section"
 import { AICodeAnalysisSection } from "@/components/ai-code-analysis-section"
 import { NewWayToLearnSection } from "@/components/new-way-to-learn-section"
 import { CoursesSectionHomepage } from "@/components/courses-section-homepage"
+import { HomePageReusiteSection } from "@/components/homepage-reusite-section"
+import { HomePageInteractiveSchoolSection } from "@/components/homepage-interactive-school-section"
+import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
 import { ReviewsSection } from "@/components/homepage-reviews"
 import { FAQSection } from "@/components/faq-section"
@@ -41,8 +44,10 @@ const HowItWorksSection = dynamic(() => import("@/components/how-it-works-sectio
 
 const HOME_SECTION_IDS = [
   "home-hero",
-  "home-video",
+  "home-reusite",
+  "home-interactive-school",
   "home-ai-demo",
+  "home-mai-eficient",
   "home-courses",
   "home-reviews",
   "home-faq",
@@ -165,6 +170,7 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
+      <HomePageScrollNavbar />
       <HomeSectionIndicator />
 
       {/* Hero Section cu temă spațială */}
@@ -172,15 +178,16 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
         <HomePageHeroRedesign isMobile={isMobile} />
       </section>
 
-      {/* Video Cards Section */}
-      <section id="home-video">
-        <VideoCardsSection />
-      </section>
+      <HomePageReusiteSection />
+
+      <HomePageInteractiveSchoolSection />
 
       {/* AI Demo Section */}
       <section id="home-ai-demo">
         <AIDemoSection />
       </section>
+
+      <HomePageMaiEficientSection />
 
       {/* Courses Section */}
       <section id="home-courses">

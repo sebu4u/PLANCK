@@ -28,6 +28,89 @@ const features = [
     }
 ]
 
+const stats = [
+    {
+        icon: GraduationCap,
+        iconWrap: "bg-purple-500/10",
+        iconClass: "text-purple-400",
+        title: "50+ Lecții explicate",
+        description: "Toate capitolele de fizică pentru liceu, explicate clar și pe înțelesul tău.",
+    },
+    {
+        icon: Clock,
+        iconWrap: "bg-blue-500/10",
+        iconClass: "text-blue-400",
+        title: "Disponibil 24/7",
+        description: "Învață oricând vrei, de pe orice dispozitiv. Fără program fix.",
+    },
+    {
+        icon: Users,
+        iconWrap: "bg-green-500/10",
+        iconClass: "text-green-400",
+        title: "1000+ Elevi activi",
+        description: "O comunitate de elevi care învață fizica mai ușor cu PLANCK.",
+    },
+    {
+        icon: MessageCircle,
+        iconWrap: "bg-orange-500/10",
+        iconClass: "text-orange-400",
+        title: "Asistent AI integrat",
+        description: "Pune întrebări și primești răspunsuri instant, direct în lecție.",
+    },
+    {
+        icon: Award,
+        iconWrap: "bg-pink-500/10",
+        iconClass: "text-pink-400",
+        title: "Certificat de finalizare",
+        description: "Primești un certificat pentru fiecare curs finalizat complet.",
+    },
+    {
+        icon: Zap,
+        iconWrap: "bg-cyan-500/10",
+        iconClass: "text-cyan-400",
+        title: "Progres în timp real",
+        description: "Urmărește-ți progresul și continuă de unde ai rămas.",
+    },
+] as const
+
+function StatGridItem({ stat }: { stat: (typeof stats)[number] }) {
+    const Icon = stat.icon
+    return (
+        <div className="flex flex-row sm:flex-col items-start gap-2.5 sm:gap-4">
+            <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl shrink-0 ${stat.iconWrap}`}>
+                <Icon className={`w-5 h-5 sm:w-7 sm:h-7 ${stat.iconClass}`} />
+            </div>
+            <div className="min-w-0 flex-1">
+                <h3 className="text-[0.9375rem] sm:text-xl font-bold text-white mb-0.5 sm:mb-2 leading-snug">
+                    {stat.title}
+                </h3>
+                <p className="text-gray-400 text-xs sm:text-sm leading-snug sm:leading-relaxed">
+                    {stat.description}
+                </p>
+            </div>
+        </div>
+    )
+}
+
+function StatMobileSlide({ stat }: { stat: (typeof stats)[number] }) {
+    const Icon = stat.icon
+    return (
+        <div
+            className="flex flex-row items-start gap-2.5 flex-shrink-0 w-[min(88vw,300px)] rounded-xl border border-white/10 bg-white/[0.04] p-3"
+            role="group"
+            aria-roledescription="slide"
+        >
+            <div className={`p-2 rounded-lg shrink-0 ${stat.iconWrap}`}>
+                <Icon className={`w-5 h-5 ${stat.iconClass}`} />
+            </div>
+            <div className="min-w-0 flex-1">
+                <h3 className="text-[0.9375rem] font-bold text-white mb-0.5 leading-snug">{stat.title}</h3>
+                <p className="text-gray-400 text-xs leading-snug">{stat.description}</p>
+            </div>
+        </div>
+    )
+}
+
 export function CoursesSectionHomepage() {
     return (
         <section
@@ -189,74 +272,36 @@ export function CoursesSectionHomepage() {
                     </div>
                 </div>
 
-                {/* Stats Icons Grid */}
-                <FadeInUp delay={0.5} className="mt-20 lg:mt-28">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-12 max-w-5xl mx-auto">
-                        {/* Stat 1 */}
-                        <div className="flex flex-col items-start gap-4">
-                            <div className="p-3 rounded-xl bg-purple-500/10">
-                                <GraduationCap className="w-7 h-7 text-purple-400" />
+                {/* Stats: mobile = auto horizontal marquee (no user scroll); sm+ = grid */}
+                <FadeInUp delay={0.5} className="mt-12 sm:mt-16 lg:mt-28">
+                    {/* Mobile — prefers-reduced-motion: list statică */}
+                    <div
+                        className="sm:hidden hidden motion-reduce:flex flex-col gap-3 max-w-5xl mx-auto"
+                        role="list"
+                    >
+                        {stats.map((stat, index) => (
+                            <div key={index} role="listitem">
+                                <StatMobileSlide stat={stat} />
                             </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">50+ Lecții explicate</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">Toate capitolele de fizică pentru liceu, explicate clar și pe înțelesul tău.</p>
-                            </div>
-                        </div>
+                        ))}
+                    </div>
 
-                        {/* Stat 2 */}
-                        <div className="flex flex-col items-start gap-4">
-                            <div className="p-3 rounded-xl bg-blue-500/10">
-                                <Clock className="w-7 h-7 text-blue-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">Disponibil 24/7</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">Învață oricând vrei, de pe orice dispozitiv. Fără program fix.</p>
-                            </div>
+                    {/* Mobile — auto-scroll orizontal (utilizatorul nu poate derula manual) */}
+                    <div
+                        className="sm:hidden motion-reduce:hidden -mx-6 w-[calc(100%+3rem)] overflow-hidden touch-none select-none overscroll-none [touch-action:none]"
+                        aria-label="Caracteristici cursuri"
+                    >
+                        <div className="flex w-max gap-3 pl-6 motion-safe:animate-stats-marquee">
+                            {[...stats, ...stats].map((stat, index) => (
+                                <StatMobileSlide key={`${stat.title}-${index}`} stat={stat} />
+                            ))}
                         </div>
+                    </div>
 
-                        {/* Stat 3 */}
-                        <div className="flex flex-col items-start gap-4">
-                            <div className="p-3 rounded-xl bg-green-500/10">
-                                <Users className="w-7 h-7 text-green-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">1000+ Elevi activi</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">O comunitate de elevi care învață fizica mai ușor cu PLANCK.</p>
-                            </div>
-                        </div>
-
-                        {/* Stat 4 */}
-                        <div className="flex flex-col items-start gap-4">
-                            <div className="p-3 rounded-xl bg-orange-500/10">
-                                <MessageCircle className="w-7 h-7 text-orange-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">Asistent AI integrat</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">Pune întrebări și primești răspunsuri instant, direct în lecție.</p>
-                            </div>
-                        </div>
-
-                        {/* Stat 5 */}
-                        <div className="flex flex-col items-start gap-4">
-                            <div className="p-3 rounded-xl bg-pink-500/10">
-                                <Award className="w-7 h-7 text-pink-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">Certificat de finalizare</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">Primești un certificat pentru fiecare curs finalizat complet.</p>
-                            </div>
-                        </div>
-
-                        {/* Stat 6 */}
-                        <div className="flex flex-col items-start gap-4">
-                            <div className="p-3 rounded-xl bg-cyan-500/10">
-                                <Zap className="w-7 h-7 text-cyan-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">Progres în timp real</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">Urmărește-ți progresul și continuă de unde ai rămas.</p>
-                            </div>
-                        </div>
+                    <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10 lg:gap-12 max-w-5xl mx-auto">
+                        {stats.map((stat, index) => (
+                            <StatGridItem key={index} stat={stat} />
+                        ))}
                     </div>
                 </FadeInUp>
             </div>

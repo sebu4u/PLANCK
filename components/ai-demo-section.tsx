@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type CSSProperties } from "react"
 import Link from "next/link"
-import { LayoutGrid, Video, UserPlus } from "lucide-react"
+import { LayoutGrid, Video, UserPlus, ArrowRight } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
 
 interface ChatMessage {
@@ -299,12 +299,16 @@ Calculăm: t = 30 s`,
                     <p className="text-gray-600 text-lg mb-6 font-medium">
                         Vezi aici catalogul cu 1000+ probleme rezolvate de fizica si informatica
                     </p>
-                    <div className="relative group">
-                        <div className="absolute inset-0 bg-orange-500 blur-lg opacity-50 animate-pulse rounded-full group-hover:opacity-75 transition-opacity duration-300"></div>
-                        <Link href="/probleme">
-                            <button className="relative z-10 px-10 py-4 bg-[#1a1d21] text-white font-bold rounded-full border-2 border-orange-500 hover:scale-105 transition-transform duration-300">
+                    <div className="flex w-full max-w-2xl justify-center px-4">
+                        <Link
+                            href="/probleme"
+                            className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#4ade80] to-[#29cc57] px-9 text-base font-semibold text-white shadow-[0_4px_0_#169c4a] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#169c4a] active:translate-y-1 active:shadow-[0_1px_0_#169c4a] lg:w-auto"
+                            style={{ "--start-glow-tint": "rgba(200, 255, 230, 0.88)" } as CSSProperties}
+                        >
+                            <span className="relative z-10 inline-flex items-center gap-2 text-white">
                                 Sunt gata sa iau note mai mari
-                            </button>
+                                <ArrowRight className="h-4 w-4 shrink-0 text-white" aria-hidden />
+                            </span>
                         </Link>
                     </div>
                 </FadeInUp>

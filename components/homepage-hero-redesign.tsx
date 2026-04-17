@@ -1,249 +1,100 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { LaserFlow } from "@/components/laser-flow"
+import { type CSSProperties } from "react"
+import { ArrowRight, Star } from "lucide-react"
 import { LiveStats } from "@/components/live-stats"
 import { HomePageNavbar } from "@/components/homepage-navbar"
-import { useRef, useState, useEffect } from "react"
+import { HeroFeatureBar } from "@/components/hero-feature-bar"
 
-export function HomePageHeroRedesign({ isMobile = false }: { isMobile?: boolean }) {
-    const pathname = usePathname()
-    const revealImgRef = useRef<HTMLImageElement>(null)
-    const sectionRef = useRef<HTMLElement>(null)
-    const imageContainerRef = useRef<HTMLDivElement>(null)
-    const [beamOffset, setBeamOffset] = useState({ x: 0.1, y: 0.0 })
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-    const [isHovering, setIsHovering] = useState(false)
-    // Key to force LaserFlow remount on navigation
-    const [laserKey, setLaserKey] = useState(0)
-
-    // Force LaserFlow remount when navigating to this page
-    useEffect(() => {
-        setLaserKey(prev => prev + 1)
-    }, [pathname])
-
-    useEffect(() => {
-        const updateAlignment = () => {
-            if (imageContainerRef.current && sectionRef.current) {
-                const sectionRect = sectionRef.current.getBoundingClientRect();
-                const imageRect = imageContainerRef.current.getBoundingClientRect();
-
-                // Calculate position relative to the section
-                const relativeTop = imageRect.top - sectionRect.top;
-                const relativeLeft = imageRect.left - sectionRect.left;
-
-                // Calculate normalized offsets for the shader
-                // Vertical: 0.0 is center. Positive moves up.
-                // Formula derived: 0.5 - (targetY / height)
-                const offsetY = 0.5 - (relativeTop / sectionRect.height);
-
-                // Horizontal: 0.0 is center. Positive moves right.
-                // Fixed offset as per user request: 5% to the right
-                const offsetX = 0.05;
-
-                setBeamOffset({ x: offsetX, y: offsetY });
-            }
-        }
-
-        // Initial calc
-        updateAlignment();
-        const timeout = setTimeout(updateAlignment, 100);
-
-        window.addEventListener('resize', updateAlignment);
-
-        const resizeObserver = new ResizeObserver(updateAlignment);
-        if (imageContainerRef.current) resizeObserver.observe(imageContainerRef.current);
-        if (sectionRef.current) resizeObserver.observe(sectionRef.current);
-
-        return () => {
-            window.removeEventListener('resize', updateAlignment);
-            resizeObserver.disconnect();
-            clearTimeout(timeout);
-        }
-    }, [])
-
-    const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
-        if (sectionRef.current) {
-            const rect = sectionRef.current.getBoundingClientRect()
-            setMousePos({
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            })
-        }
-    }
-
+export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile?: boolean }) {
     return (
         <section
-            ref={sectionRef}
             id="hero-section"
-            className="relative min-h-svh lg:min-h-[140vh] w-full overflow-hidden"
-            style={{ backgroundColor: '#090b0d' }}
-            onMouseMove={handleMouseMove}
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => setIsHovering(false)}
+            className="flex w-full flex-col bg-white lg:h-dvh lg:overflow-hidden"
         >
-            <HomePageNavbar />
-
-            {/* Background Image with Circular Hover Reveal */}
-            <div
-                className="hidden lg:block absolute inset-0 z-0 pointer-events-none transition-opacity duration-300"
-                style={{
-                    opacity: isHovering ? 0.3 : 0,
-                    backgroundImage: 'url(/hero1.png)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    maskImage: `radial-gradient(circle 300px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 100%)`,
-                    WebkitMaskImage: `radial-gradient(circle 300px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 100%)`
-                }}
-            />
-
-            {/* Background LaserFlow Effect */}
-            <div className="absolute inset-0 z-[1] pointer-events-none">
-                <LaserFlow
-                    key={laserKey}
-                    horizontalBeamOffset={beamOffset.x}
-                    verticalBeamOffset={beamOffset.y}
-                    color="#cf9eff"
-                    flowSpeed={0.4}
-                    wispDensity={1.5}
-                    isStatic={isMobile}
-                />
+            {/* Navbar — absolute inside a fixed-height row so content below doesn’t slide under the bar */}
+            <div className="relative h-24 shrink-0">
+                <HomePageNavbar variant="light" />
             </div>
 
-            <div className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-36 lg:pt-52 pb-20">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Main content — on lg+, fills space between navbar and banner; on mobile, natural height + scroll */}
+            <div className="relative z-10 flex flex-col px-6 max-lg:pt-5 lg:min-h-0 lg:flex-1 lg:px-8">
+                <div className="flex flex-col translate-y-[3px] lg:min-h-0 lg:flex-1 lg:justify-center">
+                    <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:items-center lg:gap-x-16">
+                        {/* max-lg:contents = mobil păstrează ordinea intro → imagine → CTA; lg = o coloană flex fără „gol” sub subtext */}
+                        <div className="max-lg:contents lg:flex lg:min-h-0 lg:flex-col lg:justify-center lg:gap-3">
+                            <div className="order-1 mx-auto flex w-full max-w-2xl flex-col text-center lg:mx-0 lg:max-w-2xl lg:text-left">
+                                <LiveStats variant="light" />
 
-                    {/* Left Column: Text Content */}
-                    <div className="max-w-2xl text-center lg:text-left mx-auto lg:mx-0 w-full flex flex-col justify-center">
-
-                        {/* Live Stats - Online Users & Solved Problems */}
-                        <LiveStats />
-
-                        {/* Original Text Content */}
-                        <h1 className="scroll-animate-fade-up text-3xl sm:text-4xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-white mb-6 leading-tight">
-                            Explicații clare pentru note mai mari
-                        </h1>
-                        <p className="scroll-animate-fade-up animate-delay-200 text-base sm:text-lg text-[#dbd1d7] mb-8 leading-relaxed">
-                            Lecții structurate, exerciții interactive și AI care te ajută exact când te blochezi.
-                        </p>
-
-                        {/* Action buttons */}
-                        <div className="scroll-animate-fade-up animate-delay-400 flex flex-row gap-4 justify-center items-center lg:justify-start lg:items-start mb-16 lg:mb-24">
-                            <Link href="/register" className="group relative flex justify-center">
-                                <Button
-                                    size="lg"
-                                    className="relative isolate overflow-hidden bg-white hover:bg-white focus-visible:bg-white active:bg-white text-black flex items-center gap-2 rounded-full"
-                                >
-                                    <span className="relative z-10">Începe gratuit</span>
-                                    <span
-                                        aria-hidden="true"
-                                        className="shimmer-sweep pointer-events-none absolute inset-0 -translate-x-[170%] opacity-0 bg-[linear-gradient(115deg,transparent_28%,rgba(168,85,247,0.14)_40%,rgba(59,130,246,0.5)_48%,rgba(255,255,255,0.98)_52%,rgba(59,130,246,0.5)_56%,rgba(168,85,247,0.14)_64%,transparent_74%)]"
-                                    />
-                                    <span
-                                        aria-hidden="true"
-                                        className="shimmer-sweep-glow pointer-events-none absolute -inset-2 -translate-x-[170%] opacity-0 blur-md bg-[linear-gradient(115deg,transparent_34%,rgba(168,85,247,0.35)_48%,rgba(59,130,246,0.45)_52%,transparent_66%)]"
-                                    />
-                                </Button>
-                            </Link>
-                            <Link href="/probleme" className="group relative inline-flex">
-                                <span className="absolute max-sm:hidden -inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl bg-gradient-to-r from-purple-400/60 to-blue-400/60 -z-20 pointer-events-none"></span>
-                                <span className="absolute max-sm:hidden inset-0 rounded-full bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 pointer-events-none"></span>
-                                <span className="absolute max-sm:hidden inset-[1px] rounded-full bg-transparent group-hover:bg-transparent -z-10 pointer-events-none"></span>
-
-                                <Button
-                                    variant="outline"
-                                    size="lg"
-                                    className="border-white text-white hover:border-transparent transition-all duration-300 flex items-center gap-2 bg-transparent relative z-10 rounded-full max-sm:border-transparent max-sm:bg-white max-sm:text-black max-sm:hover:bg-white max-sm:hover:text-black max-sm:focus-visible:bg-white max-sm:active:bg-white max-sm:isolate max-sm:overflow-hidden max-sm:hover:border-transparent"
-                                >
-                                    <span
-                                        aria-hidden="true"
-                                        className="hidden max-sm:block shimmer-sweep pointer-events-none absolute inset-0 -translate-x-[170%] opacity-0 bg-[linear-gradient(115deg,transparent_28%,rgba(168,85,247,0.14)_40%,rgba(59,130,246,0.5)_48%,rgba(255,255,255,0.98)_52%,rgba(59,130,246,0.5)_56%,rgba(168,85,247,0.14)_64%,transparent_74%)]"
-                                    />
-                                    <span
-                                        aria-hidden="true"
-                                        className="hidden max-sm:block shimmer-sweep-glow pointer-events-none absolute -inset-2 -translate-x-[170%] opacity-0 blur-md bg-[linear-gradient(115deg,transparent_34%,rgba(168,85,247,0.35)_48%,rgba(59,130,246,0.45)_52%,transparent_66%)]"
-                                    />
-                                    <span className="relative z-10 bg-gradient-to-r from-white to-white group-hover:from-purple-400 group-hover:to-blue-400 bg-clip-text group-hover:text-transparent transition-all duration-300 max-sm:bg-none max-sm:text-black max-sm:group-hover:text-black max-sm:group-hover:from-transparent max-sm:group-hover:to-transparent">
-                                        Explorează problemele
-                                    </span>
-                                </Button>
-                            </Link>
-                        </div>
-
-                        {/* Placeholder Image - Centered, 70% screen width */}
-                        <div
-                            ref={imageContainerRef}
-                            className="relative w-[90vw] mx-auto lg:w-[60vw] xl:w-[1152px] lg:ml-auto lg:mr-0 pointer-events-none"
-                            style={{ aspectRatio: '16/9' }}
-                        >
-                            {/* Mobile-only Purple Glow Behind Card - renders behind LaserFlow (z-0) */}
-                            <div
-                                className="lg:hidden absolute left-1/2 -translate-x-1/2 -top-[30%] w-[80%] h-[60%] bg-[#cf9eff]/40 blur-[80px] rounded-full pointer-events-none"
-                                style={{ zIndex: 0 }}
-                            />
-
-                            {/* Radial Glow Effects */}
-                            <div className="absolute left-[-15%] top-1/2 -translate-y-1/2 w-[40%] h-[60%] bg-white/10 blur-[80px] rounded-full z-0 pointer-events-none" />
-                            <div className="absolute right-[-25%] top-1/2 -translate-y-1/2 w-[60%] h-[100%] bg-[#cf9eff]/30 blur-[100px] rounded-full z-0 pointer-events-none" />
-
-                            <div className="absolute inset-0 rounded-2xl overflow-hidden bg-[#0d1117]/50 backdrop-blur-sm z-10 w-full h-full">
-                                {/* Fallback/Placeholder Image */}
-                                <img
-                                    src="/hero.png"
-                                    alt="Hero"
-                                    className="w-full h-full object-cover"
-                                />
-
-                                {/* Bottom Fade Effect - smaller on mobile */}
-                                <div
-                                    className="absolute bottom-0 left-0 right-0 h-1/4 lg:h-1/2 bg-gradient-to-t from-[#090b0d] to-transparent"
-                                    style={{ zIndex: 20 }}
-                                />
+                                <h1 className="scroll-animate-fade-up mb-4 text-3xl font-bold leading-tight text-gray-900 sm:mb-6 sm:text-4xl lg:text-4xl xl:text-5xl">
+                                    Explicații clare pentru note mai mari
+                                </h1>
+                                <p className="scroll-animate-fade-up animate-delay-200 mb-0 text-base leading-relaxed text-gray-600 sm:text-lg">
+                                    Lecții structurate, exerciții interactive și AI care te ajută exact când te blochezi.
+                                </p>
                             </div>
 
-                            {/* Gradient Outline - Top Right */}
-                            <div
-                                className="absolute inset-0 rounded-2xl border-t border-r border-[#cf9eff] z-20 pointer-events-none"
-                                style={{
-                                    maskImage: 'linear-gradient(to bottom left, black 0%, transparent 50%)',
-                                    WebkitMaskImage: 'linear-gradient(to bottom left, black 0%, transparent 50%)'
-                                }}
-                            />
+                            <div className="scroll-animate-fade-up animate-delay-400 order-3 mx-auto flex w-full max-w-2xl flex-col items-stretch justify-center gap-4 lg:order-2 lg:mx-0 lg:max-w-2xl lg:flex-row lg:flex-wrap lg:items-center lg:justify-start">
+                                <Link
+                                    href="/register"
+                                    className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#4ade80] to-[#29cc57] px-9 text-base font-semibold text-white shadow-[0_4px_0_#169c4a] transition-[filter] duration-200 hover:brightness-105 active:brightness-[0.98] lg:w-auto"
+                                    style={{ "--start-glow-tint": "rgba(200, 255, 230, 0.88)" } as CSSProperties}
+                                >
+                                    <span className="relative z-10 inline-flex items-center gap-2 text-white">
+                                        Începe gratuit
+                                        <ArrowRight className="h-4 w-4 shrink-0 text-white" aria-hidden />
+                                    </span>
+                                </Link>
 
-                            {/* Laser Connection Point - Visual Guide (Optional, the laser itself is background) */}
-                            {/* The user wants the laser to touch the top of the image. 
-                   Since the LaserFlow is a full-screen background canvas, we align it visually.
-                   The laser comes down at a specific X fraction. We can try to align the image to that X fraction 
-                   or adjust the beam offset to match the image.
-                   Let's say we position the image and then maybe we can adjust the beam offset via props if strictly needed,
-                   but visual alignment via CSS is easier.
-               */}
+                                <Link
+                                    href="/probleme"
+                                    className="box-border inline-flex h-[62px] w-full shrink-0 items-center justify-center rounded-full border border-gray-300 border-b-[5px] border-b-[#b8bcc4] bg-white px-9 text-base font-semibold leading-snug text-gray-900 transition-[background-color,border-color] hover:bg-gray-50 hover:border-gray-400 hover:border-b-[#a8adb6] lg:w-auto"
+                                >
+                                    Explorează problemele
+                                </Link>
+                            </div>
                         </div>
 
+                        {/* Image — mobil între intro și CTA; desktop coloana dreaptă */}
+                        <div className="order-2 flex min-h-0 items-center justify-center lg:order-none lg:col-start-2 lg:row-start-1">
+                            <Image
+                                src="/hero-homepage.png"
+                                alt="Elevi colaborand la masa"
+                                width={1024}
+                                height={1024}
+                                priority
+                                className="h-auto max-h-[30vh] w-auto max-w-full object-contain sm:max-h-[35vh] lg:max-h-[55vh]"
+                            />
+                        </div>
                     </div>
+                </div>
 
-                    {/* Right Column - Empty (Card Stack Removed) */}
-                    <div className="hidden lg:block">
-                        {/* Space reserved or empty as per instruction to remove card stack */}
+                {/* Trust row — above feature banner, centered */}
+                <div className="flex shrink-0 flex-col items-center justify-center pb-3 pt-10 sm:pb-4 sm:pt-4">
+                    <div
+                        className="flex items-center justify-center gap-0.5"
+                        role="img"
+                        aria-label="5 din 5 stele"
+                    >
+                        {Array.from({ length: 5 }, (_, i) => (
+                            <Star
+                                key={i}
+                                className="h-5 w-5 shrink-0 fill-yellow-400 text-yellow-400 sm:h-5 sm:w-5"
+                                aria-hidden
+                            />
+                        ))}
                     </div>
+                    <p className="mt-1.5 text-center text-sm font-semibold text-gray-500 sm:text-base">
+                        „Folosit de elevi din 200+ școli”
+                    </p>
                 </div>
             </div>
 
-            {/* Bottom Fade Gradient - Overlays everything, smaller on mobile */}
-            <div className="absolute bottom-0 left-0 right-0 h-[200px] lg:h-[480px] bg-[linear-gradient(to_top,#090b0d_40%,transparent)] z-40 pointer-events-none" />
-
-            {/* Feature Text - Over the gradient */}
-            <div className="absolute bottom-6 lg:bottom-20 left-0 right-0 z-50 pointer-events-none">
-                <div className="max-w-7xl mx-auto px-6">
-                    <p className="text-gray-500 text-sm mb-2">
-                        Tot ce ai nevoie pentru a învăța fizică mai ușor.
-                    </p>
-                    <p className="text-white text-sm font-medium">
-                        Lecții interactive · Probleme rezolvate · AI Tutor · Teste grilă · Memorator · Simulări BAC
-                    </p>
-                </div>
+            {/* Feature banner — pinned to bottom, never shrinks */}
+            <div className="shrink-0">
+                <HeroFeatureBar />
             </div>
         </section>
     )

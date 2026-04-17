@@ -17,8 +17,6 @@ import {
   ListChecks,
   GraduationCap,
   Brain,
-  Bell,
-  Users,
   User,
 } from "lucide-react"
 import { UserStats, UserTask, DashboardUpdate, ContinueLearningItem, Achievement } from "@/lib/dashboard-data"
@@ -76,10 +74,8 @@ function DashboardSidebarComponent({
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
     { href: "/cursuri", label: "Cursuri de fizica", icon: <BookOpen className="w-4 h-4" /> },
-    { href: null, label: "Noutati", icon: <Bell className="w-4 h-4" /> },
     { href: "/insight/chat", label: "Insight", icon: <Sparkles className="w-4 h-4" /> },
     { href: "/grile", label: "Teste Grila", icon: <ListChecks className="w-4 h-4" /> },
-    { href: "/classrooms", label: "Clasa mea", icon: <Users className="w-4 h-4" /> },
     { href: "/simulari-bac", label: "Simulari Bac", icon: <GraduationCap className="w-4 h-4" /> },
     { href: "/space", label: "Memorator", icon: <Brain className="w-4 h-4" /> },
   ]
@@ -171,11 +167,10 @@ function DashboardSidebarComponent({
                   )
                 }
 
-                // Insert mobile-only "Probleme" button before Noutati (on mobile)
-                if (link.href === null) {
+                // Mobile-only "Probleme" before Insight (desktop has Probleme in top bar)
+                if (link.href === "/insight/chat") {
                   const problemeIsActive = pathname === "/probleme"
                   return [
-                    // Mobile-only Probleme button
                     <Link key="probleme-mobile" href="/probleme" className="lg:hidden block">
                       <div
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${problemeIsActive
@@ -187,15 +182,17 @@ function DashboardSidebarComponent({
                         <span className="text-sm font-medium">Probleme</span>
                       </div>
                     </Link>,
-                    // Noutati - nu navighează
-                    <button
-                      key={key}
-                      type="button"
-                      className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                    >
-                      {link.icon}
-                      <span className="text-sm font-medium">{link.label}</span>
-                    </button>
+                    <Link key={key} href={link.href}>
+                      <div
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          }`}
+                      >
+                        {link.icon}
+                        <span className="text-sm font-medium">{link.label}</span>
+                      </div>
+                    </Link>,
                   ]
                 }
 

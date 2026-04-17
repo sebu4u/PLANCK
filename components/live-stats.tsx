@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react"
 
+type LiveStatsProps = {
+    variant?: "dark" | "light"
+}
+
 // Deterministic pseudo-random number generator using a seed
 // This ensures all users see the same "random" values at the same time
 function seededRandom(seed: number): number {
@@ -40,10 +44,13 @@ function getSolvedProblems(timestamp: number): number {
     return Math.max(8000, baseProblems + dailyGrowth + intraDayProblems + microVariation)
 }
 
-export function LiveStats() {
+export function LiveStats({ variant = "dark" }: LiveStatsProps) {
     const [onlineUsers, setOnlineUsers] = useState<number>(200)
     const [solvedProblems, setSolvedProblems] = useState<number>(8000)
     const [mounted, setMounted] = useState(false)
+    const isLight = variant === "light"
+    const labelClassName = isLight ? "text-gray-600" : "text-gray-300"
+    const valueClassName = isLight ? "text-gray-900" : "text-white"
 
     useEffect(() => {
         setMounted(true)
@@ -72,13 +79,13 @@ export function LiveStats() {
                         <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                     </span>
-                    <span className="text-gray-300 text-sm font-medium">
-                        <span className="text-white font-semibold">200</span> online
+                    <span className={`${labelClassName} text-sm font-medium`}>
+                        <span className={`${valueClassName} font-semibold`}>200</span> online
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-gray-300 text-sm font-medium">
-                        <span className="text-white font-semibold">8.000</span> probleme rezolvate
+                    <span className={`${labelClassName} text-sm font-medium`}>
+                        <span className={`${valueClassName} font-semibold`}>8.000</span> probleme rezolvate
                     </span>
                 </div>
             </div>
@@ -107,8 +114,8 @@ export function LiveStats() {
                     {/* Solid dot */}
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </span>
-                <span className="text-gray-300 text-sm font-medium">
-                    <span className="text-white font-semibold tabular-nums transition-all duration-300">
+                <span className={`${labelClassName} text-sm font-medium`}>
+                    <span className={`${valueClassName} font-semibold tabular-nums transition-all duration-300`}>
                         {formatNumber(onlineUsers)}
                     </span> online
                 </span>
@@ -116,8 +123,8 @@ export function LiveStats() {
 
             {/* Solved Problems */}
             <div className="flex items-center gap-2">
-                <span className="text-gray-300 text-sm font-medium">
-                    <span className="text-white font-semibold tabular-nums transition-all duration-300">
+                <span className={`${labelClassName} text-sm font-medium`}>
+                    <span className={`${valueClassName} font-semibold tabular-nums transition-all duration-300`}>
                         {formatNumber(solvedProblems)}
                     </span> probleme rezolvate
                 </span>

@@ -69,6 +69,12 @@ const ProfilPage = () => {
   const [contestLoading, setContestLoading] = useState(true);
   const [codeCopied, setCodeCopied] = useState(false);
 
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, user, router]);
+
   // Get rank icon path
   const getRankIconPath = (rankName: string): string => {
     const rankLower = rankName?.toLowerCase() || '';
@@ -247,7 +253,7 @@ const ProfilPage = () => {
     }
   };
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#0D0D0F]">
         <Navigation />
@@ -263,6 +269,14 @@ const ProfilPage = () => {
             </div>
           </div>
         </main>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0D0D0F] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
       </div>
     );
   }

@@ -1940,6 +1940,7 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
   content: "";
   pointer-events: none;
   position: absolute;
+  z-index: 0;
   top: -70%;
   left: -30%;
   width: 36%;

@@ -11,6 +11,7 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel"
 import type { Problem } from "@/data/problems"
+import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { cn } from "@/lib/utils"
 
 interface DashboardRecommendedProblemsCardProps {
@@ -27,10 +28,45 @@ function toClassLabel(problem: Problem): string | null {
   return null
 }
 
+/** Word-based preview that keeps `$...$` segments intact (same idea as catalog cards). */
+function createStatementPreview(statement: string | undefined | null, wordLimit = 22): string {
+  if (!statement) return ""
+  const normalized = statement.replace(/\s+/g, " ").trim()
+  if (!normalized) return ""
+
+  const parts = normalized.split(/(\$[^$]+\$)/g).filter(Boolean)
+  const collected: string[] = []
+  let wordCount = 0
+
+  for (const part of parts) {
+    const isMath = part.startsWith("$") && part.endsWith("$")
+    if (isMath) {
+      if (wordCount >= wordLimit) break
+      collected.push(part)
+      wordCount += 1
+      continue
+    }
+
+    const words = part.trim().split(/\s+/)
+    for (const word of words) {
+      if (!word) continue
+      collected.push(word)
+      wordCount += 1
+      if (wordCount >= wordLimit) break
+    }
+    if (wordCount >= wordLimit) break
+  }
+
+  const preview = collected.join(" ")
+  const totalWords = normalized.split(/\s+/).filter(Boolean).length
+  return wordCount < totalWords ? `${preview}...` : preview
+}
+
 function toSnippet(problem: Problem): string {
   const text = (problem.statement || problem.description || problem.title || "").trim()
   if (!text) return "Alege aceasta problema pentru urmatorul pas."
-  return text.length > 135 ? `${text.slice(0, 135)}...` : text
+  const preview = createStatementPreview(text, 22)
+  return preview || text
 }
 
 export function DashboardRecommendedProblemsCard({
@@ -101,8 +137,14 @@ export function DashboardRecommendedProblemsCard({
                     ) : null}
                   </div>
 
-                  <p className="mt-3 text-lg font-semibold leading-snug text-[#191919]">{problem.title}</p>
-                  <p className="mt-2 text-sm text-[#666666]">{toSnippet(problem)}</p>
+                  <LatexRichText
+                    content={problem.title}
+                    className="mt-3 text-lg font-semibold leading-snug text-[#191919] [&_.katex]:text-[#191919]"
+                  />
+                  <LatexRichText
+                    content={toSnippet(problem)}
+                    className="mt-2 text-sm text-[#666666] [&_.katex]:text-[#666666]"
+                  />
 
                   <Link
                     href={`/probleme/${problem.id}`}
