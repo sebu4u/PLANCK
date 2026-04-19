@@ -61,7 +61,7 @@ export function HomePageScrollNavbar() {
           </Link>
           <Link
             href="/register"
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[#29cc57] px-5 text-sm font-semibold text-white hover:bg-[#24b34e] sm:h-11 sm:px-7 sm:text-base"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-5 text-sm font-semibold text-white transition-[filter] hover:brightness-110 sm:h-11 sm:px-7 sm:text-base"
           >
             Începe gratuit
           </Link>

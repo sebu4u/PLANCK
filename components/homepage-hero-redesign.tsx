@@ -39,8 +39,8 @@ export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile
                             <div className="scroll-animate-fade-up animate-delay-400 order-3 mx-auto flex w-full max-w-2xl flex-col items-stretch justify-center gap-4 lg:order-2 lg:mx-0 lg:max-w-2xl lg:flex-row lg:flex-wrap lg:items-center lg:justify-start">
                                 <Link
                                     href="/register"
-                                    className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#4ade80] to-[#29cc57] px-9 text-base font-semibold text-white shadow-[0_4px_0_#169c4a] transition-[filter] duration-200 hover:brightness-105 active:brightness-[0.98] lg:w-auto"
-                                    style={{ "--start-glow-tint": "rgba(200, 255, 230, 0.88)" } as CSSProperties}
+                                    className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-9 text-base font-semibold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98] lg:w-auto"
+                                    style={{ "--start-glow-tint": "rgba(224, 215, 255, 0.88)" } as CSSProperties}
                                 >
                                     <span className="relative z-10 inline-flex items-center gap-2 text-white">
                                         Începe gratuit

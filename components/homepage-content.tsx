@@ -19,7 +19,6 @@ import FinalCTASection from "@/components/final-cta-section"
 import { Suspense, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
-import { ScrollToTopButton } from "@/components/scroll-to-top-button"
 import { HomePageHeroRedesign } from "@/components/homepage-hero-redesign"
 import { HomePageScrollNavbar } from "@/components/homepage-scroll-navbar"
 import { AIDemoSection } from "@/components/ai-demo-section"
@@ -214,8 +213,6 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
 
       {/* Progress Notification */}
       <ProgressNotification />
-
-      <ScrollToTopButton />
     </div>
   )
 }
