@@ -1,5 +1,6 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import { useClassroomAssignmentDraft } from "@/components/classrooms/classroom-assignment-draft-context"
 import { cn } from "@/lib/utils"
 
@@ -16,8 +17,17 @@ export function ClassroomDetailHeader({
   joinCode,
   coverImage,
 }: ClassroomDetailHeaderProps) {
+  const pathname = usePathname()
   const { isPickingForClassroom } = useClassroomAssignmentDraft()
   const hideOnDesktop = isPickingForClassroom(classroomId)
+
+  const hideForAssignmentsArea =
+    pathname === `/classrooms/${classroomId}/assignments` ||
+    pathname?.startsWith(`/classrooms/${classroomId}/assignments/`)
+
+  if (hideForAssignmentsArea) {
+    return null
+  }
 
   return (
     <div className={cn("overflow-hidden rounded-xl border border-[#d2e3fc]", hideOnDesktop && "lg:hidden")}>

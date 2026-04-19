@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button"
 
 interface CopyJoinCodeButtonProps {
   joinCode: string
+  /** Mai compact pentru anteturi / carduri mici */
+  compact?: boolean
 }
 
-export function CopyJoinCodeButton({ joinCode }: CopyJoinCodeButtonProps) {
+export function CopyJoinCodeButton({ joinCode, compact }: CopyJoinCodeButtonProps) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = async () => {
@@ -17,7 +19,13 @@ export function CopyJoinCodeButton({ joinCode }: CopyJoinCodeButtonProps) {
   }
 
   return (
-    <Button type="button" variant="outline" onClick={onCopy}>
+    <Button
+      type="button"
+      variant="outline"
+      size={compact ? "sm" : "default"}
+      className={compact ? "h-8 shrink-0 text-xs px-3" : undefined}
+      onClick={onCopy}
+    >
       {copied ? "Copiat" : "Copiază codul"}
     </Button>
   )

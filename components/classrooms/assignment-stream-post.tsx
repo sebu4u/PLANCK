@@ -1,6 +1,5 @@
 import Link from "next/link"
-import { AlertTriangle, CalendarDays, ClipboardList } from "lucide-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { AlertTriangle, ArrowRight, CalendarDays } from "lucide-react"
 import { AuthorAvatar } from "@/components/classrooms/author-avatar"
 import { DeadlineTimer } from "@/components/classrooms/deadline-timer"
 import type { ClassroomAssignmentListItem } from "@/lib/classrooms/types"
@@ -13,107 +12,95 @@ interface AssignmentStreamPostProps {
 
 export function AssignmentStreamPost({ classroomId, assignment }: AssignmentStreamPostProps) {
   const createdAt = new Date(assignment.created_at).toLocaleString("ro-RO", {
-    dateStyle: "medium",
+    dateStyle: "short",
     timeStyle: "short",
   })
   const deadlineLabel = assignment.deadline
-    ? new Date(assignment.deadline).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(assignment.deadline).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" })
     : "Fără termen"
 
   const deadlineMs = assignment.deadline ? new Date(assignment.deadline).getTime() : null
   const isOverdue =
     deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs < Date.now()
 
+  const assignmentHref = `/classrooms/${classroomId}/assignments/${assignment.id}`
+
   return (
-    <Card
+    <Link
+      href={assignmentHref}
+      aria-label={`Deschide tema: ${assignment.title}`}
       className={cn(
-        "relative overflow-hidden shadow-sm transition-colors",
+        "group block rounded-xl border px-3 py-2.5 outline-none transition-[box-shadow,border-color,background-color]",
         isOverdue
-          ? "border-rose-200/90 bg-gradient-to-br from-rose-50/90 via-white to-white ring-1 ring-rose-100"
-          : "border-[#dfe3ea] bg-white",
+          ? "border-rose-200/80 bg-rose-50/30 hover:border-rose-300/90 hover:bg-rose-50/45 hover:shadow-md"
+          : "border-[#e8eaed] bg-white hover:border-[#c6dafc] hover:bg-[#fafcff] hover:shadow-md",
+        "focus-visible:ring-2 focus-visible:ring-[#1a73e8] focus-visible:ring-offset-2",
       )}
     >
-      {isOverdue ? (
-        <div
-          className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-rose-500 to-rose-600"
-          aria-hidden
-        />
-      ) : null}
-
-      <CardHeader className={cn("space-y-1 pb-3", isOverdue && "pl-5")}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <AuthorAvatar name={assignment.author_name} />
-            <div>
-              <p className="text-sm font-semibold text-[#111827]">{assignment.author_name}</p>
-              <p className="text-xs text-[#6b7280]">{createdAt}</p>
+      <div className="flex gap-2.5">
+        <AuthorAvatar name={assignment.author_name} compact />
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-[#111827]">{assignment.author_name}</p>
+              <p className="text-[11px] text-[#9ca3af]">{createdAt}</p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[#9ca3af]">Temă</span>
+              {isOverdue ? (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-rose-700">
+                  <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
+                  Depășit
+                </span>
+              ) : null}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <span className="rounded-full bg-[#e0f2fe] px-2.5 py-1 text-[11px] font-semibold text-[#0369a1]">
-              Temă
-            </span>
-            {isOverdue ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-800 shadow-sm">
-                <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
-                Termen depășit
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className={cn("space-y-3", isOverdue && "pl-5")}>
-        <div className="flex items-start gap-2">
-          <ClipboardList
-            className={cn("mt-0.5 h-5 w-5 shrink-0", isOverdue ? "text-rose-600" : "text-[#2563eb]")}
-            aria-hidden
-          />
-          <div>
-            <h3
+
+          <h3 className={cn("text-sm font-semibold leading-snug", isOverdue ? "text-rose-950" : "text-[#111827]")}>
+            {assignment.title}
+          </h3>
+          {assignment.description ? (
+            <p className="line-clamp-2 whitespace-pre-wrap text-xs leading-relaxed text-[#6b7280]">
+              {assignment.description}
+            </p>
+          ) : null}
+          <p className="text-[11px] text-[#9ca3af]">{assignment.problem_count} probleme</p>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0f2f5] pt-1.5">
+            <span
               className={cn(
-                "text-base font-semibold",
-                isOverdue ? "text-[#9f1239]" : "text-[#111827]",
+                "inline-flex items-center gap-1 text-[11px]",
+                isOverdue ? "text-rose-800" : "text-[#6b7280]",
               )}
             >
-              {assignment.title}
-            </h3>
-            {assignment.description ? (
-              <p className="mt-1 whitespace-pre-wrap text-sm text-[#4b5563]">{assignment.description}</p>
-            ) : null}
-            <p className="mt-2 text-xs text-[#6b7280]">{assignment.problem_count} probleme</p>
+              <CalendarDays className="h-3 w-3 shrink-0 opacity-70" />
+              {deadlineLabel}
+            </span>
+            <DeadlineTimer
+              deadline={assignment.deadline}
+              className={cn(
+                "!rounded-md !px-1.5 !py-0.5 !text-[10px] !font-normal",
+                isOverdue ? "!bg-rose-100/80 !text-rose-800" : "!bg-[#f4f5f7] !text-[#4b5563]",
+              )}
+            />
           </div>
-        </div>
 
-        <div
-          className={cn(
-            "flex flex-wrap items-center justify-between gap-2 border-t pt-3",
-            isOverdue ? "border-rose-100" : "border-[#eef2f7]",
-          )}
-        >
-          <span
+          <div
             className={cn(
-              "inline-flex items-center gap-1 text-xs font-medium",
-              isOverdue ? "text-rose-800" : "text-[#6b7280]",
+              "mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
+              isOverdue
+                ? "bg-rose-100/90 text-rose-900 group-hover:bg-rose-200/85"
+                : "bg-[#e8f0fe] text-[#1557b0] group-hover:bg-[#d2e3fc]",
             )}
           >
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-            Termen: {deadlineLabel}
-          </span>
-          <DeadlineTimer deadline={assignment.deadline} />
+            Deschide tema
+            <ArrowRight
+              className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
+          </div>
         </div>
-
-        <Link
-          href={`/classrooms/${classroomId}/assignments/${assignment.id}`}
-          className={cn(
-            "inline-flex rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            isOverdue
-              ? "border border-rose-200 bg-white text-rose-900 hover:bg-rose-50"
-              : "bg-[#111827] text-white hover:bg-[#1f2937]",
-          )}
-        >
-          Deschide tema
-        </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </Link>
   )
 }

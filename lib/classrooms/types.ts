@@ -56,6 +56,10 @@ export interface ClassroomMemberOverview {
   joined_at: string
   name: string
   email: string
+  /** Public profile image URL from `profiles.user_icon` */
+  user_icon: string | null
+  elo: number
+  rank: string
 }
 
 export interface AssignmentProblem {
@@ -83,4 +87,14 @@ export interface AssignmentSubmission {
   answer: string
   is_correct: boolean
   submitted_at: string
+  /** Count of teacher-only photos; set for the current student’s rows only. */
+  teacher_attachment_count?: number
+}
+
+export interface TeacherAssignmentAttachmentGroup {
+  student_id: string
+  student_name: string
+  problem_id: string
+  problem_title: string
+  signed_urls: string[]
 }

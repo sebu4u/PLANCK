@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import { classroomCoverPublicPath, listClassroomCoverFilenames } from "@/lib/classrooms/cover-images"
@@ -39,6 +40,114 @@ function toSafeStorageName(fileName: string): string {
     .replace(/[^a-z0-9.\-_]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
+}
+
+const TEACHER_SUBMISSION_PHOTO_BUCKET = "assignment-teacher-attachments"
+const TEACHER_SUBMISSION_PHOTO_LIMIT = 5
+const TEACHER_SUBMISSION_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+const TEACHER_SUBMISSION_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"])
+
+function collectTeacherSubmissionPhotos(formData: FormData): File[] {
+  return formData
+    .getAll("teacher_photos")
+    .filter((item): item is File => item instanceof File && item.size > 0)
+}
+
+function validateTeacherSubmissionPhotos(files: File[]): "too_many" | "too_large" | "bad_type" | null {
+  if (files.length > TEACHER_SUBMISSION_PHOTO_LIMIT) {
+    return "too_many"
+  }
+  for (const file of files) {
+    if (file.size > TEACHER_SUBMISSION_PHOTO_MAX_BYTES) {
+      return "too_large"
+    }
+    if (!TEACHER_SUBMISSION_PHOTO_TYPES.has(file.type)) {
+      return "bad_type"
+    }
+  }
+  return null
+}
+
+async function replaceTeacherOnlySubmissionPhotos(
+  supabase: SupabaseClient,
+  params: {
+    submissionId: string
+    classroomId: string
+    studentId: string
+    assignmentId: string
+    problemId: string
+    photos: File[]
+  }
+): Promise<{ ok: true } | { ok: false }> {
+  const { submissionId, classroomId, studentId, assignmentId, problemId, photos } = params
+
+  if (photos.length === 0) {
+    return { ok: true }
+  }
+
+  const { data: existing } = await supabase
+    .from("submission_teacher_attachments")
+    .select("id, storage_path")
+    .eq("submission_id", submissionId)
+
+  if (existing && existing.length > 0) {
+    const paths = existing
+      .map((row) => (typeof row.storage_path === "string" ? row.storage_path : ""))
+      .filter(Boolean)
+    await supabase.from("submission_teacher_attachments").delete().eq("submission_id", submissionId)
+    if (paths.length > 0) {
+      const { error: removeError } = await supabase.storage.from(TEACHER_SUBMISSION_PHOTO_BUCKET).remove(paths)
+      if (removeError) {
+        console.error("replaceTeacherOnlySubmissionPhotos remove old:", removeError)
+      }
+    }
+  }
+
+  const uploadedPaths: string[] = []
+
+  try {
+    for (let index = 0; index < photos.length; index += 1) {
+      const file = photos[index]
+      const ext = file.name.split(".").pop() ?? "jpg"
+      const safeBase = toSafeStorageName(file.name.replace(`.${ext}`, "")) || "poza"
+      const objectPath = `${classroomId}/${studentId}/${assignmentId}/${problemId}/${Date.now()}-${index}-${safeBase}.${ext}`
+
+      const { error: uploadError } = await supabase.storage.from(TEACHER_SUBMISSION_PHOTO_BUCKET).upload(objectPath, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      })
+
+      if (uploadError) {
+        console.error("replaceTeacherOnlySubmissionPhotos upload:", uploadError)
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(TEACHER_SUBMISSION_PHOTO_BUCKET).remove(uploadedPaths)
+        }
+        return { ok: false }
+      }
+
+      uploadedPaths.push(objectPath)
+    }
+
+    const rows = uploadedPaths.map((storage_path) => ({
+      submission_id: submissionId,
+      storage_path,
+    }))
+
+    const { error: insertError } = await supabase.from("submission_teacher_attachments").insert(rows)
+    if (insertError) {
+      console.error("replaceTeacherOnlySubmissionPhotos insert:", insertError)
+      await supabase.storage.from(TEACHER_SUBMISSION_PHOTO_BUCKET).remove(uploadedPaths)
+      return { ok: false }
+    }
+  } catch (error) {
+    console.error("replaceTeacherOnlySubmissionPhotos:", error)
+    if (uploadedPaths.length > 0) {
+      await supabase.storage.from(TEACHER_SUBMISSION_PHOTO_BUCKET).remove(uploadedPaths)
+    }
+    return { ok: false }
+  }
+
+  return { ok: true }
 }
 
 function generateJoinCode(length = 6): string {
@@ -356,6 +465,12 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
     redirect(`${redirectTo}?error=assignment_not_found`)
   }
 
+  const teacherPhotos = collectTeacherSubmissionPhotos(formData)
+  const teacherPhotoError = validateTeacherSubmissionPhotos(teacherPhotos)
+  if (teacherPhotoError) {
+    redirect(`${redirectTo}?error=teacher_photos_${teacherPhotoError}`)
+  }
+
   const { data: relation } = await supabase
     .from("assignment_problems")
     .select("problems!inner(answer_type, grila_correct_index, value_subpoints)")
@@ -407,11 +522,11 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
       submittedValues.length === correctValues.length &&
       submittedValues.every((value, index) => isWithinTolerance(value, correctValues[index]))
   } else {
-    normalizedAnswer = answer || "submitted"
+    normalizedAnswer = directAnswer || "submitted"
     isCorrect = false
   }
 
-  const { error } = await supabase
+  const { data: submissionRow, error } = await supabase
     .from("submissions")
     .upsert(
       {
@@ -426,10 +541,26 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
         onConflict: "assignment_id,problem_id,student_id",
       }
     )
+    .select("id")
+    .single()
 
-  if (error) {
+  if (error || !submissionRow?.id) {
     console.error("submitAssignmentAnswerAction upsert error:", error)
     redirect(`${redirectTo}?error=submission_failed`)
+  }
+
+  if (teacherPhotos.length > 0) {
+    const photoResult = await replaceTeacherOnlySubmissionPhotos(supabase, {
+      submissionId: submissionRow.id,
+      classroomId,
+      studentId: user.id,
+      assignmentId,
+      problemId,
+      photos: teacherPhotos,
+    })
+    if (!photoResult.ok) {
+      redirect(`${redirectTo}?error=teacher_photos_upload_failed`)
+    }
   }
 
   revalidatePath(`/classrooms/${classroomId}/assignments/${assignmentId}`)
@@ -472,23 +603,47 @@ export async function syncCatalogSolvedProblemAction(formData: FormData) {
     redirect(`${redirectTo}?error=solve_in_catalog_first`)
   }
 
-  const { error } = await supabase.from("submissions").upsert(
-    {
-      assignment_id: assignmentId,
-      problem_id: problemId,
-      student_id: user.id,
-      answer: "catalog_solved",
-      is_correct: true,
-      submitted_at: new Date().toISOString(),
-    },
-    {
-      onConflict: "assignment_id,problem_id,student_id",
-    }
-  )
+  const teacherPhotos = collectTeacherSubmissionPhotos(formData)
+  const teacherPhotoError = validateTeacherSubmissionPhotos(teacherPhotos)
+  if (teacherPhotoError) {
+    redirect(`${redirectTo}?error=teacher_photos_${teacherPhotoError}`)
+  }
 
-  if (error) {
+  const { data: submissionRow, error } = await supabase
+    .from("submissions")
+    .upsert(
+      {
+        assignment_id: assignmentId,
+        problem_id: problemId,
+        student_id: user.id,
+        answer: "catalog_solved",
+        is_correct: true,
+        submitted_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "assignment_id,problem_id,student_id",
+      }
+    )
+    .select("id")
+    .single()
+
+  if (error || !submissionRow?.id) {
     console.error("syncCatalogSolvedProblemAction upsert error:", error)
     redirect(`${redirectTo}?error=submission_failed`)
+  }
+
+  if (teacherPhotos.length > 0) {
+    const photoResult = await replaceTeacherOnlySubmissionPhotos(supabase, {
+      submissionId: submissionRow.id,
+      classroomId,
+      studentId: user.id,
+      assignmentId,
+      problemId,
+      photos: teacherPhotos,
+    })
+    if (!photoResult.ok) {
+      redirect(`${redirectTo}?error=teacher_photos_upload_failed`)
+    }
   }
 
   revalidatePath(`/classrooms/${classroomId}/assignments/${assignmentId}`)

@@ -9,6 +9,7 @@ import type {
   ClassroomDetails,
   ClassroomMemberOverview,
   ClassroomSummary,
+  TeacherAssignmentAttachmentGroup,
 } from "@/lib/classrooms/types"
 
 export interface AnnouncementLessonOption {
@@ -381,21 +382,43 @@ export async function getClassroomMembers(classroomId: string): Promise<Classroo
   const membership = await getClassroomMembership(admin, classroomId, user.id)
   if (!membership) return []
 
-  const { data: rows } = await admin
-    .from("classroom_members")
-    .select("id, user_id, role, joined_at")
-    .eq("classroom_id", classroomId)
-    .order("joined_at", { ascending: true })
+  const [{ data: rows }, { data: classroomRow }] = await Promise.all([
+    admin
+      .from("classroom_members")
+      .select("id, user_id, role, joined_at")
+      .eq("classroom_id", classroomId)
+      .order("joined_at", { ascending: true }),
+    admin.from("classrooms").select("teacher_id, created_at").eq("id", classroomId).maybeSingle(),
+  ])
 
-  const members = (rows ?? []).filter(isObject)
+  let members = (rows ?? []).filter(isObject)
+  const teacherIdFromClass = isObject(classroomRow) ? asString(classroomRow.teacher_id) : ""
+  const classCreatedAt = isObject(classroomRow) ? asString(classroomRow.created_at) : ""
+
+  const teacherUserInMembers = teacherIdFromClass
+    ? members.some((row) => asString(row.user_id) === teacherIdFromClass)
+    : true
+
+  if (teacherIdFromClass && !teacherUserInMembers) {
+    members = [
+      {
+        id: `virtual-teacher-${teacherIdFromClass}`,
+        user_id: teacherIdFromClass,
+        role: "teacher",
+        joined_at: classCreatedAt || new Date(0).toISOString(),
+      },
+      ...members,
+    ]
+  }
+
   const userIds = members.map((row) => asString(row.user_id)).filter(Boolean)
 
   const { data: profiles } = await admin
     .from("profiles")
-    .select("user_id, name, nickname")
+    .select("user_id, name, nickname, user_icon")
     .in("user_id", userIds)
 
-  const profileByUserId = new Map<string, { name: string; nickname: string }>()
+  const profileByUserId = new Map<string, { name: string; nickname: string; user_icon: string | null }>()
   for (const profile of profiles ?? []) {
     if (!isObject(profile)) continue
     const userIdValue = asString(profile.user_id)
@@ -403,6 +426,23 @@ export async function getClassroomMembers(classroomId: string): Promise<Classroo
     profileByUserId.set(userIdValue, {
       name: asString(profile.name),
       nickname: asString(profile.nickname),
+      user_icon: (() => {
+        const raw = asNullableString(profile.user_icon)
+        return raw && raw.trim() ? raw.trim() : null
+      })(),
+    })
+  }
+
+  const { data: statsRows } = await admin.from("user_stats").select("user_id, elo, rank").in("user_id", userIds)
+
+  const statsByUserId = new Map<string, { elo: number; rank: string }>()
+  for (const stat of statsRows ?? []) {
+    if (!isObject(stat)) continue
+    const uid = asString(stat.user_id)
+    if (!uid) continue
+    statsByUserId.set(uid, {
+      elo: asNumber(stat.elo, 500),
+      rank: asString(stat.rank, "Bronze III"),
     })
   }
 
@@ -411,13 +451,18 @@ export async function getClassroomMembers(classroomId: string): Promise<Classroo
   return members.map((row) => {
     const userIdValue = asString(row.user_id)
     const profile = profileByUserId.get(userIdValue)
+    const role: "teacher" | "student" = asString(row.role) === "teacher" ? "teacher" : "student"
+    const stats = statsByUserId.get(userIdValue)
     return {
       member_id: asString(row.id),
       user_id: userIdValue,
-      role: asString(row.role) === "teacher" ? "teacher" : "student",
+      role,
       joined_at: asString(row.joined_at),
-      name: profile?.nickname || profile?.name || "Student",
+      name: profile?.nickname || profile?.name || (role === "teacher" ? "Profesor" : "Elev"),
       email: emailByUserId.get(userIdValue) ?? "",
+      user_icon: profile?.user_icon ?? null,
+      elo: stats?.elo ?? 500,
+      rank: stats?.rank ?? "Bronze III",
     }
   })
 }
@@ -558,20 +603,155 @@ export async function getAssignmentSubmissions(
   const membership = await getClassroomMembership(admin, classroomId, user.id)
   if (!membership) return []
 
-  const { data } = await admin
+  let submissionsQuery = admin
     .from("submissions")
     .select("id, assignment_id, problem_id, student_id, answer, is_correct, submitted_at")
     .eq("assignment_id", assignmentId)
 
-  return (data ?? [])
-    .filter(isObject)
-    .map((row) => ({
-      id: asString(row.id),
-      assignment_id: asString(row.assignment_id),
-      problem_id: asString(row.problem_id),
-      student_id: asString(row.student_id),
-      answer: asString(row.answer),
-      is_correct: Boolean(row.is_correct),
-      submitted_at: asString(row.submitted_at),
-    }))
+  if (membership.role === "student") {
+    submissionsQuery = submissionsQuery.eq("student_id", user.id)
+  }
+
+  const { data } = await submissionsQuery
+
+  const rows = (data ?? []).filter(isObject).map((row) => ({
+    id: asString(row.id),
+    assignment_id: asString(row.assignment_id),
+    problem_id: asString(row.problem_id),
+    student_id: asString(row.student_id),
+    answer: asString(row.answer),
+    is_correct: Boolean(row.is_correct),
+    submitted_at: asString(row.submitted_at),
+  }))
+
+  if (membership.role !== "student" || rows.length === 0) {
+    return rows
+  }
+
+  const submissionIds = rows.map((row) => row.id).filter(Boolean)
+  const { data: attachmentRows } = await admin
+    .from("submission_teacher_attachments")
+    .select("submission_id")
+    .in("submission_id", submissionIds)
+
+  const countBySubmission = new Map<string, number>()
+  for (const raw of attachmentRows ?? []) {
+    if (!isObject(raw)) continue
+    const sid = asString(raw.submission_id)
+    if (!sid) continue
+    countBySubmission.set(sid, (countBySubmission.get(sid) ?? 0) + 1)
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    teacher_attachment_count: countBySubmission.get(row.id) ?? 0,
+  }))
+}
+
+export async function getTeacherAssignmentAttachmentGroups(
+  classroomId: string,
+  assignmentId: string,
+  problems: Pick<AssignmentProblem, "id" | "title">[],
+  members: Pick<ClassroomMemberOverview, "user_id" | "name" | "role">[]
+): Promise<TeacherAssignmentAttachmentGroup[]> {
+  const { admin, user } = await getAuthenticatedContext()
+  if (!user) return []
+
+  const membership = await getClassroomMembership(admin, classroomId, user.id)
+  if (!membership || membership.role !== "teacher") return []
+
+  const { data: submissionRows } = await admin
+    .from("submissions")
+    .select("id, student_id, problem_id")
+    .eq("assignment_id", assignmentId)
+
+  const submissions = (submissionRows ?? []).filter(isObject)
+  if (submissions.length === 0) return []
+
+  const submissionIds = submissions.map((row) => asString(row.id)).filter(Boolean)
+  const { data: attachmentRows } = await admin
+    .from("submission_teacher_attachments")
+    .select("submission_id, storage_path")
+    .in("submission_id", submissionIds)
+
+  const attachments = (attachmentRows ?? []).filter(isObject)
+  if (attachments.length === 0) return []
+
+  const submissionById = new Map(
+    submissions.map((row) => {
+      const id = asString(row.id)
+      return [
+        id,
+        {
+          student_id: asString(row.student_id),
+          problem_id: asString(row.problem_id),
+        },
+      ] as const
+    })
+  )
+
+  const titleByProblem = new Map(problems.map((problem) => [problem.id, problem.title]))
+  const nameByStudent = new Map(
+    members.filter((member) => member.role === "student").map((member) => [member.user_id, member.name])
+  )
+
+  type MutableGroup = {
+    student_id: string
+    student_name: string
+    problem_id: string
+    problem_title: string
+    paths: string[]
+  }
+  const groupMap = new Map<string, MutableGroup>()
+
+  for (const raw of attachments) {
+    const submissionId = asString(raw.submission_id)
+    const storagePath = asString(raw.storage_path)
+    if (!submissionId || !storagePath) continue
+
+    const submission = submissionById.get(submissionId)
+    if (!submission) continue
+
+    const key = `${submission.student_id}::${submission.problem_id}`
+    let group = groupMap.get(key)
+    if (!group) {
+      group = {
+        student_id: submission.student_id,
+        student_name: nameByStudent.get(submission.student_id) ?? "Elev",
+        problem_id: submission.problem_id,
+        problem_title: titleByProblem.get(submission.problem_id) ?? "Problemă",
+        paths: [],
+      }
+      groupMap.set(key, group)
+    }
+    group.paths.push(storagePath)
+  }
+
+  const bucket = admin.storage.from("assignment-teacher-attachments")
+  const result: TeacherAssignmentAttachmentGroup[] = []
+
+  for (const group of groupMap.values()) {
+    const signed_urls: string[] = []
+    for (const path of group.paths) {
+      const { data: signed } = await bucket.createSignedUrl(path, 60 * 60)
+      if (signed?.signedUrl) {
+        signed_urls.push(signed.signedUrl)
+      }
+    }
+    result.push({
+      student_id: group.student_id,
+      student_name: group.student_name,
+      problem_id: group.problem_id,
+      problem_title: group.problem_title,
+      signed_urls,
+    })
+  }
+
+  result.sort((left, right) => {
+    const nameCmp = left.student_name.localeCompare(right.student_name, "ro")
+    if (nameCmp !== 0) return nameCmp
+    return left.problem_id.localeCompare(right.problem_id)
+  })
+
+  return result
 }

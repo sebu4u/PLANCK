@@ -46,9 +46,9 @@ export default async function ClassroomAssignmentsPage({
         </div>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {assignments.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d1d5db] bg-white p-8 text-center text-sm text-[#6b7280]">
+          <div className="rounded-xl border border-dashed border-[#e5e7eb] bg-white px-4 py-6 text-center text-xs text-[#9ca3af]">
             Încă nu există teme.
           </div>
         ) : (

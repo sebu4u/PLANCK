@@ -18,9 +18,9 @@ const AnnouncementComposer = dynamic(
   () => import("@/components/classrooms/announcement-composer").then((module) => module.AnnouncementComposer),
   {
     loading: () => (
-      <div className="rounded-xl border border-[#eceff3] bg-white p-4">
-        <div className="h-5 w-52 animate-pulse rounded-md bg-[#e5e7eb]" />
-        <div className="mt-4 h-20 w-full animate-pulse rounded-xl bg-[#e5e7eb]" />
+      <div className="rounded-xl border border-[#e8eaed] bg-white px-3 py-2.5">
+        <div className="h-4 w-48 animate-pulse rounded bg-[#e5e7eb]" />
+        <div className="mt-3 h-16 w-full animate-pulse rounded-lg bg-[#f3f4f6]" />
       </div>
     ),
   },
@@ -108,16 +108,16 @@ export default async function ClassroomStreamPage({
       initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
     >
       <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
-        <aside className="rounded-xl border border-[#dadce0] bg-white p-4">
-          <h2 className="text-sm font-semibold text-[#202124]">Urmează</h2>
+        <aside className="rounded-xl border border-[#e8eaed] bg-white p-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Urmează</h2>
           {nextDeadlines.length === 0 ? (
-            <p className="mt-3 text-xs text-[#5f6368]">Nimic de predat curând.</p>
+            <p className="mt-2 text-[11px] text-[#9ca3af]">Nimic de predat curând.</p>
           ) : (
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-1.5">
               {nextDeadlines.map((assignment) => (
-                <div key={assignment.id} className="rounded-lg border border-[#e8eaed] p-2">
-                  <p className="line-clamp-1 text-sm font-medium text-[#1f1f1f]">{assignment.title}</p>
-                  <p className="mt-1 text-xs text-[#5f6368]">
+                <div key={assignment.id} className="rounded-lg border border-[#eceff3] bg-[#fafbfc] px-2 py-1.5">
+                  <p className="line-clamp-1 text-xs font-medium text-[#1f1f1f]">{assignment.title}</p>
+                  <p className="mt-0.5 text-[11px] text-[#6b7280]">
                     {assignment.deadline
                       ? new Date(assignment.deadline).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" })
                       : "Fără termen limită"}
@@ -139,9 +139,9 @@ export default async function ClassroomStreamPage({
             </div>
           ) : null}
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {feedItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#d1d5db] bg-white p-8 text-center text-sm text-[#6b7280]">
+              <div className="rounded-xl border border-dashed border-[#e5e7eb] bg-white px-4 py-6 text-center text-xs text-[#9ca3af]">
                 Încă nu există postări.
               </div>
             ) : (

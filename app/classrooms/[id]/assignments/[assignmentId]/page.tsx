@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StudentAssignmentProblems } from "@/components/classrooms/student-assignment-problems"
 import { StudentAnalyticsTable } from "@/components/classrooms/student-analytics-table"
+import { TeacherAssignmentAttachmentsSection } from "@/components/classrooms/teacher-assignment-attachments"
 import {
   getAssignmentDetails,
   getAssignmentSubmissions,
   getClassroomDetailsForUser,
   getClassroomMembers,
+  getTeacherAssignmentAttachmentGroups,
   requireAuthenticatedUser,
 } from "@/lib/classrooms/server"
 
@@ -15,6 +16,10 @@ const errorMessages: Record<string, string> = {
   students_only: "Doar elevii pot trimite răspunsuri.",
   submission_failed: "Nu am putut salva răspunsul.",
   solve_in_catalog_first: "Deschide problema în catalog, rezolv-o acolo, apoi sincronizeaz-o aici.",
+  teacher_photos_too_many: "Poți atașa cel mult 5 imagini pentru profesor.",
+  teacher_photos_too_large: "Fiecare imagine trebuie să aibă cel mult 5 MB.",
+  teacher_photos_bad_type: "Sunt acceptate doar imagini JPG, PNG, WebP sau GIF.",
+  teacher_photos_upload_failed: "Răspunsul a fost salvat, dar pozele nu s-au încărcat. Încearcă din nou.",
 }
 
 export default async function AssignmentDetailPage({
@@ -45,6 +50,11 @@ export default async function AssignmentDetailPage({
     classroom.role === "teacher" ? getClassroomMembers(classroomId) : Promise.resolve([]),
     searchParams,
   ])
+
+  const teacherAttachmentGroups =
+    classroom.role === "teacher"
+      ? await getTeacherAssignmentAttachmentGroups(classroomId, assignmentId, assignment.problems, members)
+      : []
 
   const errorMessage = query.error ? errorMessages[query.error] : undefined
   const showSaved = query.saved === "1"
@@ -87,26 +97,34 @@ export default async function AssignmentDetailPage({
 
   const studentSubmissions = submissions.filter((entry) => entry.student_id === user.id)
 
+  const deadlineText = assignment.deadline
+    ? new Date(assignment.deadline).toLocaleString("ro-RO", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    : "Fără termen limită"
+
+  const problemCount = assignment.problems.length
+  const problemCountLabel = `${problemCount} ${problemCount === 1 ? "problemă" : "probleme"}`
+
   return (
     <div className="space-y-4">
-      <Card className="border-[#eceff3] bg-white">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-xl">{assignment.title}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-[#4b5563]">
-          {assignment.description ? <p>{assignment.description}</p> : null}
-          <p>
-            Termen limită:{" "}
-            {assignment.deadline
-              ? new Date(assignment.deadline).toLocaleString("ro-RO")
-              : "Fără termen limită"}
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+          <h1 className="min-w-0 flex-1 text-2xl font-semibold leading-tight tracking-tight text-[#111827] md:text-3xl lg:text-4xl">
+            {assignment.title}
+          </h1>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#6b7280]">
+            <span className="whitespace-nowrap">Termen limită: {deadlineText}</span>
+            <span className="whitespace-nowrap">{problemCountLabel}</span>
+          </div>
+        </div>
+        {assignment.description ? (
+          <p className="max-w-3xl whitespace-pre-wrap text-sm leading-relaxed text-[#4b5563]">
+            {assignment.description}
           </p>
-          <p>
-            {assignment.problems.length}{" "}
-            {assignment.problems.length === 1 ? "problemă" : "probleme"}
-          </p>
-        </CardContent>
-      </Card>
+        ) : null}
+      </header>
 
       {errorMessage ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -121,7 +139,10 @@ export default async function AssignmentDetailPage({
       ) : null}
 
       {classroom.role === "teacher" ? (
-        <StudentAnalyticsTable rows={teacherRows} problemStats={problemStats} />
+        <>
+          <TeacherAssignmentAttachmentsSection groups={teacherAttachmentGroups} />
+          <StudentAnalyticsTable rows={teacherRows} problemStats={problemStats} />
+        </>
       ) : (
         <StudentAssignmentProblems
           classroomId={classroomId}

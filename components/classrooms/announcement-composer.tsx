@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import { useFormStatus } from "react-dom"
 import { createAnnouncementAction } from "@/app/classrooms/actions"
 import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -20,8 +19,8 @@ interface AnnouncementComposerProps {
 function SubmitButton() {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Se publică..." : "Publică"}
+    <Button type="submit" size="sm" disabled={pending}>
+      {pending ? "Se publică…" : "Publică"}
     </Button>
   )
 }
@@ -42,22 +41,21 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
   }, [type])
 
   return (
-    <Card className="border-[#eceff3] bg-white">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">Distribuie ceva clasei tale…</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
+    <div className="rounded-xl border border-[#e8eaed] bg-white px-3 py-2.5">
+      <h2 className="text-sm font-semibold leading-snug text-[#111827]">Distribuie ceva clasei tale…</h2>
+
+      <div className="mt-2 space-y-3">
+        <div className="flex flex-wrap gap-1.5">
           {(["text", "image", "file", "lesson"] as AnnouncementType[]).map((option) => (
             <button
               key={option}
               type="button"
               onClick={() => setType(option)}
               className={cn(
-                "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                 type === option
                   ? "border-[#111827] bg-[#111827] text-white"
-                  : "border-[#d1d5db] text-[#374151] hover:bg-[#f3f4f6]"
+                  : "border-[#e5e7eb] bg-[#fafbfc] text-[#4b5563] hover:border-[#d1d5db]",
               )}
             >
               {TYPE_LABELS[option]}
@@ -65,28 +63,29 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
           ))}
         </div>
 
-        <form action={createAnnouncementAction} className="space-y-4">
+        <form action={createAnnouncementAction} className="space-y-3">
           <input type="hidden" name="classroom_id" value={classroomId} />
           <input type="hidden" name="type" value={type} />
 
           {(type === "text" || type === "image" || type === "file") && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[#111827]">{messageFieldLabel}</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[#6b7280]">{messageFieldLabel}</label>
               <Textarea
                 name="content"
-                rows={4}
+                rows={3}
                 placeholder="Scrie anunțul…"
                 required={type === "text"}
+                className="min-h-[4.5rem] resize-y text-sm"
               />
             </div>
           )}
 
           {type === "lesson" && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[#111827]">Lecție</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[#6b7280]">Lecție</label>
               <select
                 name="lesson_slug"
-                className="h-10 w-full rounded-md border border-[#d1d5db] bg-white px-3 text-sm"
+                className="h-9 w-full rounded-md border border-[#e5e7eb] bg-white px-2.5 text-sm"
                 required
                 defaultValue=""
               >
@@ -103,8 +102,8 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
           )}
 
           {(type === "image" || type === "file") && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[#111827]">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[#6b7280]">
                 {type === "image" ? "Imagine" : "Fișier (PDF sau document)"}
               </label>
               <Input
@@ -112,13 +111,14 @@ export function AnnouncementComposer({ classroomId, lessons }: AnnouncementCompo
                 type="file"
                 accept={type === "image" ? "image/*" : ".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx"}
                 required
+                className="h-9 cursor-pointer text-xs file:mr-2 file:rounded file:border-0 file:bg-[#f3f4f6] file:px-2 file:py-1 file:text-xs"
               />
             </div>
           )}
 
           <SubmitButton />
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
