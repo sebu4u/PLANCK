@@ -89,6 +89,12 @@ export function LessonItemShell({
       return
     }
     const fetchStreak = async () => {
+      const { error: streakRpcError } = await supabase.rpc("check_and_reset_streak_if_needed", {
+        user_uuid: user.id,
+      })
+      if (streakRpcError) {
+        console.warn("Streak reset check failed:", streakRpcError.message)
+      }
       const { data } = await supabase
         .from("user_stats")
         .select("current_streak")

@@ -1,104 +1,95 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import { AUTH_MESSAGE_ERROR, AUTH_MESSAGE_SUCCESS, type AuthPopupMessage } from "@/lib/oauth-popup"
 
-const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
+function postToOpener(payload: AuthPopupMessage) {
+  if (typeof window === "undefined" || !window.opener) return
+  try {
+    window.opener.postMessage(payload, window.location.origin)
+  } catch {
+    /* ignore */
+  }
+}
 
+/**
+ * Pagină încărcată în popup după OAuth.
+ * Schimbă codul/token-ul în sesiune, notifică fereastra părinte, apoi se închide.
+ */
 export default function AuthCallbackPage() {
-  const router = useRouter()
-  const processingRef = useRef(false)
-
   useEffect(() => {
-    const getPostAuthRedirect = () => {
-      const cameFromOnboarding = localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1"
-      if (cameFromOnboarding) {
-        localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
-        return "/register?onboarding=1"
+    let cancelled = false
+
+    const run = async () => {
+      const href = window.location.href
+      const url = new URL(href)
+
+      const searchErr = url.searchParams.get("error")
+      const hash = new URLSearchParams(url.hash.replace(/^#/, ""))
+      const hashErr = hash.get("error")
+      const oauthError = searchErr || hashErr
+
+      if (oauthError) {
+        const desc = url.searchParams.get("error_description") || hash.get("error_description") || oauthError
+        postToOpener({
+          type: AUTH_MESSAGE_ERROR,
+          message: desc.replace(/\+/g, " "),
+        })
+        window.close()
+        return
       }
-      return "/"
-    }
-
-    const handleSession = async () => {
-      // Supabase v2 handles hash parsing internally when using the client.
-      // We just need to confirm session is set, then redirect.
-      const { data } = await supabase.auth.getSession()
-
-      if (data.session) {
-        // Process referral if there's a stored referral code
-        await processReferralIfNeeded(data.session.user.id)
-        router.replace(getPostAuthRedirect())
-      } else {
-        // If no session yet, wait briefly then check again (OAuth callback may be processing)
-        setTimeout(async () => {
-          const { data: data2 } = await supabase.auth.getSession()
-          if (data2.session) {
-            // Process referral if there's a stored referral code
-            await processReferralIfNeeded(data2.session.user.id)
-            router.replace(getPostAuthRedirect())
-          } else {
-            // If no session, redirect to register page
-            router.replace("/register")
-          }
-        }, 800)
-      }
-    }
-
-    const processReferralIfNeeded = async (userId: string) => {
-      if (processingRef.current) return
 
       try {
-        // Check if there's a stored referral code
-        const referralCode = localStorage.getItem("planck_referral_code")
-        if (!referralCode) return
-
-        processingRef.current = true
-        console.log("Processing referral for user:", userId, "with code:", referralCode)
-
-        // Wait a bit for the profile to be created by the trigger
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        // Process the referral
-        const response = await fetch("/api/referral/process", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            referral_code: referralCode,
-            referred_user_id: userId,
-          }),
-        })
-
-        const result = await response.json()
-        console.log("Referral processing result:", result)
-
-        if (result.success) {
-          // Clear the stored referral code after successful processing
-          localStorage.removeItem("planck_referral_code")
-          console.log("Referral processed successfully!")
-        } else {
-          console.error("Referral processing failed:", result.error)
-          // Still clear the code to prevent repeated attempts
-          localStorage.removeItem("planck_referral_code")
+        const code = url.searchParams.get("code")
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(href)
+          if (exchangeError) {
+            if (!cancelled) {
+              postToOpener({ type: AUTH_MESSAGE_ERROR, message: exchangeError.message })
+            }
+            window.close()
+            return
+          }
         }
-      } catch (error) {
-        console.error("Error processing referral:", error)
-        // Clear the code on error to prevent loops
-        localStorage.removeItem("planck_referral_code")
-      } finally {
-        processingRef.current = false
+
+        await supabase.auth.getSession()
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          if (!cancelled) {
+            postToOpener({ type: AUTH_MESSAGE_ERROR, message: sessionError.message })
+          }
+          window.close()
+          return
+        }
+
+        if (!session) {
+          if (!cancelled) {
+            postToOpener({
+              type: AUTH_MESSAGE_ERROR,
+              message: "Sesiune indisponibilă după autentificare. Încearcă din nou.",
+            })
+          }
+        } else if (!cancelled) {
+          postToOpener({ type: AUTH_MESSAGE_SUCCESS })
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Eroare la finalizarea autentificării."
+        if (!cancelled) postToOpener({ type: AUTH_MESSAGE_ERROR, message: msg })
       }
+
+      window.close()
     }
 
-    handleSession()
-  }, [router])
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  return (
-    <div className="min-h-screen bg-[#101113] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        <p className="text-white/60 text-sm">Se procesează autentificarea...</p>
-      </div>
-    </div>
-  )
+  return null
 }

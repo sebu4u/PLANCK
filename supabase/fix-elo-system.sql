@@ -3,29 +3,29 @@
 -- Rulează acest script în Supabase SQL Editor
 -- ============================================
 
--- 1. Actualizare funcție get_rank_from_elo() cu distribuție progresivă
+-- 1. Actualizare funcție get_rank_from_elo()
 CREATE OR REPLACE FUNCTION public.get_rank_from_elo(elo_value integer)
 RETURNS text AS $$
 BEGIN
-  IF elo_value < 833 THEN RETURN 'Bronze III';
-  ELSIF elo_value < 1166 THEN RETURN 'Bronze II';
-  ELSIF elo_value < 1500 THEN RETURN 'Bronze I';
-  ELSIF elo_value < 2000 THEN RETURN 'Silver III';
-  ELSIF elo_value < 2500 THEN RETURN 'Silver II';
-  ELSIF elo_value < 3000 THEN RETURN 'Silver I';
-  ELSIF elo_value < 3667 THEN RETURN 'Gold III';
-  ELSIF elo_value < 4334 THEN RETURN 'Gold II';
-  ELSIF elo_value < 5000 THEN RETURN 'Gold I';
-  ELSIF elo_value < 5833 THEN RETURN 'Platinum III';
-  ELSIF elo_value < 6666 THEN RETURN 'Platinum II';
-  ELSIF elo_value < 7500 THEN RETURN 'Platinum I';
-  ELSIF elo_value < 8667 THEN RETURN 'Diamond III';
-  ELSIF elo_value < 9834 THEN RETURN 'Diamond II';
-  ELSIF elo_value < 11000 THEN RETURN 'Diamond I';
-  ELSIF elo_value < 12333 THEN RETURN 'Masters III';
-  ELSIF elo_value < 13666 THEN RETURN 'Masters II';
-  ELSIF elo_value < 15000 THEN RETURN 'Masters I';
-  ELSIF elo_value < 16500 THEN RETURN 'Ascendant';
+  IF elo_value < 650 THEN RETURN 'Bronze III';
+  ELSIF elo_value < 850 THEN RETURN 'Bronze II';
+  ELSIF elo_value < 1050 THEN RETURN 'Bronze I';
+  ELSIF elo_value < 1400 THEN RETURN 'Silver III';
+  ELSIF elo_value < 1800 THEN RETURN 'Silver II';
+  ELSIF elo_value < 2300 THEN RETURN 'Silver I';
+  ELSIF elo_value < 3000 THEN RETURN 'Gold III';
+  ELSIF elo_value < 3700 THEN RETURN 'Gold II';
+  ELSIF elo_value < 4500 THEN RETURN 'Gold I';
+  ELSIF elo_value < 5600 THEN RETURN 'Platinum III';
+  ELSIF elo_value < 6700 THEN RETURN 'Platinum II';
+  ELSIF elo_value < 7900 THEN RETURN 'Platinum I';
+  ELSIF elo_value < 9300 THEN RETURN 'Diamond III';
+  ELSIF elo_value < 10800 THEN RETURN 'Diamond II';
+  ELSIF elo_value < 12500 THEN RETURN 'Diamond I';
+  ELSIF elo_value < 14300 THEN RETURN 'Masters III';
+  ELSIF elo_value < 16200 THEN RETURN 'Masters II';
+  ELSIF elo_value < 18200 THEN RETURN 'Masters I';
+  ELSIF elo_value < 20000 THEN RETURN 'Ascendant';
   ELSE RETURN 'Singularity';
   END IF;
 END;
@@ -77,10 +77,14 @@ BEGIN
   
   -- Map difficulty to ELO
   CASE problem_difficulty
-    WHEN 'Ușor' THEN elo_to_award := 15;
-    WHEN 'Mediu' THEN elo_to_award := 21;
-    WHEN 'Avansat' THEN elo_to_award := 30;
-    ELSE elo_to_award := 15; -- Default to easy if unknown
+    WHEN 'Ușor' THEN elo_to_award := 200;
+    WHEN 'Mediu' THEN elo_to_award := 300;
+    WHEN 'Avansat' THEN elo_to_award := 450;
+    WHEN 'Easy' THEN elo_to_award := 200;
+    WHEN 'Medium' THEN elo_to_award := 300;
+    WHEN 'Hard' THEN elo_to_award := 450;
+    WHEN 'Difficult' THEN elo_to_award := 450;
+    ELSE elo_to_award := 200; -- Default to easy if unknown
   END CASE;
   
   RAISE NOTICE 'ELO to award: %', elo_to_award;

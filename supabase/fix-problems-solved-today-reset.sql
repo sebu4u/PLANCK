@@ -52,17 +52,17 @@ BEGIN
   
   -- Map difficulty to ELO (match EXACT cu valorile din problems)
   CASE problem_difficulty
-    WHEN 'Ușor' THEN elo_to_award := 15;
-    WHEN 'Mediu' THEN elo_to_award := 21;
-    WHEN 'Avansat' THEN elo_to_award := 30;
+    WHEN 'Ușor' THEN elo_to_award := 200;
+    WHEN 'Mediu' THEN elo_to_award := 300;
+    WHEN 'Avansat' THEN elo_to_award := 450;
     -- Fallback pentru alte variante posibile
-    WHEN 'Easy' THEN elo_to_award := 15;
-    WHEN 'Medium' THEN elo_to_award := 21;
-    WHEN 'Hard' THEN elo_to_award := 30;
-    WHEN 'Difficult' THEN elo_to_award := 30;
+    WHEN 'Easy' THEN elo_to_award := 200;
+    WHEN 'Medium' THEN elo_to_award := 300;
+    WHEN 'Hard' THEN elo_to_award := 450;
+    WHEN 'Difficult' THEN elo_to_award := 450;
     ELSE 
-      RAISE NOTICE 'ATENȚIE: Dificultate necunoscută "%". Folosim default 15 ELO.', problem_difficulty;
-      elo_to_award := 15;
+      RAISE NOTICE 'ATENȚIE: Dificultate necunoscută "%". Folosim default 200 ELO.', problem_difficulty;
+      elo_to_award := 200;
   END CASE;
   
   RAISE NOTICE 'ELO de acordat: %', elo_to_award;

@@ -119,6 +119,12 @@ export function Navigation() {
     return () => window.removeEventListener('openLoginModal', handleOpenLoginModal)
   }, [])
 
+  useEffect(() => {
+    if (user && isLoginModalOpen) {
+      setIsLoginModalOpen(false)
+    }
+  }, [user, isLoginModalOpen])
+
   // Open search modal with '/' when not typing in an input/textarea/contentEditable
   // Disable on IDE page to allow typing '/' in code editor
   useEffect(() => {
@@ -303,33 +309,33 @@ export function Navigation() {
 
   const handleGoogleLogin = async () => {
     setLoginLoading("google")
-    const { error } = await loginWithGoogle()
+    const { error, popupBlocked } = await loginWithGoogle()
     setLoginLoading(null)
 
     if (error) {
       toast({
         title: "Eroare la autentificare cu Google",
-        description: error.message,
+        description: popupBlocked
+          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
+          : error.message,
         variant: "destructive",
       })
-    } else {
-      setIsLoginModalOpen(false)
     }
   }
 
   const handleGitHubLogin = async () => {
     setLoginLoading("github")
-    const { error } = await loginWithGitHub()
+    const { error, popupBlocked } = await loginWithGitHub()
     setLoginLoading(null)
 
     if (error) {
       toast({
         title: "Eroare la autentificare cu GitHub",
-        description: error.message,
+        description: popupBlocked
+          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
+          : error.message,
         variant: "destructive",
       })
-    } else {
-      setIsLoginModalOpen(false)
     }
   }
 
@@ -513,7 +519,7 @@ export function Navigation() {
                         <Menu className="h-5 w-5" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={12} className={`z-[400] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
+                    <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                       <DropdownMenuItem asChild>
                         <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
                       </DropdownMenuItem>
@@ -644,7 +650,7 @@ export function Navigation() {
                       <Menu className="h-5 w-5" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" sideOffset={12} className={`z-[400] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
+                  <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                     <DropdownMenuItem asChild>
                       <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
                     </DropdownMenuItem>

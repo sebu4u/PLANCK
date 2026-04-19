@@ -1,14 +1,24 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"
+import type { AuthError, User } from "@supabase/supabase-js"
 import { clearSupabaseAuthStorage, supabase } from "@/lib/supabaseClient"
+import {
+  AUTH_MESSAGE_ERROR,
+  AUTH_MESSAGE_SUCCESS,
+  isAuthPopupMessage,
+  signInWithOAuthPopup,
+} from "@/lib/oauth-popup"
 
 interface AuthContextType {
-  user: any
+  user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<any>
-  loginWithGoogle: () => Promise<any>
-  loginWithGitHub: () => Promise<any>
+  login: (email: string, password: string) => Promise<{
+    data: { user: User | null }
+    error: AuthError | null
+  }>
+  loginWithGoogle: () => Promise<{ error: Error | null; popupBlocked?: boolean }>
+  loginWithGitHub: () => Promise<{ error: Error | null; popupBlocked?: boolean }>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -23,7 +33,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const FREE_PLAN_IDENTIFIER = "free"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null) // nou: profilul
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>(FREE_PLAN_IDENTIFIER)
@@ -36,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return normalized.includes("refresh token") || normalized.includes("refresh_token")
   }
 
-  const handleInvalidAuthSession = async (message?: string) => {
+  const handleInvalidAuthSession = useCallback(async (message?: string) => {
     console.warn("Invalid auth session detected:", message)
     clearSupabaseAuthStorage()
     setUser(null)
@@ -44,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
     setUserElo(null)
     setIsAdmin(false)
-  }
+  }, [])
 
   useEffect(() => {
     const getUser = async () => {
@@ -97,7 +107,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       listener.subscription.unsubscribe()
     }
-  }, [])
+  }, [handleInvalidAuthSession])
+
+  const hydrateUserFromSession = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession()
+
+      if (error) {
+        if (isInvalidRefreshTokenError(error.message)) {
+          await handleInvalidAuthSession(error.message)
+          return
+        }
+        console.error("Error syncing session:", error)
+      }
+
+      setUser(data?.session?.user ?? null)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (isInvalidRefreshTokenError(msg)) {
+        await handleInvalidAuthSession(msg)
+      } else {
+        console.error("Unexpected error syncing session:", err)
+      }
+    }
+  }, [handleInvalidAuthSession])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (!isAuthPopupMessage(event.data)) return
+
+      if (event.data.type === AUTH_MESSAGE_SUCCESS) {
+        void hydrateUserFromSession()
+        return
+      }
+
+      if (event.data.type === AUTH_MESSAGE_ERROR) {
+        const detail = event.data.message ?? "Autentificarea a eșuat."
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("planck:oauth-error", { detail: { message: detail } }))
+        }
+      }
+    }
+
+    window.addEventListener("message", onMessage)
+    return () => window.removeEventListener("message", onMessage)
+  }, [hydrateUserFromSession])
 
   // Fetch profile din tabelul profiles când userul se schimbă
   const fetchProfile = useCallback(async () => {
@@ -200,31 +255,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     setUser(data.user ?? null)
     setLoading(false)
-    return { data, error }
+    return {
+      data: { user: data.user ?? null },
+      error,
+    }
   }
 
   const loginWithGoogle = async () => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
-      }
-    })
-    setLoading(false)
-    return { data, error }
+    if (typeof window === "undefined") return { error: new Error("Client-only") }
+    return signInWithOAuthPopup(supabase, "google")
   }
 
   const loginWithGitHub = async () => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
-      }
-    })
-    setLoading(false)
-    return { data, error }
+    if (typeof window === "undefined") return { error: new Error("Client-only") }
+    return signInWithOAuthPopup(supabase, "github")
   }
 
   const logout = async () => {
@@ -295,4 +339,23 @@ export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) throw new Error("useAuth must be used within an AuthProvider")
   return context
+}
+
+/**
+ * Blochează conținutul paginii până când sesiunea inițială e cunoscută (fără flash de „logged out”).
+ */
+export function AuthSessionGate({ children }: { children: ReactNode }) {
+  const { loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-[100dvh] bg-[#121212]"
+        aria-busy="true"
+        aria-label="Se încarcă sesiunea"
+      />
+    )
+  }
+
+  return <>{children}</>
 } 

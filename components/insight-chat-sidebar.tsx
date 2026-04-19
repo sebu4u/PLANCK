@@ -924,28 +924,32 @@ export default function InsightChatSidebar({
 
   const handleGoogleLogin = async () => {
     setLoginLoading('google')
-    const { error } = await loginWithGoogle()
+    const { error, popupBlocked } = await loginWithGoogle()
     if (error) {
       toast({
         title: 'Eroare la autentificare cu Google',
-        description: error.message,
+        description: popupBlocked
+          ? 'Permite ferestrele pop-up pentru acest site, apoi încearcă din nou.'
+          : error.message,
         variant: 'destructive',
       })
-      setLoginLoading(null)
     }
+    setLoginLoading(null)
   }
 
   const handleGitHubLogin = async () => {
     setLoginLoading('github')
-    const { error } = await loginWithGitHub()
+    const { error, popupBlocked } = await loginWithGitHub()
     if (error) {
       toast({
         title: 'Eroare la autentificare cu GitHub',
-        description: error.message,
+        description: popupBlocked
+          ? 'Permite ferestrele pop-up pentru acest site, apoi încearcă din nou.'
+          : error.message,
         variant: 'destructive',
       })
-      setLoginLoading(null)
     }
+    setLoginLoading(null)
   }
 
   const stopGeneration = useCallback(async () => {

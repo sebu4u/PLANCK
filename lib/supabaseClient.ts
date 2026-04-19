@@ -1,5 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+// Folosește NEXT_PUBLIC_SUPABASE_URL și NEXT_PUBLIC_SUPABASE_ANON_KEY (echivalent cu createClient din
+// @supabase/supabase-js, dar cu stocare cookie compatibilă Next.js App Router + server components).
+
 // Browser client MUST use @supabase/ssr so the session is stored in cookies and is visible to
 // Server Components via lib/supabase/server.ts. A plain supabase-js client keeps the session in
 // localStorage only, so getUser() on the server is always null and routes that redirect to "/"

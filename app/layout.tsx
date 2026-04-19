@@ -4,7 +4,7 @@ import Script from "next/script"
 import { Mona_Sans, VT323, Dancing_Script } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ScrollToTop } from "@/components/scroll-to-top"
-import { AuthProvider } from "@/components/auth-provider"
+import { AuthProvider, AuthSessionGate } from "@/components/auth-provider"
 import { AnalyticsProvider } from "@/components/analytics-provider"
 import { KatexProvider } from "@/components/katex-provider"
 import { Toaster } from "@/components/ui/toaster"
@@ -111,7 +111,7 @@ export default function RootLayout({
             <GlobalLoadingOverlay />
             <AnalyticsProvider>
               <KatexProvider>
-                {children}
+                <AuthSessionGate>{children}</AuthSessionGate>
               </KatexProvider>
               <Toaster />
               <CookieConsentBanner />

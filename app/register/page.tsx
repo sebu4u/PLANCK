@@ -432,7 +432,7 @@ function RegisterPageContent() {
     setOauthLoading(provider)
     markStateForOAuthReturn()
 
-    const { error } =
+    const { error, popupBlocked } =
       provider === "google" ? await loginWithGoogle() : await loginWithGitHub()
 
     if (error) {
@@ -447,11 +447,13 @@ function RegisterPageContent() {
           provider === "google"
             ? "Eroare la autentificare cu Google"
             : "Eroare la autentificare cu GitHub",
-        description: error.message,
+        description: popupBlocked
+          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
+          : error.message,
         variant: "destructive",
       })
-      setOauthLoading(null)
     }
+    setOauthLoading(null)
   }
 
   const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

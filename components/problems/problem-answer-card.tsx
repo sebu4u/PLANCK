@@ -28,13 +28,13 @@ function getProblemElo(problem: Problem): number | null {
 
   switch (problem.difficulty) {
     case "Ușor":
-      return 20
+      return 200
     case "Mediu":
-      return 30
+      return 300
     case "Avansat":
-      return 40
+      return 450
     default:
-      return 30
+      return 200
   }
 }
 

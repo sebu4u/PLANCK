@@ -74,38 +74,37 @@ export async function getUserStats(userId: string, accessToken: string): Promise
 }
 
 export function getNextRankThreshold(currentElo: number): { nextRank: string; threshold: number; progress: number } {
-  // 19 tiers total matching SQL function get_rank_from_elo
-  // Distribuție progresivă: mai ușor în Bronze/Silver/Gold, din ce în ce mai greu
+  // Lower-bound thresholds per tier; must match SQL get_rank_from_elo (migration 20260420_elo_ranks_and_gains.sql)
   const ranks = [
-    { name: 'Bronze III', threshold: 500 },
-    { name: 'Bronze II', threshold: 833 },
-    { name: 'Bronze I', threshold: 1166 },
-    { name: 'Silver III', threshold: 1500 },
-    { name: 'Silver II', threshold: 2000 },
-    { name: 'Silver I', threshold: 2500 },
-    { name: 'Gold III', threshold: 3000 },
-    { name: 'Gold II', threshold: 3667 },
-    { name: 'Gold I', threshold: 4334 },
-    { name: 'Platinum III', threshold: 5000 },
-    { name: 'Platinum II', threshold: 5833 },
-    { name: 'Platinum I', threshold: 6666 },
-    { name: 'Diamond III', threshold: 7500 },
-    { name: 'Diamond II', threshold: 8667 },
-    { name: 'Diamond I', threshold: 9834 },
-    { name: 'Masters III', threshold: 11000 },
-    { name: 'Masters II', threshold: 12333 },
-    { name: 'Masters I', threshold: 13666 },
-    { name: 'Ascendant', threshold: 15000 },
-    { name: 'Singularity', threshold: 16500 },
+    { name: 'Bronze III', threshold: 0 },
+    { name: 'Bronze II', threshold: 650 },
+    { name: 'Bronze I', threshold: 850 },
+    { name: 'Silver III', threshold: 1050 },
+    { name: 'Silver II', threshold: 1400 },
+    { name: 'Silver I', threshold: 1800 },
+    { name: 'Gold III', threshold: 2300 },
+    { name: 'Gold II', threshold: 3000 },
+    { name: 'Gold I', threshold: 3700 },
+    { name: 'Platinum III', threshold: 4500 },
+    { name: 'Platinum II', threshold: 5600 },
+    { name: 'Platinum I', threshold: 6700 },
+    { name: 'Diamond III', threshold: 7900 },
+    { name: 'Diamond II', threshold: 9300 },
+    { name: 'Diamond I', threshold: 10800 },
+    { name: 'Masters III', threshold: 12500 },
+    { name: 'Masters II', threshold: 14300 },
+    { name: 'Masters I', threshold: 16200 },
+    { name: 'Ascendant', threshold: 18200 },
+    { name: 'Singularity', threshold: 20000 },
   ]
 
   const nextRank = ranks.find(r => r.threshold > currentElo)
   if (!nextRank) {
-    return { nextRank: 'Singularity', threshold: 16500, progress: 100 }
+    return { nextRank: 'Singularity', threshold: 20000, progress: 100 }
   }
 
   const currentRank = ranks.filter(r => r.threshold <= currentElo).pop()
-  const currentThreshold = currentRank?.threshold || 500
+  const currentThreshold = currentRank?.threshold ?? 0
   const rangeSize = nextRank.threshold - currentThreshold
   const progress = rangeSize > 0 ? ((currentElo - currentThreshold) / rangeSize) * 100 : 0
 

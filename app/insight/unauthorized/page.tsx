@@ -64,36 +64,32 @@ function InsightUnauthorizedContent() {
 
   const handleGoogleLogin = async () => {
     setLoading("google")
-    const { error } = await loginWithGoogle()
+    const { error, popupBlocked } = await loginWithGoogle()
     if (error) {
       toast({
         title: "Eroare la autentificare cu Google",
-        description: error.message,
+        description: popupBlocked
+          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
+          : error.message,
         variant: "destructive",
       })
-      setLoading(null)
-    } else {
-      setTimeout(() => {
-        router.push(redirectUrl)
-      }, 500)
     }
+    setLoading(null)
   }
 
   const handleGitHubLogin = async () => {
     setLoading("github")
-    const { error } = await loginWithGitHub()
+    const { error, popupBlocked } = await loginWithGitHub()
     if (error) {
       toast({
         title: "Eroare la autentificare cu GitHub",
-        description: error.message,
+        description: popupBlocked
+          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
+          : error.message,
         variant: "destructive",
       })
-      setLoading(null)
-    } else {
-      setTimeout(() => {
-        router.push(redirectUrl)
-      }, 500)
     }
+    setLoading(null)
   }
 
   // Show loading state while checking auth

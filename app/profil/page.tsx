@@ -130,6 +130,12 @@ const ProfilPage = () => {
     if (!user) return;
     const fetchUserStats = async () => {
       setStatsLoading(true);
+      const { error: streakRpcError } = await supabase.rpc('check_and_reset_streak_if_needed', {
+        user_uuid: user.id,
+      })
+      if (streakRpcError) {
+        console.warn('Streak reset check failed:', streakRpcError.message)
+      }
       const { data, error } = await supabase
         .from('user_stats')
         .select('*')
@@ -281,7 +287,7 @@ const ProfilPage = () => {
     );
   }
 
-  const nextRankInfo = userStats ? getNextRankThreshold(userStats.elo) : { nextRank: 'Bronze II', threshold: 600, progress: 0 };
+  const nextRankInfo = userStats ? getNextRankThreshold(userStats.elo) : { nextRank: 'Bronze II', threshold: 650, progress: 0 };
   const rankIconPath = userStats ? getRankIconPath(userStats.rank) : '/ranks/bronze.png';
   const rankColor = userStats ? getRankColor(userStats.rank) : 'text-gray-400';
 

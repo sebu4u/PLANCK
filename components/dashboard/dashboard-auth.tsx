@@ -795,14 +795,18 @@ async function fetchEloQuickStats(userId: string): Promise<EloQuickStats> {
     .in('id', problemIds)
 
   const difficultyToElo: Record<string, number> = {
-    'Ușor': 15,
-    'Mediu': 21,
-    'Avansat': 30,
+    'Ușor': 200,
+    'Mediu': 300,
+    'Avansat': 450,
+    Easy: 200,
+    Medium: 300,
+    Hard: 450,
+    Difficult: 450,
   }
 
   const eloByProblemId = new Map<string, number>()
   problems?.forEach((p: any) => {
-    const elo = difficultyToElo[p.difficulty] ?? 15
+    const elo = difficultyToElo[p.difficulty] ?? 200
     eloByProblemId.set(p.id, elo)
   })
 
@@ -811,7 +815,7 @@ async function fetchEloQuickStats(userId: string): Promise<EloQuickStats> {
 
   for (const sp of solvedProblems as any[]) {
     const solvedAt = new Date(sp.solved_at)
-    const elo = eloByProblemId.get(sp.problem_id) ?? 15
+    const elo = eloByProblemId.get(sp.problem_id) ?? 200
 
     if (solvedAt >= weekAgo) {
       weekGain += elo
@@ -861,14 +865,18 @@ async function fetchEloHistory(userId: string): Promise<number[]> {
     .in('id', problemIds)
 
   const difficultyToElo: Record<string, number> = {
-    'Ușor': 15,
-    'Mediu': 21,
-    'Avansat': 30,
+    'Ușor': 200,
+    'Mediu': 300,
+    'Avansat': 450,
+    Easy: 200,
+    Medium: 300,
+    Hard: 450,
+    Difficult: 450,
   }
 
   const eloByProblemId = new Map<string, number>()
   problems?.forEach((p: any) => {
-    const elo = difficultyToElo[p.difficulty] ?? 15
+    const elo = difficultyToElo[p.difficulty] ?? 200
     eloByProblemId.set(p.id, elo)
   })
 
@@ -878,7 +886,7 @@ async function fetchEloHistory(userId: string): Promise<number[]> {
   for (const sp of solvedProblems as any[]) {
     const solvedAt = new Date(sp.solved_at)
     const dayKey = solvedAt.toISOString().split('T')[0]
-    const elo = eloByProblemId.get(sp.problem_id) ?? 15
+    const elo = eloByProblemId.get(sp.problem_id) ?? 200
     eloByDay.set(dayKey, (eloByDay.get(dayKey) || 0) + elo)
   }
 

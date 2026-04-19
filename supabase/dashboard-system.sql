@@ -327,30 +327,42 @@ create policy "dashboard_updates_select_all"
 -- ============================================
 
 -- Function to check and reset streak if needed (called when viewing dashboard)
--- This resets streak to 0 if user skipped a full day (gap > 1 day), and updates best_streak
--- If last activity was yesterday, the user still has today to continue the streak
+-- Resets streak to 0 when >= 24h since last solved_problems.solved_at; updates best_streak
 create or replace function public.check_and_reset_streak_if_needed(user_uuid uuid)
 returns void as $$
 declare
-  last_activity date;
-  today date := current_date;
+  last_solve timestamptz;
   current_streak_count integer;
 begin
-  select last_activity_date, current_streak into last_activity, current_streak_count
-  from public.user_stats
-  where user_id = user_uuid;
-
-  if last_activity is null then
+  if auth.uid() is distinct from user_uuid then
     return;
   end if;
 
-  if last_activity >= today - interval '1 day' then
+  select max(sp.solved_at) into last_solve
+  from public.solved_problems sp
+  where sp.user_id = user_uuid;
+
+  select us.current_streak into current_streak_count
+  from public.user_stats us
+  where us.user_id = user_uuid;
+
+  if last_solve is null then
+    if coalesce(current_streak_count, 0) > 0 then
+      update public.user_stats
+      set current_streak = 0,
+          best_streak = greatest(best_streak, current_streak_count)
+      where user_id = user_uuid;
+    end if;
+    return;
+  end if;
+
+  if now() - last_solve < interval '24 hours' then
     return;
   end if;
 
   update public.user_stats
   set current_streak = 0,
-      best_streak = greatest(best_streak, current_streak_count)
+      best_streak = greatest(best_streak, coalesce(current_streak_count, 0))
   where user_id = user_uuid;
 end;
 $$ language plpgsql security definer;
@@ -424,39 +436,29 @@ end;
 $$ language plpgsql security definer;
 
 -- Function to calculate rank from ELO
--- 19 tiers total: Bronze (III, II, I), Silver (III, II, I), Gold (III, II, I), 
--- Platinum (III, II, I), Diamond (III, II, I), Masters (III, II, I), Ascendant, Singularity
--- Distribution progresivă: mai ușor în Bronze/Silver/Gold, din ce în ce mai greu
--- Bronze: 500-1500 (333 ELO per tier - ușor)
--- Silver: 1500-3000 (500 ELO per tier - ușor)
--- Gold: 3000-5000 (667 ELO per tier - mediu)
--- Platinum: 5000-7500 (833 ELO per tier - mediu)
--- Diamond: 7500-11000 (1167 ELO per tier - greu)
--- Masters: 11000-15000 (1333 ELO per tier - foarte greu)
--- Ascendant: 15000-16500 (1500 ELO - extrem)
--- Singularity: 16500+ (foarte extrem)
+-- 19 tiers: Bronze III .. Singularity (see migration 20260420_elo_ranks_and_gains.sql for ranges)
 create or replace function public.get_rank_from_elo(elo_value integer)
 returns text as $$
 begin
-  if elo_value < 833 then return 'Bronze III';
-  elsif elo_value < 1166 then return 'Bronze II';
-  elsif elo_value < 1500 then return 'Bronze I';
-  elsif elo_value < 2000 then return 'Silver III';
-  elsif elo_value < 2500 then return 'Silver II';
-  elsif elo_value < 3000 then return 'Silver I';
-  elsif elo_value < 3667 then return 'Gold III';
-  elsif elo_value < 4334 then return 'Gold II';
-  elsif elo_value < 5000 then return 'Gold I';
-  elsif elo_value < 5833 then return 'Platinum III';
-  elsif elo_value < 6666 then return 'Platinum II';
-  elsif elo_value < 7500 then return 'Platinum I';
-  elsif elo_value < 8667 then return 'Diamond III';
-  elsif elo_value < 9834 then return 'Diamond II';
-  elsif elo_value < 11000 then return 'Diamond I';
-  elsif elo_value < 12333 then return 'Masters III';
-  elsif elo_value < 13666 then return 'Masters II';
-  elsif elo_value < 15000 then return 'Masters I';
-  elsif elo_value < 16500 then return 'Ascendant';
+  if elo_value < 650 then return 'Bronze III';
+  elsif elo_value < 850 then return 'Bronze II';
+  elsif elo_value < 1050 then return 'Bronze I';
+  elsif elo_value < 1400 then return 'Silver III';
+  elsif elo_value < 1800 then return 'Silver II';
+  elsif elo_value < 2300 then return 'Silver I';
+  elsif elo_value < 3000 then return 'Gold III';
+  elsif elo_value < 3700 then return 'Gold II';
+  elsif elo_value < 4500 then return 'Gold I';
+  elsif elo_value < 5600 then return 'Platinum III';
+  elsif elo_value < 6700 then return 'Platinum II';
+  elsif elo_value < 7900 then return 'Platinum I';
+  elsif elo_value < 9300 then return 'Diamond III';
+  elsif elo_value < 10800 then return 'Diamond II';
+  elsif elo_value < 12500 then return 'Diamond I';
+  elsif elo_value < 14300 then return 'Masters III';
+  elsif elo_value < 16200 then return 'Masters II';
+  elsif elo_value < 18200 then return 'Masters I';
+  elsif elo_value < 20000 then return 'Ascendant';
   else return 'Singularity';
   end if;
 end;
@@ -513,6 +515,8 @@ declare
   challenge_bonus integer;
   challenge_completed boolean;
   old_last_activity_date date;
+  newest_solve timestamptz;
+  prev_solve timestamptz;
 begin
   -- Get problem difficulty (handle both text and uuid types)
   -- Try direct match first, then try casting
@@ -548,17 +552,17 @@ begin
   
   -- Map difficulty to ELO (match EXACT cu valorile din problems)
   case problem_difficulty
-    when 'Ușor' then elo_to_award := 15;
-    when 'Mediu' then elo_to_award := 21;
-    when 'Avansat' then elo_to_award := 30;
+    when 'Ușor' then elo_to_award := 200;
+    when 'Mediu' then elo_to_award := 300;
+    when 'Avansat' then elo_to_award := 450;
     -- Fallback pentru alte variante posibile
-    when 'Easy' then elo_to_award := 15;
-    when 'Medium' then elo_to_award := 21;
-    when 'Hard' then elo_to_award := 30;
-    when 'Difficult' then elo_to_award := 30;
+    when 'Easy' then elo_to_award := 200;
+    when 'Medium' then elo_to_award := 300;
+    when 'Hard' then elo_to_award := 450;
+    when 'Difficult' then elo_to_award := 450;
     else 
-      raise notice 'ATENȚIE: Dificultate necunoscută "%". Folosim default 15 ELO.', problem_difficulty;
-      elo_to_award := 15;
+      raise notice 'ATENȚIE: Dificultate necunoscută "%". Folosim default 200 ELO.', problem_difficulty;
+      elo_to_award := 200;
   end case;
   
   raise notice 'ELO de acordat: %', elo_to_award;
@@ -658,7 +662,22 @@ begin
     update public.daily_activity
     set activity_level = new_activity_level
     where user_id = user_uuid and activity_date = today_date;
-    
+
+    select max(sp.solved_at) into newest_solve
+    from public.solved_problems sp
+    where sp.user_id = user_uuid;
+
+    select max(sp.solved_at) into prev_solve
+    from public.solved_problems sp
+    where sp.user_id = user_uuid
+      and sp.solved_at < newest_solve;
+
+    if prev_solve is null or (newest_solve - prev_solve >= interval '24 hours') then
+      update public.user_stats
+      set current_streak = 0
+      where user_id = user_uuid;
+    end if;
+
     -- Update streak (pass old_last_activity_date so function knows if we should increment or reset)
     perform public.update_user_streak(user_uuid, old_last_activity_date);
     
