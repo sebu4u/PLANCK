@@ -107,6 +107,13 @@ function PricingPageContent() {
     syncSubscription()
   }, [searchParams, toast, user, syncingSessionId, refreshProfile])
 
+  useEffect(() => {
+    const planParam = searchParams?.get("plan")
+    if (planParam === "free" || planParam === "plus" || planParam === "premium") {
+      setSelectedPlan(planParam)
+    }
+  }, [searchParams])
+
   const startCheckout = async (planId: "plus" | "premium") => {
     if (!user) {
       router.push("/login")

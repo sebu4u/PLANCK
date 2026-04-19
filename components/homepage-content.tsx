@@ -14,7 +14,7 @@ import InteractiveFeaturesSection from "@/components/interactive-features-sectio
 import InsightCTAHomepage from "@/components/insight-cta-homepage"
 import { GlassImageCard } from "@/components/glass-image-card"
 import RealTimeGraphicsSection from "@/components/realtime-graphics-section"
-import InsightPricingSection from "@/components/insight-pricing-section"
+import { HomepagePricingPlansSection } from "@/components/homepage-pricing-plans-section"
 import FinalCTASection from "@/components/final-cta-section"
 import { Suspense, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
@@ -50,6 +50,7 @@ const HOME_SECTION_IDS = [
   "home-mai-eficient",
   "home-courses",
   "home-reviews",
+  "home-pricing",
   "home-faq",
 ]
 
@@ -198,6 +199,8 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
       <section id="home-reviews">
         <ReviewsSection />
       </section>
+
+      <HomepagePricingPlansSection />
 
       {/* FAQ Section */}
       <section id="home-faq">
