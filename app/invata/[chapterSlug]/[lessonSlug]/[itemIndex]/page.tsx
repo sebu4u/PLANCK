@@ -12,7 +12,6 @@ import {
   LearningPathItemBody,
   getItemIcon,
 } from "@/components/invata/learning-path-item-body"
-import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learning-path-lesson-progress"
 import { ProblemSection } from "@/components/invata/problem-section"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import {
@@ -147,6 +146,8 @@ export default async function InvataLessonItemPage({
       lessonSlug={lesson.slug ?? lesson.id}
       itemIndex={parsedIndex}
       items={items}
+      lessonId={lesson.id}
+      currentItemId={item.id}
       lessonBaseHref={lessonBaseHref}
       isTextLesson={isLinkedTextItem || isCustomTextItem}
       hideBottomCta={isPoll || (isProblem && !!problemHasAnswer)}
@@ -154,9 +155,6 @@ export default async function InvataLessonItemPage({
       fullWidth={isProblem}
       grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
     >
-      {items.length > 0 && parsedIndex === items.length ? (
-        <MarkLearningPathLessonProgress lessonId={lesson.id} />
-      ) : null}
       {isPoll ? (
         <LearningPathItemBody
           item={item}
@@ -164,9 +162,18 @@ export default async function InvataLessonItemPage({
           sourceProblem={sourceProblem}
           sourceQuizQuestion={sourceQuizQuestion}
           nextItemHref={nextItemHref}
+          lessonId={lesson.id}
+          isLastItem={parsedIndex >= items.length}
         />
       ) : isProblem && sourceProblem ? (
-        <ProblemSection problem={sourceProblem} nextItemHref={nextItemHref} itemIndex={parsedIndex} />
+        <ProblemSection
+          problem={sourceProblem}
+          nextItemHref={nextItemHref}
+          itemIndex={parsedIndex}
+          lessonId={lesson.id}
+          currentItemId={item.id}
+          isLastItem={parsedIndex >= items.length}
+        />
       ) : isCustomTextItem ? (
         <div className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col justify-center py-6 sm:py-10">
           <LearningPathItemBody
@@ -175,6 +182,8 @@ export default async function InvataLessonItemPage({
             sourceProblem={sourceProblem}
             sourceQuizQuestion={sourceQuizQuestion}
             nextItemHref={nextItemHref}
+            lessonId={lesson.id}
+            isLastItem={parsedIndex >= items.length}
           />
         </div>
       ) : item.item_type === "grila" ? (
@@ -186,6 +195,8 @@ export default async function InvataLessonItemPage({
               sourceProblem={sourceProblem}
               sourceQuizQuestion={sourceQuizQuestion}
               nextItemHref={nextItemHref}
+              lessonId={lesson.id}
+              isLastItem={parsedIndex >= items.length}
             />
           </div>
         </div>
@@ -218,6 +229,8 @@ export default async function InvataLessonItemPage({
               sourceProblem={sourceProblem}
               sourceQuizQuestion={sourceQuizQuestion}
               nextItemHref={nextItemHref}
+              lessonId={lesson.id}
+              isLastItem={parsedIndex >= items.length}
             />
           </div>
         </section>
@@ -250,6 +263,8 @@ export default async function InvataLessonItemPage({
               sourceProblem={sourceProblem}
               sourceQuizQuestion={sourceQuizQuestion}
               nextItemHref={nextItemHref}
+              lessonId={lesson.id}
+              isLastItem={parsedIndex >= items.length}
             />
           </div>
         </section>

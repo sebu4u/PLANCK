@@ -20,6 +20,10 @@ import {
   useGrilaLesson,
 } from "@/components/invata/grila-lesson-context"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
+import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
+import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
+import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -46,6 +50,8 @@ interface LessonItemShellProps {
   lessonSlug: string
   itemIndex: number
   items: LearningPathLessonItem[]
+  lessonId: string
+  currentItemId: string
   lessonBaseHref: string
   isTextLesson: boolean
   hideBottomCta?: boolean
@@ -61,6 +67,8 @@ export function LessonItemShell({
   lessonSlug,
   itemIndex,
   items,
+  lessonId,
+  currentItemId,
   lessonBaseHref,
   isTextLesson,
   hideBottomCta = false,
@@ -75,6 +83,8 @@ export function LessonItemShell({
   const [scrollProgress, setScrollProgress] = useState(0)
   const [streak, setStreak] = useState<number | null>(null)
   const [showQuitDialog, setShowQuitDialog] = useState(false)
+  const pushMomentum = useMomentumTrigger()
+  useStreakTrigger({ enabled: Boolean(user?.id) })
 
   const nextItemHref =
     itemIndex < items.length
@@ -82,6 +92,22 @@ export function LessonItemShell({
       : lessonBaseHref
 
   const stepProgress = items.length > 0 ? itemIndex / items.length : 0
+  const markCurrentItemCompleted = useLearningPathItemCompletion({
+    itemId: currentItemId,
+    lessonId,
+    isLastItem: itemIndex >= items.length,
+  })
+
+  const continueToNextItem = useCallback(async () => {
+    await markCurrentItemCompleted()
+    pushMomentum({
+      nextHref: nextItemHref,
+      isLastItem: itemIndex >= items.length,
+      itemIndex,
+      totalItems: items.length,
+    })
+    router.push(nextItemHref)
+  }, [itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum, router])
 
   useEffect(() => {
     if (!user) {
@@ -190,7 +216,7 @@ export function LessonItemShell({
       </main>
 
       {!hideBottomCta && grilaQuestion ? (
-        <GrilaLessonBottomCta nextItemHref={nextItemHref} />
+        <GrilaLessonBottomCta nextItemHref={nextItemHref} onContinue={continueToNextItem} />
       ) : !hideBottomCta ? (
         <div
           className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
@@ -199,7 +225,11 @@ export function LessonItemShell({
           <div className="mx-auto flex max-w-5xl justify-center">
             <Link
               href={nextItemHref}
-              onClick={playClickSound}
+              onClick={(event) => {
+                event.preventDefault()
+                playClickSound()
+                void continueToNextItem()
+              }}
               className="dashboard-start-glow inline-flex w-full max-w-sm items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
               style={{ "--start-glow-tint": CTA_GLOW_TINT } as CSSProperties}
             >
@@ -257,8 +287,15 @@ export function LessonItemShell({
   )
 }
 
-function GrilaLessonBottomCta({ nextItemHref }: { nextItemHref: string }) {
+function GrilaLessonBottomCta({
+  nextItemHref,
+  onContinue,
+}: {
+  nextItemHref: string
+  onContinue: () => Promise<void> | void
+}) {
   const ctx = useGrilaLesson()
+  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
   if (!ctx) return null
 
   const { selectedAnswer, isVerified, isCorrect, verify, reset } = ctx
@@ -270,8 +307,17 @@ function GrilaLessonBottomCta({ nextItemHref }: { nextItemHref: string }) {
       state={barState}
       hasAnswer={hasAnswer}
       nextItemHref={nextItemHref}
-      onVerify={() => void verify()}
-      onRetry={reset}
+      onVerify={() => {
+        void verify().then((result) => {
+          if (result === false) registerFailure()
+          if (result === true) resetFailures()
+        })
+      }}
+      onRetry={() => {
+        reset()
+      }}
+      onContinue={onContinue}
+      onExplain={() => pushHint("manual")}
       answerSlot={
         <span className="text-sm font-medium text-[#6f657b]">
           Răspunsul se selectează în chenarele de mai sus.

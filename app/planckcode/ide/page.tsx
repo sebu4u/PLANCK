@@ -5,8 +5,6 @@ import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
-import { Check } from 'lucide-react'
-
 // Lazy load Monaco Editor to reduce initial bundle size
 const Editor = dynamic(() => import('@monaco-editor/react').then((mod) => mod.default), {
   ssr: false,
@@ -55,9 +53,10 @@ import { breadcrumbStructuredData } from "@/lib/structured-data"
 import { supabase } from "@/lib/supabaseClient"
 import { FileItem } from "@/lib/types"
 import { SaveProjectDialog } from "@/components/save-project-dialog"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { useRouter } from 'next/navigation'
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import { PlusPromoCard } from "@/components/plus-promo-card"
 
 const FREE_PLAN_PROJECT_LIMIT = 3
@@ -387,7 +386,6 @@ interface RunResponse {
 function IDEPageContent() {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
-  const [showRaptorCard, setShowRaptorCard] = useState<boolean>(true)
   const [showAuthRequiredCard, setShowAuthRequiredCard] = useState<boolean>(false)
   // Default initial state - always used for first render (SSR/client must match)
   const defaultFiles: FileItem[] = [{ id: '1', name: 'main.cpp', content: defaultCode, type: 'cpp' }]
@@ -713,6 +711,16 @@ function IDEPageContent() {
   const streamingActiveRef = useRef<Set<string>>(new Set())
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0]
+  const {
+    registerFailure: registerIdeFailure,
+    resetFailures: resetIdeFailures,
+  } = useStuckTrigger({
+    surface: "ide",
+    threshold: 3,
+    idleMs: 90_000,
+    activityKey: activeFile?.content,
+    onHintCta: () => setIsInsightOpen(true),
+  })
 
   const getModelUri = (file: FileItem) => {
     return monacoRef.current?.Uri.parse(`inmemory://model/${file.id}/${file.name}`)
@@ -1330,6 +1338,7 @@ function IDEPageContent() {
         setIsTerminalOpen(true)
       }
       setError('Programul folosește cin, dar nu ai furnizat valori în "Input (stdin)". Completează-le înainte de a rula codul.')
+      registerIdeFailure()
       setOutput(null)
       setInteractiveOutput('')
       setWaitingForInput(false)
@@ -1430,6 +1439,11 @@ function IDEPageContent() {
                     memory: null
                   }
                   setOutput(runResponse)
+                  if (data.exitCode === 0) {
+                    resetIdeFailures()
+                  } else {
+                    registerIdeFailure()
+                  }
                   // Parse file updates if any
                   parseFileUpdates(data.stdout)
                 }
@@ -1448,6 +1462,7 @@ function IDEPageContent() {
                   return
                 } else {
                   setError(data.error)
+                  registerIdeFailure()
                   setLoading(false)
                   setWaitingForInput(false)
                 }
@@ -1461,6 +1476,7 @@ function IDEPageContent() {
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
         setError(err.message)
+        registerIdeFailure()
         setLoading(false)
         setWaitingForInput(false)
       }
@@ -1479,6 +1495,11 @@ function IDEPageContent() {
       // Always set output, even if there are compilation/runtime errors
       // Those are part of the normal response, not API errors
       setOutput(response.data)
+      if (response.data?.status?.id === 3) {
+        resetIdeFailures()
+      } else {
+        registerIdeFailure()
+      }
 
       parseFileUpdates(response.data?.stdout || '')
     } catch (err) {
@@ -1487,6 +1508,7 @@ function IDEPageContent() {
         if (!err.response) {
           const errorMessage = err.message || 'Network error: Failed to connect to server'
           setError(errorMessage)
+          registerIdeFailure()
           if (process.env.NODE_ENV === 'development') {
             console.log('Network Error:', {
               message: err.message,
@@ -1518,6 +1540,7 @@ function IDEPageContent() {
         }
 
         setError(errorMessage)
+        registerIdeFailure()
 
         // Only log if there's meaningful data to log
         if (process.env.NODE_ENV === 'development') {
@@ -1534,6 +1557,7 @@ function IDEPageContent() {
       } else {
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
         setError(errorMessage)
+        registerIdeFailure()
         if (process.env.NODE_ENV === 'development') {
           console.log('Unexpected error:', err)
         }
@@ -1553,84 +1577,6 @@ function IDEPageContent() {
         ])}
         id="breadcrumbs-planckcode-ide"
       />
-      {showRaptorCard && isFree && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#181818] shadow-2xl"
-          >
-            <button
-              onClick={() => setShowRaptorCard(false)}
-              className="absolute right-4 top-4 z-20 rounded-full bg-black/40 p-2 text-gray-200 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-md"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            {/* Ultrawide Image Section */}
-            <div className="relative h-44 w-full">
-              <img
-                src="/raptor1.png"
-                alt="RAPTOR1 AI"
-                className="h-full w-full object-cover object-[50%_25%]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/40 to-transparent" />
-            </div>
-
-            {/* Content Section - Landscape Layout */}
-            <div className="relative px-8 pb-8 pt-2">
-              <div className="grid md:grid-cols-[1.2fr_1fr] gap-8 items-end">
-                <div className="space-y-4 text-left">
-                  <div>
-                    <h2 className="text-4xl font-bold tracking-wider text-white mb-2 font-sans uppercase" style={{ fontFamily: 'Horizon, sans-serif' }}>
-                      RAPTOR1 Is Here
-                    </h2>
-                    <div className="h-1 w-24 bg-blue-500 rounded-full" />
-                  </div>
-
-                  <p className="text-gray-300 text-base leading-relaxed">
-                    Experimentează noul model AI <span className="text-blue-400 font-semibold">RAPTOR1</span>.
-                    Optimizat pentru viteză, precizie și debugging avansat în C++.
-                    Analizează codul instantaneu și oferă sugestii inteligente.
-                  </p>
-                </div>
-
-                <div className="space-y-5">
-                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
-                    <span className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-green-500" />
-                      Analiză instantă
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-green-500" />
-                      Optimizare
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-green-500" />
-                      STL Support
-                    </span>
-                  </div>
-
-                  <div>
-                    <Button
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 text-base rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] hover:scale-[1.02]"
-                      onClick={() => {
-                        window.location.href = '/pricing'
-                      }}
-                    >
-                      Upgrade to Premium
-                    </Button>
-                    <p className="mt-2 text-center text-[10px] text-gray-500 uppercase tracking-widest">
-                      Disponibil în planurile Plus & Premium
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
       {showAuthRequiredCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <motion.div

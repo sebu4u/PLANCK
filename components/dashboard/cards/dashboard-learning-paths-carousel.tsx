@@ -9,11 +9,13 @@ import type { LearningPathChapter, LearningPathLesson } from "@/lib/supabase-lea
 interface DashboardLearningPathsCarouselProps {
   chapters: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
+  startHrefByChapter?: Record<string, string>
 }
 
 export function DashboardLearningPathsCarousel({
   chapters,
   lessonsByChapter,
+  startHrefByChapter = {},
 }: DashboardLearningPathsCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [dragOffset, setDragOffset] = useState(0)
@@ -125,12 +127,13 @@ export function DashboardLearningPathsCarousel({
         {chapters.map((chapter) => {
           const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
           const firstLesson = chapterLessons[0]
-          const chapterHref =
+          const fallbackChapterHref =
             chapter.slug && firstLesson?.slug
               ? `/invata/${chapter.slug}/${firstLesson.slug}`
               : firstLesson
                 ? `/invata/${chapter.id}/${firstLesson.id}`
                 : "/invata"
+          const chapterHref = startHrefByChapter[chapter.id] ?? fallbackChapterHref
           const colors = getChapterTheme(chapter.title)
 
           return (
@@ -223,12 +226,13 @@ export function DashboardLearningPathsCarousel({
         {chapters.map((chapter, index) => {
           const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
           const firstLesson = chapterLessons[0]
-          const chapterHref =
+          const fallbackChapterHref =
             chapter.slug && firstLesson?.slug
               ? `/invata/${chapter.slug}/${firstLesson.slug}`
               : firstLesson
                 ? `/invata/${chapter.id}/${firstLesson.id}`
                 : "/invata"
+          const chapterHref = startHrefByChapter[chapter.id] ?? fallbackChapterHref
 
           const offset = ((index - activeIndex + count) % count)
           const normalizedOffset = offset > Math.floor(count / 2) ? offset - count : offset

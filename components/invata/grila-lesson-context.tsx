@@ -41,7 +41,7 @@ type GrilaLessonContextValue = {
   isVerified: boolean
   /** După verificare: true/false; înainte de verificare null */
   isCorrect: boolean | null
-  verify: () => Promise<void>
+  verify: () => Promise<boolean | null>
   reset: () => void
 }
 
@@ -63,7 +63,7 @@ export function GrilaLessonProvider({
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
 
   const verify = useCallback(async () => {
-    if (selectedAnswer === null || isVerified) return
+    if (selectedAnswer === null || isVerified) return null
     const correct = selectedAnswer === question.correct_answer
     setIsVerified(true)
     setIsCorrect(correct)
@@ -71,6 +71,7 @@ export function GrilaLessonProvider({
       playSuccessSound()
       await markQuestionAsSolved(question.id)
     }
+    return correct
   }, [selectedAnswer, isVerified, question.correct_answer, question.id])
 
   const reset = useCallback(() => {

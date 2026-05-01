@@ -3,6 +3,8 @@
 import React, { createContext, useCallback, useContext, useState } from "react"
 import { PollFeedbackBar } from "@/components/invata/poll-feedback-bar"
 import type { LessonPollOption } from "@/components/invata/lesson-poll"
+import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -55,6 +57,9 @@ interface PollSectionProps {
   correctAnswerId: string
   options: LessonPollOption[]
   nextItemHref: string
+  lessonId: string
+  currentItemId: string
+  isLastItem: boolean
   children: React.ReactNode
 }
 
@@ -63,23 +68,32 @@ export function PollSection({
   correctAnswerId,
   options,
   nextItemHref,
+  lessonId,
+  currentItemId,
+  isLastItem,
   children,
 }: PollSectionProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [verified, setVerified] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [displayText, setDisplayText] = useState(question)
+  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "poll" })
 
   const onVerify = useCallback(() => {
     if (selectedId === null) return
     const selectedOption = options.find((o) => o.id === selectedId)
     if (!selectedOption) return
     const correct = selectedId === correctAnswerId
-    if (correct) playSuccessSound()
+    if (correct) {
+      playSuccessSound()
+      resetFailures()
+    } else {
+      registerFailure()
+    }
     setDisplayText(selectedOption.feedback)
     setVerified(true)
     setIsCorrect(correct)
-  }, [selectedId, correctAnswerId, options])
+  }, [selectedId, correctAnswerId, options, registerFailure, resetFailures])
 
   const onRetry = useCallback(() => {
     setSelectedId(null)
@@ -89,6 +103,11 @@ export function PollSection({
   }, [question])
 
   const barState: PollBarState = !verified ? "verify" : isCorrect ? "correct" : "incorrect"
+  const onContinue = useLearningPathItemCompletion({
+    itemId: currentItemId,
+    lessonId,
+    isLastItem,
+  })
 
   return (
     <PollStateContext.Provider
@@ -122,6 +141,8 @@ export function PollSection({
         nextItemHref={nextItemHref}
         onVerify={onVerify}
         onRetry={onRetry}
+        onContinue={onContinue}
+        onExplain={() => pushHint("manual")}
       />
     </PollStateContext.Provider>
   )

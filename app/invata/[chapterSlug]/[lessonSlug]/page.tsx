@@ -6,12 +6,15 @@ import { LearningPathLessonPage } from "@/components/invata/learning-path-lesson
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import { canViewLearningPathContent } from "@/lib/learning-path-access"
+import { createClient } from "@/lib/supabase/server"
 import {
+  getCompletedLearningPathItemIdsForUser,
   getLearningPathChapterById,
   getLearningPathChapterBySlug,
   getLearningPathLessonById,
   getLearningPathLessonBySlug,
   getLearningPathLessonItems,
+  getNextIncompleteLearningPathItem,
   isUuid,
 } from "@/lib/supabase-learning-paths"
 
@@ -68,6 +71,24 @@ export default async function InvataLessonDetailPage({
   }
 
   const items = canViewLearningPathsContent ? await getLearningPathLessonItems(lesson.id) : []
+  let initialSelectedItemId: string | null = items[0]?.id ?? null
+
+  if (items.length > 0) {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (user) {
+      const completedItemIds = await getCompletedLearningPathItemIdsForUser(
+        supabase,
+        user.id,
+        items.map((item) => item.id)
+      )
+      initialSelectedItemId =
+        getNextIncompleteLearningPathItem(items, completedItemIds)?.id ?? items[items.length - 1]?.id ?? null
+    }
+  }
 
   return (
     <>
@@ -75,7 +96,12 @@ export default async function InvataLessonDetailPage({
       <main className="min-h-screen bg-[#ffffff]">
         {canViewLearningPathsContent ? (
           <>
-            <LearningPathLessonPage chapter={chapter} lesson={lesson} items={items} />
+            <LearningPathLessonPage
+              chapter={chapter}
+              lesson={lesson}
+              items={items}
+              initialSelectedItemId={initialSelectedItemId}
+            />
             {items.length === 0 ? <MarkLearningPathLessonProgress lessonId={lesson.id} /> : null}
           </>
         ) : (

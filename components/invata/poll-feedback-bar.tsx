@@ -1,6 +1,8 @@
 "use client"
 
+import type { MouseEvent } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -30,6 +32,8 @@ interface PollFeedbackBarProps {
   nextItemHref: string
   onVerify: () => void
   onRetry: () => void
+  onContinue?: () => Promise<void> | void
+  onExplain?: () => void
 }
 
 export function PollFeedbackBar({
@@ -38,9 +42,19 @@ export function PollFeedbackBar({
   nextItemHref,
   onVerify,
   onRetry,
+  onContinue,
+  onExplain,
 }: PollFeedbackBarProps) {
+  const router = useRouter()
   const isVerified = state === "correct" || state === "incorrect"
   const isCorrect = state === "correct"
+
+  const handleContinue = async (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    playClickSound()
+    await onContinue?.()
+    router.push(nextItemHref)
+  }
 
   return (
     <div
@@ -94,6 +108,7 @@ export function PollFeedbackBar({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
+              onClick={onExplain}
               className="rounded-full border border-gray-300 bg-white px-4 py-2.5 text-base font-semibold text-[#111111] transition-colors hover:bg-gray-50"
             >
               De ce?
@@ -101,7 +116,7 @@ export function PollFeedbackBar({
             {isCorrect ? (
               <Link
                 href={nextItemHref}
-                onClick={playClickSound}
+                onClick={handleContinue}
                 className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-base font-semibold text-white shadow-[0_3px_0_#047857] transition-[transform,box-shadow] hover:translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_1px_0_#047857]"
               >
                 Continuă

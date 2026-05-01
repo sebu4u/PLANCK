@@ -49,6 +49,8 @@ interface LearningPathItemBodyProps {
   sourceProblem?: Problem | null
   sourceQuizQuestion?: QuizQuestion | null
   nextItemHref?: string
+  lessonId?: string
+  isLastItem?: boolean
 }
 
 function parseCustomTextContent(content: Record<string, unknown> | null | undefined): { body: string } | null {
@@ -153,7 +155,15 @@ function parsePollContent(content: Record<string, unknown> | null | undefined): 
   return { imageSrc, imageAlt, question, correctAnswerId, options: parsedOptions }
 }
 
-export function LearningPathItemBody({ item, sourceLesson, sourceProblem, sourceQuizQuestion, nextItemHref }: LearningPathItemBodyProps) {
+export function LearningPathItemBody({
+  item,
+  sourceLesson,
+  sourceProblem,
+  sourceQuizQuestion,
+  nextItemHref,
+  lessonId,
+  isLastItem = false,
+}: LearningPathItemBodyProps) {
   if (item.item_type === "text") {
     if (!sourceLesson) {
       return <p className="text-sm text-[#777777]">Lecția text nu este încă disponibilă.</p>
@@ -228,7 +238,7 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
 
   if (item.item_type === "poll") {
     const pollData = parsePollContent(item.content_json ?? null)
-    if (!pollData || !nextItemHref) {
+    if (!pollData || !nextItemHref || !lessonId) {
       return <p className="text-sm text-[#777777]">Sondajul nu este configurat încă.</p>
     }
     return (
@@ -237,6 +247,9 @@ export function LearningPathItemBody({ item, sourceLesson, sourceProblem, source
         correctAnswerId={pollData.correctAnswerId}
         options={pollData.options}
         nextItemHref={nextItemHref}
+        lessonId={lessonId}
+        currentItemId={item.id}
+        isLastItem={isLastItem}
       >
         <LessonPollClientWrapper
           imageSrc={pollData.imageSrc}

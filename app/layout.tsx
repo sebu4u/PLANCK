@@ -13,6 +13,8 @@ import { TopLoader } from "@/components/top-loader"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MobileViewportFix } from "@/components/mobile-viewport-fix"
 import { RealVHProvider } from "@/components/real-vh-provider"
+import { EngagementProvider } from "@/components/engagement/notification-provider"
+import { EngagementNotificationToaster } from "@/components/engagement/notification-toaster"
 
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
 import { baseMetadata } from "@/lib/metadata"
@@ -111,9 +113,12 @@ export default function RootLayout({
             <GlobalLoadingOverlay />
             <AnalyticsProvider>
               <KatexProvider>
-                <AuthSessionGate>{children}</AuthSessionGate>
+                <EngagementProvider>
+                  <AuthSessionGate>{children}</AuthSessionGate>
+                </EngagementProvider>
               </KatexProvider>
               <Toaster />
+              <EngagementNotificationToaster />
               <CookieConsentBanner />
 
               <div

@@ -27,8 +27,14 @@ import type {
 } from "@/lib/dashboard-data"
 import { FreePlanUpgradeModal } from "@/components/dashboard/free-plan-upgrade-modal"
 import {
+  getCompletedLearningPathItemIdsForUser,
+  getCompletedLearningPathLessonIdsForUser,
   getLearningPathChapters,
+  getLearningPathItemHref,
+  getLearningPathLessonHref,
+  getLearningPathLessonItems,
   getLearningPathLessonsByChapterId,
+  getNextIncompleteLearningPathItem,
   getProblemsByClass,
   type LearningPathChapter,
   type LearningPathLesson,
@@ -38,9 +44,12 @@ import {
   DashboardStreakCard,
   type DashboardStreakDay,
 } from "@/components/dashboard/cards/dashboard-streak-card"
+import { DashboardMobileBottomNav } from "@/components/dashboard/dashboard-mobile-bottom-nav"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
+import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
+import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -73,9 +82,15 @@ export function DashboardAuth() {
     streakDays: DashboardStreakDay[]
     dashboardLearningPaths: LearningPathChapter[]
     dashboardLessonsByChapter: Record<string, LearningPathLesson[]>
+    dashboardStartHrefByChapter: Record<string, string>
     recommendedProblems: Problem[]
   } | null>(null)
 
+  useStreakTrigger({ enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack })
+  useSocialProofTrigger({
+    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack,
+    solvedTotal: dashboardData?.stats.problems_solved_total,
+  })
 
   useEffect(() => {
     if (authLoading) return
@@ -142,7 +157,7 @@ export function DashboardAuth() {
           fetchEloQuickStats(user.id),
           fetchEloHistory(user.id),
           fetchLastFiveStreakDays(user.id),
-          fetchDashboardLearningPaths(),
+          fetchDashboardLearningPaths(user.id),
           fetchRecommendedProblemsForDashboard(profile?.grade),
         ])
 
@@ -169,6 +184,7 @@ export function DashboardAuth() {
           streakDays: streakDaysData,
           dashboardLearningPaths: learningPathsData.chapters,
           dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
+          dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
           recommendedProblems: recommendedProblemsData,
         }
 
@@ -225,7 +241,7 @@ export function DashboardAuth() {
           fetchEloQuickStats(userId),
           fetchEloHistory(userId),
           fetchLastFiveStreakDays(userId),
-          fetchDashboardLearningPaths(),
+          fetchDashboardLearningPaths(userId),
           fetchRecommendedProblemsForDashboard(profile?.grade),
         ])
 
@@ -251,6 +267,7 @@ export function DashboardAuth() {
           streakDays: streakDaysData,
           dashboardLearningPaths: learningPathsData.chapters,
           dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
+          dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
           recommendedProblems: recommendedProblemsData,
         }
 
@@ -506,8 +523,8 @@ export function DashboardAuth() {
           {/* Floating Card Container */}
           <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
-            {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa]">
+            {/* Scrollable Content Area — extra bottom padding on mobile for fixed quick nav */}
+            <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa] pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
               {!isPaid ? (
                 <div className="bg-[#f7f9fa]">
                   <Link
@@ -603,6 +620,7 @@ export function DashboardAuth() {
                       <DashboardLearningPathsCarousel
                         chapters={dashboardData.dashboardLearningPaths}
                         lessonsByChapter={dashboardData.dashboardLessonsByChapter}
+                        startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
                       />
                     </div>
 
@@ -643,6 +661,8 @@ export function DashboardAuth() {
           ctaLoading={welcomeCtaLoading}
         />
       )}
+
+      <DashboardMobileBottomNav userGrade={profile?.grade} />
 
     </DashboardSidebarProvider>
   )
@@ -1254,6 +1274,7 @@ async function fetchContinueLearning(): Promise<ContinueLearningItem[]> {
 interface DashboardLearningPathsData {
   chapters: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
+  startHrefByChapterId: Record<string, string>
 }
 
 function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): LearningPathChapter[] {
@@ -1296,21 +1317,63 @@ function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): L
   return picked.slice(0, 3)
 }
 
-async function fetchDashboardLearningPaths(): Promise<DashboardLearningPathsData> {
+async function getLearningPathResumeHref(
+  userId: string,
+  chapter: LearningPathChapter,
+  lessons: LearningPathLesson[]
+): Promise<string> {
+  const firstLesson = lessons[0]
+  if (!firstLesson) return "/invata"
+
+  const lessonIds = lessons.map((lesson) => lesson.id)
+  const completedLessonIds = new Set(
+    await getCompletedLearningPathLessonIdsForUser(supabase, userId, lessonIds)
+  )
+
+  for (const lesson of lessons) {
+    const items = await getLearningPathLessonItems(lesson.id)
+    const lessonHref = getLearningPathLessonHref(chapter, lesson)
+
+    if (!items.length) {
+      if (!completedLessonIds.has(lesson.id)) return lessonHref
+      continue
+    }
+
+    const completedItemIds = await getCompletedLearningPathItemIdsForUser(
+      supabase,
+      userId,
+      items.map((item) => item.id)
+    )
+    const nextItem = getNextIncompleteLearningPathItem(items, completedItemIds)
+
+    if (nextItem) {
+      const nextItemIndex = items.findIndex((item) => item.id === nextItem.id)
+      return getLearningPathItemHref(chapter, lesson, Math.max(nextItemIndex, 0))
+    }
+  }
+
+  const lastLesson = lessons[lessons.length - 1] ?? firstLesson
+  return getLearningPathLessonHref(chapter, lastLesson)
+}
+
+async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLearningPathsData> {
   const chapters = await getLearningPathChapters()
   const selectedChapters = selectDashboardLearningPathChapters(chapters)
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
+  const startHrefByChapterId: Record<string, string> = {}
 
   await Promise.all(
     selectedChapters.map(async (chapter) => {
       const lessons = await getLearningPathLessonsByChapterId(chapter.id)
       lessonsByChapter[chapter.id] = lessons.slice(0, 2)
+      startHrefByChapterId[chapter.id] = await getLearningPathResumeHref(userId, chapter, lessons)
     })
   )
 
   return {
     chapters: selectedChapters,
     lessonsByChapter,
+    startHrefByChapterId,
   }
 }
 

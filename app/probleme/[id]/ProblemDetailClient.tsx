@@ -35,6 +35,7 @@ import {
   getFreshPhysicsCatalogProblems,
   getPhysicsCatalogSkipGridSkeletonSessionKey,
 } from "@/lib/physics-catalog-problems-cache"
+import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -235,6 +236,7 @@ export default function ProblemDetailClient({
   const [storedCatalogBackHref] = useState(getStoredCatalogBackHref)
   const router = useRouter()
   const [catalogBackLoading, setCatalogBackLoading] = useState(false)
+  useSocialProofTrigger({ enabled: Boolean(user?.id) && !isClassroomEmbed, problemId: problem.id })
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''

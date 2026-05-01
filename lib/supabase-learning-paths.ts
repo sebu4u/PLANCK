@@ -58,6 +58,28 @@ export interface LearningPathLessonItem {
   content_json?: Record<string, unknown> | null
 }
 
+export function getLearningPathLessonHref(chapter: LearningPathChapter, lesson: LearningPathLesson): string {
+  return chapter.slug && lesson.slug
+    ? `/invata/${chapter.slug}/${lesson.slug}`
+    : `/invata/${chapter.id}/${lesson.id}`
+}
+
+export function getLearningPathItemHref(
+  chapter: LearningPathChapter,
+  lesson: LearningPathLesson,
+  itemIndex: number
+): string {
+  return `${getLearningPathLessonHref(chapter, lesson)}/${itemIndex + 1}`
+}
+
+export function getNextIncompleteLearningPathItem(
+  items: LearningPathLessonItem[],
+  completedItemIds: Iterable<string>
+): LearningPathLessonItem | null {
+  const completed = new Set(completedItemIds)
+  return items.find((item) => !completed.has(item.id)) ?? null
+}
+
 export async function getLearningPathChapters(): Promise<LearningPathChapter[]> {
   const { data, error } = await supabase
     .from("learning_path_chapters")
@@ -390,4 +412,25 @@ export async function getCompletedLearningPathLessonIdsForUser(
   }
 
   return (data ?? []).map((row) => row.lesson_id as string)
+}
+
+export async function getCompletedLearningPathItemIdsForUser(
+  client: SupabaseClient,
+  userId: string,
+  itemIds: string[]
+): Promise<string[]> {
+  if (!itemIds.length) return []
+
+  const { data, error } = await client
+    .from("user_learning_path_item_progress")
+    .select("item_id")
+    .eq("user_id", userId)
+    .in("item_id", itemIds)
+
+  if (error) {
+    console.error("Error fetching learning path item progress:", error)
+    return []
+  }
+
+  return (data ?? []).map((row) => row.item_id as string)
 }

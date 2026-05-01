@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
-import { Button } from "@/components/ui/button"
-import { X, TrendingUp, PlayCircle } from "lucide-react"
-import Link from "next/link"
+import { EngagementCard } from "@/components/engagement/engagement-card"
+import type { EngagementNotification } from "@/lib/engagement/types"
 
 interface Problem {
   id: string
@@ -135,90 +134,33 @@ export function ProgressNotification() {
     return null
   }
 
+  const notification: EngagementNotification = {
+    id: "legacy-progress-notification",
+    type: "progress_feedback",
+    surface: "card",
+    priority: 30,
+    dedupeKey: "legacy-progress-notification",
+    payload: {
+      icon: "progress",
+      title: "Progresul tău",
+      description:
+        solvedCount === 0
+          ? `Începe să construiești progresul tău cu „${suggestedProblem.title}”.`
+          : solvedCount < 5
+            ? `Ai ${solvedCount} probleme rezolvate. Continuă cu „${suggestedProblem.title}”.`
+            : `Excelent progres: ${solvedCount} probleme rezolvate. Următoarea sugestie: „${suggestedProblem.title}”.`,
+      cta: {
+        label: suggestedProblem.youtube_url?.trim() ? "Rezolvă problema cu video" : "Rezolvă problema",
+        href: `/probleme/${suggestedProblem.id}`,
+      },
+    },
+  }
+
   return (
-    <div className={`hidden md:block fixed bottom-6 right-6 z-50 transition-all duration-700 ease-out ${
-      isVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-full opacity-0 scale-95'
-    }`}>
-      <div className="bg-gradient-to-br from-green-50/70 to-emerald-50/70 border border-green-200/60 rounded-xl shadow-2xl p-3 md:p-4 max-w-xs md:max-w-sm backdrop-blur-sm transition-all duration-300 hover:from-green-50 hover:to-emerald-50 hover:border-green-200 hover:shadow-2xl">
-        {/* Header cu buton de închidere */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <h3 className="font-bold text-green-800">Progresul tău</h3>
-          </div>
-          <button
-            onClick={handleDismiss}
-            className="text-green-600 hover:text-green-800 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Conținut notificare */}
-        <div className="space-y-2 md:space-y-3">
-          {/* Progres */}
-          <div className="bg-white/40 rounded-lg p-2 md:p-3 transition-all duration-300 hover:bg-white/60">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-green-700">Probleme rezolvate</span>
-              <span className="text-sm font-bold text-green-800">{solvedCount}</span>
-            </div>
-            <div className="w-full bg-green-200/60 rounded-full h-1">
-              <div 
-                className="bg-gradient-to-r from-green-400 to-emerald-500 h-1 rounded-full transition-all duration-1000 ease-out"
-                style={{ width: `${Math.min((solvedCount / 10) * 100, 100)}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Problemă sugerată */}
-          {suggestedProblem && (
-            <div className="bg-white/40 rounded-lg p-2 md:p-3 transition-all duration-300 hover:bg-white/60">
-              <div className="flex items-center gap-2 mb-1.5">
-                {suggestedProblem.youtube_url && suggestedProblem.youtube_url.trim() !== '' ? (
-                  <PlayCircle className="w-3 h-3 text-red-500" />
-                ) : (
-                  <span className="w-3 h-3 text-green-500">📝</span>
-                )}
-                <span className="text-xs font-medium text-green-700">
-                  {suggestedProblem.youtube_url && suggestedProblem.youtube_url.trim() !== '' 
-                    ? "Sugestie cu video" 
-                    : "Sugestie pentru tine"}
-                </span>
-              </div>
-              <p className="text-xs text-green-800 mb-1.5 line-clamp-2">
-                {suggestedProblem.title}
-              </p>
-              <div className="flex items-center gap-1 mb-2">
-                <span className="text-xs px-1.5 md:px-2 py-0.5 md:py-1 bg-green-100 text-green-700 rounded-full">
-                  {suggestedProblem.difficulty}
-                </span>
-                <span className="text-xs px-1.5 md:px-2 py-0.5 md:py-1 bg-purple-100 text-purple-700 rounded-full">
-                  {suggestedProblem.category}
-                </span>
-              </div>
-              <Link href={`/probleme/${suggestedProblem.id}`}>
-                <Button 
-                  size="sm" 
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium text-xs md:text-sm"
-                >
-                  Rezolvă problema
-                </Button>
-              </Link>
-            </div>
-          )}
-
-          {/* Mesaj motivant */}
-          <div className="text-center">
-            <p className="text-xs text-green-600/80">
-              {solvedCount === 0 
-                ? "Începe să construiești progresul tău!" 
-                : solvedCount < 5 
-                ? "Continuă așa! Fiecare problemă te aduce mai aproape de succes." 
-                : "Excelent progres! Ești pe drumul cel bun."}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <EngagementCard
+      notification={notification}
+      visible={isVisible}
+      onDismiss={handleDismiss}
+    />
   )
 }

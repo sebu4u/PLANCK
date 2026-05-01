@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toYoutubeEmbedUrl } from "@/lib/youtube-utils"
 import { cn } from "@/lib/utils"
+import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
@@ -102,9 +104,19 @@ interface ProblemSectionProps {
   problem: Problem
   nextItemHref: string
   itemIndex: number
+  lessonId: string
+  currentItemId: string
+  isLastItem: boolean
 }
 
-export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSectionProps) {
+export function ProblemSection({
+  problem,
+  nextItemHref,
+  itemIndex,
+  lessonId,
+  currentItemId,
+  isLastItem,
+}: ProblemSectionProps) {
   const tags = useMemo(() => normalizeTags(problem.tags), [problem.tags])
   const valueSubpoints = useMemo(() => normalizeValueSubpoints(problem), [problem])
   const grilaOptions = useMemo(() => normalizeGrilaOptions(problem), [problem])
@@ -116,6 +128,7 @@ export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSect
   const [valueInput, setValueInput] = useState("")
   const [grilaSelected, setGrilaSelected] = useState<string>("")
   const [valueSubpointIndex, setValueSubpointIndex] = useState(0)
+  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
 
   const hasVideo =
     typeof problem.youtube_url === "string" && problem.youtube_url.trim() !== ""
@@ -139,6 +152,11 @@ export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSect
   }, [answerType, hasValueAnswer, hasGrilaAnswer, valueInput, grilaSelected])
 
   const barState = !verified ? "verify" : isCorrect ? "correct" : "incorrect"
+  const onContinue = useLearningPathItemCompletion({
+    itemId: currentItemId,
+    lessonId,
+    isLastItem,
+  })
 
   const onVerify = useCallback(() => {
     if (answerType === "value" && hasValueAnswer && currentSubpoint) {
@@ -151,6 +169,7 @@ export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSect
           playSuccessSound()
           setVerified(true)
           setIsCorrect(true)
+          resetFailures()
         } else {
           setValueSubpointIndex(nextIndex)
           setValueInput("")
@@ -158,13 +177,19 @@ export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSect
       } else {
         setVerified(true)
         setIsCorrect(false)
+        registerFailure()
       }
       return
     }
     if (answerType === "grila" && hasGrilaAnswer) {
       const selectedIndex = Number(grilaSelected)
       const correct = selectedIndex === grilaCorrectIndex
-      if (correct) playSuccessSound()
+      if (correct) {
+        playSuccessSound()
+        resetFailures()
+      } else {
+        registerFailure()
+      }
       setVerified(true)
       setIsCorrect(correct)
     }
@@ -178,6 +203,8 @@ export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSect
     valueSubpointIndex,
     valueSubpoints.length,
     grilaCorrectIndex,
+    registerFailure,
+    resetFailures,
   ])
 
   const onRetry = useCallback(() => {
@@ -339,6 +366,8 @@ export function ProblemSection({ problem, nextItemHref, itemIndex }: ProblemSect
           nextItemHref={nextItemHref}
           onVerify={onVerify}
           onRetry={onRetry}
+          onContinue={onContinue}
+          onExplain={() => pushHint("manual")}
           answerSlot={answerSlot}
         />
       )}
