@@ -14,6 +14,7 @@ const CLASS_LABELS: Record<number, string> = {
 }
 
 const DIFFICULTY_STYLES: Record<string, string> = {
+  "Inițiere": "border-sky-500/40 bg-sky-500/15 text-sky-200",
   "Ușor": "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
   "Mediu": "border-amber-500/40 bg-amber-500/15 text-amber-200",
   "Avansat": "border-rose-500/40 bg-rose-500/15 text-rose-200",

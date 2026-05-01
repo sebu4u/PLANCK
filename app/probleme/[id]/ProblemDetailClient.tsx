@@ -6,7 +6,8 @@ import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, List, CheckCircle2, X, Lock, Play, ChevronRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowLeft, List, CheckCircle2, X, Lock, Play, ChevronRight, Loader2 } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -29,6 +30,11 @@ import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
 import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
 import { ProblemAnswerBottomSheet } from "@/components/problems/problem-answer-bottom-sheet"
 import { RecommendedProblemCard } from "@/components/problems/recommended-problem-card"
+import {
+  ensurePhysicsCatalogProblemsCached,
+  getFreshPhysicsCatalogProblems,
+  getPhysicsCatalogSkipGridSkeletonSessionKey,
+} from "@/lib/physics-catalog-problems-cache"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -72,6 +78,20 @@ const difficultyAccentClasses: Record<string, string> = {
   "Ușor": "border-emerald-600/30 bg-emerald-50 text-emerald-800",
   "Mediu": "border-amber-600/30 bg-amber-50 text-amber-800",
   "Avansat": "border-rose-600/30 bg-rose-50 text-rose-800",
+}
+
+const CATALOG_RETURN_HREF_STORAGE_KEY = "catalog:catalogReturnHref"
+
+function getStoredCatalogBackHref() {
+  try {
+    const href = sessionStorage.getItem(CATALOG_RETURN_HREF_STORAGE_KEY)
+    if (href?.startsWith("/probleme")) {
+      return href
+    }
+  } catch {
+    // ignore
+  }
+  return "/probleme"
 }
 
 // Loading skeleton for video content
@@ -212,6 +232,9 @@ export default function ProblemDetailClient({
   /** When set, overrides bubble text for the initial auto-sent message (e.g. bracketed label on card). */
   const [initialInsightDisplayOverride, setInitialInsightDisplayOverride] = useState<string | null>(null)
   const [showCongratulationCloseButton, setShowCongratulationCloseButton] = useState(false)
+  const [storedCatalogBackHref] = useState(getStoredCatalogBackHref)
+  const router = useRouter()
+  const [catalogBackLoading, setCatalogBackLoading] = useState(false)
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
@@ -346,7 +369,29 @@ export default function ProblemDetailClient({
     });
   };
 
-  const catalogBackHref = classroomCatalogHref ?? "/probleme"
+  const catalogBackHref = classroomCatalogHref ?? storedCatalogBackHref
+
+  const handleBackToCatalog = async () => {
+    if (isClassroomEmbed) return
+    if (catalogBackLoading) return
+    setCatalogBackLoading(true)
+    try {
+      await ensurePhysicsCatalogProblemsCached()
+      if (getFreshPhysicsCatalogProblems()?.length) {
+        try {
+          sessionStorage.setItem(getPhysicsCatalogSkipGridSkeletonSessionKey(), "1")
+        } catch {
+          // ignore
+        }
+      }
+      await import("@/components/problem-card")
+      router.prefetch(catalogBackHref)
+      router.push(catalogBackHref)
+    } catch (err) {
+      console.error("[problem-detail] Back to catalog prefetch failed:", err)
+      setCatalogBackLoading(false)
+    }
+  }
 
   return (
     <div
@@ -397,13 +442,30 @@ export default function ProblemDetailClient({
                   <List className="w-4 h-4" />
                   <span>Toate problemele</span>
                 </Button>
-                <Link
-                  href={catalogBackHref}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10]"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>{isClassroomEmbed ? "Înapoi la selectarea problemelor" : "Înapoi la catalog"}</span>
-                </Link>
+                {isClassroomEmbed ? (
+                  <Link
+                    href={catalogBackHref}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10]"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Înapoi la selectarea problemelor</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleBackToCatalog}
+                    disabled={catalogBackLoading}
+                    aria-busy={catalogBackLoading}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10] disabled:pointer-events-none disabled:opacity-60"
+                  >
+                    {catalogBackLoading ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                    ) : (
+                      <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+                    )}
+                    <span>Înapoi la catalog</span>
+                  </button>
+                )}
               </div>
               <div className="hidden sm:flex items-center gap-3 text-sm text-[#2C2F33]/75">
                 {classLabel && (

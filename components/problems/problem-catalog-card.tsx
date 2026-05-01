@@ -56,6 +56,7 @@ const getProblemIcon = (problemId: string): LucideIcon => {
 }
 
 const difficultyToneClasses: Record<string, string> = {
+  "Inițiere": "border-sky-200 bg-sky-50 text-sky-700",
   "Ușor": "border-emerald-200 bg-emerald-50 text-emerald-700",
   "Mediu": "border-amber-200 bg-amber-50 text-amber-700",
   "Avansat": "border-rose-200 bg-rose-50 text-rose-700",
@@ -74,7 +75,10 @@ const getProblemSolvePercentage = (problemId: string, difficulty: string): numbe
   let min = 3
   let max = 92
 
-  if (difficulty === "Ușor") {
+  if (difficulty === "Inițiere") {
+    min = 76
+    max = 95
+  } else if (difficulty === "Ușor") {
     min = 61
     max = 92
   } else if (difficulty === "Mediu") {
@@ -255,6 +259,7 @@ export function ProblemCard({ problem, solved, isLocked = false, picker, assignm
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <Badge
+              variant="outline"
               className={cn(
                 "rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
                 difficultyToneClasses[problem.difficulty] ?? "border-[#0b0c0f]/15 bg-[#f5f4f2] text-[#2c2f33]/75",

@@ -98,8 +98,14 @@ interface ProblemsCatalogSidebarProps {
   lockedClass?: string | null
 }
 
-const difficultyOptions = ["Ușor", "Mediu", "Avansat"] as const
+const difficultyOptions = ["Inițiere", "Ușor", "Mediu", "Avansat"] as const
 const progressOptions: FilterState["progress"][] = ["Nerezolvate", "Rezolvate"]
+const difficultyHoverClasses: Record<(typeof difficultyOptions)[number], string> = {
+  "Inițiere": "hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700",
+  "Ușor": "hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700",
+  "Mediu": "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700",
+  "Avansat": "hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700",
+}
 
 const hasActiveFilters = (filters: FilterState, defaultClass: string | null) =>
   Boolean(filters.search) ||
@@ -177,7 +183,7 @@ export function ProblemsCatalogSidebar({
 
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c2f33]/70">Dificultate</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {difficultyOptions.map((difficulty) => {
               const active = filters.difficulty === difficulty
               return (
@@ -189,7 +195,7 @@ export function ProblemsCatalogSidebar({
                     "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                     active
                       ? "border-[#0b0c0f] bg-[#0b0c0f] text-white"
-                      : "border-[#0b0c0f]/15 bg-white text-[#2c2f33] hover:border-[#0b0c0f]/35",
+                      : cn("border-[#0b0c0f]/15 bg-white text-[#2c2f33]", difficultyHoverClasses[difficulty]),
                   )}
                 >
                   {difficulty}

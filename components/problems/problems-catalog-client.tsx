@@ -1,9 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type CSSProperties, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type CSSProperties, type ReactNode, type UIEvent } from "react"
 import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react"
 import { Problem } from "@/data/problems"
 import { supabase } from "@/lib/supabaseClient"
+import {
+  getFreshPhysicsCatalogProblems,
+  normalizePhysicsCatalogProblems,
+  physicsCatalogClassMap as CLASS_MAP,
+  physicsCatalogProblemsCache,
+  PHYSICS_CATALOG_LIST_CACHE_KEY,
+  PHYSICS_CATALOG_CACHE_DURATION_MS,
+} from "@/lib/physics-catalog-problems-cache"
 import { Button } from "@/components/ui/button"
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from "@/components/ui/pagination"
 import { useAuth } from "@/components/auth-provider"
@@ -25,12 +33,7 @@ import {
 const ProblemCard = lazy(() => import("@/components/problem-card").then((module) => ({ default: module.ProblemCard })))
 
 const PROBLEMS_PER_PAGE = 15
-const CLASS_MAP: Record<number, string> = {
-  9: "a 9-a",
-  10: "a 10-a",
-  11: "a 11-a",
-  12: "a 12-a",
-}
+const MONTHLY_FREE_PROBLEM_COUNT = 50
 
 const CLASS_CARD_COPY: Record<(typeof CATALOG_CLASS_OPTIONS)[number], { title: string; subtitle: string }> = {
   "a 9-a": { title: "Clasa a IX-a", subtitle: "Mecanica si optica de baza" },
@@ -39,14 +42,25 @@ const CLASS_CARD_COPY: Record<(typeof CATALOG_CLASS_OPTIONS)[number], { title: s
   "a 12-a": { title: "Clasa a XII-a", subtitle: "Fizica moderna si nucleara" },
 }
 
-const problemsCache = new Map<string, { data: Problem[]; timestamp: number }>()
-const CACHE_DURATION = 5 * 60 * 1000
-const MONTHLY_FREE_PROBLEM_COUNT = 50
+const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
 const CATALOG_SELECTED_CLASS_KEY = "catalogSelectedClass"
 const CATALOG_FILTERS_KEY = "catalogFilters"
 const CATALOG_PAGE_KEY = "catalogPage"
+const CATALOG_SESSION_STATE_KEY = "catalogSessionState"
+const CATALOG_RETURN_HREF_KEY = "catalogReturnHref"
+const CATALOG_SKIP_GRID_SKELETON_ONCE_KEY = "catalogSkipGridSkeletonOnce"
+const DIFFICULTY_ORDER: Record<string, number> = { "Inițiere": 0, "Ușor": 1, "Mediu": 2, "Avansat": 3 }
 
-const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
+type CatalogSessionState = {
+  filters?: FilterState
+  page?: number
+  selectedClass?: string | null
+  scrollTop?: number
+  visibleProblems?: Problem[] | null
+  visibleFilters?: FilterState
+  visiblePage?: number
+  timestamp: number
+}
 
 function getStorageKey(prefix: string, key: string) {
   return `${prefix}:${key}`
@@ -91,6 +105,50 @@ function loadStoredPage(storageKey: string): number | null {
     return n
   } catch {
     return null
+  }
+}
+
+function loadStoredSelectedClass(storageKey: string): string | null {
+  try {
+    const storedClass = sessionStorage.getItem(storageKey)
+    if (storedClass && CATALOG_CLASS_OPTIONS.includes(storedClass as (typeof CATALOG_CLASS_OPTIONS)[number])) {
+      return storedClass
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+function isCatalogSessionState(value: unknown): value is CatalogSessionState {
+  if (!value || typeof value !== "object") return false
+  const state = value as Record<string, unknown>
+  return typeof state.timestamp === "number"
+}
+
+function loadCatalogSessionState(storageKey: string): CatalogSessionState | null {
+  try {
+    const raw = sessionStorage.getItem(storageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!isCatalogSessionState(parsed)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function saveCatalogSessionState(storageKey: string, patch: Partial<CatalogSessionState>) {
+  try {
+    const current = loadCatalogSessionState(storageKey)
+    const next: CatalogSessionState = {
+      ...(current ?? { timestamp: Date.now() }),
+      ...patch,
+      timestamp: Date.now(),
+    }
+    sessionStorage.setItem(storageKey, JSON.stringify(next))
+  } catch {
+    // ignore storage quota/private mode errors
   }
 }
 
@@ -150,6 +208,18 @@ const mapProblemClassLabel = (problem: Problem): string | null => {
   return null
 }
 
+function areFiltersEqual(a?: FilterState | null, b?: FilterState | null) {
+  if (!a || !b) return false
+  return (
+    a.search === b.search &&
+    a.category === b.category &&
+    a.difficulty === b.difficulty &&
+    a.progress === b.progress &&
+    a.class === b.class &&
+    a.chapter === b.chapter
+  )
+}
+
 interface ProblemsClientProps {
   initialProblems: Problem[]
   initialPage?: number
@@ -181,6 +251,8 @@ export default function ProblemsCatalogClient({
   const filtersStorageKey = getStorageKey(storageKeyPrefix, CATALOG_FILTERS_KEY)
   const pageStorageKey = getStorageKey(storageKeyPrefix, CATALOG_PAGE_KEY)
   const selectedClassStorageKey = getStorageKey(storageKeyPrefix, CATALOG_SELECTED_CLASS_KEY)
+  const sessionStateStorageKey = getStorageKey(storageKeyPrefix, CATALOG_SESSION_STATE_KEY)
+  const returnHrefStorageKey = getStorageKey(storageKeyPrefix, CATALOG_RETURN_HREF_KEY)
 
   const normalizedInitialChapter = typeof initialChapter === "string" ? initialChapter.trim() : ""
 
@@ -193,20 +265,62 @@ export default function ProblemsCatalogClient({
     chapter: normalizedInitialChapter || "Toate",
   }
 
-  const [filters, setFilters] = useState<FilterState>(defaultFilters)
-  const [currentPage, setCurrentPage] = useState(initialPage)
-  const hasRestoredStoredRef = useRef(false)
-  const hasRestoredFiltersRef = useRef(false)
-  const isFirstSaveFiltersRef = useRef(true)
-  const isFirstSavePageRef = useRef(true)
-  const [problems, setProblems] = useState<Problem[]>(initialProblems || [])
-  const [loading, setLoading] = useState(!initialProblems || initialProblems.length === 0)
+  const restoredCatalogStateRef = useRef<CatalogSessionState | null | undefined>(undefined)
+  if (restoredCatalogStateRef.current === undefined) {
+    restoredCatalogStateRef.current = loadCatalogSessionState(sessionStateStorageKey)
+  }
+
+  const skipGridSkeletonOnceStorageKey = getStorageKey(storageKeyPrefix, CATALOG_SKIP_GRID_SKELETON_ONCE_KEY)
+  let skipGridSkeletonOnce = false
+  if (typeof window !== "undefined") {
+    try {
+      if (sessionStorage.getItem(skipGridSkeletonOnceStorageKey) === "1") {
+        sessionStorage.removeItem(skipGridSkeletonOnceStorageKey)
+        skipGridSkeletonOnce = true
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const restoredCatalogState = restoredCatalogStateRef.current
+  const restoredFilters = restoredCatalogState?.filters ?? loadStoredFilters(filtersStorageKey)
+  const restoredPage = restoredCatalogState?.page ?? loadStoredPage(pageStorageKey)
+  const restoredSelectedClass =
+    restoredCatalogState?.selectedClass ?? loadStoredSelectedClass(selectedClassStorageKey)
+  const initialProblemsFromCache = getFreshPhysicsCatalogProblems()
+  const normalizedInitialProblems =
+    initialProblemsFromCache ?? normalizePhysicsCatalogProblems(initialProblems || [])
+  const restoredVisibleProblems =
+    restoredCatalogState?.visibleProblems &&
+    restoredCatalogState.visibleProblems.length > 0 &&
+    areFiltersEqual(restoredCatalogState.visibleFilters, restoredFilters) &&
+    restoredCatalogState.visiblePage === restoredPage
+      ? normalizePhysicsCatalogProblems(restoredCatalogState.visibleProblems)
+      : null
+
+  const hasProblemsSnapshot = normalizedInitialProblems.length > 0
+
+  const [filters, setFilters] = useState<FilterState>(restoredFilters ?? defaultFilters)
+  const [currentPage, setCurrentPage] = useState(restoredPage ?? initialPage)
+  const hasRestoredFiltersRef = useRef(Boolean(restoredFilters))
+  const [problems, setProblems] = useState<Problem[]>(normalizedInitialProblems)
+  const [loading, setLoading] = useState(() => {
+    if (hasProblemsSnapshot) return false
+    if (skipGridSkeletonOnce && (initialProblemsFromCache?.length ?? 0) > 0) return false
+    return true
+  })
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
-  const [visibleProblems, setVisibleProblems] = useState<Problem[]>([])
+  const [visibleProblems, setVisibleProblems] = useState<Problem[] | null>(restoredVisibleProblems)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [selectedClassGate, setSelectedClassGate] = useState<string | null>(null)
+  const [selectedClassGate, setSelectedClassGate] = useState<string | null>(restoredSelectedClass)
   const [sidebarScrolling, setSidebarScrolling] = useState(false)
   const sidebarScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const problemsScrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestProblemsScrollTopRef = useRef(restoredCatalogState?.scrollTop ?? 0)
+  const skipNextVisibleStaggerRef = useRef(Boolean(restoredVisibleProblems))
+  const restoredScrollTopRef = useRef(restoredCatalogState?.scrollTop ?? null)
+  const didRestoreScrollRef = useRef(false)
   const selectedProblemIdsSet = useMemo(
     () => new Set(assignmentPicker?.selectedProblemIds ?? []),
     [assignmentPicker?.selectedProblemIds],
@@ -218,10 +332,9 @@ export default function ProblemsCatalogClient({
   const effectiveUserClass = profileClass ?? selectedClassGate ?? CATALOG_CLASS_OPTIONS[0]
 
   const fetchProblems = useCallback(async () => {
-    const cacheKey = "all-problems"
-    const cached = problemsCache.get(cacheKey)
+    const cached = physicsCatalogProblemsCache.get(PHYSICS_CATALOG_LIST_CACHE_KEY)
 
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    if (cached && Date.now() - cached.timestamp < PHYSICS_CATALOG_CACHE_DURATION_MS) {
       setProblems(cached.data)
       setLoading(false)
       return
@@ -239,7 +352,8 @@ export default function ProblemsCatalogClient({
           ...problem,
           classString: CLASS_MAP[problem.class] || "Toate",
         }))
-        problemsCache.set(cacheKey, { data: mapped, timestamp: Date.now() })
+        const timestamp = Date.now()
+        physicsCatalogProblemsCache.set(PHYSICS_CATALOG_LIST_CACHE_KEY, { data: mapped, timestamp })
         setProblems(mapped)
       }
     } catch (error) {
@@ -250,19 +364,20 @@ export default function ProblemsCatalogClient({
   }, [])
 
   useEffect(() => {
-    if (!initialProblems || initialProblems.length === 0) {
+    if ((!initialProblems || initialProblems.length === 0) && problems.length === 0) {
       fetchProblems()
       return
     }
+    if (!initialProblems || initialProblems.length === 0) {
+      return
+    }
 
-    const normalized = initialProblems.map((problem: any) => ({
-      ...problem,
-      classString: CLASS_MAP[problem.class as number] || problem.classString || "Toate",
-    }))
+    const normalized = normalizePhysicsCatalogProblems(initialProblems)
+    const timestamp = Date.now()
     setProblems(normalized)
     setLoading(false)
-    problemsCache.set("all-problems", { data: normalized, timestamp: Date.now() })
-  }, [fetchProblems, initialProblems])
+    physicsCatalogProblemsCache.set(PHYSICS_CATALOG_LIST_CACHE_KEY, { data: normalized, timestamp })
+  }, [fetchProblems, initialProblems, problems.length])
 
   const fetchSolvedProblems = useCallback(async () => {
     if (!user) {
@@ -301,23 +416,7 @@ export default function ProblemsCatalogClient({
     } catch {
       // ignore storage errors
     }
-  }, [requiresClassSelection])
-
-  // Restore filters and page from sessionStorage when returning to catalog (e.g. from a problem page)
-  useEffect(() => {
-    if (hasRestoredStoredRef.current) return
-    hasRestoredStoredRef.current = true
-
-    const storedFilters = loadStoredFilters(filtersStorageKey)
-    const storedPage = loadStoredPage(pageStorageKey)
-    if (storedFilters) {
-      setFilters(storedFilters)
-      hasRestoredFiltersRef.current = true
-    }
-    if (storedPage != null) {
-      setCurrentPage(storedPage)
-    }
-  }, [filtersStorageKey, pageStorageKey])
+  }, [requiresClassSelection, selectedClassStorageKey])
 
   useEffect(() => {
     if (hasRestoredFiltersRef.current) return
@@ -432,9 +531,15 @@ export default function ProblemsCatalogClient({
     if (noFiltersApplied && !isFreeOnly) {
       const featuredProblemIds = ["M008", "T001", "M033", "T004", "M025", "T014", "M071", "T034"]
       const featuredProblemsMap = new Map<string, Problem>()
+      const initiationProblems: Problem[] = []
       const otherProblems: Problem[] = []
 
       filteredProblems.forEach((problem) => {
+        if (problem.difficulty === "Inițiere") {
+          initiationProblems.push(problem)
+          return
+        }
+
         if (featuredProblemIds.includes(problem.id)) {
           featuredProblemsMap.set(problem.id, problem)
         } else {
@@ -442,7 +547,7 @@ export default function ProblemsCatalogClient({
         }
       })
 
-      const result: Problem[] = []
+      const result: Problem[] = [...initiationProblems]
       featuredProblemIds.forEach((id) => {
         const problem = featuredProblemsMap.get(id)
         if (problem) result.push(problem)
@@ -451,7 +556,6 @@ export default function ProblemsCatalogClient({
       return result
     }
 
-    const difficultyOrder: Record<string, number> = { "Ușor": 1, "Mediu": 2, "Avansat": 3 }
     const hasAnyYoutube = filteredProblems.some((p) => typeof p.youtube_url === "string" && p.youtube_url.trim() !== "")
 
     return [...filteredProblems].sort((a, b) => {
@@ -460,6 +564,10 @@ export default function ProblemsCatalogClient({
         const bFree = monthlyFreeSet.has(b.id)
         if (aFree !== bFree) return aFree ? -1 : 1
       }
+
+      const aRank = DIFFICULTY_ORDER[a.difficulty] ?? 99
+      const bRank = DIFFICULTY_ORDER[b.difficulty] ?? 99
+      if (aRank !== bRank) return aRank - bRank
 
       const aSolved = solvedProblems.includes(a.id)
       const bSolved = solvedProblems.includes(b.id)
@@ -470,10 +578,6 @@ export default function ProblemsCatalogClient({
         const bHas = typeof b.youtube_url === "string" && b.youtube_url.trim() !== ""
         if (aHas !== bHas) return aHas ? -1 : 1
       }
-
-      const aRank = difficultyOrder[a.difficulty] ?? 99
-      const bRank = difficultyOrder[b.difficulty] ?? 99
-      if (aRank !== bRank) return aRank - bRank
 
       const aTime = new Date(a.created_at).getTime()
       const bTime = new Date(b.created_at).getTime()
@@ -489,6 +593,12 @@ export default function ProblemsCatalogClient({
   }, [currentPage, sortedProblems])
 
   useEffect(() => {
+    if (skipNextVisibleStaggerRef.current) {
+      skipNextVisibleStaggerRef.current = false
+      setVisibleProblems(paginationData.paginatedProblems)
+      return
+    }
+
     setVisibleProblems(paginationData.paginatedProblems.slice(0, 4))
     const timer = setTimeout(() => {
       setVisibleProblems(paginationData.paginatedProblems)
@@ -496,27 +606,82 @@ export default function ProblemsCatalogClient({
     return () => clearTimeout(timer)
   }, [paginationData.paginatedProblems])
 
+  const displayedProblems = visibleProblems ?? paginationData.paginatedProblems
+
+  useEffect(() => {
+    if (!displayedProblems.length) return
+    saveCatalogSessionState(sessionStateStorageKey, {
+      visibleProblems: displayedProblems,
+      visibleFilters: filters,
+      visiblePage: currentPage,
+    })
+  }, [currentPage, displayedProblems, filters, sessionStateStorageKey])
+
+  const resetProblemsScrollPersistence = useCallback(() => {
+    if (problemsScrollSaveTimeoutRef.current) {
+      clearTimeout(problemsScrollSaveTimeoutRef.current)
+      problemsScrollSaveTimeoutRef.current = null
+    }
+
+    restoredScrollTopRef.current = 0
+    latestProblemsScrollTopRef.current = 0
+    didRestoreScrollRef.current = true
+
+    const scrollContainer = document.querySelector("[data-problems-scroll]")
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: "auto" })
+    } else {
+      window.scrollTo({ top: 0, behavior: "auto" })
+    }
+
+    saveCatalogSessionState(sessionStateStorageKey, { scrollTop: 0 })
+  }, [sessionStateStorageKey])
+
   const handleFilterChange = useCallback((nextFilters: FilterState) => {
+    resetProblemsScrollPersistence()
     setFilters(nextFilters)
     setCurrentPage(1)
+    setVisibleProblems(null)
     saveStoredPage(pageStorageKey, 1)
-  }, [pageStorageKey])
+    saveCatalogSessionState(sessionStateStorageKey, {
+      filters: nextFilters,
+      page: 1,
+      scrollTop: 0,
+      visibleProblems: null,
+      visibleFilters: nextFilters,
+      visiblePage: 1,
+    })
+  }, [pageStorageKey, resetProblemsScrollPersistence, sessionStateStorageKey])
+
+  const handlePageChange = useCallback((nextPage: number | ((page: number) => number)) => {
+    resetProblemsScrollPersistence()
+    setVisibleProblems(null)
+    setCurrentPage(nextPage)
+  }, [resetProblemsScrollPersistence])
 
   useEffect(() => {
-    if (isFirstSaveFiltersRef.current) {
-      isFirstSaveFiltersRef.current = false
-      return
-    }
     saveStoredFilters(filtersStorageKey, filters)
-  }, [filters, filtersStorageKey])
+    saveCatalogSessionState(sessionStateStorageKey, { filters })
+  }, [filters, filtersStorageKey, sessionStateStorageKey])
 
   useEffect(() => {
-    if (isFirstSavePageRef.current) {
-      isFirstSavePageRef.current = false
-      return
-    }
     saveStoredPage(pageStorageKey, currentPage)
-  }, [currentPage, pageStorageKey])
+    saveCatalogSessionState(sessionStateStorageKey, { page: currentPage })
+  }, [currentPage, pageStorageKey, sessionStateStorageKey])
+
+  useEffect(() => {
+    saveCatalogSessionState(sessionStateStorageKey, { selectedClass: selectedClassGate })
+  }, [selectedClassGate, sessionStateStorageKey])
+
+  useEffect(() => {
+    try {
+      const href = `${window.location.pathname}${window.location.search}`
+      sessionStorage.setItem(returnHrefStorageKey, href)
+      saveCatalogSessionState(sessionStateStorageKey, { page: currentPage, filters })
+    } catch {
+      // ignore
+    }
+  }, [currentPage, filters, returnHrefStorageKey, sessionStateStorageKey])
 
   useEffect(() => {
     if (!didMountRef.current) {
@@ -526,10 +691,35 @@ export default function ProblemsCatalogClient({
     const scrollContainer = document.querySelector('[data-problems-scroll]')
     if (scrollContainer) {
       scrollContainer.scrollTo({ top: 0, behavior: "auto" })
+      latestProblemsScrollTopRef.current = 0
+      saveCatalogSessionState(sessionStateStorageKey, { scrollTop: 0 })
     } else {
       window.scrollTo({ top: 0, behavior: "auto" })
     }
-  }, [currentPage])
+  }, [currentPage, sessionStateStorageKey])
+
+  useEffect(() => {
+    if (didRestoreScrollRef.current) return
+    if (!catalogReady || loading || displayedProblems.length === 0) return
+    const scrollTop = restoredScrollTopRef.current
+    if (typeof scrollTop !== "number" || scrollTop <= 0) {
+      didRestoreScrollRef.current = true
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const scrollContainer = document.querySelector('[data-problems-scroll]')
+      if (scrollContainer) {
+        scrollContainer.scrollTo({ top: scrollTop, behavior: "auto" })
+      } else {
+        window.scrollTo({ top: scrollTop, behavior: "auto" })
+      }
+      latestProblemsScrollTopRef.current = scrollTop
+      didRestoreScrollRef.current = true
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [catalogReady, displayedProblems.length, loading])
 
   const progressByClass = useMemo<Record<string, SidebarClassProgress>>(() => {
     const solvedSet = new Set(solvedProblems)
@@ -571,16 +761,28 @@ export default function ProblemsCatalogClient({
   }, [problems, solvedProblems])
 
   const selectClassAndOpenCatalog = (classValue: (typeof CATALOG_CLASS_OPTIONS)[number]) => {
-    setSelectedClassGate(classValue)
-    setFilters((prev) => ({
-      ...prev,
+    const nextFilters = {
+      ...filters,
       class: classValue,
       chapter: "Toate",
-    }))
+    }
+    resetProblemsScrollPersistence()
+    setSelectedClassGate(classValue)
+    setFilters(nextFilters)
     setCurrentPage(1)
+    setVisibleProblems(null)
 
     try {
       sessionStorage.setItem(selectedClassStorageKey, classValue)
+      saveCatalogSessionState(sessionStateStorageKey, {
+        filters: nextFilters,
+        page: 1,
+        selectedClass: classValue,
+        scrollTop: 0,
+        visibleProblems: null,
+        visibleFilters: nextFilters,
+        visiblePage: 1,
+      })
     } catch {
       // ignore storage errors
     }
@@ -601,6 +803,26 @@ export default function ProblemsCatalogClient({
       sidebarScrollTimeoutRef.current = null
     }, 600)
   }, [])
+
+  const handleProblemsScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop
+    latestProblemsScrollTopRef.current = scrollTop
+    if (problemsScrollSaveTimeoutRef.current) {
+      clearTimeout(problemsScrollSaveTimeoutRef.current)
+    }
+    problemsScrollSaveTimeoutRef.current = setTimeout(() => {
+      saveCatalogSessionState(sessionStateStorageKey, { scrollTop })
+      problemsScrollSaveTimeoutRef.current = null
+    }, 120)
+  }, [sessionStateStorageKey])
+
+  useEffect(() => {
+    return () => {
+      if (sidebarScrollTimeoutRef.current) clearTimeout(sidebarScrollTimeoutRef.current)
+      if (problemsScrollSaveTimeoutRef.current) clearTimeout(problemsScrollSaveTimeoutRef.current)
+      saveCatalogSessionState(sessionStateStorageKey, { scrollTop: latestProblemsScrollTopRef.current })
+    }
+  }, [sessionStateStorageKey])
 
   return (
     <>
@@ -687,6 +909,7 @@ export default function ProblemsCatalogClient({
                 isEmbedded ? "overflow-visible" : "h-full overflow-y-auto",
               )}
               data-problems-scroll
+              onScroll={handleProblemsScroll}
             >
               <div className="pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px] pt-6 pb-12 space-y-6">
           {!catalogReady ? (
@@ -820,16 +1043,16 @@ export default function ProblemsCatalogClient({
                 </div>
 
                 <div className="relative z-10">
-                  {loading ? (
+                  {loading && !skipGridSkeletonOnce ? (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {Array.from({ length: 8 }).map((_, index) => (
                         <ProblemCardSkeleton key={index} />
                       ))}
                     </div>
-                  ) : visibleProblems.length > 0 ? (
+                  ) : displayedProblems.length > 0 ? (
                     <>
                       <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {visibleProblems.map((problem) => {
+                        {displayedProblems.map((problem) => {
                           const isFreeOnly = isFree && !isPaid
                           const canAccess = ALLOW_ALL_PHYSICS_PROBLEMS
                             ? true
@@ -837,7 +1060,10 @@ export default function ProblemsCatalogClient({
                           const isLocked = ALLOW_ALL_PHYSICS_PROBLEMS ? false : isFreeOnly && !canAccess
 
                           return (
-                            <Suspense key={problem.id} fallback={<ProblemCardSkeleton />}>
+                            <Suspense
+                              key={problem.id}
+                              fallback={skipGridSkeletonOnce ? null : <ProblemCardSkeleton />}
+                            >
                               <ProblemCard
                                 problem={problem}
                                 solved={solvedProblems.includes(problem.id)}
@@ -866,7 +1092,7 @@ export default function ProblemsCatalogClient({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                                onClick={() => handlePageChange((page) => Math.max(1, page - 1))}
                                 disabled={currentPage === 1}
                                 className="rounded-full border-[#0b0c0f]/20 bg-white text-[#2c2f33] hover:bg-[#f5f4f2] disabled:opacity-40"
                               >
@@ -886,7 +1112,7 @@ export default function ProblemsCatalogClient({
                                       <Button
                                         variant={i === currentPage ? "default" : "outline"}
                                         size="sm"
-                                        onClick={() => setCurrentPage(i)}
+                                        onClick={() => handlePageChange(i)}
                                         className={cn(
                                           "rounded-full border-[#0b0c0f]/20 bg-white text-[#2c2f33] hover:bg-[#f5f4f2]",
                                           i === currentPage && "border-[#0b0c0f] bg-[#0b0c0f] text-white hover:bg-[#0b0c0f]",
@@ -904,7 +1130,7 @@ export default function ProblemsCatalogClient({
                                       <Button
                                         variant={1 === currentPage ? "default" : "outline"}
                                         size="sm"
-                                        onClick={() => setCurrentPage(1)}
+                                        onClick={() => handlePageChange(1)}
                                         className={cn(
                                           "rounded-full border-[#0b0c0f]/20 bg-white text-[#2c2f33] hover:bg-[#f5f4f2]",
                                           1 === currentPage && "border-[#0b0c0f] bg-[#0b0c0f] text-white hover:bg-[#0b0c0f]",
@@ -927,7 +1153,7 @@ export default function ProblemsCatalogClient({
                                       <Button
                                         variant={i === currentPage ? "default" : "outline"}
                                         size="sm"
-                                        onClick={() => setCurrentPage(i)}
+                                        onClick={() => handlePageChange(i)}
                                         className={cn(
                                           "rounded-full border-[#0b0c0f]/20 bg-white text-[#2c2f33] hover:bg-[#f5f4f2]",
                                           i === currentPage && "border-[#0b0c0f] bg-[#0b0c0f] text-white hover:bg-[#0b0c0f]",
@@ -948,7 +1174,7 @@ export default function ProblemsCatalogClient({
                                     <Button
                                       variant={totalPages === currentPage ? "default" : "outline"}
                                       size="sm"
-                                      onClick={() => setCurrentPage(totalPages)}
+                                      onClick={() => handlePageChange(totalPages)}
                                       className={cn(
                                         "rounded-full border-[#0b0c0f]/20 bg-white text-[#2c2f33] hover:bg-[#f5f4f2]",
                                         totalPages === currentPage &&
@@ -968,7 +1194,7 @@ export default function ProblemsCatalogClient({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPage((page) => Math.min(paginationData.totalPages, page + 1))}
+                                onClick={() => handlePageChange((page) => Math.min(paginationData.totalPages, page + 1))}
                                 disabled={currentPage === paginationData.totalPages}
                                 className="rounded-full border-[#0b0c0f]/20 bg-white text-[#2c2f33] hover:bg-[#f5f4f2] disabled:opacity-40"
                               >

@@ -17,6 +17,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 const SUPPORTED_DIFFICULTIES: Record<string, string> = {
+  "inițiere": "Inițiere",
+  "initiere": "Inițiere",
   "ușor": "Ușor",
   "usor": "Ușor",
   "mediu": "Mediu",

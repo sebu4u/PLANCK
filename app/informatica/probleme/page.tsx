@@ -25,6 +25,8 @@ export const revalidate = 21600
 
 const PAGE_SIZE = 12
 const SUPPORTED_DIFFICULTIES: Record<string, string> = {
+  "inițiere": "Inițiere",
+  "initiere": "Inițiere",
   "ușor": "Ușor",
   "usor": "Ușor",
   "mediu": "Mediu",

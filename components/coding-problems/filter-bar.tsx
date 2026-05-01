@@ -36,6 +36,7 @@ const CLASS_OPTIONS: Array<{ value: ClassFilterValue; label: string }> = [
 
 const DIFFICULTY_OPTIONS: Array<{ value: DifficultyFilterValue; label: string }> = [
   { value: "Toate", label: "Toate dificultățile" },
+  { value: "Inițiere", label: "Inițiere" },
   { value: "Ușor", label: "Ușor" },
   { value: "Mediu", label: "Mediu" },
   { value: "Avansat", label: "Avansat" },

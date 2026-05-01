@@ -8,7 +8,7 @@ export interface CodingProblem {
   input_format?: string | null;
   output_format?: string | null;
   constraints_markdown?: string | null;
-  difficulty: "Ușor" | "Mediu" | "Avansat" | "Concurs" | string;
+  difficulty: "Inițiere" | "Ușor" | "Mediu" | "Avansat" | "Concurs" | string;
   class: number;
   chapter: string;
   points: number;
@@ -57,6 +57,7 @@ export interface CodingProblemsApiResponse {
 export type ClassFilterValue = "Toate" | 9 | 10 | 11 | 12;
 export type DifficultyFilterValue =
   | "Toate"
+  | "Inițiere"
   | "Ușor"
   | "Mediu"
   | "Avansat"
