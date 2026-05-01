@@ -36,6 +36,7 @@ import {
   getPhysicsCatalogSkipGridSkeletonSessionKey,
 } from "@/lib/physics-catalog-problems-cache"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
+import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -426,10 +427,15 @@ export default function ProblemDetailClient({
               : "lg:h-full lg:overflow-y-auto lg:overflow-x-hidden lg:rounded-xl",
           )}
         >
+        {!isClassroomEmbed ? (
+          <div className="pt-16 lg:hidden">
+            <ProblemsPwaInstallBanner />
+          </div>
+        ) : null}
         <div
           className={cn(
             "px-4 sm:px-6 lg:px-12 pb-16",
-            isClassroomEmbed ? "pt-4" : "pt-20 lg:pt-8",
+            isClassroomEmbed ? "pt-4" : "pt-4 lg:pt-8",
             isMobile && "pb-28",
           )}
         >

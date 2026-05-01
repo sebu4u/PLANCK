@@ -36,7 +36,7 @@ export function DashboardMobileBottomNav({ userGrade }: DashboardMobileBottomNav
       className="pointer-events-none fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[280] px-3 lg:hidden"
       aria-label="Navigare rapidă dashboard"
     >
-      <div className="pointer-events-auto mx-auto flex max-w-md items-center gap-1 rounded-[28px] border border-white/70 bg-white/88 p-1.5 shadow-[0_16px_45px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.03] backdrop-blur-xl">
+      <div className="pointer-events-auto mx-auto flex max-w-md items-center gap-1 rounded-[28px] border border-gray-200 bg-white p-1.5 shadow-[0_16px_45px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04]">
         {items.map(({ href, label, icon, prefix }) => {
           const active = isRouteActive(prefix)
 

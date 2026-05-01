@@ -9,6 +9,7 @@ import { generateMetadata } from "@/lib/metadata"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
+import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
 
 export const revalidate = 21600
 
@@ -71,6 +72,7 @@ export default async function ProblemsPage({
             initialProblems={initialProblems as any}
             initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
             initialChapter={initialChapter}
+            topSlot={<ProblemsPwaInstallBanner />}
           />
         </div>
       </CatalogThemeBackground>

@@ -9,6 +9,7 @@ import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
+import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
 
 const PROBLEMS_PER_PAGE = 8
 const PREGENERATED_PAGES = 10
@@ -73,6 +74,7 @@ export default async function ProblemsPaginatedPage({ params }: { params: Promis
             initialProblems={initialProblems as any}
             initialPage={pageNum}
             initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
+            topSlot={<ProblemsPwaInstallBanner />}
           />
         </div>
       </CatalogThemeBackground>

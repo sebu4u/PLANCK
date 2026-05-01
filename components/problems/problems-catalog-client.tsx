@@ -227,6 +227,7 @@ interface ProblemsClientProps {
   initialChapter?: string
   layoutVariant?: "fullPage" | "embedded"
   storageKeyPrefix?: string
+  topSlot?: ReactNode
   assignmentPicker?: {
     selectedProblemIds: string[]
     onAddProblem: (problemId: string) => void
@@ -241,6 +242,7 @@ export default function ProblemsCatalogClient({
   initialChapter,
   layoutVariant = "fullPage",
   storageKeyPrefix = "catalog",
+  topSlot,
   assignmentPicker,
 }: ProblemsClientProps) {
   const { user, profile } = useAuth()
@@ -911,6 +913,7 @@ export default function ProblemsCatalogClient({
               data-problems-scroll
               onScroll={handleProblemsScroll}
             >
+              {topSlot}
               <div className="pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px] pt-6 pb-12 space-y-6">
           {!catalogReady ? (
             <section className="flex min-h-[56vh] items-center justify-center py-4">
