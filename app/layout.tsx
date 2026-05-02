@@ -125,7 +125,7 @@ export default function RootLayout({
                 className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
                 aria-label="Versiunea site-ului"
               >
-                v1.02.30
+                v1.04.52
               </div>
             </AnalyticsProvider>
           </AuthProvider>

@@ -232,38 +232,16 @@ export default async function InvataLessonItemPage({
           </div>
         </div>
       ) : isSimulation ? (
-        <section className="mt-4 sm:mt-6 sm:overflow-hidden sm:rounded-[30px] sm:border sm:border-[#ebe4f1] sm:bg-white sm:shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
-          <header className="px-1 pb-3 sm:border-b sm:border-[#eee7f3] sm:bg-[linear-gradient(180deg,#fcfbfe_0%,#f7f4fb_100%)] sm:px-7 sm:py-5">
-            <div className="flex items-start gap-3 sm:gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_6px_12px_rgba(124,58,237,0.24)] sm:h-12 sm:w-12 sm:rounded-2xl sm:shadow-[0_8px_16px_rgba(124,58,237,0.24)]">
-                <ItemIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8b6fac] sm:text-xs sm:tracking-[0.18em]">
-                  Pasul {parsedIndex} din {items.length}
-                </p>
-                <h1 className="mt-1.5 text-xl font-bold leading-tight text-[#111111] sm:mt-2 sm:text-3xl">
-                  {item.title || ITEM_TYPE_LABEL[item.item_type]}
-                </h1>
-                <p className="mt-1.5 text-xs text-[#6f657b] sm:mt-2 sm:text-sm">
-                  {ITEM_TYPE_LABEL[item.item_type]} din lecția {lesson.title}
-                </p>
-              </div>
-            </div>
-          </header>
-
-          <div className="px-0 py-0 sm:px-7 sm:py-6">
-            <LearningPathItemBody
-              item={item}
-              sourceLesson={sourceLesson}
-              sourceProblem={sourceProblem}
-              sourceQuizQuestion={sourceQuizQuestion}
-              nextItemHref={nextItemHref}
-              lessonId={lesson.id}
-              isLastItem={parsedIndex >= items.length}
-            />
-          </div>
+        <section className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10">
+          <LearningPathItemBody
+            item={item}
+            sourceLesson={sourceLesson}
+            sourceProblem={sourceProblem}
+            sourceQuizQuestion={sourceQuizQuestion}
+            nextItemHref={nextItemHref}
+            lessonId={lesson.id}
+            isLastItem={parsedIndex >= items.length}
+          />
         </section>
       ) : (
         <section className="mt-6 overflow-hidden rounded-[30px] border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)]">

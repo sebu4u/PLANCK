@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Traiectorii</title>
+  <title>Căderea liberă</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --text: #292929;
-      --muted: #777777;
       --line: #e8e8ec;
       --accent: #8043f0;
     }
@@ -25,10 +24,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    body {
-      display: grid;
-      place-items: stretch;
-    }
+    body { display: grid; place-items: stretch; }
 
     .sim {
       width: 100%;
@@ -86,14 +82,14 @@
 </head>
 <body>
   <main class="sim">
-    <nav class="tabs" aria-label="Tipuri de traiectorii">
-      <button class="tab active" type="button" data-type="rectilinear">Dreaptă</button>
-      <button class="tab" type="button" data-type="parabolic">Parabolă</button>
-      <button class="tab" type="button" data-type="circular">Cerc</button>
-      <button class="tab" type="button" data-type="helicoidal">Elice</button>
+    <nav class="tabs" aria-label="Cădere liberă">
+      <button class="tab active" type="button" data-type="earth">Pământ</button>
+      <button class="tab" type="button" data-type="moon">Lună</button>
+      <button class="tab" type="button" data-type="jupiter">Jupiter</button>
+      <button class="tab" type="button" data-type="vacuum">Vid</button>
     </nav>
 
-    <section class="stage" aria-label="Simulare traiectorie">
+    <section class="stage" aria-label="Simulare cădere liberă">
       <canvas id="canvas"></canvas>
     </section>
   </main>
@@ -104,33 +100,33 @@
     const tabs = Array.from(document.querySelectorAll(".tab"));
 
     const TYPES = {
-      rectilinear: {
-        name: "Dreaptă",
-        text: "corpul merge pe aceeași direcție.",
-        color: "#292929",
-        trail: "rgba(41,41,41,0.32)"
-      },
-      parabolic: {
-        name: "Parabolă",
-        text: "specifică unui proiectil.",
+      earth: {
+        name: "Cădere pe Pământ",
+        text: "viteza crește uniform sub acțiunea gravitației.",
         color: "#8043f0",
-        trail: "rgba(128,67,240,0.36)"
+        g: 1
       },
-      circular: {
-        name: "Cerc",
-        text: "distanța față de centru rămâne constantă.",
+      moon: {
+        name: "Cădere pe Lună",
+        text: "accelerația este mai mică, deci căderea e mai lentă.",
         color: "#292929",
-        trail: "rgba(41,41,41,0.26)"
+        g: 0.38
       },
-      helicoidal: {
-        name: "Elice",
-        text: "rotație plus deplasare înainte.",
+      jupiter: {
+        name: "Cădere pe Jupiter",
+        text: "accelerația mare face corpul să cadă mai repede.",
         color: "#8043f0",
-        trail: "rgba(128,67,240,0.34)"
+        g: 1.55
+      },
+      vacuum: {
+        name: "În vid",
+        text: "toate corpurile cad la fel, fără rezistența aerului.",
+        color: "#292929",
+        g: 1
       }
     };
 
-    let type = "rectilinear";
+    let type = "earth";
     let time = 0;
     let paused = false;
     let trail = [];
@@ -140,7 +136,7 @@
 
     function postState() {
       window.parent.postMessage({
-        type: "trajectory-simulation-state",
+        type: "learning-path-simulation-state",
         name: TYPES[type].name,
         text: TYPES[type].text,
         paused
@@ -158,63 +154,46 @@
       trail = [];
     }
 
-    function position(kind, t) {
-      const cx = cssW / 2;
-      const cy = cssH / 2;
-      const margin = Math.max(18, cssW * 0.08);
-
-      if (kind === "rectilinear") {
-        const span = cssW - margin * 2;
-        return { x: margin + ((t * 0.22 * span) % span), y: cy };
-      }
-
-      if (kind === "parabolic") {
-        const p = (t * 0.18) % 1;
-        const arc = Math.min(cssH * 0.42, cssW * 0.24);
-        return {
-          x: margin + p * (cssW - margin * 2),
-          y: cy + arc * 0.5 - arc * 4 * p * (1 - p)
-        };
-      }
-
-      if (kind === "circular") {
-        const r = Math.min(cssW, cssH) * 0.3;
-        return { x: cx + r * Math.cos(t), y: cy + r * Math.sin(t) };
-      }
-
-      const r = Math.min(cssH * 0.22, 42);
-      const span = cssW - margin * 2;
+    function stateAt(t) {
+      const top = Math.max(20, cssH * 0.12);
+      const ground = cssH - Math.max(20, cssH * 0.14);
+      const fallTime = 2.15 / Math.sqrt(TYPES[type].g);
+      const p = (t % fallTime) / fallTime;
+      const eased = p * p;
       return {
-        x: margin + ((t * 0.18 * span) % span),
-        y: cy + r * Math.sin(t * 2.4)
+        x: cssW * 0.5,
+        y: top + eased * (ground - top),
+        p,
+        ground,
+        speed: p * TYPES[type].g
       };
     }
 
-    function drawGrid() {
-      const step = cssW < 360 ? 34 : 42;
+    function drawGrid(ground) {
       ctx.strokeStyle = "rgba(41,41,41,0.08)";
       ctx.lineWidth = 1;
-      for (let x = step; x < cssW; x += step) {
+      for (let y = 24; y < ground; y += cssH < 220 ? 28 : 34) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, cssH);
+        ctx.moveTo(16, y);
+        ctx.lineTo(cssW - 16, y);
         ctx.stroke();
       }
-      for (let y = step; y < cssH; y += step) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(cssW, y);
-        ctx.stroke();
-      }
+
+      ctx.strokeStyle = "rgba(41,41,41,0.3)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(18, ground);
+      ctx.lineTo(cssW - 18, ground);
+      ctx.stroke();
     }
 
     function drawTrail() {
-      const max = cssW < 360 ? 64 : 90;
+      const max = cssH < 220 ? 28 : 38;
       while (trail.length > max) trail.shift();
       if (trail.length < 2) return;
 
-      ctx.strokeStyle = TYPES[type].trail;
-      ctx.lineWidth = cssW < 360 ? 3 : 3.5;
+      ctx.strokeStyle = TYPES[type].color === "#8043f0" ? "rgba(128,67,240,0.32)" : "rgba(41,41,41,0.24)";
+      ctx.lineWidth = 3;
       ctx.lineCap = "round";
       ctx.beginPath();
       trail.forEach((point, index) => {
@@ -224,31 +203,53 @@
       ctx.stroke();
     }
 
-    function drawBody(point) {
-      const size = cssW < 360 ? 6 : 7;
+    function drawBody(state) {
+      const color = TYPES[type].color;
+      const arrowLength = Math.min(cssH * 0.2, 20 + state.speed * 44);
+
       ctx.beginPath();
-      ctx.arc(point.x, point.y, size + 6, 0, Math.PI * 2);
-      ctx.fillStyle = TYPES[type].trail;
+      ctx.moveTo(state.x + 28, state.y - 4);
+      ctx.lineTo(state.x + 28, state.y + arrowLength);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(state.x + 28, state.y + arrowLength);
+      ctx.lineTo(state.x + 23, state.y + arrowLength - 8);
+      ctx.lineTo(state.x + 33, state.y + arrowLength - 8);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      ctx.fillStyle = color;
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText("g", state.x + 37, state.y + Math.min(arrowLength, 42));
+
+      ctx.beginPath();
+      ctx.arc(state.x, state.y, 15, 0, Math.PI * 2);
+      ctx.fillStyle = color === "#8043f0" ? "rgba(128,67,240,0.16)" : "rgba(41,41,41,0.12)";
       ctx.fill();
 
       ctx.beginPath();
-      ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
-      ctx.fillStyle = TYPES[type].color;
+      ctx.arc(state.x, state.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = color;
       ctx.fill();
     }
 
     function frame() {
       if (!paused) time += 0.016;
 
+      const state = stateAt(time);
       ctx.clearRect(0, 0, cssW, cssH);
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, cssW, cssH);
-      drawGrid();
+      drawGrid(state.ground);
 
-      const point = position(type, time);
-      if (!paused || trail.length === 0) trail.push(point);
+      if (!paused || trail.length === 0) trail.push({ x: state.x, y: state.y });
       drawTrail();
-      drawBody(point);
+      drawBody(state);
 
       requestAnimationFrame(frame);
     }
@@ -267,7 +268,8 @@
 
     window.addEventListener("message", (event) => {
       const data = event.data;
-      if (!data || typeof data !== "object" || data.type !== "trajectory-simulation-set-paused") return;
+      if (!data || typeof data !== "object") return;
+      if (data.type !== "learning-path-simulation-set-paused" && data.type !== "trajectory-simulation-set-paused") return;
       paused = Boolean(data.paused);
       postState();
     });

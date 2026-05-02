@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Traiectorii</title>
+  <title>Viteza</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --text: #292929;
-      --muted: #777777;
       --line: #e8e8ec;
       --accent: #8043f0;
     }
@@ -25,10 +24,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    body {
-      display: grid;
-      place-items: stretch;
-    }
+    body { display: grid; place-items: stretch; }
 
     .sim {
       width: 100%;
@@ -86,14 +82,14 @@
 </head>
 <body>
   <main class="sim">
-    <nav class="tabs" aria-label="Tipuri de traiectorii">
-      <button class="tab active" type="button" data-type="rectilinear">Dreaptă</button>
-      <button class="tab" type="button" data-type="parabolic">Parabolă</button>
-      <button class="tab" type="button" data-type="circular">Cerc</button>
-      <button class="tab" type="button" data-type="helicoidal">Elice</button>
+    <nav class="tabs" aria-label="Tipuri de viteză">
+      <button class="tab active" type="button" data-type="constant">Constantă</button>
+      <button class="tab" type="button" data-type="fast">Rapidă</button>
+      <button class="tab" type="button" data-type="slow">Lentă</button>
+      <button class="tab" type="button" data-type="variable">Variabilă</button>
     </nav>
 
-    <section class="stage" aria-label="Simulare traiectorie">
+    <section class="stage" aria-label="Simulare viteză">
       <canvas id="canvas"></canvas>
     </section>
   </main>
@@ -104,43 +100,43 @@
     const tabs = Array.from(document.querySelectorAll(".tab"));
 
     const TYPES = {
-      rectilinear: {
-        name: "Dreaptă",
-        text: "corpul merge pe aceeași direcție.",
+      constant: {
+        name: "Viteză constantă",
+        text: "poziția crește cu pași egali în timp.",
         color: "#292929",
-        trail: "rgba(41,41,41,0.32)"
+        speed: 0.24
       },
-      parabolic: {
-        name: "Parabolă",
-        text: "specifică unui proiectil.",
+      fast: {
+        name: "Viteză mare",
+        text: "corpul parcurge distanțe mai mari în același timp.",
         color: "#8043f0",
-        trail: "rgba(128,67,240,0.36)"
+        speed: 0.42
       },
-      circular: {
-        name: "Cerc",
-        text: "distanța față de centru rămâne constantă.",
+      slow: {
+        name: "Viteză mică",
+        text: "corpul se deplasează cu pași mai mici.",
         color: "#292929",
-        trail: "rgba(41,41,41,0.26)"
+        speed: 0.12
       },
-      helicoidal: {
-        name: "Elice",
-        text: "rotație plus deplasare înainte.",
+      variable: {
+        name: "Viteză variabilă",
+        text: "pașii nu mai sunt egali de la un moment la altul.",
         color: "#8043f0",
-        trail: "rgba(128,67,240,0.34)"
+        speed: 0.24
       }
     };
 
-    let type = "rectilinear";
+    let type = "constant";
     let time = 0;
     let paused = false;
-    let trail = [];
+    let samples = [];
     let cssW = 0;
     let cssH = 0;
     let dpr = 1;
 
     function postState() {
       window.parent.postMessage({
-        type: "trajectory-simulation-state",
+        type: "learning-path-simulation-state",
         name: TYPES[type].name,
         text: TYPES[type].text,
         paused
@@ -155,85 +151,85 @@
       canvas.width = Math.floor(cssW * dpr);
       canvas.height = Math.floor(cssH * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      trail = [];
+      samples = [];
     }
 
-    function position(kind, t) {
-      const cx = cssW / 2;
-      const cy = cssH / 2;
-      const margin = Math.max(18, cssW * 0.08);
+    function speedAt(t) {
+      if (type !== "variable") return TYPES[type].speed;
+      return 0.15 + 0.22 * (0.5 + 0.5 * Math.sin(t * 1.6));
+    }
 
-      if (kind === "rectilinear") {
-        const span = cssW - margin * 2;
-        return { x: margin + ((t * 0.22 * span) % span), y: cy };
-      }
-
-      if (kind === "parabolic") {
-        const p = (t * 0.18) % 1;
-        const arc = Math.min(cssH * 0.42, cssW * 0.24);
-        return {
-          x: margin + p * (cssW - margin * 2),
-          y: cy + arc * 0.5 - arc * 4 * p * (1 - p)
-        };
-      }
-
-      if (kind === "circular") {
-        const r = Math.min(cssW, cssH) * 0.3;
-        return { x: cx + r * Math.cos(t), y: cy + r * Math.sin(t) };
-      }
-
-      const r = Math.min(cssH * 0.22, 42);
+    function getPosition(t) {
+      const margin = Math.max(20, cssW * 0.08);
       const span = cssW - margin * 2;
+      const phase = type === "variable"
+        ? (t * 0.24 + 0.08 * Math.sin(t * 1.6)) % 1
+        : (t * TYPES[type].speed) % 1;
       return {
-        x: margin + ((t * 0.18 * span) % span),
-        y: cy + r * Math.sin(t * 2.4)
+        x: margin + phase * span,
+        y: cssH * 0.52
       };
     }
 
     function drawGrid() {
-      const step = cssW < 360 ? 34 : 42;
+      const y = cssH * 0.52;
       ctx.strokeStyle = "rgba(41,41,41,0.08)";
       ctx.lineWidth = 1;
-      for (let x = step; x < cssW; x += step) {
+      for (let x = 24; x < cssW; x += cssW < 360 ? 34 : 42) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, cssH);
         ctx.stroke();
       }
-      for (let y = step; y < cssH; y += step) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(cssW, y);
-        ctx.stroke();
-      }
-    }
-
-    function drawTrail() {
-      const max = cssW < 360 ? 64 : 90;
-      while (trail.length > max) trail.shift();
-      if (trail.length < 2) return;
-
-      ctx.strokeStyle = TYPES[type].trail;
-      ctx.lineWidth = cssW < 360 ? 3 : 3.5;
-      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(41,41,41,0.24)";
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
-      trail.forEach((point, index) => {
-        if (index === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
-      });
+      ctx.moveTo(16, y);
+      ctx.lineTo(cssW - 16, y);
       ctx.stroke();
     }
 
+    function drawTicks() {
+      const max = cssW < 360 ? 7 : 9;
+      while (samples.length > max) samples.shift();
+      samples.forEach((point, index) => {
+        const alpha = 0.28 + (index / Math.max(samples.length - 1, 1)) * 0.5;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(41,41,41,${alpha})`;
+        ctx.fill();
+      });
+    }
+
     function drawBody(point) {
-      const size = cssW < 360 ? 6 : 7;
+      const color = TYPES[type].color;
+      const v = speedAt(time);
+      const arrowLength = Math.min(cssW * 0.2, 34 + v * 95);
+
       ctx.beginPath();
-      ctx.arc(point.x, point.y, size + 6, 0, Math.PI * 2);
-      ctx.fillStyle = TYPES[type].trail;
+      ctx.moveTo(point.x + 8, point.y - 22);
+      ctx.lineTo(point.x + arrowLength, point.y - 22);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(point.x + arrowLength, point.y - 22);
+      ctx.lineTo(point.x + arrowLength - 8, point.y - 27);
+      ctx.lineTo(point.x + arrowLength - 8, point.y - 17);
+      ctx.closePath();
+      ctx.fillStyle = color;
       ctx.fill();
 
       ctx.beginPath();
-      ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
-      ctx.fillStyle = TYPES[type].color;
+      ctx.arc(point.x, point.y, 13, 0, Math.PI * 2);
+      ctx.fillStyle = type === "slow" || type === "constant" ? "rgba(41,41,41,0.12)" : "rgba(128,67,240,0.16)";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = color;
       ctx.fill();
     }
 
@@ -245,9 +241,12 @@
       ctx.fillRect(0, 0, cssW, cssH);
       drawGrid();
 
-      const point = position(type, time);
-      if (!paused || trail.length === 0) trail.push(point);
-      drawTrail();
+      const point = getPosition(time);
+      if ((!paused && Math.floor(time * 10) % 4 === 0) || samples.length === 0) {
+        const last = samples[samples.length - 1];
+        if (!last || Math.abs(last.x - point.x) > 10) samples.push(point);
+      }
+      drawTicks();
       drawBody(point);
 
       requestAnimationFrame(frame);
@@ -256,7 +255,7 @@
     function setType(nextType) {
       type = nextType;
       time = 0;
-      trail = [];
+      samples = [];
       tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.type === type));
       postState();
     }
@@ -267,7 +266,8 @@
 
     window.addEventListener("message", (event) => {
       const data = event.data;
-      if (!data || typeof data !== "object" || data.type !== "trajectory-simulation-set-paused") return;
+      if (!data || typeof data !== "object") return;
+      if (data.type !== "learning-path-simulation-set-paused" && data.type !== "trajectory-simulation-set-paused") return;
       paused = Boolean(data.paused);
       postState();
     });

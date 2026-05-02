@@ -14,6 +14,7 @@ import { EmbeddedProblemContent } from "@/components/invata/embedded-problem-con
 import { EmbeddedGrilaContent } from "@/components/invata/embedded-grila-content"
 import { LessonPollClientWrapper } from "@/components/invata/lesson-poll-client-wrapper"
 import { PollSection } from "@/components/invata/poll-section"
+import { LearningPathSimulationCard } from "@/components/invata/learning-path-simulation-card"
 import { LearningPathTestSection } from "@/components/invata/learning-path-test-section"
 import { parseTestContent, toPublicTestContent } from "@/lib/learning-path-test"
 import { resolveTestIcon } from "@/components/invata/test-icons"
@@ -91,17 +92,6 @@ function parseCustomTextContent(content: Record<string, unknown> | null | undefi
   return { body }
 }
 
-function parseAspectRatio(value: unknown): string {
-  if (typeof value !== "string") return "16 / 9"
-
-  const normalized = value.trim()
-  if (!/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(normalized)) {
-    return "16 / 9"
-  }
-
-  return normalized
-}
-
 function parseSimulationUrl(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null
 
@@ -119,21 +109,14 @@ function parseSimulationUrl(value: unknown): string | null {
 
 function parseSimulationContent(content: Record<string, unknown> | null | undefined): {
   embedUrl: string
-  introMarkdown: string | null
-  aspectRatio: string
 } | null {
   if (!content || typeof content !== "object") return null
 
   const embedUrl = parseSimulationUrl(content.embedUrl)
   if (!embedUrl) return null
 
-  const introMarkdown =
-    typeof content.introMarkdown === "string" && content.introMarkdown.trim() ? content.introMarkdown : null
-
   return {
     embedUrl,
-    introMarkdown,
-    aspectRatio: parseAspectRatio(content.aspectRatio),
   }
 }
 
@@ -313,36 +296,10 @@ export function LearningPathItemBody({
     }
 
     return (
-      <div className="space-y-3 sm:space-y-6">
-        {simulationData.introMarkdown ? (
-          <div className="prose prose-sm max-w-none px-1 sm:px-0 sm:prose-base lg:prose-lg prose-headings:break-words prose-p:break-words">
-            <LessonRichContent content={simulationData.introMarkdown} theme="light" />
-          </div>
-        ) : null}
-
-        <div className="-mx-5 overflow-hidden rounded-none border-y border-[#e8e8e8] bg-white sm:mx-0 sm:rounded-2xl sm:border sm:bg-black">
-          <div className="w-full aspect-[9/16] sm:hidden">
-            <iframe
-              src={simulationData.embedUrl}
-              title={item.title || "Simulare interactivă"}
-              className="h-full w-full"
-              referrerPolicy="strict-origin-when-cross-origin"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-presentation allow-popups"
-              allowFullScreen
-            />
-          </div>
-          <div className="hidden w-full sm:block" style={{ aspectRatio: simulationData.aspectRatio }}>
-            <iframe
-              src={simulationData.embedUrl}
-              title={item.title || "Simulare interactivă"}
-              className="h-full w-full"
-              referrerPolicy="strict-origin-when-cross-origin"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-presentation allow-popups"
-              allowFullScreen
-            />
-          </div>
-        </div>
-      </div>
+      <LearningPathSimulationCard
+        embedUrl={simulationData.embedUrl}
+        title={item.title || "Simulare interactivă"}
+      />
     )
   }
 
