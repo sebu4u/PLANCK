@@ -7,6 +7,7 @@ import { LearningPathLessonLockedPreview } from "@/components/invata/learning-pa
 import { supabase } from "@/lib/supabaseClient"
 import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
 import { canViewLearningPathContent } from "@/lib/learning-path-access"
+import { createClient } from "@/lib/supabase/server"
 import {
   ITEM_TYPE_LABEL,
   LearningPathItemBody,
@@ -15,11 +16,13 @@ import {
 import { ProblemSection } from "@/components/invata/problem-section"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import {
+  getLearningPathLessonHref,
   getLearningPathChapterById,
   getLearningPathChapterBySlug,
   getLearningPathLessonById,
   getLearningPathLessonBySlug,
   getLearningPathLessonItems,
+  getCompletedLearningPathItemIdsForUser,
   isUuid,
 } from "@/lib/supabase-learning-paths"
 import { getLessonBySlug } from "@/lib/supabase-physics"
@@ -129,16 +132,31 @@ export default async function InvataLessonItemPage({
       ? await fetchQuizQuestionById(item.quiz_question_id)
       : null
   const ItemIcon = getItemIcon(item.item_type)
-  const lessonBaseHref = `/invata/${chapter.slug ?? chapter.id}/${lesson.slug ?? lesson.id}`
+  const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
   const nextItemHref =
     parsedIndex < items.length ? `${lessonBaseHref}/${parsedIndex + 1}` : lessonBaseHref
 
   const isPoll = item.item_type === "poll"
   const isProblem = item.item_type === "problem" && !!sourceProblem
   const isSimulation = item.item_type === "simulation"
+  const isTest = item.item_type === "test"
   const problemHasAnswer =
     sourceProblem &&
     (sourceProblem.answer_type === "value" || sourceProblem.answer_type === "grila")
+
+  let initialCurrentItemCompleted = false
+  const supabaseForProgress = await createClient()
+  const {
+    data: { user: progressUser },
+  } = await supabaseForProgress.auth.getUser()
+  if (progressUser) {
+    const completedForItem = await getCompletedLearningPathItemIdsForUser(
+      supabaseForProgress,
+      progressUser.id,
+      [item.id]
+    )
+    initialCurrentItemCompleted = completedForItem.includes(item.id)
+  }
 
   return (
     <LessonItemShell
@@ -148,14 +166,27 @@ export default async function InvataLessonItemPage({
       items={items}
       lessonId={lesson.id}
       currentItemId={item.id}
+      initialCurrentItemCompleted={initialCurrentItemCompleted}
       lessonBaseHref={lessonBaseHref}
       isTextLesson={isLinkedTextItem || isCustomTextItem}
-      hideBottomCta={isPoll || (isProblem && !!problemHasAnswer)}
+      hideBottomCta={isPoll || isTest || (isProblem && !!problemHasAnswer)}
       overflowHidden={isProblem}
       fullWidth={isProblem}
       grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
     >
-      {isPoll ? (
+      {isTest ? (
+        <div className="py-4 sm:py-6">
+          <LearningPathItemBody
+            item={item}
+            sourceLesson={sourceLesson}
+            sourceProblem={sourceProblem}
+            sourceQuizQuestion={sourceQuizQuestion}
+            nextItemHref={nextItemHref}
+            lessonId={lesson.id}
+            isLastItem={parsedIndex >= items.length}
+          />
+        </div>
+      ) : isPoll ? (
         <LearningPathItemBody
           item={item}
           sourceLesson={sourceLesson}

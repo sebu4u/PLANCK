@@ -17,6 +17,7 @@ import {
   getNextIncompleteLearningPathItem,
   isUuid,
 } from "@/lib/supabase-learning-paths"
+import { sanitizeTestContentJson } from "@/lib/learning-path-test"
 
 export const revalidate = 21600
 
@@ -70,7 +71,11 @@ export default async function InvataLessonDetailPage({
     notFound()
   }
 
-  const items = canViewLearningPathsContent ? await getLearningPathLessonItems(lesson.id) : []
+  const rawItems = canViewLearningPathsContent ? await getLearningPathLessonItems(lesson.id) : []
+  const items = rawItems.map((item) => ({
+    ...item,
+    content_json: sanitizeTestContentJson(item.item_type, item.content_json ?? null),
+  }))
   let initialSelectedItemId: string | null = items[0]?.id ?? null
 
   if (items.length > 0) {

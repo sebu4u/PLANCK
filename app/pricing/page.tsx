@@ -370,7 +370,7 @@ function PricingPageContent() {
           )}
         </section>
 
-        <div className="flex min-h-0 w-full flex-1 flex-col justify-start pt-2 pb-1 sm:pt-3 sm:pb-2 lg:justify-end">
+        <div className="flex min-h-0 w-full flex-1 flex-col justify-start pt-2 pb-1 sm:pt-3 sm:pb-2 lg:justify-center">
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -386,7 +386,7 @@ function PricingPageContent() {
                 <div
                   key={plan.id}
                   className={cn(
-                    "relative h-full rounded-[28px] p-[3px] sm:p-[1.5px] transition duration-200",
+                    "relative h-full rounded-[28px] p-[3px] sm:p-[1.5px] md:p-[3px] transition duration-200",
                     plan.id === "free" && "order-2 md:order-1",
                     plan.id === "plus" && "order-1 md:order-2",
                     plan.id === "premium" && "order-3 md:order-3",

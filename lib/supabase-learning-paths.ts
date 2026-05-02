@@ -10,6 +10,7 @@ export type LearningPathLessonType =
   | "poll"
   | "custom_text"
   | "simulation"
+  | "test"
 
 export interface LearningPathChapter {
   id: string

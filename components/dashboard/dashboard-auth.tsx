@@ -50,6 +50,9 @@ import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/d
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
+import { DashboardFakeSolveSocialOverlay } from "@/components/dashboard/dashboard-fake-solve-social-overlay"
+import { useDashboardFakeSolveSocialProof } from "@/hooks/use-dashboard-fake-solve-social-proof"
+import type { FakeSolveProblem } from "@/lib/dashboard/fake-solve-social-proof"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -63,6 +66,7 @@ export function DashboardAuth() {
   const [showTrialModal, setShowTrialModal] = useState(false)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
+  const [fakeSolveProblems, setFakeSolveProblems] = useState<FakeSolveProblem[]>([])
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -85,12 +89,72 @@ export function DashboardAuth() {
     dashboardStartHrefByChapter: Record<string, string>
     recommendedProblems: Problem[]
   } | null>(null)
+  const fakeSolveProblemPool = useMemo<FakeSolveProblem[]>(() => {
+    if (fakeSolveProblems.length > 0) return fakeSolveProblems
+
+    return (dashboardData?.recommendedProblems || []).map((problem) => ({
+      id: String(problem.id),
+      title: problem.title || `problema ${problem.id}`,
+    }))
+  }, [dashboardData?.recommendedProblems, fakeSolveProblems])
 
   useStreakTrigger({ enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack })
   useSocialProofTrigger({
     enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
+  const {
+    mobileNotification: fakeSolveMobileNotification,
+    mobileVisible: fakeSolveMobileVisible,
+    dismissMobileNotification: dismissFakeSolveMobileNotification,
+  } = useDashboardFakeSolveSocialProof({
+    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack && !showTrialModal,
+    problemPool: fakeSolveProblemPool,
+  })
+
+  useEffect(() => {
+    if (authLoading || !user?.id) {
+      setFakeSolveProblems([])
+      return
+    }
+
+    let cancelled = false
+
+    async function fetchFakeSolveProblems() {
+      const { data, error } = await supabase
+        .from("problems")
+        .select("id, title")
+        .order("created_at", { ascending: false })
+        .limit(400)
+
+      if (cancelled) return
+
+      if (error) {
+        console.error("Error fetching fake solve problem pool:", error)
+        setFakeSolveProblems([])
+        return
+      }
+
+      setFakeSolveProblems(
+        (data || [])
+          .filter((problem) => problem.id != null)
+          .map((problem) => {
+            const id = String(problem.id)
+            const title = typeof problem.title === "string" && problem.title.trim()
+              ? problem.title.trim()
+              : `problema ${id}`
+
+            return { id, title }
+          }),
+      )
+    }
+
+    void fetchFakeSolveProblems()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authLoading, user?.id])
 
   useEffect(() => {
     if (authLoading) return
@@ -663,6 +727,11 @@ export function DashboardAuth() {
       )}
 
       <DashboardMobileBottomNav userGrade={profile?.grade} />
+      <DashboardFakeSolveSocialOverlay
+        notification={fakeSolveMobileNotification}
+        visible={fakeSolveMobileVisible}
+        onDismiss={dismissFakeSolveMobileNotification}
+      />
 
     </DashboardSidebarProvider>
   )

@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { TEST_ICON_OPTIONS } from "@/components/invata/test-icons"
+import {
+  isTestImageUrl,
+  validateTestContent,
+  type TestProblem,
+  type TestProblemOption,
+} from "@/lib/learning-path-test"
 import {
   AlertCircle,
   ArrowDown,
@@ -72,9 +79,23 @@ interface ItemFormState {
   simulation_embed_url: string
   simulation_intro_markdown: string
   simulation_aspect_ratio: string
+  test_icon: string
+  test_description: string
+  test_difficulty: number
+  test_time_limit_seconds: number
+  test_problems: TestProblem[]
 }
 
-const ITEM_TYPES: LearningPathLessonType[] = ["custom_text", "text", "video", "grila", "problem", "poll", "simulation"]
+const ITEM_TYPES: LearningPathLessonType[] = [
+  "custom_text",
+  "text",
+  "video",
+  "grila",
+  "problem",
+  "poll",
+  "simulation",
+  "test",
+]
 
 const MARKERS = ["FORMULA", "ENUNT", "IMPORTANT", "DEFINITIE", "EXEMPLU", "INDENT"] as const
 
@@ -90,6 +111,67 @@ function createPollOption(index: number): PollOption {
 
 function createDefaultPollOptions() {
   return [createPollOption(0), createPollOption(1)]
+}
+
+let testIdCounter = 0
+
+function nextTestUid(prefix: string) {
+  testIdCounter += 1
+  return `${prefix}_${Date.now()}_${testIdCounter}`
+}
+
+function createTestProblemOption(index: number): TestProblemOption {
+  const labels = ["A", "B", "C", "D"]
+  const letter = labels[index] || `O${index + 1}`
+  return {
+    id: nextTestUid("opt"),
+    label: `Varianta ${letter}`,
+  }
+}
+
+function createTestProblem(): TestProblem {
+  const options = [createTestProblemOption(0), createTestProblemOption(1)]
+  return {
+    id: nextTestUid("prob"),
+    statement: "",
+    imageUrl: null,
+    options,
+    correctOptionId: options[0].id,
+  }
+}
+
+function parseTestProblemsForForm(value: unknown): TestProblem[] {
+  if (!Array.isArray(value)) return []
+  const problems: TestProblem[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue
+    const record = entry as Record<string, unknown>
+    const id = typeof record.id === "string" ? record.id.trim() : ""
+    const statement = typeof record.statement === "string" ? record.statement : ""
+    const correctOptionId =
+      typeof record.correctOptionId === "string" ? record.correctOptionId : ""
+    const rawOptions = Array.isArray(record.options) ? record.options : []
+    const options: TestProblemOption[] = []
+    for (const opt of rawOptions) {
+      if (!opt || typeof opt !== "object") continue
+      const optRecord = opt as Record<string, unknown>
+      const optId = typeof optRecord.id === "string" ? optRecord.id.trim() : ""
+      const label = typeof optRecord.label === "string" ? optRecord.label : ""
+      if (!optId) continue
+      options.push({ id: optId, label })
+    }
+    if (!id || options.length < 2) continue
+    const imageUrlRaw = typeof record.imageUrl === "string" ? record.imageUrl.trim() : ""
+    const imageUrl = imageUrlRaw ? imageUrlRaw : null
+    problems.push({
+      id,
+      statement,
+      imageUrl,
+      options,
+      correctOptionId: correctOptionId || options[0]?.id || "",
+    })
+  }
+  return problems
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -139,6 +221,11 @@ function createEmptyForm(lessonId: string, nextOrderIndex: number): ItemFormStat
     simulation_embed_url: "",
     simulation_intro_markdown: "",
     simulation_aspect_ratio: "16/9",
+    test_icon: "ClipboardList",
+    test_description: "",
+    test_difficulty: 3,
+    test_time_limit_seconds: 600,
+    test_problems: [createTestProblem()],
   }
 }
 
@@ -146,6 +233,16 @@ function createFormFromItem(item: LearningPathLessonItem): ItemFormState {
   const content = toRecord(item.content_json ?? null)
   const pollOptions = parsePollOptions(content?.options)
   const pollCorrectAnswerId = toStringSafe(content?.correctAnswerId) || pollOptions[0]?.id || ""
+  const testProblems =
+    item.item_type === "test" ? parseTestProblemsForForm(content?.problems) : []
+  const testDifficultyRaw =
+    typeof content?.difficulty === "number" ? Math.floor(content.difficulty) : 3
+  const testDifficulty = Math.min(5, Math.max(1, testDifficultyRaw))
+  const testTimeRaw =
+    typeof content?.timeLimitSeconds === "number"
+      ? Math.floor(content.timeLimitSeconds)
+      : 600
+  const testTime = Math.min(4 * 60 * 60, Math.max(30, testTimeRaw))
 
   return {
     id: item.id,
@@ -167,6 +264,11 @@ function createFormFromItem(item: LearningPathLessonItem): ItemFormState {
     simulation_embed_url: toStringSafe(content?.embedUrl),
     simulation_intro_markdown: toStringSafe(content?.introMarkdown),
     simulation_aspect_ratio: toStringSafe(content?.aspectRatio) || "16/9",
+    test_icon: toStringSafe(content?.icon) || "ClipboardList",
+    test_description: toStringSafe(content?.description),
+    test_difficulty: testDifficulty,
+    test_time_limit_seconds: testTime,
+    test_problems: testProblems.length > 0 ? testProblems : [createTestProblem()],
   }
 }
 
@@ -308,6 +410,14 @@ export function LearningPathsManager() {
     setError(null)
   }
 
+  /** Inserează la poziția dată; API-ul mută automat order_index pentru itemii existenți cu index >= țintă. */
+  const openCreateItemAtOrderIndex = (lessonId: string, targetOrderIndex: number) => {
+    setSelectedLessonId(lessonId)
+    setForm(createEmptyForm(lessonId, targetOrderIndex))
+    setFormMode("create-item")
+    setError(null)
+  }
+
   const openEditItem = (item: LearningPathLessonItem) => {
     setSelectedLessonId(item.lesson_id)
     setForm(createFormFromItem(item))
@@ -405,6 +515,27 @@ export function LearningPathsManager() {
           return "Embed URL pentru simulare trebuie să fie HTTPS valid (sau http://localhost în development)."
         }
         break
+      case "test": {
+        if (currentForm.test_problems.length === 0) {
+          return "Testul trebuie să aibă cel puțin o problemă."
+        }
+        if (currentForm.test_difficulty < 1 || currentForm.test_difficulty > 5) {
+          return "Dificultatea testului trebuie să fie între 1 și 5."
+        }
+        if (currentForm.test_time_limit_seconds < 30) {
+          return "Timpul testului trebuie să fie de minim 30 de secunde."
+        }
+        const payloadForValidation = {
+          icon: currentForm.test_icon,
+          description: currentForm.test_description,
+          difficulty: currentForm.test_difficulty,
+          timeLimitSeconds: currentForm.test_time_limit_seconds,
+          problems: currentForm.test_problems,
+        }
+        const testError = validateTestContent(payloadForValidation)
+        if (testError) return testError
+        break
+      }
     }
 
     return null
@@ -480,6 +611,28 @@ export function LearningPathsManager() {
           embedUrl: currentForm.simulation_embed_url.trim(),
           introMarkdown: normalizeNullable(currentForm.simulation_intro_markdown),
           aspectRatio: normalizeNullable(currentForm.simulation_aspect_ratio),
+        }
+        payload.cursuri_lesson_slug = null
+        payload.youtube_url = null
+        payload.quiz_question_id = null
+        payload.problem_id = null
+        break
+      case "test":
+        payload.content_json = {
+          icon: currentForm.test_icon || null,
+          description: currentForm.test_description,
+          difficulty: currentForm.test_difficulty,
+          timeLimitSeconds: currentForm.test_time_limit_seconds,
+          problems: currentForm.test_problems.map((problem) => ({
+            id: problem.id,
+            statement: problem.statement,
+            imageUrl: problem.imageUrl ?? null,
+            options: problem.options.map((option) => ({
+              id: option.id,
+              label: option.label,
+            })),
+            correctOptionId: problem.correctOptionId,
+          })),
         }
         payload.cursuri_lesson_slug = null
         payload.youtube_url = null
@@ -1055,6 +1208,266 @@ export function LearningPathsManager() {
       )
     }
 
+    if (form.item_type === "test") {
+      const updateProblem = (problemId: string, updater: (problem: TestProblem) => TestProblem) => {
+        const next = form.test_problems.map((problem) =>
+          problem.id === problemId ? updater(problem) : problem
+        )
+        updateForm("test_problems", next)
+      }
+
+      const removeProblem = (problemId: string) => {
+        const next = form.test_problems.filter((problem) => problem.id !== problemId)
+        updateForm("test_problems", next)
+      }
+
+      const minutes = Math.floor(form.test_time_limit_seconds / 60)
+      const seconds = form.test_time_limit_seconds % 60
+
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-gray-300">Icon</p>
+              <select
+                value={form.test_icon}
+                onChange={(e) => updateForm("test_icon", e.target.value)}
+                className="w-full rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"
+              >
+                {TEST_ICON_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.id} - {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-gray-300">Dificultate (1-5)</p>
+              <Input
+                type="number"
+                min={1}
+                max={5}
+                value={form.test_difficulty}
+                onChange={(e) =>
+                  updateForm(
+                    "test_difficulty",
+                    Math.min(5, Math.max(1, Number.parseInt(e.target.value || "1", 10)))
+                  )
+                }
+                className="bg-black/40 border-white/20 text-gray-100"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-gray-300">Timp rezolvare</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  max={240}
+                  value={minutes}
+                  onChange={(e) => {
+                    const nextMinutes = Math.max(0, Number.parseInt(e.target.value || "0", 10))
+                    updateForm(
+                      "test_time_limit_seconds",
+                      Math.max(30, nextMinutes * 60 + seconds)
+                    )
+                  }}
+                  className="bg-black/40 border-white/20 text-gray-100"
+                  placeholder="min"
+                />
+                <span className="text-xs text-gray-400">min</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={seconds}
+                  onChange={(e) => {
+                    const nextSeconds = Math.max(
+                      0,
+                      Math.min(59, Number.parseInt(e.target.value || "0", 10))
+                    )
+                    updateForm(
+                      "test_time_limit_seconds",
+                      Math.max(30, minutes * 60 + nextSeconds)
+                    )
+                  }}
+                  className="bg-black/40 border-white/20 text-gray-100"
+                  placeholder="sec"
+                />
+                <span className="text-xs text-gray-400">sec</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs text-gray-300">Descriere test (afișată în pop-up)</p>
+            <Textarea
+              value={form.test_description}
+              onChange={(e) => updateForm("test_description", e.target.value)}
+              rows={3}
+              placeholder="Descriere scurtă pentru pop-up. Suportă markdown / [FORMULA] / LaTeX."
+              className="bg-black/40 border-white/20 text-gray-100"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">
+                Probleme ({form.test_problems.length})
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateForm("test_problems", [...form.test_problems, createTestProblem()])
+                }
+                className="border-white/20 bg-white/5 text-gray-200 hover:bg-white/10 hover:text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Adaugă problemă
+              </Button>
+            </div>
+
+            {form.test_problems.map((problem, problemIndex) => {
+              const imageInvalid =
+                !!problem.imageUrl && problem.imageUrl.trim() !== "" && !isTestImageUrl(problem.imageUrl)
+              return (
+                <div
+                  key={problem.id}
+                  className="rounded-md border border-white/10 bg-white/5 p-3 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-300">Problema {problemIndex + 1}</p>
+                    <button
+                      type="button"
+                      onClick={() => removeProblem(problem.id)}
+                      className="text-gray-400 hover:text-red-300 disabled:opacity-50"
+                      disabled={form.test_problems.length <= 1}
+                      title="Șterge problema"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <Textarea
+                    value={problem.statement}
+                    onChange={(e) =>
+                      updateProblem(problem.id, (current) => ({
+                        ...current,
+                        statement: e.target.value,
+                      }))
+                    }
+                    rows={2}
+                    placeholder="Enunțul problemei"
+                    className="bg-black/40 border-white/20 text-gray-100"
+                  />
+
+                  <div className="space-y-1">
+                    <Input
+                      value={problem.imageUrl ?? ""}
+                      onChange={(e) =>
+                        updateProblem(problem.id, (current) => ({
+                          ...current,
+                          imageUrl: e.target.value.trim() ? e.target.value.trim() : null,
+                        }))
+                      }
+                      placeholder="URL imagine (opțional, https://...)"
+                      className="bg-black/40 border-white/20 text-gray-100"
+                    />
+                    {imageInvalid ? (
+                      <p className="text-[11px] text-red-300">URL-ul nu este valid (folosește http(s) sau lasă gol).</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    {problem.options.map((option, optionIndex) => (
+                      <div
+                        key={option.id}
+                        className="flex flex-col gap-2 rounded-md border border-white/10 bg-black/30 p-2 sm:flex-row sm:items-center"
+                      >
+                        <input
+                          type="radio"
+                          name={`correct_${problem.id}`}
+                          checked={problem.correctOptionId === option.id}
+                          onChange={() =>
+                            updateProblem(problem.id, (current) => ({
+                              ...current,
+                              correctOptionId: option.id,
+                            }))
+                          }
+                          className="h-4 w-4 cursor-pointer accent-emerald-500"
+                          title="Variantă corectă"
+                        />
+                        <Input
+                          value={option.label}
+                          onChange={(e) =>
+                            updateProblem(problem.id, (current) => ({
+                              ...current,
+                              options: current.options.map((current_option) =>
+                                current_option.id === option.id
+                                  ? { ...current_option, label: e.target.value }
+                                  : current_option
+                              ),
+                            }))
+                          }
+                          placeholder={`Varianta ${optionIndex + 1}`}
+                          className="bg-black/40 border-white/20 text-gray-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateProblem(problem.id, (current) => {
+                              const nextOptions = current.options.filter(
+                                (current_option) => current_option.id !== option.id
+                              )
+                              return {
+                                ...current,
+                                options: nextOptions,
+                                correctOptionId:
+                                  current.correctOptionId === option.id
+                                    ? nextOptions[0]?.id || ""
+                                    : current.correctOptionId,
+                              }
+                            })
+                          }
+                          disabled={problem.options.length <= 2}
+                          className="text-gray-400 hover:text-red-300 disabled:opacity-30"
+                          title="Șterge varianta"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={problem.options.length >= 4}
+                      onClick={() =>
+                        updateProblem(problem.id, (current) => ({
+                          ...current,
+                          options: [
+                            ...current.options,
+                            createTestProblemOption(current.options.length),
+                          ],
+                        }))
+                      }
+                      className="border-white/20 bg-white/5 text-gray-200 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adaugă variantă (max 4)
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
+
     if (form.item_type === "simulation") {
       return (
         <div className="space-y-3">
@@ -1219,7 +1632,8 @@ export function LearningPathsManager() {
                   <p className="text-xs uppercase tracking-wider text-gray-400">{selectedChapter?.title || "Capitol"}</p>
                   <h3 className="text-xl font-semibold text-white mt-1">{selectedLesson.title}</h3>
                   <p className="text-xs text-gray-400 mt-1">
-                    {selectedLessonItems.length} itemi (ordonați după order_index)
+                    {selectedLessonItems.length} itemi (ordonați după order_index). Treci cu mouse-ul între itemi pentru
+                    „Inserează aici”.
                   </p>
                 </div>
                 <Button
@@ -1232,90 +1646,171 @@ export function LearningPathsManager() {
                 </Button>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-0">
                 {selectedLessonItems.length === 0 ? (
-                  <div className="rounded-md border border-white/10 bg-black/20 p-4 text-sm text-gray-400">
-                    Lecția nu are itemi încă.
+                  <div className="space-y-2">
+                    <div className="rounded-md border border-white/10 bg-black/20 p-4 text-sm text-gray-400">
+                      Lecția nu are itemi încă.
+                    </div>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => openCreateItemAtOrderIndex(selectedLesson.id, 0)}
+                      className="w-full rounded-md border border-dashed border-white/15 bg-white/[0.03] py-2 text-xs text-gray-400 transition-colors hover:border-violet-500/50 hover:bg-violet-500/10 hover:text-violet-200"
+                    >
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5" />
+                        Adaugă primul item (order_index 0)
+                      </span>
+                    </button>
                   </div>
                 ) : (
-                  selectedLessonItems.map((item, index) => {
-                    const ItemIcon = getItemIcon(item.item_type)
-                    return (
-                      <div
-                        key={item.id}
-                        className={`rounded-md border p-3 flex items-center gap-3 ${
-                          form?.id === item.id ? "border-violet-400 bg-violet-500/10" : "border-white/10 bg-black/20"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white/10">
-                          <ItemIcon className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-sm font-medium ${item.is_active ? "text-white" : "text-gray-500 line-through"}`}>
-                            {item.title || ITEM_TYPE_LABEL[item.item_type]}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {ITEM_TYPE_LABEL[item.item_type]} | order_index: {item.order_index}
-                          </p>
-                        </div>
+                  <>
+                    {selectedLessonItems.map((item, index) => {
+                      const ItemIcon = getItemIcon(item.item_type)
+                      const insertTargetOrder = item.order_index
+                      const isInsertActive =
+                        formMode === "create-item" && form && !form.id && form.order_index === insertTargetOrder
 
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-white/10"
-                            onClick={() => moveItem(item.id, "up")}
-                            disabled={index === 0 || saving}
-                            title="Mută sus"
+                      return (
+                        <div key={item.id} className="relative">
+                          <div
+                            className={`group/insert relative z-10 flex justify-center ${index === 0 ? "h-3 -mb-1.5" : "h-2 -my-1"}`}
                           >
-                            <ArrowUp className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-white/10"
-                            onClick={() => moveItem(item.id, "down")}
-                            disabled={index === selectedLessonItems.length - 1 || saving}
-                            title="Mută jos"
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => openCreateItemAtOrderIndex(selectedLesson.id, insertTargetOrder)}
+                              title="Inserează item aici (itemii următori își actualizează order_index automat)"
+                              className={`absolute inset-x-0 top-0 flex h-full min-h-[1.25rem] items-center justify-center rounded border border-transparent transition-all ${
+                                isInsertActive
+                                  ? "border-violet-500/60 bg-violet-500/15"
+                                  : "border-transparent hover:border-violet-500/40 hover:bg-violet-500/10"
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-violet-200/90 shadow-sm transition-opacity ${
+                                  isInsertActive
+                                    ? "bg-violet-600/40 opacity-100"
+                                    : "bg-violet-600/30 opacity-0 group-hover/insert:opacity-100"
+                                }`}
+                              >
+                                <Plus className="w-3 h-3" />
+                                Inserează aici
+                              </span>
+                            </button>
+                          </div>
+
+                          <div
+                            className={`relative z-0 rounded-md border p-3 flex items-center gap-3 ${
+                              form?.id === item.id ? "border-violet-400 bg-violet-500/10" : "border-white/10 bg-black/20"
+                            }`}
                           >
-                            <ArrowDown className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-blue-300 hover:text-blue-200 hover:bg-blue-500/10"
-                            onClick={() => openEditItem(item)}
-                            title="Editează"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
-                            onClick={() => deleteItem(item.id, false)}
-                            title="Dezactivează item"
-                          >
-                            <EyeOff className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-red-300 hover:text-red-200 hover:bg-red-500/10"
-                            onClick={() => deleteItem(item.id, true)}
-                            title="Șterge definitiv"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white/10">
+                              <ItemIcon className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm font-medium ${item.is_active ? "text-white" : "text-gray-500 line-through"}`}>
+                                {item.title || ITEM_TYPE_LABEL[item.item_type]}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {ITEM_TYPE_LABEL[item.item_type]} | order_index: {item.order_index}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-white/10"
+                                onClick={() => moveItem(item.id, "up")}
+                                disabled={index === 0 || saving}
+                                title="Mută sus"
+                              >
+                                <ArrowUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-white/10"
+                                onClick={() => moveItem(item.id, "down")}
+                                disabled={index === selectedLessonItems.length - 1 || saving}
+                                title="Mută jos"
+                              >
+                                <ArrowDown className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-blue-300 hover:text-blue-200 hover:bg-blue-500/10"
+                                onClick={() => openEditItem(item)}
+                                title="Editează"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                                onClick={() => deleteItem(item.id, false)}
+                                title="Dezactivează item"
+                              >
+                                <EyeOff className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-300 hover:text-red-200 hover:bg-red-500/10"
+                                onClick={() => deleteItem(item.id, true)}
+                                title="Șterge definitiv"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })
+                      )
+                    })}
+
+                    {(() => {
+                      const lastOrder = Math.max(...selectedLessonItems.map((i) => i.order_index))
+                      const appendOrder = lastOrder + 1
+                      const isAppendActive =
+                        formMode === "create-item" && form && !form.id && form.order_index === appendOrder
+
+                      return (
+                        <div className="group/insertappend relative z-10 -mt-0.5 flex h-3 justify-center pt-0.5">
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => openCreateItemAtOrderIndex(selectedLesson.id, appendOrder)}
+                            title="Adaugă item la sfârșitul listei"
+                            className={`absolute inset-x-0 top-0 flex min-h-[1.25rem] items-center justify-center rounded border border-transparent transition-all ${
+                              isAppendActive
+                                ? "border-violet-500/60 bg-violet-500/15"
+                                : "border-transparent hover:border-violet-500/40 hover:bg-violet-500/10"
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-violet-200/90 transition-opacity ${
+                                isAppendActive
+                                  ? "bg-violet-600/40 opacity-100"
+                                  : "bg-violet-600/30 opacity-0 group-hover/insertappend:opacity-100"
+                              }`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              Adaugă la final
+                            </span>
+                          </button>
+                        </div>
+                      )
+                    })()}
+                  </>
                 )}
               </div>
 
@@ -1371,6 +1866,11 @@ export function LearningPathsManager() {
                         onChange={(e) => updateForm("order_index", Number.parseInt(e.target.value || "0", 10))}
                         className="bg-black/40 border-white/20 text-gray-100"
                       />
+                      {formMode === "create-item" && !form.id ? (
+                        <p className="text-[11px] text-gray-500 leading-snug">
+                          La salvare, itemii existenți cu același order_index sau mai mare sunt incrementați automat (+1), apoi noul item ocupă poziția setată.
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="space-y-1">

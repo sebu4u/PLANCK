@@ -3,8 +3,13 @@
 import { useLayoutEffect, useMemo, useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { BookOpen, ChevronRight } from "lucide-react"
-import type { LearningPathChapter, LearningPathLesson, LearningPathLessonItem } from "@/lib/supabase-learning-paths"
-import { ITEM_TYPE_LABEL, getItemIcon } from "@/components/invata/learning-path-item-body"
+import {
+  getLearningPathLessonHref,
+  type LearningPathChapter,
+  type LearningPathLesson,
+  type LearningPathLessonItem,
+} from "@/lib/supabase-learning-paths"
+import { ITEM_TYPE_LABEL, getLessonItemDisplayIcon } from "@/components/invata/learning-path-item-body"
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
 
 interface LearningPathLessonPageProps {
@@ -82,10 +87,10 @@ export function LearningPathLessonPage({
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
     [items, selectedItemId]
   )
-  const lessonBaseHref = `/invata/${chapter.slug ?? chapter.id}/${lesson.slug ?? lesson.id}`
-  const selectedItemHref = selectedItem ? `${lessonBaseHref}/${selectedItem.order_index + 1}` : null
+  const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
   const levelCount = Math.ceil(items.length / ITEMS_PER_LEVEL)
   const selectedItemIndex = selectedItem ? Math.max(items.findIndex((item) => item.id === selectedItem.id), 0) : 0
+  const selectedItemHref = selectedItem ? `${lessonBaseHref}/${selectedItemIndex + 1}` : null
   const selectedTheme = LEVEL_CARD_THEMES[Math.floor(selectedItemIndex / ITEMS_PER_LEVEL) % LEVEL_CARD_THEMES.length]
 
   useLayoutEffect(() => {
@@ -159,70 +164,135 @@ export function LearningPathLessonPage({
                       {levelItems.map((item, localIndex) => {
                         const index = start + localIndex
                         const isSelected = item.id === selectedItem?.id
-                        const ItemIcon = getItemIcon(item.item_type)
-                        const offsetClass = NODE_ROW_OFFSETS[index % NODE_ROW_OFFSETS.length]
+                        const ItemIcon = getLessonItemDisplayIcon(item)
+                        const isTest = item.item_type === "test"
+                        const offsetClass = isTest
+                          ? ""
+                          : NODE_ROW_OFFSETS[index % NODE_ROW_OFFSETS.length]
 
                         return (
                           <div
                             key={item.id}
                             id={`learning-path-item-node-${item.id}`}
-                            className={`relative mb-10 w-fit max-w-full ${offsetClass}`}
+                            className={`relative mb-10 w-fit max-w-full ${offsetClass} ${isTest ? "mx-auto" : ""}`}
                           >
                             {index < items.length - 1 ? (
-                              <div className="pointer-events-none absolute left-10 top-20 h-24 w-[3px] rounded-full bg-gradient-to-b from-[#ddd3ea] via-[#ece8f5] to-transparent" />
+                              <div
+                                className={`pointer-events-none absolute h-24 w-[3px] rounded-full bg-gradient-to-b from-[#ddd3ea] via-[#ece8f5] to-transparent ${
+                                  isTest ? "left-1/2 top-[72px] -translate-x-1/2" : "left-10 top-20"
+                                }`}
+                              />
                             ) : null}
 
                             <button
                               type="button"
                               onClick={() => setSelectedItemId(item.id)}
-                              className="group flex max-w-full items-center gap-4 text-left"
+                              className={`group flex max-w-full items-center gap-4 text-left ${
+                                isTest
+                                  ? "rounded-[26px] border p-3 pr-4 shadow-[0_14px_34px_rgba(82,44,111,0.08)] transition-[transform,box-shadow,border-color] hover:-translate-y-0.5"
+                                  : ""
+                              }`}
+                              style={
+                                isTest
+                                  ? ({
+                                      borderColor: isSelected ? theme.from : "#e8ddf2",
+                                      background: isSelected
+                                        ? `linear-gradient(135deg, ${theme.from} 0%, ${theme.to} 100%)`
+                                        : "linear-gradient(135deg, #ffffff 0%, #fbf8ff 100%)",
+                                      boxShadow: isSelected
+                                        ? `0 18px 40px ${theme.shadow}`
+                                        : "0 14px 34px rgba(82,44,111,0.08)",
+                                    } as CSSProperties)
+                                  : undefined
+                              }
                             >
-                              <span className="relative flex h-20 w-20 shrink-0 items-center justify-center">
-                                {isSelected ? (
-                                  <>
+                              {isTest ? (
+                                <>
+                                  <span
+                                    className={`relative flex h-16 w-16 shrink-0 rotate-3 items-center justify-center rounded-[22px] border-2 transition-transform group-hover:rotate-0 ${
+                                      isSelected
+                                        ? "border-white/40 bg-white/18 text-white"
+                                        : "border-[#ded2eb] bg-[#f4efff] text-[#7c3aed]"
+                                    }`}
+                                  >
+                                    <ItemIcon className="h-8 w-8" />
                                     <span
-                                      className="absolute inset-0 rounded-full border-[5px]"
-                                      style={{ borderColor: theme.ring }}
+                                      className={`absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 ${
+                                        isSelected ? "border-white bg-emerald-300" : "border-white bg-[#f59e0b]"
+                                      }`}
                                     />
-                                    <span
-                                      className="absolute inset-[3px] rounded-full border-[5px] border-l-transparent animate-spin [animation-duration:2.6s]"
-                                      style={{
-                                        borderTopColor: theme.from,
-                                        borderRightColor: theme.to,
-                                        borderBottomColor: theme.to,
-                                      }}
-                                    />
-                                    <span
-                                      className="absolute inset-[12px] rounded-full"
-                                      style={{
-                                        backgroundImage: `linear-gradient(to right, ${theme.from}, ${theme.to})`,
-                                        boxShadow: `0 8px 18px ${theme.shadow}`,
-                                      }}
-                                    />
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="absolute inset-[1px] rounded-full bg-[#d9d9de]" />
-                                    <span className="absolute inset-[9px] rounded-full border border-white/70 bg-[#f4f4f7]" />
-                                  </>
-                                )}
-                                <span className={`relative z-[1] flex items-center justify-center ${isSelected ? "text-white" : "text-[#9a9aa2]"}`}>
-                                  <ItemIcon className="h-8 w-8" />
-                                </span>
-                              </span>
+                                  </span>
 
-                              <span className="min-w-0">
-                                <span
-                                  className={`block text-sm font-semibold sm:text-base ${
-                                    isSelected ? "text-[#18101f]" : "text-[#b7b0be]"
-                                  }`}
-                                >
-                                  {item.title || ITEM_TYPE_LABEL[item.item_type]}
-                                </span>
-                                <span className={`mt-1 block text-xs ${isSelected ? "text-[#7d6a92]" : "text-[#d0c9d7]"}`}>
-                                  {ITEM_TYPE_LABEL[item.item_type]}
-                                </span>
-                              </span>
+                                  <span className="min-w-0">
+                                    <span
+                                      className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.16em] ${
+                                        isSelected ? "bg-white/20 text-white" : "bg-[#fff7ed] text-[#c2410c]"
+                                      }`}
+                                    >
+                                      Test
+                                    </span>
+                                    <span
+                                      className={`block text-sm font-bold leading-tight sm:text-base ${
+                                        isSelected ? "text-white" : "text-[#18101f]"
+                                      }`}
+                                    >
+                                      {item.title || ITEM_TYPE_LABEL[item.item_type]}
+                                    </span>
+                                    <span className={`mt-1 block text-xs ${isSelected ? "text-white/78" : "text-[#8b6fac]"}`}>
+                                      Provocare cu timp și scor minim
+                                    </span>
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="relative flex h-20 w-20 shrink-0 items-center justify-center">
+                                    {isSelected ? (
+                                      <>
+                                        <span
+                                          className="absolute inset-0 rounded-full border-[5px]"
+                                          style={{ borderColor: theme.ring }}
+                                        />
+                                        <span
+                                          className="absolute inset-[3px] rounded-full border-[5px] border-l-transparent animate-spin [animation-duration:2.6s]"
+                                          style={{
+                                            borderTopColor: theme.from,
+                                            borderRightColor: theme.to,
+                                            borderBottomColor: theme.to,
+                                          }}
+                                        />
+                                        <span
+                                          className="absolute inset-[12px] rounded-full"
+                                          style={{
+                                            backgroundImage: `linear-gradient(to right, ${theme.from}, ${theme.to})`,
+                                            boxShadow: `0 8px 18px ${theme.shadow}`,
+                                          }}
+                                        />
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="absolute inset-[1px] rounded-full bg-[#d9d9de]" />
+                                        <span className="absolute inset-[9px] rounded-full border border-white/70 bg-[#f4f4f7]" />
+                                      </>
+                                    )}
+                                    <span className={`relative z-[1] flex items-center justify-center ${isSelected ? "text-white" : "text-[#9a9aa2]"}`}>
+                                      <ItemIcon className="h-8 w-8" />
+                                    </span>
+                                  </span>
+
+                                  <span className="min-w-0">
+                                    <span
+                                      className={`block text-sm font-semibold sm:text-base ${
+                                        isSelected ? "text-[#18101f]" : "text-[#b7b0be]"
+                                      }`}
+                                    >
+                                      {item.title || ITEM_TYPE_LABEL[item.item_type]}
+                                    </span>
+                                    <span className={`mt-1 block text-xs ${isSelected ? "text-[#7d6a92]" : "text-[#d0c9d7]"}`}>
+                                      {ITEM_TYPE_LABEL[item.item_type]}
+                                    </span>
+                                  </span>
+                                </>
+                              )}
                             </button>
                           </div>
                         )

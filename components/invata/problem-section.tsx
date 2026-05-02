@@ -10,7 +10,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toYoutubeEmbedUrl } from "@/lib/youtube-utils"
 import { cn } from "@/lib/utils"
 import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
+import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
+import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
@@ -128,6 +131,7 @@ export function ProblemSection({
   const [valueInput, setValueInput] = useState("")
   const [grilaSelected, setGrilaSelected] = useState<string>("")
   const [valueSubpointIndex, setValueSubpointIndex] = useState(0)
+  const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
 
   const hasVideo =
@@ -157,8 +161,13 @@ export function ProblemSection({
     lessonId,
     isLastItem,
   })
+  const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
+    itemId: currentItemId,
+    lessonId,
+    isLastItem,
+  })
 
-  const onVerify = useCallback(() => {
+  const onVerify = useCallback(async () => {
     if (answerType === "value" && hasValueAnswer && currentSubpoint) {
       const parsed = parseNumericInput(valueInput)
       if (parsed === null) return
@@ -167,6 +176,9 @@ export function ProblemSection({
         const nextIndex = valueSubpointIndex + 1
         if (nextIndex >= valueSubpoints.length) {
           playSuccessSound()
+          fireLearningPathCorrectConfetti()
+          const award = await awardCorrectAnswerElo()
+          setEloAward(award?.awarded ? award : null)
           setVerified(true)
           setIsCorrect(true)
           resetFailures()
@@ -186,6 +198,9 @@ export function ProblemSection({
       const correct = selectedIndex === grilaCorrectIndex
       if (correct) {
         playSuccessSound()
+        fireLearningPathCorrectConfetti()
+        const award = await awardCorrectAnswerElo()
+        setEloAward(award?.awarded ? award : null)
         resetFailures()
       } else {
         registerFailure()
@@ -203,6 +218,7 @@ export function ProblemSection({
     valueSubpointIndex,
     valueSubpoints.length,
     grilaCorrectIndex,
+    awardCorrectAnswerElo,
     registerFailure,
     resetFailures,
   ])
@@ -213,12 +229,13 @@ export function ProblemSection({
     setValueInput("")
     setGrilaSelected("")
     setValueSubpointIndex(0)
+    setEloAward(null)
   }, [])
 
   const answerSlot = useMemo(() => {
     if (answerType === "value" && hasValueAnswer && currentSubpoint) {
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           {valueSubpoints.length > 1 && (
             <span className="shrink-0 text-sm font-medium text-[#6f657b]">
               {String.fromCharCode(97 + valueSubpointIndex)})
@@ -284,10 +301,18 @@ export function ProblemSection({
 
   const canShowVerifyBar = hasValueAnswer || hasGrilaAnswer
 
+  // Sub lg: înălțime în viewport ca scroll-ul să includă enunț + video; fără verify scădem ~6rem (bara Continuă din shell).
+  const mobileScrollHeightClass = canShowVerifyBar
+    ? "max-lg:h-[calc(100dvh-3.5rem)] max-lg:min-h-0"
+    : "max-lg:h-[calc(100dvh-3.5rem-6rem)] max-lg:min-h-0"
+
   return (
     <>
       <div
-        className="flex min-h-[calc(100vh-3.5rem)] flex-col overflow-y-auto px-4 pt-4 pb-4 sm:pt-6 sm:pb-6 lg:h-[calc(100vh-3.5rem)] lg:items-center lg:justify-center"
+        className={cn(
+          "flex flex-col overflow-y-auto px-4 pt-4 pb-4 sm:pt-6 sm:pb-6 lg:h-[calc(100vh-3.5rem)] lg:min-h-0 lg:items-center lg:justify-center",
+          mobileScrollHeightClass,
+        )}
         style={{
           paddingBottom: canShowVerifyBar
             ? "calc(6rem + env(safe-area-inset-bottom, 0px))"
@@ -295,66 +320,65 @@ export function ProblemSection({
         }}
       >
         <div className="mx-auto my-auto flex w-full max-w-4xl flex-col items-center py-3 sm:py-4 lg:my-0 lg:py-0">
-          <h1 className="w-full shrink-0 pb-4 text-center text-3xl font-bold tracking-tight sm:pb-6 sm:text-4xl">
+          <h1 className="hidden w-full shrink-0 pb-4 text-center text-3xl font-bold tracking-tight md:block md:pb-6 md:text-4xl">
             <span className="text-[#6f657b]">#{itemIndex}</span>
             <span className="ml-2 text-[#2C2F33]">Problema rezolvată</span>
           </h1>
-          <div className="flex w-full flex-col rounded-2xl border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)] lg:flex-row lg:overflow-hidden">
-          {/* Enunț + date */}
-          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-5 sm:p-6">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="rounded border border-[#e8e8e8] bg-[#fafafa] px-1.5 py-0.5 text-[10px] font-semibold text-[#555555] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs">
-                #{problem.id.slice(0, 8)}
-              </span>
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded border border-[#e8e8e8] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#555555] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs"
-                >
-                  {tag}
+          <div className="flex w-full flex-col lg:flex-row lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[#ebe4f1] lg:bg-white lg:shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
+            <div className="min-h-0 min-w-0 flex-1 py-2 sm:p-6 lg:overflow-y-auto">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="rounded border border-[#e8e8e8] bg-[#fafafa] px-1.5 py-0.5 text-[10px] font-semibold text-[#555555] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs">
+                  #{problem.id.slice(0, 8)}
                 </span>
-              ))}
-              {problem.difficulty && (
-                <span
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px] font-semibold sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs",
-                    difficultyColors[problem.difficulty] ??
-                      "border-[#e8e8e8] bg-[#fafafa] text-[#555555]",
-                  )}
-                >
-                  {problem.difficulty}
-                </span>
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded border border-[#e8e8e8] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#555555] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {problem.difficulty && (
+                  <span
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 text-[10px] font-semibold sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs",
+                      difficultyColors[problem.difficulty] ??
+                        "border-[#e8e8e8] bg-[#fafafa] text-[#555555]",
+                    )}
+                  >
+                    {problem.difficulty}
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 whitespace-pre-wrap text-lg font-semibold leading-relaxed text-[#2C2F33] sm:text-xl lg:text-lg">
+                {renderInlineMath(problem.statement)}
+              </div>
+              {problem.image_url && (
+                <div className="mt-4 flex justify-start">
+                  <img
+                    src={problem.image_url.replace(/^@/, "")}
+                    alt="Ilustrație problemă"
+                    className="max-h-48 max-w-full rounded-xl border border-[#e8e8e8] bg-white object-contain shadow-sm"
+                  />
+                </div>
               )}
             </div>
-            <div className="mt-4 whitespace-pre-wrap text-lg font-semibold leading-relaxed text-[#2C2F33]">
-              {renderInlineMath(problem.statement)}
-            </div>
-            {problem.image_url && (
-              <div className="mt-4 flex justify-start">
-                <img
-                  src={problem.image_url.replace(/^@/, "")}
-                  alt="Ilustrație problemă"
-                  className="max-h-48 max-w-full rounded-xl border border-[#e8e8e8] bg-white object-contain shadow-sm"
-                />
+
+            {/* Video player în același card */}
+            {hasVideo && embedUrl && (
+              <div className="shrink-0 border-t border-[#ebe4f1] lg:w-[min(50%,420px)] lg:border-t-0 lg:border-l">
+                <div className="relative w-full bg-black" style={{ paddingBottom: "56.25%" }}>
+                  <iframe
+                    src={embedUrl}
+                    title="Rezolvare video"
+                    className="absolute inset-0 h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
               </div>
             )}
-          </div>
-
-          {/* Video player în același card */}
-          {hasVideo && embedUrl && (
-            <div className="shrink-0 border-t border-[#ebe4f1] lg:w-[min(50%,420px)] lg:border-t-0 lg:border-l">
-              <div className="relative w-full bg-black" style={{ paddingBottom: "56.25%" }}>
-                <iframe
-                  src={embedUrl}
-                  title="Rezolvare video"
-                  className="absolute inset-0 h-full w-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          )}
           </div>
         </div>
       </div>
@@ -368,6 +392,7 @@ export function ProblemSection({
           onRetry={onRetry}
           onContinue={onContinue}
           onExplain={() => pushHint("manual")}
+          eloAward={eloAward}
           answerSlot={answerSlot}
         />
       )}

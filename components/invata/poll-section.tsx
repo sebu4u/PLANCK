@@ -4,7 +4,10 @@ import React, { createContext, useCallback, useContext, useState } from "react"
 import { PollFeedbackBar } from "@/components/invata/poll-feedback-bar"
 import type { LessonPollOption } from "@/components/invata/lesson-poll"
 import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
+import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
+import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -77,15 +80,24 @@ export function PollSection({
   const [verified, setVerified] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [displayText, setDisplayText] = useState(question)
+  const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "poll" })
+  const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
+    itemId: currentItemId,
+    lessonId,
+    isLastItem,
+  })
 
-  const onVerify = useCallback(() => {
+  const onVerify = useCallback(async () => {
     if (selectedId === null) return
     const selectedOption = options.find((o) => o.id === selectedId)
     if (!selectedOption) return
     const correct = selectedId === correctAnswerId
     if (correct) {
       playSuccessSound()
+      fireLearningPathCorrectConfetti()
+      const award = await awardCorrectAnswerElo()
+      setEloAward(award?.awarded ? award : null)
       resetFailures()
     } else {
       registerFailure()
@@ -93,13 +105,14 @@ export function PollSection({
     setDisplayText(selectedOption.feedback)
     setVerified(true)
     setIsCorrect(correct)
-  }, [selectedId, correctAnswerId, options, registerFailure, resetFailures])
+  }, [selectedId, correctAnswerId, options, awardCorrectAnswerElo, registerFailure, resetFailures])
 
   const onRetry = useCallback(() => {
     setSelectedId(null)
     setVerified(false)
     setIsCorrect(null)
     setDisplayText(question)
+    setEloAward(null)
   }, [question])
 
   const barState: PollBarState = !verified ? "verify" : isCorrect ? "correct" : "incorrect"
@@ -143,6 +156,7 @@ export function PollSection({
         onRetry={onRetry}
         onContinue={onContinue}
         onExplain={() => pushHint("manual")}
+        eloAward={eloAward}
       />
     </PollStateContext.Provider>
   )

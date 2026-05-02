@@ -4,11 +4,12 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { isAdminFromDB, getAccessTokenFromRequest } from "@/lib/admin-check"
 import { logger } from "@/lib/logger"
+import { validateTestContent } from "@/lib/learning-path-test"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 
 const LESSON_TYPES = ["text", "video", "grila", "problem"] as const
-const ITEM_TYPES = ["text", "video", "grila", "problem", "poll", "custom_text", "simulation"] as const
+const ITEM_TYPES = ["text", "video", "grila", "problem", "poll", "custom_text", "simulation", "test"] as const
 
 async function verifyAdmin(req: NextRequest) {
   const accessToken = getAccessTokenFromRequest(req.headers.get("authorization"))
@@ -192,6 +193,14 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
 
   if (itemType === "poll" && !isObject(body.content_json)) {
     return "Pentru item de tip poll, content_json este obligatoriu."
+  }
+
+  if (itemType === "test") {
+    if (!isObject(body.content_json)) {
+      return "Pentru item de tip test, content_json este obligatoriu."
+    }
+    const testError = validateTestContent(body.content_json)
+    if (testError) return testError
   }
 
   return null

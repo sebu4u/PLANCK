@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { X, ChevronRight, Flame } from "lucide-react"
+import { X, ChevronLeft, ChevronRight, Flame } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import {
   Dialog,
@@ -20,10 +20,13 @@ import {
   useGrilaLesson,
 } from "@/components/invata/grila-lesson-context"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
+import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
 import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
+import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -52,6 +55,8 @@ interface LessonItemShellProps {
   items: LearningPathLessonItem[]
   lessonId: string
   currentItemId: string
+  /** Din DB la SSR; shell-ul confirmă din nou la client după login. */
+  initialCurrentItemCompleted?: boolean
   lessonBaseHref: string
   isTextLesson: boolean
   hideBottomCta?: boolean
@@ -69,6 +74,7 @@ export function LessonItemShell({
   items,
   lessonId,
   currentItemId,
+  initialCurrentItemCompleted = false,
   lessonBaseHref,
   isTextLesson,
   hideBottomCta = false,
@@ -83,6 +89,16 @@ export function LessonItemShell({
   const [scrollProgress, setScrollProgress] = useState(0)
   const [streak, setStreak] = useState<number | null>(null)
   const [showQuitDialog, setShowQuitDialog] = useState(false)
+  const [showPrevItemCue, setShowPrevItemCue] = useState(false)
+  const [showNextItemCue, setShowNextItemCue] = useState(false)
+  const [currentItemCompleted, setCurrentItemCompleted] = useState(initialCurrentItemCompleted)
+  const [mobileSwipeOffset, setMobileSwipeOffset] = useState(0)
+  const [isMobileSwipeSettling, setIsMobileSwipeSettling] = useState(false)
+  const prevArrowHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nextArrowHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const touchAxisRef = useRef<"pending" | "horizontal" | "vertical" | null>(null)
+  const swipeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pushMomentum = useMomentumTrigger()
   useStreakTrigger({ enabled: Boolean(user?.id) })
 
@@ -90,6 +106,10 @@ export function LessonItemShell({
     itemIndex < items.length
       ? `${lessonBaseHref}/${itemIndex + 1}`
       : lessonBaseHref
+
+  const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
+  const prevItemTitle = itemIndex > 1 ? items[itemIndex - 2]?.title || "Pasul anterior" : null
+  const nextItemTitle = itemIndex < items.length ? items[itemIndex]?.title || "Pasul următor" : "Înapoi la lecție"
 
   const stepProgress = items.length > 0 ? itemIndex / items.length : 0
   const markCurrentItemCompleted = useLearningPathItemCompletion({
@@ -108,6 +128,34 @@ export function LessonItemShell({
     })
     router.push(nextItemHref)
   }, [itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum, router])
+
+  useEffect(() => {
+    setCurrentItemCompleted(initialCurrentItemCompleted)
+  }, [initialCurrentItemCompleted])
+
+  useEffect(() => {
+    if (!user?.id || !currentItemId) return
+
+    let cancelled = false
+    void supabase
+      .from("user_learning_path_item_progress")
+      .select("item_id")
+      .eq("user_id", user.id)
+      .eq("item_id", currentItemId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          setCurrentItemCompleted(initialCurrentItemCompleted)
+          return
+        }
+        setCurrentItemCompleted(!!data)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, currentItemId, initialCurrentItemCompleted])
 
   useEffect(() => {
     if (!user) {
@@ -163,7 +211,184 @@ export function LessonItemShell({
     }
   }, [isTextLesson, updateScrollProgress])
 
+  useEffect(() => {
+    const canShowNextCue = currentItemCompleted
+    if (!prevItemHref && !canShowNextCue) return
+
+    const EDGE_PX = 96
+    const HIDE_DELAY_MS = 220
+
+    const clearPrevHideTimer = () => {
+      if (prevArrowHideTimerRef.current) {
+        clearTimeout(prevArrowHideTimerRef.current)
+        prevArrowHideTimerRef.current = null
+      }
+    }
+
+    const clearNextHideTimer = () => {
+      if (nextArrowHideTimerRef.current) {
+        clearTimeout(nextArrowHideTimerRef.current)
+        nextArrowHideTimerRef.current = null
+      }
+    }
+
+    const clearAllHideTimers = () => {
+      clearPrevHideTimer()
+      clearNextHideTimer()
+    }
+
+    const onMove = (e: MouseEvent) => {
+      if (window.innerWidth < 768) return
+
+      const w = window.innerWidth
+      clearAllHideTimers()
+
+      if (prevItemHref) {
+        if (e.clientX < EDGE_PX) {
+          setShowPrevItemCue(true)
+        } else {
+          prevArrowHideTimerRef.current = setTimeout(() => {
+            setShowPrevItemCue(false)
+            prevArrowHideTimerRef.current = null
+          }, HIDE_DELAY_MS)
+        }
+      }
+
+      if (canShowNextCue) {
+        if (e.clientX > w - EDGE_PX) {
+          setShowNextItemCue(true)
+        } else {
+          nextArrowHideTimerRef.current = setTimeout(() => {
+            setShowNextItemCue(false)
+            nextArrowHideTimerRef.current = null
+          }, HIDE_DELAY_MS)
+        }
+      }
+    }
+
+    window.addEventListener("mousemove", onMove, { passive: true })
+    return () => {
+      clearAllHideTimers()
+      window.removeEventListener("mousemove", onMove)
+    }
+  }, [prevItemHref, currentItemCompleted])
+
+  useEffect(() => {
+    const isMobileViewport = () => window.innerWidth < 768
+    const isInteractiveTarget = (target: EventTarget | null) =>
+      target instanceof Element &&
+      Boolean(target.closest("a, button, input, textarea, select, iframe, [role='button']"))
+
+    const clearSwipeSettleTimer = () => {
+      if (swipeSettleTimerRef.current) {
+        clearTimeout(swipeSettleTimerRef.current)
+        swipeSettleTimerRef.current = null
+      }
+    }
+
+    const onTouchStart = (e: TouchEvent) => {
+      clearSwipeSettleTimer()
+      if (!isMobileViewport() || showQuitDialog || isInteractiveTarget(e.target)) {
+        touchStartRef.current = null
+        touchAxisRef.current = null
+        return
+      }
+
+      const touch = e.touches[0]
+      if (!touch) return
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+      touchAxisRef.current = "pending"
+      setIsMobileSwipeSettling(false)
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isMobileViewport() || !touchStartRef.current) return
+
+      const touch = e.touches[0]
+      if (!touch) return
+
+      const dx = touch.clientX - touchStartRef.current.x
+      const dy = touch.clientY - touchStartRef.current.y
+      const absX = Math.abs(dx)
+      const absY = Math.abs(dy)
+
+      if (touchAxisRef.current === "pending" && Math.max(absX, absY) > 8) {
+        touchAxisRef.current = absX > absY * 1.2 ? "horizontal" : "vertical"
+      }
+
+      if (touchAxisRef.current !== "horizontal") return
+
+      e.preventDefault()
+
+      const canSwipePrev = dx > 0 && !!prevItemHref
+      const canSwipeNext = dx < 0 && currentItemCompleted
+      if (!canSwipePrev && !canSwipeNext) {
+        setMobileSwipeOffset(0)
+        return
+      }
+
+      const maxOffset = window.innerWidth * 0.82
+      const resistedOffset = Math.sign(dx) * Math.min(absX, maxOffset)
+      setMobileSwipeOffset(resistedOffset)
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isMobileViewport() || !touchStartRef.current) {
+        touchStartRef.current = null
+        touchAxisRef.current = null
+        return
+      }
+
+      const touch = e.changedTouches[0]
+      const start = touchStartRef.current
+      touchStartRef.current = null
+      const axis = touchAxisRef.current
+      touchAxisRef.current = null
+      if (!touch) return
+
+      const dx = touch.clientX - start.x
+      const dy = touch.clientY - start.y
+      const absX = Math.abs(dx)
+      const absY = Math.abs(dy)
+      const isHorizontalSwipe = absX >= 70 && absX > absY * 1.4
+      const shouldGoPrev = Boolean(axis === "horizontal" && isHorizontalSwipe && dx > 0 && prevItemHref)
+      const shouldGoNext = Boolean(axis === "horizontal" && isHorizontalSwipe && dx < 0 && currentItemCompleted)
+
+      if (shouldGoPrev || shouldGoNext) {
+        const href = shouldGoPrev && prevItemHref ? prevItemHref : nextItemHref
+        setIsMobileSwipeSettling(true)
+        setMobileSwipeOffset(Math.sign(dx) * window.innerWidth)
+        playClickSound()
+        swipeSettleTimerRef.current = setTimeout(() => {
+          router.push(href)
+        }, 140)
+        return
+      }
+
+      setIsMobileSwipeSettling(true)
+      setMobileSwipeOffset(0)
+      swipeSettleTimerRef.current = setTimeout(() => {
+        setIsMobileSwipeSettling(false)
+        swipeSettleTimerRef.current = null
+      }, 180)
+    }
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true })
+    window.addEventListener("touchmove", onTouchMove, { passive: false })
+    window.addEventListener("touchend", onTouchEnd, { passive: true })
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true })
+    return () => {
+      clearSwipeSettleTimer()
+      window.removeEventListener("touchstart", onTouchStart)
+      window.removeEventListener("touchmove", onTouchMove)
+      window.removeEventListener("touchend", onTouchEnd)
+      window.removeEventListener("touchcancel", onTouchEnd)
+    }
+  }, [currentItemCompleted, nextItemHref, prevItemHref, router, showQuitDialog])
+
   const progress = isTextLesson ? scrollProgress : stepProgress
+  const mobileSwipeProgress = Math.min(1, Math.abs(mobileSwipeOffset) / 120)
+  const isMobileSwipeActive = mobileSwipeOffset !== 0 || isMobileSwipeSettling
 
   const shell = (
     <>
@@ -196,13 +421,115 @@ export function LessonItemShell({
         </div>
       </nav>
 
+      {prevItemHref ? (
+        <div
+          className={cn(
+            "pointer-events-none fixed left-0 top-14 z-[250] hidden w-[min(100vw,7rem)] items-center justify-start md:flex",
+            /* Align cu zona de citire: fără bara „Continuă”, înălțime până la baza viewport; cu bara fixă jos, scădem ~aceeași rezervă ca padding-ul principalului (6rem). */
+            hideBottomCta
+              ? "h-[calc(100dvh-3.5rem)]"
+              : "h-[calc(100dvh-3.5rem-6rem)]",
+          )}
+          aria-hidden={!showPrevItemCue}
+        >
+          <Link
+            href={prevItemHref}
+            className={cn(
+              "pointer-events-auto ml-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#e8e2ee] bg-white text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] transition-[opacity,transform,visibility] duration-200 sm:ml-3 sm:h-14 sm:w-14",
+              showPrevItemCue
+                ? "visible translate-x-0 opacity-100"
+                : "invisible -translate-x-2 opacity-0 pointer-events-none",
+            )}
+            aria-label="Pasul anterior"
+            scroll
+          >
+            <ChevronLeft className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.25} />
+          </Link>
+        </div>
+      ) : null}
+
+      {currentItemCompleted ? (
+        <div
+          className={cn(
+            "pointer-events-none fixed right-0 top-14 z-[250] hidden w-[min(100vw,7rem)] items-center justify-end md:flex",
+            hideBottomCta
+              ? "h-[calc(100dvh-3.5rem)]"
+              : "h-[calc(100dvh-3.5rem-6rem)]",
+          )}
+          aria-hidden={!showNextItemCue}
+        >
+          <Link
+            href={nextItemHref}
+            onClick={() => playClickSound()}
+            className={cn(
+              "pointer-events-auto mr-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#e8e2ee] bg-white text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] transition-[opacity,transform,visibility] duration-200 sm:mr-3 sm:h-14 sm:w-14",
+              showNextItemCue
+                ? "visible translate-x-0 opacity-100"
+                : "invisible translate-x-2 opacity-0 pointer-events-none",
+            )}
+            aria-label={itemIndex < items.length ? "Pasul următor" : "Înapoi la lecție"}
+            scroll
+          >
+            <ChevronRight className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.25} />
+          </Link>
+        </div>
+      ) : null}
+
+      <div
+        className="pointer-events-none fixed inset-x-0 top-14 z-0 bg-[#f7f4fb] md:hidden"
+        style={{
+          bottom: hideBottomCta ? "0px" : "6rem",
+        }}
+        aria-hidden
+      >
+        {prevItemHref ? (
+          <div
+            className="absolute inset-y-0 left-0 flex w-1/2 items-center pl-5"
+            style={{ opacity: mobileSwipeOffset > 0 ? mobileSwipeProgress : 0 }}
+          >
+            <div className="flex max-w-[11rem] items-center gap-3 rounded-2xl border border-[#e8e2ee] bg-white/90 px-4 py-3 text-[#7c3aed] shadow-[0_10px_28px_rgba(82,44,111,0.10)]">
+              <ChevronLeft className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8b6fac]">Anterior</p>
+                <p className="truncate text-sm font-semibold text-[#22192d]">{prevItemTitle}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {currentItemCompleted ? (
+          <div
+            className="absolute inset-y-0 right-0 flex w-1/2 items-center justify-end pr-5"
+            style={{ opacity: mobileSwipeOffset < 0 ? mobileSwipeProgress : 0 }}
+          >
+            <div className="flex max-w-[11rem] items-center gap-3 rounded-2xl border border-[#e8e2ee] bg-white/90 px-4 py-3 text-[#7c3aed] shadow-[0_10px_28px_rgba(82,44,111,0.10)]">
+              <div className="min-w-0 text-right">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8b6fac]">
+                  {itemIndex < items.length ? "Următor" : "Final"}
+                </p>
+                <p className="truncate text-sm font-semibold text-[#22192d]">{nextItemTitle}</p>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       <main
-        className={cn("min-h-screen bg-[#ffffff] pt-14", overflowHidden && "overflow-hidden")}
+        className={cn("relative z-10 min-h-screen bg-[#ffffff] pt-14", overflowHidden && "overflow-hidden")}
         style={{
           paddingBottom: hideBottomCta
             ? "max(16px, env(safe-area-inset-bottom, 0px))"
             : "calc(6rem + env(safe-area-inset-bottom, 0px))",
-        }}
+          transform: isMobileSwipeActive ? `translate3d(${mobileSwipeOffset}px, 0, 0)` : undefined,
+          transition: isMobileSwipeSettling ? "transform 160ms ease-out" : "none",
+          touchAction: "pan-y",
+          willChange: isMobileSwipeActive ? "transform" : "auto",
+          boxShadow:
+            isMobileSwipeActive
+              ? "0 0 32px rgba(82,44,111,0.10)"
+              : "none",
+        } as CSSProperties}
       >
         <div
           ref={contentRef}
@@ -216,7 +543,13 @@ export function LessonItemShell({
       </main>
 
       {!hideBottomCta && grilaQuestion ? (
-        <GrilaLessonBottomCta nextItemHref={nextItemHref} onContinue={continueToNextItem} />
+        <GrilaLessonBottomCta
+          nextItemHref={nextItemHref}
+          onContinue={continueToNextItem}
+          currentItemId={currentItemId}
+          lessonId={lessonId}
+          isLastItem={itemIndex >= items.length}
+        />
       ) : !hideBottomCta ? (
         <div
           className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
@@ -290,12 +623,24 @@ export function LessonItemShell({
 function GrilaLessonBottomCta({
   nextItemHref,
   onContinue,
+  currentItemId,
+  lessonId,
+  isLastItem,
 }: {
   nextItemHref: string
   onContinue: () => Promise<void> | void
+  currentItemId: string
+  lessonId: string
+  isLastItem: boolean
 }) {
   const ctx = useGrilaLesson()
   const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
+  const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
+  const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
+    itemId: currentItemId,
+    lessonId,
+    isLastItem,
+  })
   if (!ctx) return null
 
   const { selectedAnswer, isVerified, isCorrect, verify, reset } = ctx
@@ -308,16 +653,23 @@ function GrilaLessonBottomCta({
       hasAnswer={hasAnswer}
       nextItemHref={nextItemHref}
       onVerify={() => {
-        void verify().then((result) => {
+        void verify().then(async (result) => {
           if (result === false) registerFailure()
-          if (result === true) resetFailures()
+          if (result === true) {
+            fireLearningPathCorrectConfetti()
+            const award = await awardCorrectAnswerElo()
+            setEloAward(award?.awarded ? award : null)
+            resetFailures()
+          }
         })
       }}
       onRetry={() => {
+        setEloAward(null)
         reset()
       }}
       onContinue={onContinue}
       onExplain={() => pushHint("manual")}
+      eloAward={eloAward}
       answerSlot={
         <span className="text-sm font-medium text-[#6f657b]">
           Răspunsul se selectează în chenarele de mai sus.

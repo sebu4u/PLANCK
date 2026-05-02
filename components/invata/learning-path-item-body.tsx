@@ -1,10 +1,22 @@
 import Link from "next/link"
-import { BarChart2, CirclePlay, FileText, ListChecks, Orbit, PenSquare, Type } from "lucide-react"
+import {
+  BarChart2,
+  CirclePlay,
+  ClipboardList,
+  FileText,
+  ListChecks,
+  Orbit,
+  PenSquare,
+  Type,
+} from "lucide-react"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { EmbeddedProblemContent } from "@/components/invata/embedded-problem-content"
 import { EmbeddedGrilaContent } from "@/components/invata/embedded-grila-content"
 import { LessonPollClientWrapper } from "@/components/invata/lesson-poll-client-wrapper"
 import { PollSection } from "@/components/invata/poll-section"
+import { LearningPathTestSection } from "@/components/invata/learning-path-test-section"
+import { parseTestContent, toPublicTestContent } from "@/lib/learning-path-test"
+import { resolveTestIcon } from "@/components/invata/test-icons"
 import type { LearningPathLessonItem, LearningPathLessonType } from "@/lib/supabase-learning-paths"
 import type { Lesson as PhysicsLesson } from "@/lib/supabase-physics"
 import type { Problem } from "@/data/problems"
@@ -19,6 +31,7 @@ export const ITEM_TYPE_LABEL: Record<LearningPathLessonType, string> = {
   poll: "Sondaj",
   custom_text: "Text personalizat",
   simulation: "Simulare interactivă",
+  test: "Test",
 }
 
 export function getItemIcon(type: LearningPathLessonType) {
@@ -35,10 +48,24 @@ export function getItemIcon(type: LearningPathLessonType) {
       return BarChart2
     case "simulation":
       return Orbit
+    case "test":
+      return ClipboardList
     case "text":
     default:
       return FileText
   }
+}
+
+export function getLessonItemDisplayIcon(item: { item_type: LearningPathLessonType; content_json?: Record<string, unknown> | null }) {
+  if (item.item_type === "test") {
+    const testContent = parseTestContent(item.content_json ?? null)
+    if (testContent?.icon) {
+      const fromCatalog = resolveTestIcon(testContent.icon)
+      if (fromCatalog) return fromCatalog
+    }
+    return ClipboardList
+  }
+  return getItemIcon(item.item_type)
 }
 
 export { toYoutubeEmbedUrl } from "@/lib/youtube-utils"
@@ -258,6 +285,24 @@ export function LearningPathItemBody({
           options={pollData.options}
         />
       </PollSection>
+    )
+  }
+
+  if (item.item_type === "test") {
+    const testContent = parseTestContent(item.content_json ?? null)
+    if (!testContent || !nextItemHref || !lessonId) {
+      return <p className="text-sm text-[#777777]">Testul nu este configurat încă.</p>
+    }
+    const publicContent = toPublicTestContent(testContent)
+    return (
+      <LearningPathTestSection
+        itemId={item.id}
+        title={item.title || "Test"}
+        content={publicContent}
+        nextItemHref={nextItemHref}
+        lessonId={lessonId}
+        isLastItem={isLastItem}
+      />
     )
   }
 
