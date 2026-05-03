@@ -206,31 +206,28 @@ function ValueAnswerCard({
   const progressLabel = `${currentIndex + 1}/${subpoints.length}`
 
   return (
-    <div className="rounded-3xl border border-[#0b0d10]/10 bg-white/90 pt-3 px-5 pb-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)]">
-      <div className="space-y-3 text-sm text-[#2C2F33]">
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
-          <div className="flex justify-start">
-            {subpoints.length > 1 && (
-              <span className="rounded-full border border-[#0b0d10]/10 bg-[#f6f5f4] px-2.5 py-1 text-xs font-semibold text-[#2C2F33]/70">
-                {progressLabel}
-              </span>
-            )}
+    <div className="rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)] lg:p-4">
+      <div className="text-sm text-[#2C2F33]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          {subpoints.length > 1 && (
+            <span className="w-fit rounded-full border border-[#0b0d10]/10 bg-[#f6f5f4] px-2.5 py-1 text-xs font-semibold text-[#2C2F33]/70 lg:shrink-0">
+              {progressLabel}
+            </span>
+          )}
+          <div className="flex flex-wrap items-center justify-center gap-3 lg:flex-1 lg:flex-nowrap lg:justify-start">
+            <span className="text-base font-semibold text-[#0b0d10] lg:min-w-0">
+              {renderInlineMath(currentSubpoint.text_before)}
+            </span>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              placeholder="..."
+              className="h-12 w-[240px] bg-white text-center text-base font-semibold lg:h-11 lg:w-[120px] lg:shrink-0"
+            />
+            <span className="shrink-0 text-base font-semibold text-[#0b0d10]">{renderInlineMath(currentSubpoint.text_after)}</span>
           </div>
-          <span className="text-base font-semibold text-[#0b0d10] text-center">
-            {renderInlineMath(currentSubpoint.text_before)}
-          </span>
-          <div />
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Input
-            type="text"
-            inputMode="decimal"
-            value={inputValue}
-            onChange={(event) => setInputValue(event.target.value)}
-            placeholder="..."
-            className="h-12 w-[240px] bg-white text-center text-base font-semibold"
-          />
-          <span className="text-base font-semibold text-[#0b0d10]">{renderInlineMath(currentSubpoint.text_after)}</span>
         </div>
       </div>
 
@@ -238,7 +235,7 @@ function ValueAnswerCard({
         <p className={`mt-3 text-sm ${isError ? "text-rose-600" : "text-emerald-700"}`}>{feedback}</p>
       )}
 
-      <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
+      <div className="mt-5 flex items-center justify-between gap-3 flex-wrap lg:mt-4">
         <div className="flex items-center gap-2">
           <Button
             type="button"

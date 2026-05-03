@@ -37,6 +37,7 @@ import {
 } from "@/lib/physics-catalog-problems-cache"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
+import { extractYouTubeVideoId } from "@/components/lazy-youtube-player"
 
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
@@ -132,51 +133,69 @@ function NoAnswerCard() {
   )
 }
 
-function LockedVideoCard({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-white/5">
-      <img
-        src="/video-locked-placeholder.jpg"
-        alt="Rezolvare video blocată"
-        className="h-full w-full object-cover blur-md scale-[1.03]"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/20" />
+function LockedVideoCard({
+  onClose,
+  onUpgradeClick,
+  videoUrl,
+}: {
+  onClose: () => void
+  onUpgradeClick: () => void
+  videoUrl?: string | null
+}) {
+  const videoId = videoUrl ? extractYouTubeVideoId(videoUrl) : null
+  const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null
 
-      {/* Mobile: only lock icon + CTA (more space) */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 text-center sm:hidden">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-sm">
-          <Lock className="h-5 w-5 text-white" />
+  return (
+    <div className="relative w-full overflow-hidden rounded-3xl bg-white text-center shadow-[0_20px_60px_-35px_rgba(11,13,16,0.75)]">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onClose}
+        className="absolute right-3 top-3 z-20 h-8 w-8 rounded-full bg-white/85 text-[#2C2F33]/55 backdrop-blur hover:bg-white hover:text-[#0b0d10]"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+
+      <div className="relative aspect-video w-full bg-[#f6f5f4]">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt="Thumbnail rezolvare video"
+            className="h-full w-full scale-[1.02] object-cover blur-[2px] brightness-75"
+            onError={(event) => {
+              event.currentTarget.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-[#f6f5f4] text-sm font-semibold text-[#2C2F33]/45">
+            Rezolvare video
+          </div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-[#0b0d10] shadow-lg">
+            <Lock className="h-6 w-6" />
+          </div>
         </div>
-        <Link
-          href="/pricing"
-          className="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-white/90"
-          aria-label="Încearcă Planck Plus+ gratuit 7 zile"
-        >
-          Încearcă Plus+ (7 zile gratuit)
-        </Link>
       </div>
 
-      {/* Desktop: keep full copy + secondary CTA */}
-      <div className="absolute inset-0 hidden sm:flex flex-col items-center justify-center px-6 text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-sm">
-          <Lock className="h-6 w-6 text-white" />
-        </div>
-        <p className="text-xl sm:text-2xl font-semibold text-white">
-          Ai nevoie de Planck Plus+ pentru rezolvarea video
+      <div className="px-6 py-7 sm:px-8">
+        <p className="text-xl font-semibold leading-tight text-[#0b0d10] sm:text-2xl">
+          Ai nevoie de Planck Plus+ pentru a vedea soluția
         </p>
-        <p className="mt-2 text-sm sm:text-base text-white/70 max-w-md">
-          Deblochează videoclipul pentru această problemă și toate rezolvările video.
+        <p className="mx-auto mt-3 max-w-sm text-sm font-medium leading-relaxed text-[#2C2F33]/65">
+          Rezolvările video sunt disponibile pentru membrii Plus+.
         </p>
-        <div className="mt-5 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        <div className="mt-6 flex w-full flex-col gap-2">
           <Link
             href="/pricing"
-            className="inline-flex w-full sm:w-auto items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-white/90"
+            className="inline-flex w-full items-center justify-center rounded-full bg-[#0b0d10] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#1a1d21]"
+            aria-label="Încearcă Planck Plus+ gratuit 7 zile"
           >
-            Încearcă Plus+ (7 zile gratuit)
+            Încearcă Plus+ gratuit
           </Link>
           <Button
-            variant="outline"
-            className="w-full sm:w-auto rounded-full border-white/25 bg-transparent text-white hover:bg-white/10"
+            variant="ghost"
+            className="w-full rounded-full px-6 py-3 text-sm font-bold text-[#0b0d10] hover:bg-[#f6f5f4]"
             onClick={onUpgradeClick}
           >
             Vezi detalii
@@ -243,8 +262,7 @@ export default function ProblemDetailClient({
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
   }, [problem.youtube_url])
   const hasAnswerCard = problem.answer_type === "value" || problem.answer_type === "grila"
-
-  const isVideoLockedForUser = hasVideo && isFree
+  const hasProblemImage = typeof problem.image_url === "string" && problem.image_url.trim() !== ""
 
   React.useEffect(() => {
     setCanMarkSolvedByAnswer(false)
@@ -287,6 +305,23 @@ export default function ProblemDetailClient({
     : typeof problem.class === 'number'
       ? `Clasa a ${problem.class}-a`
       : null
+
+  const renderProblemMetaBadges = (className?: string) => (
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
+        {problem.difficulty}
+      </Badge>
+      <Badge className="flex items-center gap-2 border border-[#0b0d10]/15 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-[#2C2F33]">
+        <span className="text-base leading-none">{categoryIcons?.[problem.category] ?? '📘'}</span>
+        {problem.category}
+      </Badge>
+      {hasVideo && (
+        <Badge className="border border-red-600/30 bg-red-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-800">
+          🎥 Video
+        </Badge>
+      )}
+    </div>
+  )
 
   // Add custom scrollbar class to body (skip when embedded in classroom shell — parent scrolls)
   React.useEffect(() => {
@@ -530,11 +565,11 @@ export default function ProblemDetailClient({
                         {renderInlineMath(problem.statement)}
                       </div>
                     </div>
-                    {problem.image_url && (
-                      <div className="flex justify-center">
+                    {hasProblemImage && (
+                      <div className="flex justify-center lg:hidden">
                         {!imageLoaded && <ImageSkeleton />}
                         <img
-                          src={problem.image_url.replace(/^@/, '')}
+                          src={problem.image_url!.replace(/^@/, '')}
                           alt="Ilustrație problemă"
                           className={cn(
                             "w-full h-auto max-w-full rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
@@ -548,16 +583,51 @@ export default function ProblemDetailClient({
                         />
                       </div>
                     )}
+                    {hasProblemImage && (
+                      <div className="hidden lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.72fr)] items-start gap-6 xl:gap-8">
+                        <div className="flex justify-start">
+                          {!imageLoaded && <Skeleton className="h-72 w-full max-w-[620px] rounded-xl bg-[#dfdcd8]" />}
+                          <img
+                            src={problem.image_url!.replace(/^@/, '')}
+                            alt="Ilustrație problemă"
+                            className={cn(
+                              "h-auto w-full max-w-[620px] rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
+                              !imageLoaded && "hidden"
+                            )}
+                            onLoad={() => setImageLoaded(true)}
+                            onError={(e) => {
+                              console.error('Image failed to load:', problem.image_url, e)
+                              setImageLoaded(true)
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          {hasAnswerCard ? (
+                            <ProblemAnswerCard
+                              problem={problem}
+                              onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                              onSolvedCorrectly={handleMarkSolved}
+                              isSolved={isSolved}
+                            />
+                          ) : (
+                            <NoAnswerCard />
+                          )}
+                          {renderProblemMetaBadges("hidden lg:flex")}
+                        </div>
+                      </div>
+                    )}
                     <div className="pt-1 space-y-3">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => hasVideo && setIsVideoModalOpen(true)}
-                        disabled={!hasVideo}
+                        onClick={() => {
+                          if (hasVideo || isFree) setIsVideoModalOpen(true)
+                        }}
+                        disabled={!hasVideo && !isFree}
                         className="rounded-full border-[#0b0d10]/20 bg-white/70 px-5 py-2.5 text-sm font-medium text-[#2C2F33] hover:bg-white disabled:cursor-not-allowed disabled:opacity-55"
                       >
                         <Play className="mr-2 h-4 w-4" />
-                        {hasVideo ? "Rezolvare video" : "Video în curând"}
+                        {hasVideo || isFree ? "Rezolvare video" : "Video în curând"}
                       </Button>
                       {!isClassroomEmbed && (
                         <button
@@ -594,35 +664,27 @@ export default function ProblemDetailClient({
                         </button>
                       )}
                     </div>
-                    <div className="hidden lg:grid grid-cols-2 gap-6 xl:gap-8">
-                      {hasAnswerCard ? (
-                        <ProblemAnswerCard
-                          problem={problem}
-                          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-                          onSolvedCorrectly={handleMarkSolved}
-                          isSolved={isSolved}
-                        />
-                      ) : (
-                        <NoAnswerCard />
+                    <div className={cn("hidden items-start gap-6 lg:grid xl:gap-8", hasProblemImage ? "grid-cols-1" : "grid-cols-2")}>
+                      {!hasProblemImage && (
+                        <div className="space-y-3">
+                          {hasAnswerCard ? (
+                            <ProblemAnswerCard
+                              problem={problem}
+                              onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                              onSolvedCorrectly={handleMarkSolved}
+                              isSolved={isSolved}
+                            />
+                          ) : (
+                            <NoAnswerCard />
+                          )}
+                          {renderProblemMetaBadges()}
+                        </div>
                       )}
                       <RecommendedProblemCard currentProblem={problem} />
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
-                    {problem.difficulty}
-                  </Badge>
-                  <Badge className="flex items-center gap-2 border border-[#0b0d10]/15 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-[#2C2F33]">
-                    <span className="text-base leading-none">{categoryIcons?.[problem.category] ?? '📘'}</span>
-                    {problem.category}
-                  </Badge>
-                  {hasVideo && (
-                    <Badge className="border border-red-600/30 bg-red-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-800">
-                      🎥 Video
-                    </Badge>
-                  )}
-                </div>
+                {renderProblemMetaBadges("lg:hidden")}
               </section>
 
               {/* Pe mobil: card problema recomandată sub datele problemei, înainte de footer */}
@@ -750,39 +812,50 @@ export default function ProblemDetailClient({
         <DialogContent
           hideClose
           overlayClassName="z-[590]"
-          className="z-[600] max-w-4xl border border-white/10 bg-[#141414] text-white top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]"
+          className={cn(
+            "z-[600] text-[#0b0d10]",
+            isFree
+              ? "max-w-[min(92vw,560px)] border-0 bg-transparent p-0 shadow-none"
+              : "max-w-4xl border border-[#0b0d10]/10 bg-[#f6f5f4] top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]"
+          )}
         >
           <DialogTitle className="sr-only">Rezolvare video</DialogTitle>
           <DialogDescription className="sr-only">
             Modal cu rezolvarea video pentru problema curentă.
           </DialogDescription>
-          <div className="flex items-center justify-between pb-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/40">Video</p>
-              <p className="text-sm text-white/70">Rezolvare pentru această problemă</p>
+          {!isFree && (
+            <div className="flex items-center justify-between pb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/45">Video</p>
+                <p className="text-sm font-medium text-[#2C2F33]/70">Rezolvare pentru această problemă</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsVideoModalOpen(false)}
+                className="rounded-full border border-[#0b0d10]/10 bg-white text-[#0b0d10] transition hover:bg-[#ebe9e6]"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsVideoModalOpen(false)}
-              className="rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/20"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-black/40 p-3 sm:p-6">
-            {hasVideo ? (
-              isVideoLockedForUser ? (
-                <LockedVideoCard onUpgradeClick={() => setShowMobileUpgradeModal(true)} />
-              ) : (
+          )}
+          {isFree ? (
+            <LockedVideoCard
+              onClose={() => setIsVideoModalOpen(false)}
+              onUpgradeClick={() => setShowMobileUpgradeModal(true)}
+              videoUrl={problem.youtube_url}
+            />
+          ) : (
+            <div className="rounded-3xl border border-[#0b0d10]/10 bg-white p-3 shadow-[0_18px_50px_-42px_rgba(11,13,16,0.7)] sm:p-4">
+              {hasVideo ? (
                 <Suspense fallback={<VideoSkeleton />}>
                   <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
                 </Suspense>
-              )
-            ) : (
-              <MissingVideoCard />
-            )}
-          </div>
+              ) : (
+                <MissingVideoCard />
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
