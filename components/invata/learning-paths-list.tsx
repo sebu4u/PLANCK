@@ -15,7 +15,7 @@ interface LearningPathsListProps {
   chapters: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
   problemsByChapterId?: Record<string, Problem[]>
-  showComingSoonBadge?: boolean
+  lockedChapterIds?: string[]
   completedLessonIds?: string[]
 }
 
@@ -365,9 +365,11 @@ export function LearningPathsList({
   chapters,
   lessonsByChapter,
   problemsByChapterId = {},
-  showComingSoonBadge = false,
+  lockedChapterIds = [],
   completedLessonIds = [],
 }: LearningPathsListProps) {
+  const lockedChapterIdSet = new Set(lockedChapterIds)
+
   if (!chapters.length) {
     return (
       <section className="rounded-2xl border border-[#e6e6e6] bg-[#f7f7f7] p-8 text-center">
@@ -424,7 +426,7 @@ export function LearningPathsList({
                   ) : null}
                 </div>
               </div>
-              {showComingSoonBadge ? (
+              {lockedChapterIdSet.has(chapter.id) ? (
                 <span className="shrink-0 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
                   In curand..
                 </span>

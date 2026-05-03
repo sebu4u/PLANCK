@@ -2,21 +2,30 @@
 
 import { useLayoutEffect, useMemo, useState, type CSSProperties } from "react"
 import Link from "next/link"
-import { BookOpen, ChevronRight } from "lucide-react"
+import { BookOpen, Check, ChevronRight, Lock } from "lucide-react"
 import {
   getLearningPathLessonHref,
   type LearningPathChapter,
   type LearningPathLesson,
   type LearningPathLessonItem,
 } from "@/lib/supabase-learning-paths"
+import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
 import { ITEM_TYPE_LABEL, getLessonItemDisplayIcon } from "@/components/invata/learning-path-item-body"
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
+import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
+
+interface FreeAccessState {
+  itemsSolved: number
+  itemsRemaining: number
+}
 
 interface LearningPathLessonPageProps {
   chapter: LearningPathChapter
   lesson: LearningPathLesson
   items: LearningPathLessonItem[]
   initialSelectedItemId?: string | null
+  completedItemIds?: string[]
+  freeAccess?: FreeAccessState | null
 }
 
 const NODE_ROW_OFFSETS = ["ml-[6%]", "ml-[26%]", "ml-[12%]", "ml-[32%]", "ml-[18%]"]
@@ -80,8 +89,12 @@ export function LearningPathLessonPage({
   lesson,
   items,
   initialSelectedItemId = null,
+  completedItemIds = [],
+  freeAccess = null,
 }: LearningPathLessonPageProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialSelectedItemId ?? items[0]?.id ?? null)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const completedItemIdSet = useMemo(() => new Set(completedItemIds), [completedItemIds])
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
@@ -92,6 +105,11 @@ export function LearningPathLessonPage({
   const selectedItemIndex = selectedItem ? Math.max(items.findIndex((item) => item.id === selectedItem.id), 0) : 0
   const selectedItemHref = selectedItem ? `${lessonBaseHref}/${selectedItemIndex + 1}` : null
   const selectedTheme = LEVEL_CARD_THEMES[Math.floor(selectedItemIndex / ITEMS_PER_LEVEL) % LEVEL_CARD_THEMES.length]
+  const nextItemId = useMemo(() => {
+    const firstUncompleted = items.find((item) => !completedItemIdSet.has(item.id))
+    return firstUncompleted?.id ?? items[0]?.id ?? null
+  }, [items, completedItemIdSet])
+  const isSelectedNextItem = selectedItem ? selectedItem.id === nextItemId : true
 
   useLayoutEffect(() => {
     if (!initialSelectedItemId || items.length < 2) return
@@ -164,6 +182,7 @@ export function LearningPathLessonPage({
                       {levelItems.map((item, localIndex) => {
                         const index = start + localIndex
                         const isSelected = item.id === selectedItem?.id
+                        const isCompleted = completedItemIdSet.has(item.id)
                         const ItemIcon = getLessonItemDisplayIcon(item)
                         const isTest = item.item_type === "test"
                         const offsetClass = isTest
@@ -232,11 +251,21 @@ export function LearningPathLessonPage({
                                       Test
                                     </span>
                                     <span
-                                      className={`block text-sm font-bold leading-tight sm:text-base ${
+                                      className={`flex items-center gap-1.5 text-sm font-bold leading-tight sm:text-base ${
                                         isSelected ? "text-white" : "text-[#18101f]"
                                       }`}
                                     >
-                                      {item.title || ITEM_TYPE_LABEL[item.item_type]}
+                                      <span>{item.title || ITEM_TYPE_LABEL[item.item_type]}</span>
+                                      {isCompleted ? (
+                                        <span
+                                          className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                                            isSelected ? "bg-white text-emerald-600" : "bg-emerald-500 text-white"
+                                          }`}
+                                          aria-label="Completat"
+                                        >
+                                          <Check className="h-3 w-3" strokeWidth={3} />
+                                        </span>
+                                      ) : null}
                                     </span>
                                     <span className={`mt-1 block text-xs ${isSelected ? "text-white/78" : "text-[#8b6fac]"}`}>
                                       Provocare cu timp și scor minim
@@ -281,11 +310,19 @@ export function LearningPathLessonPage({
 
                                   <span className="min-w-0">
                                     <span
-                                      className={`block text-sm font-semibold sm:text-base ${
+                                      className={`flex items-center gap-1.5 text-sm font-semibold sm:text-base ${
                                         isSelected ? "text-[#18101f]" : "text-[#b7b0be]"
                                       }`}
                                     >
-                                      {item.title || ITEM_TYPE_LABEL[item.item_type]}
+                                      <span>{item.title || ITEM_TYPE_LABEL[item.item_type]}</span>
+                                      {isCompleted ? (
+                                        <span
+                                          className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+                                          aria-label="Completat"
+                                        >
+                                          <Check className="h-3 w-3" strokeWidth={3} />
+                                        </span>
+                                      ) : null}
                                     </span>
                                     <span className={`mt-1 block text-xs ${isSelected ? "text-[#7d6a92]" : "text-[#d0c9d7]"}`}>
                                       {ITEM_TYPE_LABEL[item.item_type]}
@@ -307,26 +344,71 @@ export function LearningPathLessonPage({
                   {/* Spacer păstrează layout-ul; cardul real e fixed mai jos */}
                   <div className="mt-6 h-[140px] w-full shrink-0 lg:w-1/2 lg:min-w-[200px] lg:max-w-sm" aria-hidden="true" />
                   <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:left-[calc(360px+2rem)] lg:right-8 lg:justify-center xl:left-[calc(400px+2rem)]">
-                    <div className="w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)] lg:w-[min(100%,320px)]">
+                    <div
+                      key={selectedItem.id}
+                      className="animate-learning-path-card-pop w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)] lg:w-[min(100%,320px)]"
+                    >
+                      {freeAccess ? (
+                        <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7c3aed]">
+                          {Math.min(freeAccess.itemsSolved, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT)} / {FREE_PLAN_LEARNING_PATH_ITEM_LIMIT} itemi gratuiți
+                        </p>
+                      ) : null}
                       <p className="text-center text-xl font-bold text-[#111111]">
                         {selectedItem.title || ITEM_TYPE_LABEL[selectedItem.item_type]}
                       </p>
-                      <Link
-                        href={selectedItemHref || lessonBaseHref}
-                        className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] hover:translate-y-0.5"
-                        style={
-                          {
-                            "--start-glow-tint": selectedTheme.glow,
-                            backgroundImage: `linear-gradient(to right, ${selectedTheme.from}, ${selectedTheme.to})`,
-                            boxShadow: `0 3px 0 ${selectedTheme.buttonShadow}`,
-                          } as CSSProperties
+                      {(() => {
+                        const isSelectedCompleted = completedItemIdSet.has(selectedItem.id)
+                        const showSkipPaywall =
+                          !!freeAccess && !isSelectedNextItem && !isSelectedCompleted
+                        const showLimitPaywall =
+                          !!freeAccess &&
+                          !isSelectedCompleted &&
+                          freeAccess.itemsRemaining <= 0 &&
+                          isSelectedNextItem
+                        const requiresPaywall = showSkipPaywall || showLimitPaywall
+                        const buttonLabel = requiresPaywall
+                          ? "Deblochează cu Plus+"
+                          : isSelectedNextItem
+                            ? "Continuă"
+                            : "Sari către"
+
+                        const commonClassName =
+                          "dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] hover:translate-y-0.5"
+                        const commonStyle = {
+                          "--start-glow-tint": selectedTheme.glow,
+                          backgroundImage: `linear-gradient(to right, ${selectedTheme.from}, ${selectedTheme.to})`,
+                          boxShadow: `0 3px 0 ${selectedTheme.buttonShadow}`,
+                        } as CSSProperties
+
+                        if (requiresPaywall) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setPaywallOpen(true)}
+                              className={commonClassName}
+                              style={commonStyle}
+                            >
+                              <span className="relative z-[1] inline-flex items-center gap-2">
+                                <Lock className="h-3.5 w-3.5" />
+                                {buttonLabel}
+                              </span>
+                            </button>
+                          )
                         }
-                      >
-                        <span className="relative z-[1] inline-flex items-center gap-2">
-                          Continuă
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </span>
-                      </Link>
+
+                        return (
+                          <Link
+                            href={selectedItemHref || lessonBaseHref}
+                            className={commonClassName}
+                            style={commonStyle}
+                          >
+                            <span className="relative z-[1] inline-flex items-center gap-2">
+                              {buttonLabel}
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </span>
+                          </Link>
+                        )
+                      })()}
                     </div>
                   </div>
                 </>
@@ -339,6 +421,7 @@ export function LearningPathLessonPage({
           )}
         </section>
       </div>
+      {paywallOpen ? <FreePlanComparisonOverlay onClose={() => setPaywallOpen(false)} /> : null}
     </div>
   )
 }

@@ -36,6 +36,25 @@ interface InsightChatSidebarProps {
   initialUserMessageDisplay?: string | null
   /** Called after initialUserMessage has been sent so parent can clear it. */
   onInitialMessageSent?: () => void
+  /**
+   * Prefix prepended to problemStatement as hidden context for the first user message.
+   * - undefined: default "Rezolva problema asta:\\n\\n" (catalog problem pages)
+   * - "": use problemStatement only
+   * - other: that string + "\\n\\n" + statement
+   */
+  problemContextPreamble?: string
+  /** Light UI (same chrome as embedded problem chat) on desktop when not embedded (e.g. learning path slide-over). */
+  lightChromeWhenSlideOver?: boolean
+  /** With embedOnDesktop: show header close (learning path). Catalog problem page omits. */
+  showCloseWhenDesktopEmbedded?: boolean
+  /** Override embedded top offset (default top-16 for catalog nav). */
+  embedDesktopTopClass?: string
+  /** Override embedded height (default h-[calc(100dvh-4rem)]). */
+  embedDesktopHeightClass?: string
+  /** After slide-out `transform` transition (learning path). Catalog omits. */
+  onExitAnimationComplete?: () => void
+  /** Replace default problem_tutor starter chips when opening empty chat (e.g. /grile). */
+  starterQuestionChips?: string[] | null
 }
 
 interface SuggestedQuestionsProps {
@@ -141,6 +160,21 @@ const normalizeLatexDelimiters = (text: string): string => {
     .join('')
 }
 
+function buildProblemContextFromStatement(
+  statement: string,
+  preamble: string | undefined
+): string | null {
+  const trimmed = statement?.trim()
+  if (!trimmed) return null
+  if (preamble === undefined) {
+    return `Rezolva problema asta:\n\n${trimmed}`
+  }
+  if (preamble === '') {
+    return trimmed
+  }
+  return `${preamble}\n\n${trimmed}`
+}
+
 export default function InsightChatSidebar({
   isOpen,
   onClose,
@@ -154,6 +188,13 @@ export default function InsightChatSidebar({
   initialUserMessage,
   initialUserMessageDisplay,
   onInitialMessageSent,
+  problemContextPreamble,
+  lightChromeWhenSlideOver = false,
+  showCloseWhenDesktopEmbedded = false,
+  embedDesktopTopClass,
+  embedDesktopHeightClass,
+  onExitAnimationComplete,
+  starterQuestionChips,
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -199,7 +240,14 @@ export default function InsightChatSidebar({
 
   const isDesktopEmbedded = embedOnDesktop && viewportModeResolved && !isMobile
   const effectiveOpen = isOpen || isDesktopEmbedded
-  const isProblemLightTheme = problemLightTheme && isDesktopEmbedded
+  const isProblemLightTheme = Boolean(
+    problemLightTheme && (isDesktopEmbedded || (lightChromeWhenSlideOver && !isMobile))
+  )
+
+  const starterChipsToShow = useMemo(
+    () => starterQuestionChips ?? starterInsightCards,
+    [starterQuestionChips]
+  )
 
   // Handle mobile keyboard resizing and prevent body scroll
   const [viewportHeight, setViewportHeight] = useState<string | undefined>(undefined)
@@ -410,7 +458,8 @@ export default function InsightChatSidebar({
     !loadingSession &&
     !busy &&
     effectiveOpen &&
-    !initialUserMessage?.trim()
+    !initialUserMessage?.trim() &&
+    starterChipsToShow.length > 0
   const lastVisibleMessage = visibleMessages.length > 0
     ? visibleMessages[visibleMessages.length - 1]
     : null
@@ -469,7 +518,7 @@ export default function InsightChatSidebar({
 
         // Auto-fill problem statement for fresh chat as context
         if (problemStatement) {
-          setProblemContext(`Rezolva problema asta:\n\n${problemStatement}`)
+          setProblemContext(buildProblemContextFromStatement(problemStatement, problemContextPreamble))
         }
 
         // Focus textarea after a short delay only on desktop
@@ -486,7 +535,7 @@ export default function InsightChatSidebar({
     }
 
     initializeSession()
-  }, [effectiveOpen, user, problemId]) // Dependencies kept, but logic guards against re-run
+  }, [effectiveOpen, user, problemId, problemStatement, problemContextPreamble])
 
   // Reset state when problem changes
   useEffect(() => {
@@ -996,6 +1045,17 @@ export default function InsightChatSidebar({
   const send = () => submitMessage()
   const isInputDisabled = busy || !user
 
+  const handlePanelTransitionEnd = useCallback(
+    (e: React.TransitionEvent<HTMLDivElement>) => {
+      if (e.target !== e.currentTarget) return
+      if (e.propertyName !== "transform") return
+      if (!isOpen && onExitAnimationComplete) {
+        onExitAnimationComplete()
+      }
+    },
+    [isOpen, onExitAnimationComplete]
+  )
+
   // Prevent page scroll when hovering over sidebar
   useEffect(() => {
     if (!effectiveOpen || !sidebarRef.current || isDesktopEmbedded) return
@@ -1033,6 +1093,7 @@ export default function InsightChatSidebar({
       {/* Sidebar: on desktop (lg) full height and above navbar (z-[500] > navbar z-[300]); on mobile unchanged */}
       <div
         ref={sidebarRef}
+        onTransitionEnd={handlePanelTransitionEnd}
         className={`fixed right-0 ${
           isProblemLightTheme
             ? isDesktopEmbedded
@@ -1041,7 +1102,19 @@ export default function InsightChatSidebar({
             : "bg-[#101010] border-l border-white/10"
         } z-[500] flex flex-col overscroll-contain ${
           isDesktopEmbedded
-            ? 'top-16 bottom-0 h-[calc(100dvh-4rem)] w-[25vw] translate-x-0 transition-none rounded-tl-xl rounded-bl-xl overflow-hidden'
+            ? showCloseWhenDesktopEmbedded
+              ? cn(
+                  embedDesktopTopClass ?? "top-16",
+                  embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
+                  "bottom-0 w-[25vw] rounded-tl-xl rounded-bl-xl overflow-hidden",
+                  "transition-transform duration-300 ease-out",
+                  isOpen ? "translate-x-0" : "translate-x-full",
+                )
+              : cn(
+                  embedDesktopTopClass ?? "top-16",
+                  embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
+                  "bottom-0 w-[25vw] translate-x-0 transition-none rounded-tl-xl rounded-bl-xl overflow-hidden",
+                )
             : `top-0 h-dvh lg:h-dvh w-[90vw] lg:w-[25vw] transition-transform duration-300 ease-in-out ${
                 isOpen ? 'translate-x-0' : 'translate-x-full'
               }`
@@ -1065,13 +1138,14 @@ export default function InsightChatSidebar({
           className={cn(
             'flex items-center gap-3 p-4 border-b',
             isProblemLightTheme ? 'border-[#0b0d10]/10' : 'border-white/10',
-            isDesktopEmbedded ? 'justify-start' : 'justify-between'
+            isDesktopEmbedded && !showCloseWhenDesktopEmbedded ? 'justify-start' : 'justify-between'
           )}
         >
           <div
             className={cn(
               'flex items-center gap-3',
-              !isDesktopEmbedded && 'min-w-0 flex-1'
+              !isDesktopEmbedded && 'min-w-0 flex-1',
+              isDesktopEmbedded && showCloseWhenDesktopEmbedded && 'min-w-0 flex-1'
             )}
           >
             <h2 className={cn('shrink-0 font-semibold', isProblemLightTheme ? 'text-[#0b0d10]' : 'text-white')}>
@@ -1088,7 +1162,7 @@ export default function InsightChatSidebar({
               </div>
             )}
           </div>
-          {!isDesktopEmbedded && (
+          {(!isDesktopEmbedded || showCloseWhenDesktopEmbedded) && (
             <button
               onClick={onClose}
               className={cn(
@@ -1333,7 +1407,7 @@ export default function InsightChatSidebar({
 
                 {canShowStarterCards && (
                   <div className="mb-2 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    {starterInsightCards.map((cardText) => (
+                    {starterChipsToShow.map((cardText) => (
                       <button
                         key={cardText}
                         onClick={() => handleStarterCardSelect(cardText)}

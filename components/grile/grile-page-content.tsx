@@ -3,13 +3,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QuizProvider, useQuiz } from './quiz-context';
+import { GrileInsightChatProvider, useGrileInsightChat } from './grile-insight-chat-provider';
 import { ClassSelector } from './class-selector';
 import { QuestionCard } from './question-card';
 import { AnswersList } from './answers-list';
 import { NavigationControls } from './navigation-controls';
 import { fetchAndShuffleQuestions, fetchQuizQuestionById } from '@/lib/supabase-quiz';
-import type { GradeLevel } from '@/lib/types/quiz-questions';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { formatGrileCatalogInsightContext } from '@/lib/grile-insight-context';
+import type { GradeLevel, QuizQuestion, UserAnswer } from '@/lib/types/quiz-questions';
+import { Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function QuizContent() {
     const router = useRouter();
@@ -171,6 +174,10 @@ function QuizContent() {
         return null;
     }
 
+    if (!classLevel) {
+        return null;
+    }
+
     return (
         <div className="w-full max-w-4xl mx-auto px-4 lg:px-6">
             {/* Progress bar */}
@@ -210,18 +217,87 @@ function QuizContent() {
                 onReset={resetQuiz}
                 isLastQuestion={currentIndex === totalQuestions - 1}
             />
+
+            <GrileInsightFab
+                classLevel={classLevel}
+                currentQuestion={currentQuestion}
+                currentAnswer={currentAnswer}
+                currentIndex={currentIndex}
+                totalQuestions={totalQuestions}
+            />
         </div>
     );
+}
+
+function GrileInsightFab({
+    classLevel,
+    currentQuestion,
+    currentAnswer,
+    currentIndex,
+    totalQuestions,
+}: {
+    classLevel: GradeLevel
+    currentQuestion: QuizQuestion
+    currentAnswer: UserAnswer | null
+    currentIndex: number
+    totalQuestions: number
+}) {
+    const grileChat = useGrileInsightChat()
+    const grileDesktopChat = Boolean(grileChat?.grileChatDocked && grileChat?.isDesktopViewport)
+
+    if (!grileChat) return null
+
+    return (
+        <button
+            type="button"
+            onClick={() => {
+                grileChat.openGrileChat({
+                    problemStatement: formatGrileCatalogInsightContext({
+                        question: currentQuestion,
+                        userAnswer: currentAnswer,
+                        classLevel,
+                        questionIndex: currentIndex,
+                        totalQuestions,
+                    }),
+                    problemId: `grile-catalog:${currentQuestion.id}:${currentIndex}`,
+                })
+            }}
+            className={cn(
+                'fixed z-[400] flex items-center gap-2 rounded-full border border-violet-400/50 bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/25 transition hover:from-violet-500 hover:to-purple-500',
+                'bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] max-lg:right-[max(1.5rem,env(safe-area-inset-right,0px))]',
+                grileDesktopChat ? 'lg:right-[calc(1.5rem+25vw)]' : 'lg:right-6',
+            )}
+        >
+            <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+            Întreabă Insight
+        </button>
+    )
+}
+
+function GrilePageShell() {
+    const chat = useGrileInsightChat()
+    const insightDesktopOpen = Boolean(chat?.grileChatDocked && chat?.isDesktopViewport)
+
+    return (
+        <div
+            className={cn(
+                'min-h-screen lg:h-screen lg:overflow-hidden bg-[#0a0a0f] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col',
+                insightDesktopOpen && 'lg:mr-[25vw]',
+            )}
+        >
+            <div className="flex-1 flex items-start lg:items-center justify-center">
+                <QuizContent />
+            </div>
+        </div>
+    )
 }
 
 export function GrilePageContent() {
     return (
         <QuizProvider>
-            <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#0a0a0f] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col">
-                <div className="flex-1 flex items-start lg:items-center justify-center">
-                    <QuizContent />
-                </div>
-            </div>
+            <GrileInsightChatProvider>
+                <GrilePageShell />
+            </GrileInsightChatProvider>
         </QuizProvider>
-    );
+    )
 }

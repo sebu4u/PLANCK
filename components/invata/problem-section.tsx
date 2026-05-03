@@ -14,6 +14,11 @@ import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-corre
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
+import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
+import {
+  formatProblemLearningPathContext,
+  LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+} from "@/lib/learning-path-insight-context"
 
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
@@ -132,6 +137,7 @@ export function ProblemSection({
   const [grilaSelected, setGrilaSelected] = useState<string>("")
   const [valueSubpointIndex, setValueSubpointIndex] = useState(0)
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
+  const explainChat = useLearningPathExplainChat()
   const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
 
   const hasVideo =
@@ -391,7 +397,39 @@ export function ProblemSection({
           onVerify={onVerify}
           onRetry={onRetry}
           onContinue={onContinue}
-          onExplain={() => pushHint("manual")}
+          onExplain={() => {
+            pushHint("manual")
+            const statement =
+              answerType === "value" && currentSubpoint
+                ? formatProblemLearningPathContext({
+                    problem,
+                    answerType,
+                    valueInput,
+                    valueSubpointLabel: currentSubpoint.label,
+                    valueCorrectValue: currentSubpoint.correct_value,
+                    wasCorrect: isCorrect,
+                  })
+                : answerType === "grila" && hasGrilaAnswer
+                  ? formatProblemLearningPathContext({
+                      problem,
+                      answerType,
+                      grilaOptions,
+                      grilaSelectedIndex:
+                        grilaSelected === "" ? undefined : Number(grilaSelected),
+                      grilaCorrectIndex,
+                      wasCorrect: isCorrect,
+                    })
+                  : formatProblemLearningPathContext({
+                      problem,
+                      answerType,
+                      wasCorrect: isCorrect,
+                    })
+            explainChat?.openExplainChat({
+              problemStatement: statement,
+              problemContextPreamble: "",
+              initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+            })
+          }}
           eloAward={eloAward}
           answerSlot={answerSlot}
         />

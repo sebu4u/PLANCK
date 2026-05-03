@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EloGainCard } from "@/components/invata/elo-gain-card"
+import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 
 function playClickSound() {
@@ -50,6 +51,10 @@ export function PollFeedbackBar({
   eloAward,
 }: PollFeedbackBarProps) {
   const router = useRouter()
+  const explainChat = useLearningPathExplainChat()
+  const bottomBarDesktopInset = Boolean(
+    explainChat?.insightOpen && explainChat?.isDesktopViewport
+  )
   const [showEloCard, setShowEloCard] = useState(false)
   const isVerified = state === "correct" || state === "incorrect"
   const isCorrect = state === "correct"
@@ -77,6 +82,7 @@ export function PollFeedbackBar({
       <div
         className={cn(
           "fixed bottom-0 left-0 right-0 z-[300] flex items-center justify-between gap-3 border-t px-4 py-2.5 sm:gap-4 sm:px-6 sm:py-4",
+          bottomBarDesktopInset && "lg:right-[25vw]",
           state === "verify" && "border-[#eee7f3] bg-white/95 backdrop-blur-sm",
           state === "incorrect" && "border-gray-200 bg-gray-100",
           state === "correct" && "border-emerald-200 bg-emerald-50",

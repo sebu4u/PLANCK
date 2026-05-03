@@ -27,6 +27,14 @@ import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
+import {
+  formatGrilaLearningPathContext,
+  LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+} from "@/lib/learning-path-insight-context"
+import {
+  LearningPathExplainChatProvider,
+  useLearningPathExplainChat,
+} from "@/components/invata/learning-path-explain-chat-context"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -67,7 +75,7 @@ interface LessonItemShellProps {
   children: React.ReactNode
 }
 
-export function LessonItemShell({
+function LessonItemShellInner({
   chapterSlug,
   lessonSlug,
   itemIndex,
@@ -83,6 +91,10 @@ export function LessonItemShell({
   grilaQuestion = null,
   children,
 }: LessonItemShellProps) {
+  const explainChat = useLearningPathExplainChat()
+  const insightDesktopOpen = Boolean(
+    explainChat?.insightOpen && explainChat?.isDesktopViewport
+  )
   const { user } = useAuth()
   const router = useRouter()
   const contentRef = useRef<HTMLDivElement>(null)
@@ -516,7 +528,11 @@ export function LessonItemShell({
       </div>
 
       <main
-        className={cn("relative z-10 min-h-screen bg-[#ffffff] pt-14", overflowHidden && "overflow-hidden")}
+        className={cn(
+          "relative z-10 min-h-screen bg-[#ffffff] pt-14",
+          overflowHidden && "overflow-hidden",
+          insightDesktopOpen && "lg:mr-[25vw]",
+        )}
         style={{
           paddingBottom: hideBottomCta
             ? "max(16px, env(safe-area-inset-bottom, 0px))"
@@ -544,6 +560,7 @@ export function LessonItemShell({
 
       {!hideBottomCta && grilaQuestion ? (
         <GrilaLessonBottomCta
+          grilaQuestion={grilaQuestion}
           nextItemHref={nextItemHref}
           onContinue={continueToNextItem}
           currentItemId={currentItemId}
@@ -552,7 +569,10 @@ export function LessonItemShell({
         />
       ) : !hideBottomCta ? (
         <div
-          className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
+          className={cn(
+            "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
+            insightDesktopOpen && "lg:right-[25vw]",
+          )}
           style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
         >
           <div className="mx-auto flex max-w-5xl justify-center">
@@ -620,19 +640,30 @@ export function LessonItemShell({
   )
 }
 
+export function LessonItemShell(props: LessonItemShellProps) {
+  return (
+    <LearningPathExplainChatProvider currentItemId={props.currentItemId}>
+      <LessonItemShellInner {...props} />
+    </LearningPathExplainChatProvider>
+  )
+}
+
 function GrilaLessonBottomCta({
+  grilaQuestion,
   nextItemHref,
   onContinue,
   currentItemId,
   lessonId,
   isLastItem,
 }: {
+  grilaQuestion: QuizQuestion
   nextItemHref: string
   onContinue: () => Promise<void> | void
   currentItemId: string
   lessonId: string
   isLastItem: boolean
 }) {
+  const explainChat = useLearningPathExplainChat()
   const ctx = useGrilaLesson()
   const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
@@ -668,7 +699,18 @@ function GrilaLessonBottomCta({
         reset()
       }}
       onContinue={onContinue}
-      onExplain={() => pushHint("manual")}
+      onExplain={() => {
+        pushHint("manual")
+        explainChat?.openExplainChat({
+          problemStatement: formatGrilaLearningPathContext(
+            grilaQuestion,
+            selectedAnswer,
+            isCorrect
+          ),
+          problemContextPreamble: "",
+          initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+        })
+      }}
       eloAward={eloAward}
       answerSlot={
         <span className="text-sm font-medium text-[#6f657b]">

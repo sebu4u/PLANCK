@@ -4,9 +4,10 @@ import type { Problem } from "@/data/problems"
 import { Navigation } from "@/components/navigation"
 import { LessonItemShell } from "@/components/invata/lesson-item-shell"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
+import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
 import { supabase } from "@/lib/supabaseClient"
 import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
-import { canViewLearningPathContent } from "@/lib/learning-path-access"
+import { getLearningPathAccess } from "@/lib/learning-path-access"
 import { createClient } from "@/lib/supabase/server"
 import {
   ITEM_TYPE_LABEL,
@@ -52,15 +53,15 @@ export async function generateMetadata({
 }: {
   params: Promise<{ chapterSlug: string; lessonSlug: string; itemIndex: string }>
 }): Promise<Metadata> {
-  const canViewLearningPathsContent = await canViewLearningPathContent()
-  if (!canViewLearningPathsContent) {
-    return generatePageMetadata("learning-paths")
-  }
-
   const { chapterSlug, lessonSlug, itemIndex } = await params
   const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
 
   if (!chapter || !lesson) {
+    return generatePageMetadata("learning-paths")
+  }
+
+  const access = await getLearningPathAccess(chapter)
+  if (access.mode === "locked") {
     return generatePageMetadata("learning-paths")
   }
 
@@ -86,7 +87,6 @@ export default async function InvataLessonItemPage({
 }: {
   params: Promise<{ chapterSlug: string; lessonSlug: string; itemIndex: string }>
 }) {
-  const canViewLearningPathsContent = await canViewLearningPathContent()
   const { chapterSlug, lessonSlug, itemIndex } = await params
   const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
 
@@ -99,7 +99,9 @@ export default async function InvataLessonItemPage({
     notFound()
   }
 
-  if (!canViewLearningPathsContent) {
+  const access = await getLearningPathAccess(chapter)
+
+  if (access.mode === "locked") {
     return (
       <>
         <Navigation />
@@ -117,6 +119,46 @@ export default async function InvataLessonItemPage({
     notFound()
   }
 
+  const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
+
+  let initialCurrentItemCompleted = false
+  let completedItemIdsForLesson: string[] = []
+  const supabaseForProgress = await createClient()
+  const {
+    data: { user: progressUser },
+  } = await supabaseForProgress.auth.getUser()
+  if (progressUser) {
+    completedItemIdsForLesson = await getCompletedLearningPathItemIdsForUser(
+      supabaseForProgress,
+      progressUser.id,
+      items.map((i) => i.id)
+    )
+    initialCurrentItemCompleted = completedItemIdsForLesson.includes(item.id)
+  }
+
+  if (access.mode === "free-preview") {
+    const completedSet = new Set(completedItemIdsForLesson)
+    const nextItemId = items.find((i) => !completedSet.has(i.id))?.id ?? items[0]?.id ?? null
+    const isCurrentItemNext = item.id === nextItemId
+    const isCurrentItemCompleted = initialCurrentItemCompleted
+
+    if (!isCurrentItemCompleted) {
+      const blockedBySkip = !isCurrentItemNext
+      const blockedByLimit = isCurrentItemNext && access.itemsRemaining <= 0
+
+      if (blockedBySkip || blockedByLimit) {
+        return (
+          <>
+            <Navigation />
+            <main className="min-h-screen bg-[#ffffff]">
+              <FreePlanComparisonScreen backHref={lessonBaseHref} />
+            </main>
+          </>
+        )
+      }
+    }
+  }
+
   const isLinkedTextItem = item.item_type === "text"
   const isCustomTextItem = item.item_type === "custom_text"
   const sourceLesson =
@@ -132,7 +174,6 @@ export default async function InvataLessonItemPage({
       ? await fetchQuizQuestionById(item.quiz_question_id)
       : null
   const ItemIcon = getItemIcon(item.item_type)
-  const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
   const nextItemHref =
     parsedIndex < items.length ? `${lessonBaseHref}/${parsedIndex + 1}` : lessonBaseHref
 
@@ -143,20 +184,6 @@ export default async function InvataLessonItemPage({
   const problemHasAnswer =
     sourceProblem &&
     (sourceProblem.answer_type === "value" || sourceProblem.answer_type === "grila")
-
-  let initialCurrentItemCompleted = false
-  const supabaseForProgress = await createClient()
-  const {
-    data: { user: progressUser },
-  } = await supabaseForProgress.auth.getUser()
-  if (progressUser) {
-    const completedForItem = await getCompletedLearningPathItemIdsForUser(
-      supabaseForProgress,
-      progressUser.id,
-      [item.id]
-    )
-    initialCurrentItemCompleted = completedForItem.includes(item.id)
-  }
 
   return (
     <LessonItemShell

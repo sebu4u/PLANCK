@@ -1,0 +1,2 @@
+export const FREE_LEARNING_PATH_CHAPTER_SLUG = "cinematica"
+export const FREE_PLAN_LEARNING_PATH_ITEM_LIMIT = 10

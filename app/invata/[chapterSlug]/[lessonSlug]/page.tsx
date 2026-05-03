@@ -5,7 +5,7 @@ import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learnin
 import { LearningPathLessonPage } from "@/components/invata/learning-path-lesson-page"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
-import { canViewLearningPathContent } from "@/lib/learning-path-access"
+import { getLearningPathAccess } from "@/lib/learning-path-access"
 import { createClient } from "@/lib/supabase/server"
 import {
   getCompletedLearningPathItemIdsForUser,
@@ -53,7 +53,6 @@ export default async function InvataLessonDetailPage({
   params: Promise<{ chapterSlug: string; lessonSlug: string }>
 }) {
   const { chapterSlug, lessonSlug } = await params
-  const canViewLearningPathsContent = await canViewLearningPathContent()
 
   const chapter = isUuid(chapterSlug)
     ? await getLearningPathChapterById(chapterSlug)
@@ -63,6 +62,9 @@ export default async function InvataLessonDetailPage({
     notFound()
   }
 
+  const access = await getLearningPathAccess(chapter)
+  const showRealContent = access.mode === "full" || access.mode === "free-preview"
+
   const lesson = isUuid(lessonSlug)
     ? await getLearningPathLessonById(lessonSlug)
     : await getLearningPathLessonBySlug(chapterSlug, lessonSlug)
@@ -71,12 +73,13 @@ export default async function InvataLessonDetailPage({
     notFound()
   }
 
-  const rawItems = canViewLearningPathsContent ? await getLearningPathLessonItems(lesson.id) : []
+  const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id) : []
   const items = rawItems.map((item) => ({
     ...item,
     content_json: sanitizeTestContentJson(item.item_type, item.content_json ?? null),
   }))
   let initialSelectedItemId: string | null = items[0]?.id ?? null
+  let completedItemIdList: string[] = []
 
   if (items.length > 0) {
     const supabase = await createClient()
@@ -90,22 +93,30 @@ export default async function InvataLessonDetailPage({
         user.id,
         items.map((item) => item.id)
       )
+      completedItemIdList = Array.from(completedItemIds)
       initialSelectedItemId =
         getNextIncompleteLearningPathItem(items, completedItemIds)?.id ?? items[items.length - 1]?.id ?? null
     }
   }
 
+  const freeAccess =
+    access.mode === "free-preview"
+      ? { itemsSolved: access.itemsSolved, itemsRemaining: access.itemsRemaining }
+      : null
+
   return (
     <>
       <Navigation />
       <main className="min-h-screen bg-[#ffffff]">
-        {canViewLearningPathsContent ? (
+        {showRealContent ? (
           <>
             <LearningPathLessonPage
               chapter={chapter}
               lesson={lesson}
               items={items}
               initialSelectedItemId={initialSelectedItemId}
+              completedItemIds={completedItemIdList}
+              freeAccess={freeAccess}
             />
             {items.length === 0 ? <MarkLearningPathLessonProgress lessonId={lesson.id} /> : null}
           </>

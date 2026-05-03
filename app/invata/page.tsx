@@ -13,13 +13,15 @@ import { createClient } from "@/lib/supabase/server"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import type { Problem } from "@/data/problems"
-import { canViewLearningPathContent } from "@/lib/learning-path-access"
+import { FREE_LEARNING_PATH_CHAPTER_SLUG } from "@/lib/learning-path-free-plan"
+import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
 export const revalidate = 21600
 
 export default async function InvataPage() {
-  const canViewLearningPathsContent = await canViewLearningPathContent()
+  const access = await getLearningPathAccess(null)
+  const hasFullAccess = access.mode === "full"
   const chapters = await getLearningPathChapters()
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
   const problemsByChapterId: Record<string, Problem[]> = {}
@@ -29,7 +31,10 @@ export default async function InvataPage() {
       const lessons = await getLearningPathLessonsByChapterId(chapter.id)
       lessonsByChapter[chapter.id] = lessons
 
-      if (canViewLearningPathsContent) {
+      const isFreeAccessibleChapter = chapter.slug === FREE_LEARNING_PATH_CHAPTER_SLUG
+      const canShowRealItems = hasFullAccess || isFreeAccessibleChapter
+
+      if (canShowRealItems) {
         const fromItems = await getProblemsFromLearningPathChapterItems(chapter.id, 3)
         if (fromItems.length) {
           problemsByChapterId[chapter.id] = fromItems
@@ -53,6 +58,12 @@ export default async function InvataPage() {
     ? await getCompletedLearningPathLessonIdsForUser(supabase, user.id, allLessonIds)
     : []
 
+  const lockedChapterIds = hasFullAccess
+    ? []
+    : chapters
+        .filter((chapter) => chapter.slug !== FREE_LEARNING_PATH_CHAPTER_SLUG)
+        .map((chapter) => chapter.id)
+
   return (
     <>
       <Navigation />
@@ -71,7 +82,7 @@ export default async function InvataPage() {
             chapters={chapters}
             lessonsByChapter={lessonsByChapter}
             problemsByChapterId={problemsByChapterId}
-            showComingSoonBadge={!canViewLearningPathsContent}
+            lockedChapterIds={lockedChapterIds}
             completedLessonIds={completedLessonIds}
           />
         </div>

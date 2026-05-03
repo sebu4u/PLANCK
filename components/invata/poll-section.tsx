@@ -8,6 +8,11 @@ import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-corre
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
+import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
+import {
+  formatPollLearningPathContext,
+  LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+} from "@/lib/learning-path-insight-context"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -81,6 +86,7 @@ export function PollSection({
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [displayText, setDisplayText] = useState(question)
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
+  const explainChat = useLearningPathExplainChat()
   const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "poll" })
   const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
     itemId: currentItemId,
@@ -155,7 +161,21 @@ export function PollSection({
         onVerify={onVerify}
         onRetry={onRetry}
         onContinue={onContinue}
-        onExplain={() => pushHint("manual")}
+        onExplain={() => {
+          pushHint("manual")
+          explainChat?.openExplainChat({
+            problemStatement: formatPollLearningPathContext({
+              question,
+              options: options.map((o) => ({ id: o.id, label: o.label })),
+              selectedId,
+              correctAnswerId,
+              displayTextAfterVerify: displayText,
+              wasCorrect: isCorrect,
+            }),
+            problemContextPreamble: "",
+            initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+          })
+        }}
         eloAward={eloAward}
       />
     </PollStateContext.Provider>
