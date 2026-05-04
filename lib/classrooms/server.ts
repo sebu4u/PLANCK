@@ -446,7 +446,8 @@ export async function getClassroomMembers(classroomId: string): Promise<Classroo
     })
   }
 
-  const emailByUserId = await getEmailMapForUserIds(admin, userIds)
+  const emailByUserId =
+    membership.role === "teacher" ? await getEmailMapForUserIds(admin, userIds) : new Map<string, string>()
 
   return members.map((row) => {
     const userIdValue = asString(row.user_id)
@@ -459,7 +460,7 @@ export async function getClassroomMembers(classroomId: string): Promise<Classroo
       role,
       joined_at: asString(row.joined_at),
       name: profile?.nickname || profile?.name || (role === "teacher" ? "Profesor" : "Elev"),
-      email: emailByUserId.get(userIdValue) ?? "",
+      email: membership.role === "teacher" ? (emailByUserId.get(userIdValue) ?? "") : "",
       user_icon: profile?.user_icon ?? null,
       elo: stats?.elo ?? 500,
       rank: stats?.rank ?? "Bronze III",

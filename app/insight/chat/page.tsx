@@ -43,6 +43,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import InsightActionButtons from '@/components/insight-action-buttons';
 import InsightProblemsDialog from '@/components/insight-problems-dialog';
+import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay';
 import { BlockMath, InlineMath } from 'react-katex';
 
 type ChatMessage = {
@@ -339,6 +340,7 @@ function InsightChatPageContent() {
   const [plusPlanPopupOpen, setPlusPlanPopupOpen] = useState(false);
   const [plusPlanPopupType, setPlusPlanPopupType] = useState<'think' | 'teach' | null>(null);
   const [problemsDialogOpen, setProblemsDialogOpen] = useState(false);
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -955,6 +957,7 @@ function InsightChatPageContent() {
 
     setBusy(true);
     setError(null);
+    setPremiumUpgradeOpen(false);
 
     let controller: AbortController | null = null;
     let currentSessionId = sessionId;
@@ -1035,19 +1038,26 @@ function InsightChatPageContent() {
       if (res.status === 429) {
         const data = await res.json();
         setLoadingMessage(null);
-        setError(data.error || 'Limită zilnică atinsă.');
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          const lastIndex = newMessages.length - 1;
-          if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
-            newMessages[lastIndex] = {
-              role: 'assistant',
-              content: data.error || 'Ai atins limita zilnică pentru planul Free (3 solicitări/zi).',
-            };
-          }
-          return newMessages;
-        });
+        if (data.resetTime) {
+          setPremiumUpgradeOpen(true);
+          setError(null);
+          setMessages((prev) => prev.slice(0, -1));
+        } else {
+          setError(data.error || 'Limită zilnică atinsă.');
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastIndex = newMessages.length - 1;
+            if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
+              newMessages[lastIndex] = {
+                role: 'assistant',
+                content: data.error || 'Ai atins limita zilnică pentru planul Free (3 solicitări/zi).',
+              };
+            }
+            return newMessages;
+          });
+        }
         setBusy(false);
+        setIsStreaming(false);
         return;
       }
 
@@ -1871,6 +1881,10 @@ function InsightChatPageContent() {
         onOpenChange={setProblemsDialogOpen}
         onSelectProblem={handleSelectProblem}
       />
+
+      {premiumUpgradeOpen ? (
+        <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
     </div>
   );
 }

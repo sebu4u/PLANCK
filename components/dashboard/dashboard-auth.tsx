@@ -531,7 +531,7 @@ export function DashboardAuth() {
       localStorage.setItem(countKey, String(nextCount))
 
       const lastShownSession = localStorage.getItem(lastShownKey)
-      if (nextCount % 3 === 0 && lastShownSession !== sessionId) {
+      if (nextCount % 5 === 0 && lastShownSession !== sessionId) {
         localStorage.setItem(lastShownKey, sessionId)
         setShowTrialModal(true)
       }

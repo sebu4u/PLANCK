@@ -94,7 +94,9 @@ export default async function ClassroomStudentsPage({
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-xs text-[#6b7280]">{member.email || "Fără adresă de e-mail"}</p>
+                    {classroom.role === "teacher" ? (
+                      <p className="text-xs text-[#6b7280]">{member.email || "Fără adresă de e-mail"}</p>
+                    ) : null}
                     <p className="text-[11px] text-[#9ca3af]">
                       Înscris la {new Date(member.joined_at).toLocaleDateString("ro-RO")}
                     </p>

@@ -12,7 +12,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { LimitReachedBanner } from './limit-reached-banner'
+import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
 
 type ChatMessage = {
     role: 'user' | 'assistant' | 'system'
@@ -76,7 +76,7 @@ export function PhysicsChatSidebar({
     const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
     // Context specifically from selection (initialQuery)
     const [selectionContext, setSelectionContext] = useState<string | null>(null)
-    const [limitResetTime, setLimitResetTime] = useState<string | null>(null)
+    const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
 
 
     const markdownComponents = useMemo(
@@ -281,7 +281,7 @@ export function PhysicsChatSidebar({
 
         setBusy(true)
         setError(null)
-        setLimitResetTime(null)
+        setPremiumUpgradeOpen(false)
         setIsStreaming(true)
 
         try {
@@ -368,7 +368,7 @@ export function PhysicsChatSidebar({
             if (res.status === 429) {
                 const data = await res.json()
                 if (data.resetTime) {
-                    setLimitResetTime(data.resetTime)
+                    setPremiumUpgradeOpen(true)
                 } else {
                     setError(data.error || 'Limită zilnică atinsă.')
                 }
@@ -739,9 +739,6 @@ export function PhysicsChatSidebar({
                         </div>
                     )}
                     <div className="flex flex-col relative w-full">
-                        {limitResetTime ? (
-                            <LimitReachedBanner resetTime={limitResetTime} />
-                        ) : (
                             <>
                                 {selectionContext && !busy && (
                                     <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -810,10 +807,12 @@ export function PhysicsChatSidebar({
                                     )}
                                 </div>
                             </>
-                        )}
                     </div>
                 </div>
             </div>
+            {premiumUpgradeOpen ? (
+                <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+            ) : null}
         </>
     )
 }

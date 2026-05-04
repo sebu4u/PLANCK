@@ -12,7 +12,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { LimitReachedBanner } from './limit-reached-banner'
+import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
 import { cn } from '@/lib/utils'
 
 type ChatMessage = {
@@ -224,7 +224,7 @@ export default function InsightChatSidebar({
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
   const [problemContext, setProblemContext] = useState<string | null>(null)
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
-  const [limitResetTime, setLimitResetTime] = useState<string | null>(null)
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [viewportModeResolved, setViewportModeResolved] = useState(false)
   const pendingStreamAnchorRef = useRef(false)
@@ -691,7 +691,7 @@ export default function InsightChatSidebar({
 
     setBusy(true)
     setError(null)
-    setLimitResetTime(null) // Reset limit banner on new attempt
+    setPremiumUpgradeOpen(false)
     setIsStreaming(true)
     setSuggestedQuestions([]) // Clear suggestions when new message starts
 
@@ -801,7 +801,7 @@ export default function InsightChatSidebar({
       if (res.status === 429) {
         const data = await res.json()
         if (data.resetTime) {
-          setLimitResetTime(data.resetTime)
+          setPremiumUpgradeOpen(true)
         } else {
           setError(data.error || 'Limită zilnică atinsă.')
         }
@@ -1381,9 +1381,6 @@ export default function InsightChatSidebar({
             )}
           />
           <div className="pointer-events-auto relative z-10 flex w-full flex-col">
-            {limitResetTime ? (
-              <LimitReachedBanner resetTime={limitResetTime} />
-            ) : (
               <>
                 {shouldShowJumpToLatest && (
                   <div className="pointer-events-none absolute -top-12 right-0 z-20">
@@ -1528,10 +1525,12 @@ export default function InsightChatSidebar({
                   )}
                 </div>
               </>
-            )}
           </div>
         </div>
       </div>
+      {premiumUpgradeOpen ? (
+        <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
     </>
   )
 }

@@ -10,7 +10,7 @@ import { Chrome, Github, Loader2, Send, X, Copy, Check, Sparkles, ChevronDown } 
 import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
-import { AiAgentLimitBanner } from "@/components/ai-agent-limit-banner"
+import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -423,7 +423,7 @@ export function InsightIdeChat({
   const [busy, setBusy] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [limitReached, setLimitReached] = useState(false)
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -577,7 +577,7 @@ export function InsightIdeChat({
     setIsStreaming(true)
     setIsGenerating(false)
     setError(null)
-    setLimitReached(false)
+    setPremiumUpgradeOpen(false)
 
     try {
       abortControllerRef.current?.abort()
@@ -673,7 +673,7 @@ export function InsightIdeChat({
         const isDailyLimit = Boolean(data.resetTime) || /zilnic/i.test(limitMessage)
 
         if (isDailyLimit) {
-          setLimitReached(true)
+          setPremiumUpgradeOpen(true)
           setMessages((prev) => prev.slice(0, -1))
         } else {
           setMessages((prev) => {
@@ -1331,7 +1331,7 @@ export function InsightIdeChat({
               </div>
             )}
 
-            {error && !limitReached && (
+            {error && !premiumUpgradeOpen && (
               <div className="bg-red-900/20 border border-red-800 text-red-300 rounded p-2 text-xs">
                 {error}
               </div>
@@ -1340,7 +1340,6 @@ export function InsightIdeChat({
           </div>
 
           <div className="p-4 space-y-3">
-            {limitReached && <AiAgentLimitBanner />}
             <div className="rounded-2xl border border-[#3b3b3b] bg-[#242424] px-3 py-1.5 space-y-1">
               <Input
                 value={input}
@@ -1439,6 +1438,9 @@ export function InsightIdeChat({
           </div>
         </>
       )}
+      {premiumUpgradeOpen ? (
+        <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
     </div>
   )
 }

@@ -26,7 +26,7 @@ export function FreePlanComparisonOverlay({ onClose }: FreePlanComparisonOverlay
 
   return (
     <div
-      className="fixed inset-0 z-[400] flex items-center justify-center overflow-y-auto bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)] px-4 py-10 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[600] flex items-center justify-center overflow-y-auto bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)] px-4 py-10 animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       onPointerDown={(event) => {

@@ -192,7 +192,7 @@ export function PhysicsSidebar({
                             chapter.lessons.some(l => l.id === currentLessonId)
                         )
 
-                        const isLocked = grade.grade_number === 11 || grade.grade_number === 12
+                        const isLocked = grade.grade_number === 12
 
                         return (
                             <div key={grade.id} className="mb-2">
