@@ -16,7 +16,7 @@ export async function updateSession(request: NextRequest) {
                 getAll() {
                     return request.cookies.getAll()
                 },
-                setAll(cookiesToSet) {
+                setAll(cookiesToSet, headers) {
                     cookiesToSet.forEach(({ name, value, options }) =>
                         request.cookies.set(name, value)
                     )
@@ -28,6 +28,9 @@ export async function updateSession(request: NextRequest) {
                     cookiesToSet.forEach(({ name, value, options }) =>
                         response.cookies.set(name, value, options)
                     )
+                    Object.entries(headers).forEach(([key, value]) =>
+                        response.headers.set(key, value)
+                    )
                 },
             },
         }
@@ -35,9 +38,12 @@ export async function updateSession(request: NextRequest) {
 
     // This will refresh session if expired - required for Server Components
     // https://supabase.com/docs/guides/auth/server-side/nextjs
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    await supabase.auth.getUser()
+
+    // Belt-and-suspenders: never cache middleware responses that may carry refreshed auth cookies.
+    if (!response.headers.get('Cache-Control')) {
+        response.headers.set('Cache-Control', 'private, no-store')
+    }
 
     return response
 }
