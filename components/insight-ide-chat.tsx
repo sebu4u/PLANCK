@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
+import { AnonLimitLockedContent } from "@/components/anon-limit-locked-content"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +26,8 @@ interface ChatMessage {
   role: ChatRole
   content: string
   model?: string
+  /** Vizitatori fără cont: placeholder blur-at după limită */
+  anonLimitLocked?: boolean
 }
 
 type MessageSegment =
@@ -547,7 +550,22 @@ export function InsightIdeChat({
     setIsStreaming(false)
     setBusy(false)
 
-    if (!user) return
+    if (!user) {
+      try {
+        await fetch("/api/insight/increment", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            persona: "ide",
+            model: mode === "ask" ? "gpt-4o" : selectedModel,
+          }),
+        })
+      } catch (error) {
+        console.error("Failed to increment usage after manual stop:", error)
+      }
+      return
+    }
 
     try {
       const { data } = await supabase.auth.getSession()
@@ -571,7 +589,7 @@ export function InsightIdeChat({
   }, [isStreaming, mode, selectedModel, supabase, user])
 
   const sendMessage = useCallback(async () => {
-    if (!user || !input.trim() || busy) return
+    if (!input.trim() || busy) return
 
     setBusy(true)
     setIsStreaming(true)
@@ -584,16 +602,23 @@ export function InsightIdeChat({
       const controller = new AbortController()
       abortControllerRef.current = controller
 
-      const { data } = await supabase.auth.getSession()
-      const accessToken = data.session?.access_token
-      if (!accessToken) {
-        setError("Necesită autentificare.")
-        toast({
-          title: "Eroare",
-          description: "Necesită autentificare.",
-          variant: "destructive",
-        })
-        return
+      const isGuest = !user
+
+      let accessToken: string | null = null
+      if (!isGuest) {
+        const { data } = await supabase.auth.getSession()
+        accessToken = data.session?.access_token ?? null
+        if (!accessToken) {
+          setError("Necesită autentificare.")
+          toast({
+            title: "Eroare",
+            description: "Necesită autentificare.",
+            variant: "destructive",
+          })
+          setBusy(false)
+          setIsStreaming(false)
+          return
+        }
       }
 
       const newUserMessage: ChatMessage = {
@@ -607,7 +632,7 @@ export function InsightIdeChat({
 
       let currentSessionId = sessionId
 
-      if (!currentSessionId) {
+      if (!isGuest && accessToken && !currentSessionId) {
         const createRes = await fetch("/api/insight/sessions", {
           method: "POST",
           headers: {
@@ -650,17 +675,22 @@ export function InsightIdeChat({
           ]
           : undefined
 
+      const fetchHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+      if (accessToken) {
+        fetchHeaders.Authorization = `Bearer ${accessToken}`
+      }
+
       const response = await fetch("/api/insight/chat", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+        credentials: "include",
+        headers: fetchHeaders,
         body: JSON.stringify({
-          sessionId: currentSessionId,
+          ...(isGuest ? {} : { sessionId: currentSessionId }),
           input: newUserMessage.content,
           persona: "ide",
-          mode, // hint server to avoid JSON in Ask mode
+          mode,
           model: mode === "ask" ? "gpt-4o" : selectedModel,
           contextMessages,
         }),
@@ -734,6 +764,7 @@ export function InsightIdeChat({
       const decoder = new TextDecoder()
       let sseBuffer = ""
       let assistantBuffer = ""
+      let anonLimitFakeStream = false
 
       while (true) {
         const { done, value } = await reader.read()
@@ -812,6 +843,23 @@ export function InsightIdeChat({
                 })
               }
               // If isGenerating is true, don't update message content at all
+            } else if (data.type === "done") {
+              if (data.anonLimitReached) {
+                anonLimitFakeStream = true
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === "assistant") {
+                      updated[i] = { ...updated[i], anonLimitLocked: true }
+                      break
+                    }
+                  }
+                  return updated
+                })
+              }
+              if (data.sessionId) {
+                setSessionId(data.sessionId)
+              }
             } else if (data.type === "session" && data.sessionId) {
               setSessionId(data.sessionId)
             } else if (data.type === "error") {
@@ -823,7 +871,9 @@ export function InsightIdeChat({
         }
       }
 
-      if (assistantBuffer.trim().length > 0) {
+      if (anonLimitFakeStream) {
+        setIsGenerating(false)
+      } else if (assistantBuffer.trim().length > 0) {
         // Try to extract and parse JSON from the buffer
         const structured = parseCodeEditResponse(assistantBuffer)
 
@@ -1058,7 +1108,10 @@ export function InsightIdeChat({
     onApplyCodeEdit,
     onInsertCode,
     mode,
+    selectedModel,
     isGenerating,
+    supabase,
+    onMessageSent,
   ])
 
   const handleGoogleLogin = useCallback(async () => {
@@ -1131,7 +1184,7 @@ export function InsightIdeChat({
   )
 
   const renderAssistantMessage = useCallback(
-    (content: string, index: number, isLastMessage: boolean = false) => {
+    (content: string, index: number, isLastMessage: boolean = false, anonLimitLocked?: boolean) => {
       // Check for markers
       const isGeneratingMarker = content.includes(":::status:generating:::")
       const parts = content.split(":::status:code_inserted:::")
@@ -1185,8 +1238,8 @@ export function InsightIdeChat({
         )
       }
 
-      return (
-        <div key={index} className="space-y-3">
+      const inner = (
+        <>
           {/* Main content (explanation + streamed code) */}
           {renderBlock(mainContent, `msg-${index}-main`)}
 
@@ -1212,6 +1265,12 @@ export function InsightIdeChat({
               </div>
             </div>
           )}
+        </>
+      )
+
+      return (
+        <div key={index} className="space-y-3">
+          <AnonLimitLockedContent active={Boolean(anonLimitLocked)}>{inner}</AnonLimitLockedContent>
         </div>
       )
     },
@@ -1253,39 +1312,6 @@ export function InsightIdeChat({
         </Button>
       </header>
 
-      {!user ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-4">
-          <p className="text-gray-300 text-sm">
-            Autentifică-te pentru a folosi Insight în PlanckCode IDE.
-          </p>
-          <div className="flex flex-col gap-3 w-full">
-            <Button
-              onClick={handleGoogleLogin}
-              disabled={loginLoading !== null}
-              className="h-10 bg-transparent border border-white/20 text-white hover:bg-white/10 transition-all duration-200"
-            >
-              {loginLoading === "google" ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Chrome className="w-4 h-4 mr-2" />
-              )}
-              Continuă cu Google
-            </Button>
-            <Button
-              onClick={handleGitHubLogin}
-              disabled={loginLoading !== null}
-              className="h-10 bg-transparent border border-white/20 text-white hover:bg-white/10 transition-all duration-200"
-            >
-              {loginLoading === "github" ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Github className="w-4 h-4 mr-2" />
-              )}
-              Continuă cu GitHub
-            </Button>
-          </div>
-        </div>
-      ) : (
         <>
           <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
             {visibleMessages.length === 0 ? (
@@ -1307,7 +1333,7 @@ export function InsightIdeChat({
                         <div className="text-xs uppercase tracking-wide text-gray-500">
                           {MODEL_OPTIONS.find((m) => m.id === message.model)?.label || "Insight"}
                         </div>
-                        {renderAssistantMessage(message.content, index, isLastMessage)}
+                        {renderAssistantMessage(message.content, index, isLastMessage, message.anonLimitLocked)}
                       </div>
                     ) : (
                       <div className="max-w-[75%] rounded-2xl bg-[#262626] text-white px-4 py-3 shadow-sm">
@@ -1437,7 +1463,6 @@ export function InsightIdeChat({
             </div>
           </div>
         </>
-      )}
       {premiumUpgradeOpen ? (
         <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
       ) : null}

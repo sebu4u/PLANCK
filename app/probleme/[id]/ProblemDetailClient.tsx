@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, List, CheckCircle2, X, Lock, Play, ChevronRight, Loader2 } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, X, Play, ChevronRight, Loader2 } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -37,8 +37,6 @@ import {
 } from "@/lib/physics-catalog-problems-cache"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
-import { extractYouTubeVideoId } from "@/components/lazy-youtube-player"
-
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
 
@@ -129,79 +127,6 @@ function NoAnswerCard() {
       <p className="text-sm text-[#2C2F33]/70">
         Încă lucrăm la rezolvarea acestei probleme. Revino curând sau explorează alte probleme din catalog.
       </p>
-    </div>
-  )
-}
-
-function LockedVideoCard({
-  onClose,
-  onUpgradeClick,
-  videoUrl,
-}: {
-  onClose: () => void
-  onUpgradeClick: () => void
-  videoUrl?: string | null
-}) {
-  const videoId = videoUrl ? extractYouTubeVideoId(videoUrl) : null
-  const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null
-
-  return (
-    <div className="relative w-full overflow-hidden rounded-3xl bg-white text-center shadow-[0_20px_60px_-35px_rgba(11,13,16,0.75)]">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onClose}
-        className="absolute right-3 top-3 z-20 h-8 w-8 rounded-full bg-white/85 text-[#2C2F33]/55 backdrop-blur hover:bg-white hover:text-[#0b0d10]"
-      >
-        <X className="h-4 w-4" />
-      </Button>
-
-      <div className="relative aspect-video w-full bg-[#f6f5f4]">
-        {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt="Thumbnail rezolvare video"
-            className="h-full w-full scale-[1.02] object-cover blur-[2px] brightness-75"
-            onError={(event) => {
-              event.currentTarget.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-[#f6f5f4] text-sm font-semibold text-[#2C2F33]/45">
-            Rezolvare video
-          </div>
-        )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-[#0b0d10] shadow-lg">
-            <Lock className="h-6 w-6" />
-          </div>
-        </div>
-      </div>
-
-      <div className="px-6 py-7 sm:px-8">
-        <p className="text-xl font-semibold leading-tight text-[#0b0d10] sm:text-2xl">
-          Ai nevoie de Planck Plus+ pentru a vedea soluția
-        </p>
-        <p className="mx-auto mt-3 max-w-sm text-sm font-medium leading-relaxed text-[#2C2F33]/65">
-          Rezolvările video sunt disponibile pentru membrii Plus+.
-        </p>
-        <div className="mt-6 flex w-full flex-col gap-2">
-          <Link
-            href="/pricing"
-            className="inline-flex w-full items-center justify-center rounded-full bg-[#0b0d10] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#1a1d21]"
-            aria-label="Încearcă Planck Plus+ gratuit 7 zile"
-          >
-            Încearcă Plus+ gratuit
-          </Link>
-          <Button
-            variant="ghost"
-            className="w-full rounded-full px-6 py-3 text-sm font-bold text-[#0b0d10] hover:bg-[#f6f5f4]"
-            onClick={onUpgradeClick}
-          >
-            Vezi detalii
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -621,7 +546,11 @@ export default function ProblemDetailClient({
                         type="button"
                         variant="outline"
                         onClick={() => {
-                          if (hasVideo || isFree) setIsVideoModalOpen(true)
+                          if (isFree) {
+                            setShowMobileUpgradeModal(true)
+                            return
+                          }
+                          if (hasVideo) setIsVideoModalOpen(true)
                         }}
                         disabled={!hasVideo && !isFree}
                         className="rounded-full border-[#0b0d10]/20 bg-white/70 px-5 py-2.5 text-sm font-medium text-[#2C2F33] hover:bg-white disabled:cursor-not-allowed disabled:opacity-55"
@@ -812,54 +741,39 @@ export default function ProblemDetailClient({
         <DialogContent
           hideClose
           overlayClassName="z-[590]"
-          className={cn(
-            "z-[600] text-[#0b0d10]",
-            isFree
-              ? "max-w-[min(92vw,560px)] border-0 bg-transparent p-0 shadow-none"
-              : "max-w-4xl border border-[#0b0d10]/10 bg-[#f6f5f4] top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]"
-          )}
+          className="z-[600] max-w-4xl border border-[#0b0d10]/10 bg-[#f6f5f4] text-[#0b0d10] top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]"
         >
           <DialogTitle className="sr-only">Rezolvare video</DialogTitle>
           <DialogDescription className="sr-only">
             Modal cu rezolvarea video pentru problema curentă.
           </DialogDescription>
-          {!isFree && (
-            <div className="flex items-center justify-between pb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/45">Video</p>
-                <p className="text-sm font-medium text-[#2C2F33]/70">Rezolvare pentru această problemă</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsVideoModalOpen(false)}
-                className="rounded-full border border-[#0b0d10]/10 bg-white text-[#0b0d10] transition hover:bg-[#ebe9e6]"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+          <div className="flex items-center justify-between pb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/45">Video</p>
+              <p className="text-sm font-medium text-[#2C2F33]/70">Rezolvare pentru această problemă</p>
             </div>
-          )}
-          {isFree ? (
-            <LockedVideoCard
-              onClose={() => setIsVideoModalOpen(false)}
-              onUpgradeClick={() => setShowMobileUpgradeModal(true)}
-              videoUrl={problem.youtube_url}
-            />
-          ) : (
-            <div className="rounded-3xl border border-[#0b0d10]/10 bg-white p-3 shadow-[0_18px_50px_-42px_rgba(11,13,16,0.7)] sm:p-4">
-              {hasVideo ? (
-                <Suspense fallback={<VideoSkeleton />}>
-                  <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
-                </Suspense>
-              ) : (
-                <MissingVideoCard />
-              )}
-            </div>
-          )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsVideoModalOpen(false)}
+              className="rounded-full border border-[#0b0d10]/10 bg-white text-[#0b0d10] transition hover:bg-[#ebe9e6]"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="rounded-3xl border border-[#0b0d10]/10 bg-white p-3 shadow-[0_18px_50px_-42px_rgba(11,13,16,0.7)] sm:p-4">
+            {hasVideo ? (
+              <Suspense fallback={<VideoSkeleton />}>
+                <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
+              </Suspense>
+            ) : (
+              <MissingVideoCard />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Upgrade Modal for Mobile */}
+      {/* Plus+ trial modal when free user opens video resolution */}
       {showMobileUpgradeModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
           <PlanckPlusTrialModal

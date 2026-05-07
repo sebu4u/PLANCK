@@ -13,11 +13,14 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
+import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content'
 import { cn } from '@/lib/utils'
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'system'
   content: string
+  /** Vizitatori fără cont: placeholder blur-at după limită */
+  anonLimitLocked?: boolean
 }
 
 interface InsightChatSidebarProps {
@@ -485,7 +488,27 @@ export default function InsightChatSidebar({
 
   // Initialize session when sidebar opens
   useEffect(() => {
-    if (!effectiveOpen || !user) return
+    if (!effectiveOpen) return
+
+    if (!user) {
+      const initGuest = async () => {
+        setLoadingSession(true)
+        try {
+          if (problemStatement) {
+            setProblemContext(buildProblemContextFromStatement(problemStatement, problemContextPreamble))
+          }
+          setTimeout(() => {
+            if (window.innerWidth >= 1024) {
+              textareaRef.current?.focus()
+            }
+          }, 100)
+        } finally {
+          setLoadingSession(false)
+        }
+      }
+      void initGuest()
+      return
+    }
 
     // If we already have messages or a session active, don't re-initialize
     if (hasMessages || sessionId) {
@@ -687,7 +710,7 @@ export default function InsightChatSidebar({
 
   const submitMessage = async (textOverride?: string, displayContentOverride?: string) => {
     const textToSend = textOverride ?? input
-    if (!user || (!textToSend.trim() && !problemContext) || busy) return
+    if ((!textToSend.trim() && !problemContext) || busy) return
 
     setBusy(true)
     setError(null)
@@ -720,18 +743,23 @@ export default function InsightChatSidebar({
       const controller = new AbortController()
       abortControllerRef.current = controller
 
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token
+      const isGuest = !user
 
-      if (!accessToken) {
-        toast({
-          title: 'Eroare',
-          description: 'Necesită autentificare.',
-          variant: 'destructive',
-        })
-        setBusy(false)
-        setIsStreaming(false)
-        return
+      let accessToken: string | null = null
+      if (!isGuest) {
+        const { data: sessionData } = await supabase.auth.getSession()
+        accessToken = sessionData.session?.access_token ?? null
+
+        if (!accessToken) {
+          toast({
+            title: 'Eroare',
+            description: 'Necesită autentificare.',
+            variant: 'destructive',
+          })
+          setBusy(false)
+          setIsStreaming(false)
+          return
+        }
       }
 
       // Combine context and input if context exists (this is what we send to the API)
@@ -739,6 +767,10 @@ export default function InsightChatSidebar({
       if (problemContext) {
         finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
       }
+
+      const priorForApi = messages
+        .filter((m) => m.role !== 'system')
+        .filter((m) => !(m.role === 'assistant' && !(m.content || '').trim()))
 
       const newUserMsg: ChatMessage = {
         role: 'user',
@@ -751,9 +783,9 @@ export default function InsightChatSidebar({
       setShouldAutoScroll(true)
       setFollowStreamToLatest(false)
 
-      // If no session, create one with problem title
+      // If no session, create one with problem title (authenticated only)
       let currentSessionId = sessionId
-      if (!currentSessionId) {
+      if (!isGuest && accessToken && !currentSessionId) {
         const problemSessionTitle = `Problem: ${problemId}`
         const res = await fetch('/api/insight/sessions', {
           method: 'POST',
@@ -783,17 +815,29 @@ export default function InsightChatSidebar({
       // Set random loading message
       setLoadingMessage(getRandomLoadingMessage())
 
+      const fetchHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (accessToken) {
+        fetchHeaders.Authorization = `Bearer ${accessToken}`
+      }
+
       const res = await fetch('/api/insight/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          sessionId: currentSessionId,
-          input: finalContent,
-          persona // Pass the persona
-        }),
+        credentials: 'include',
+        headers: fetchHeaders,
+        body: JSON.stringify(
+          isGuest
+            ? {
+                messages: [...priorForApi, { role: 'user', content: finalContent }],
+                persona,
+              }
+            : {
+                sessionId: currentSessionId,
+                input: finalContent,
+                persona,
+              }
+        ),
         signal: controller.signal,
       })
 
@@ -895,6 +939,18 @@ export default function InsightChatSidebar({
                     return newMessages
                   })
                 } else if (data.type === 'done') {
+                  if (data.anonLimitReached) {
+                    setMessages((prev) => {
+                      const next = [...prev]
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i].role === 'assistant') {
+                          next[i] = { ...next[i], anonLimitLocked: true }
+                          break
+                        }
+                      }
+                      return next
+                    })
+                  }
                   // Handle final metadata if needed
                   if (!currentSessionId && data.sessionId) {
                     setSessionId(data.sessionId)
@@ -1019,7 +1075,19 @@ export default function InsightChatSidebar({
     setLoadingMessage(null)
     pendingStreamAnchorRef.current = false
 
-    if (!user) return
+    if (!user) {
+      try {
+        await fetch('/api/insight/increment', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona }),
+        })
+      } catch (err) {
+        console.error('Failed to increment usage after manual stop:', err)
+      }
+      return
+    }
 
     try {
       const { data: sessionData } = await supabase.auth.getSession()
@@ -1043,7 +1111,7 @@ export default function InsightChatSidebar({
   }, [isStreaming, supabase, user])
 
   const send = () => submitMessage()
-  const isInputDisabled = busy || !user
+  const isInputDisabled = busy
 
   const handlePanelTransitionEnd = useCallback(
     (e: React.TransitionEvent<HTMLDivElement>) => {
@@ -1181,58 +1249,7 @@ export default function InsightChatSidebar({
           onScroll={handleScroll}
           className="insight-chat-scroll flex-1 overflow-y-auto px-3 py-5 pb-36 sm:px-4 sm:py-6 sm:pb-40 lg:px-5 overscroll-contain"
         >
-          {!user ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className={cn(
-                "text-center max-w-sm rounded-2xl px-6 py-6",
-                isProblemLightTheme ? "bg-white text-[#0b0d10] border border-[#0b0d10]/10 shadow-sm" : ""
-              )}>
-                <p className={cn("text-lg mb-6", isProblemLightTheme ? "text-[#0b0d10]" : "text-gray-300")}>
-                  Ai nevoie de un cont pentru a continua cu Insight
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Button
-                    onClick={handleGoogleLogin}
-                    disabled={loginLoading !== null}
-                    className={cn(
-                      "flex-1 h-11 transition-all duration-200",
-                      isProblemLightTheme
-                        ? "bg-white hover:bg-[#f8fafc] text-[#111827] border border-[#0b0d10]/15 hover:border-[#0b0d10]/25"
-                        : "bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20"
-                    )}
-                  >
-                    {loginLoading === 'google' ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Chrome className="w-4 h-4 mr-2" />
-                    )}
-                    <span className="font-semibold text-sm">
-                      {loginLoading === 'google' ? 'Se conectează...' : 'Google'}
-                    </span>
-                  </Button>
-                  <Button
-                    onClick={handleGitHubLogin}
-                    disabled={loginLoading !== null}
-                    className={cn(
-                      "flex-1 h-11 transition-all duration-200",
-                      isProblemLightTheme
-                        ? "bg-white hover:bg-[#f8fafc] text-[#111827] border border-[#0b0d10]/15 hover:border-[#0b0d10]/25"
-                        : "bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20"
-                    )}
-                  >
-                    {loginLoading === 'github' ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Github className="w-4 h-4 mr-2" />
-                    )}
-                    <span className="font-semibold text-sm">
-                      {loginLoading === 'github' ? 'Se conectează...' : 'GitHub'}
-                    </span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : loadingSession ? (
+          {loadingSession ? (
             <div className="flex h-full items-center justify-center">
               <div className={cn(
                 "flex flex-col items-center gap-3 rounded-2xl px-6 py-6",
@@ -1277,14 +1294,16 @@ export default function InsightChatSidebar({
                           )}
                         </div>
                         {m.content && (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm, remarkMath]}
-                            rehypePlugins={[rehypeKatex]}
-                            components={markdownComponents}
-                            className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
-                          >
-                            {normalizeLatexDelimiters(m.content)}
-                          </ReactMarkdown>
+                          <AnonLimitLockedContent active={Boolean(m.anonLimitLocked)}>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm, remarkMath]}
+                              rehypePlugins={[rehypeKatex]}
+                              components={markdownComponents}
+                              className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
+                            >
+                              {normalizeLatexDelimiters(m.content)}
+                            </ReactMarkdown>
+                          </AnonLimitLockedContent>
                         )}
                       </div>
                     ) : (

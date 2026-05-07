@@ -13,10 +13,12 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
+import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content'
 
 type ChatMessage = {
     role: 'user' | 'assistant' | 'system'
     content: string
+    anonLimitLocked?: boolean
 }
 
 interface PhysicsChatSidebarProps {
@@ -130,7 +132,43 @@ export function PhysicsChatSidebar({
 
     // Initialize session when sidebar opens
     useEffect(() => {
-        if (!isOpen || !user) return
+        if (!isOpen) return
+
+        if (!user) {
+            const initGuest = async () => {
+                try {
+                    setLoadingSession(true)
+                    setSessionId(null)
+                    setMessages([
+                        {
+                            role: 'system',
+                            content: `Ești un asistent educațional util pentru o lecție de fizică.
+            Folosește următorul conținut al lecției pentru a răspunde la întrebări.
+            Fii concis, clar și încurajator.
+            
+            Conținutul lecției:
+            ${lessonContent}`
+                        },
+                    ])
+
+                    if (initialQuery) {
+                        setSelectionContext(initialQuery)
+                    }
+
+                    setTimeout(() => {
+                        if (window.innerWidth >= 1024) {
+                            textareaRef.current?.focus()
+                        }
+                    }, 100)
+                } catch (e: any) {
+                    console.error('Failed to initialize guest session:', e)
+                } finally {
+                    setLoadingSession(false)
+                }
+            }
+            void initGuest()
+            return
+        }
 
         if (hasMessages || sessionId) {
             setTimeout(() => {
@@ -264,7 +302,7 @@ export function PhysicsChatSidebar({
             return
         }
 
-        if (initialQuery && initialQuery !== lastProcessedQuery.current && isOpen && user && !busy) {
+        if (initialQuery && initialQuery !== lastProcessedQuery.current && isOpen && !busy) {
             lastProcessedQuery.current = initialQuery
             setSelectionContext(initialQuery)
             submitMessage('', initialQuery)
@@ -277,7 +315,7 @@ export function PhysicsChatSidebar({
         const textToSend = textOverride !== undefined ? textOverride : input
         const contextToUse = contextOverride !== undefined ? contextOverride : selectionContext
 
-        if (!user || (!textToSend.trim() && !contextToUse) || busy) return
+        if ((!textToSend.trim() && !contextToUse) || busy) return
 
         setBusy(true)
         setError(null)
@@ -289,24 +327,33 @@ export function PhysicsChatSidebar({
             const controller = new AbortController()
             abortControllerRef.current = controller
 
-            const { data: sessionData } = await supabase.auth.getSession()
-            const accessToken = sessionData.session?.access_token
+            const isGuest = !user
 
-            if (!accessToken) {
-                toast({
-                    title: 'Eroare',
-                    description: 'Necesită autentificare.',
-                    variant: 'destructive',
-                })
-                setBusy(false)
-                setIsStreaming(false)
-                return
+            let accessToken: string | null = null
+            if (!isGuest) {
+                const { data: sessionData } = await supabase.auth.getSession()
+                accessToken = sessionData.session?.access_token ?? null
+
+                if (!accessToken) {
+                    toast({
+                        title: 'Eroare',
+                        description: 'Necesită autentificare.',
+                        variant: 'destructive',
+                    })
+                    setBusy(false)
+                    setIsStreaming(false)
+                    return
+                }
             }
 
             let finalContent = textToSend.trim()
             if (contextToUse) {
                 finalContent = finalContent ? `Context selectat: "${contextToUse}"\n\n${finalContent}` : `Explică asta: "${contextToUse}"`
             }
+
+            const priorForApi = messages
+                .filter((m) => m.role !== 'system')
+                .filter((m) => !(m.role === 'assistant' && !(m.content || '').trim()))
 
             const newUserMsg: ChatMessage = {
                 role: 'user',
@@ -319,7 +366,7 @@ export function PhysicsChatSidebar({
             setShouldAutoScroll(true)
 
             let currentSessionId = sessionId
-            if (!currentSessionId) {
+            if (!isGuest && accessToken && !currentSessionId) {
                 // Create session
                 const sessionTitle = `Lesson Chat`
                 const res = await fetch('/api/insight/sessions', {
@@ -345,23 +392,36 @@ export function PhysicsChatSidebar({
             setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
             setLoadingMessage(getRandomLoadingMessage())
 
+            const lessonContextMsg = {
+                role: 'system' as const,
+                content: `Conținutul complet al lecției curente, pe care îl vei folosi pentru a răspunde întrebărilor utilizatorului:\n\n${lessonContent}`,
+            }
+
+            const fetchHeaders: Record<string, string> = {
+                'Content-Type': 'application/json',
+            }
+            if (accessToken) {
+                fetchHeaders.Authorization = `Bearer ${accessToken}`
+            }
+
             const res = await fetch('/api/insight/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify({
-                    sessionId: currentSessionId,
-                    input: newUserMsg.content,
-                    persona: 'lesson_tutor',
-                    contextMessages: [
-                        {
-                            role: 'system',
-                            content: `Conținutul complet al lecției curente, pe care îl vei folosi pentru a răspunde întrebărilor utilizatorului:\n\n${lessonContent}`
-                        }
-                    ]
-                }),
+                credentials: 'include',
+                headers: fetchHeaders,
+                body: JSON.stringify(
+                    isGuest
+                        ? {
+                              messages: [...priorForApi, { role: 'user', content: finalContent }],
+                              persona: 'lesson_tutor',
+                              contextMessages: [lessonContextMsg],
+                          }
+                        : {
+                              sessionId: currentSessionId,
+                              input: newUserMsg.content,
+                              persona: 'lesson_tutor',
+                              contextMessages: [lessonContextMsg],
+                          }
+                ),
                 signal: controller.signal,
             })
 
@@ -431,6 +491,22 @@ export function PhysicsChatSidebar({
                                         }
                                         return newMessages
                                     })
+                                } else if (data.type === 'done') {
+                                    if (data.anonLimitReached) {
+                                        setMessages((prev) => {
+                                            const next = [...prev]
+                                            for (let i = next.length - 1; i >= 0; i--) {
+                                                if (next[i].role === 'assistant') {
+                                                    next[i] = { ...next[i], anonLimitLocked: true }
+                                                    break
+                                                }
+                                            }
+                                            return next
+                                        })
+                                    }
+                                    if (data.sessionId) {
+                                        setSessionId(data.sessionId)
+                                    }
                                 } else if (data.type === 'error') {
                                     throw new Error(data.error || 'Eroare la procesarea răspunsului.')
                                 }
@@ -522,7 +598,19 @@ export function PhysicsChatSidebar({
         setBusy(false)
         setLoadingMessage(null)
 
-        if (!user) return
+        if (!user) {
+            try {
+                await fetch('/api/insight/increment', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ persona: 'lesson_tutor' }),
+                })
+            } catch (err) {
+                console.error('Failed to increment usage after manual stop:', err)
+            }
+            return
+        }
 
         try {
             const { data: sessionData } = await supabase.auth.getSession()
@@ -592,45 +680,7 @@ export function PhysicsChatSidebar({
                     onScroll={handleScroll}
                     className="flex-1 overflow-y-auto px-4 py-6"
                 >
-                    {!user ? (
-                        <div className="flex flex-col items-center justify-center h-full">
-                            <div className="text-center max-w-sm">
-                                <p className="text-gray-300 text-lg mb-6">
-                                    Ai nevoie de un cont pentru a discuta cu asistentul.
-                                </p>
-                                <div className="flex gap-3 justify-center">
-                                    <Button
-                                        onClick={handleGoogleLogin}
-                                        disabled={loginLoading !== null}
-                                        className="flex-1 h-11 bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20 transition-all duration-200"
-                                    >
-                                        {loginLoading === 'google' ? (
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        ) : (
-                                            <Chrome className="w-4 h-4 mr-2" />
-                                        )}
-                                        <span className="font-semibold text-sm">
-                                            {loginLoading === 'google' ? 'Se conectează...' : 'Google'}
-                                        </span>
-                                    </Button>
-                                    <Button
-                                        onClick={handleGitHubLogin}
-                                        disabled={loginLoading !== null}
-                                        className="flex-1 h-11 bg-transparent hover:bg-white/5 text-white border border-white/10 hover:border-white/20 transition-all duration-200"
-                                    >
-                                        {loginLoading === 'github' ? (
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        ) : (
-                                            <Github className="w-4 h-4 mr-2" />
-                                        )}
-                                        <span className="font-semibold text-sm">
-                                            {loginLoading === 'github' ? 'Se conectează...' : 'GitHub'}
-                                        </span>
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    ) : loadingSession ? (
+                    {loadingSession ? (
                         <div className="flex h-full items-center justify-center">
                             <div className="flex flex-col items-center gap-3 text-gray-400">
                                 <Loader2 className="h-8 w-8 animate-spin text-white" />
@@ -665,14 +715,16 @@ export function PhysicsChatSidebar({
                                                         )}
                                                     </div>
                                                     {m.content && (
-                                                        <ReactMarkdown
-                                                            remarkPlugins={[remarkGfm, remarkMath]}
-                                                            rehypePlugins={[rehypeKatex]}
-                                                            components={markdownComponents}
-                                                            className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
-                                                        >
-                                                            {m.content}
-                                                        </ReactMarkdown>
+                                                        <AnonLimitLockedContent active={Boolean(m.anonLimitLocked)}>
+                                                            <ReactMarkdown
+                                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                                rehypePlugins={[rehypeKatex]}
+                                                                components={markdownComponents}
+                                                                className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
+                                                            >
+                                                                {m.content}
+                                                            </ReactMarkdown>
+                                                        </AnonLimitLockedContent>
                                                     )}
                                                 </div>
                                             ) : (

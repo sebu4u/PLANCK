@@ -52,12 +52,6 @@ export default function InsightScrollHero() {
 
     const chatUrl = '/insight/chat'
 
-    if (!user) {
-      // Redirect to unauthorized page which explains they need an account
-      router.push(`/insight/unauthorized?redirect=${encodeURIComponent(chatUrl)}`)
-      return
-    }
-
     setBusy(true)
 
     try {

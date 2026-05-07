@@ -10,14 +10,72 @@ import {
   shouldUseRaptorFreeTierLimits,
 } from '@/lib/insight-limits';
 import { logger } from '@/lib/logger';
-import { resolvePlanForRequest, parseAccessToken } from '@/lib/subscription-plan-server';
+import { resolvePlanForRequest } from '@/lib/subscription-plan-server';
+import { parseAnonymousIdFromCookieHeader } from '@/lib/anonymous-insight';
+import { getServiceRoleSupabase } from '@/lib/supabaseServiceRole';
 
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization') || '';
     const tokenMatch = authHeader.match(/^Bearer (.+)$/i);
     if (!tokenMatch) {
-      return NextResponse.json({ error: 'Necesită autentificare.' }, { status: 401 });
+      let admin;
+      try {
+        admin = getServiceRoleSupabase();
+      } catch {
+        return NextResponse.json({ error: 'Configurare server incompletă.' }, { status: 503 });
+      }
+
+      const anonymousId = parseAnonymousIdFromCookieHeader(req.headers.get('cookie'));
+      if (!anonymousId) {
+        return NextResponse.json({ error: 'Identitate anonimă lipsă.' }, { status: 401 });
+      }
+
+      let body: Record<string, unknown> = {};
+      try {
+        body = await req.json();
+      } catch {
+        body = {};
+      }
+
+      const useRaptorFreeTierLimits = shouldUseRaptorFreeTierLimits(body?.persona);
+      const modelToUse = resolveInsightModel(body?.model);
+      const isIdeFastModel = isInsightIdeFastModel(modelToUse);
+
+      if (useRaptorFreeTierLimits && !isIdeFastModel) {
+        const { data: incrementAllowed, error: rpcErr } = await admin.rpc(
+          'anonymous_ai_check_and_increment_monthly',
+          {
+            p_anonymous_id: anonymousId,
+            p_monthly_limit: FREE_RAPTOR1_MONTHLY_LIMIT,
+          }
+        );
+
+        if (rpcErr) {
+          logger.error('Anonymous increment monthly after stop:', rpcErr);
+          return NextResponse.json(
+            { error: 'Nu am putut actualiza utilizarea lunară pentru Raptor1.' },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({ success: true, incremented: Boolean(incrementAllowed) });
+      }
+
+      const { data: incrementAllowed, error: rpcErr } = await admin.rpc(
+        'anonymous_insight_check_and_increment',
+        {
+          p_anonymous_id: anonymousId,
+          p_daily_limit: FREE_DAILY_LIMIT,
+        }
+      );
+
+      if (rpcErr) {
+        logger.error('Anonymous increment daily after stop:', rpcErr);
+        return NextResponse.json({ error: 'Nu am putut actualiza utilizarea zilnică.' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, incremented: Boolean(incrementAllowed) });
     }
 
     const accessToken = tokenMatch[1];

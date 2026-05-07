@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type CSSProperties } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Rocket, Star, X } from "lucide-react"
+import { ArrowRight, Rocket, Star, X } from "lucide-react"
 
 const FALLBACK_AVATAR_DATA_URI =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect fill='%23e5e7eb' width='40' height='40'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%239ca3af'%3EAD%3C/text%3E%3C/svg%3E"
@@ -76,13 +76,17 @@ export function PlanckPlusTrialModal({
         </p>
       </div>
 
-      {/* CTA Button */}
+      {/* CTA — same pattern as dashboard learning-path „Start” (see free-plan-upgrade-modal) */}
       <div className="space-y-2">
         <Link
           href={ctaHref}
-          className="block w-full rounded-full bg-[#111827] px-6 py-4 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+          className="dashboard-start-glow inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#5b21b6] active:translate-y-1 active:shadow-[0_1px_0_#5b21b6]"
+          style={{ "--start-glow-tint": "rgba(221, 211, 255, 0.84)" } as CSSProperties}
         >
-          {ctaLabel}
+          <span className="relative z-[1] inline-flex items-center justify-center gap-2">
+            {ctaLabel}
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </span>
         </Link>
 
         <button

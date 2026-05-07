@@ -44,11 +44,14 @@ import { useToast } from '@/hooks/use-toast';
 import InsightActionButtons from '@/components/insight-action-buttons';
 import InsightProblemsDialog from '@/components/insight-problems-dialog';
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay';
+import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content';
 import { BlockMath, InlineMath } from 'react-katex';
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  /** Vizitatori fără cont: răspuns simulat blur-at după limită zilnică */
+  anonLimitLocked?: boolean;
 };
 
 type Session = {
@@ -429,13 +432,6 @@ function InsightChatPageContent() {
     };
   }, [isMobile, mobileSidebarOpen]);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/insight/unauthorized');
-    }
-  }, [user, authLoading, router]);
-
   // Load sessions
   const loadSessions = async (accessToken: string) => {
     try {
@@ -495,21 +491,14 @@ function InsightChatPageContent() {
     }
   }, [sessionId]);
 
-  // Redirect unauthenticated users to unauthorized page
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to load
-    
+    if (authLoading) return;
     if (!user) {
-      // Redirect to unauthorized page with redirect back to chat
-      if (typeof window !== 'undefined') {
-        const currentUrl = window.location.pathname + (window.location.search || '');
-        router.replace(`/insight/unauthorized?redirect=${encodeURIComponent(currentUrl)}`);
-      } else {
-        router.replace('/insight/unauthorized?redirect=' + encodeURIComponent('/insight/chat'));
-      }
-      return;
+      setLoadingSession(false);
+      setSessions([]);
+      setSessionId(null);
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading]);
 
   // Initialize: load sessions and restore or create session
   useEffect(() => {
@@ -926,9 +915,17 @@ function InsightChatPageContent() {
     setBusy(false);
     setLoadingMessage(null);
 
-    if (!user) return;
-
     try {
+      if (!user) {
+        await fetch('/api/insight/increment', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona: 'general_insight' }),
+        });
+        return;
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
@@ -953,7 +950,7 @@ function InsightChatPageContent() {
   const send = async (overrideMessage?: string) => {
     const messageSource = typeof overrideMessage === 'string' ? overrideMessage : input;
     const trimmedMessage = messageSource.trim();
-    if (!user || !trimmedMessage || busy) return;
+    if (!trimmedMessage || busy) return;
 
     setBusy(true);
     setError(null);
@@ -962,18 +959,23 @@ function InsightChatPageContent() {
     let controller: AbortController | null = null;
     let currentSessionId = sessionId;
     let sessionInitialized = Boolean(sessionId);
+    const isGuest = !user;
 
     try {
       abortControllerRef.current?.abort();
       controller = new AbortController();
       abortControllerRef.current = controller;
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      let accessToken: string | null = null;
+      if (!isGuest) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData.session?.access_token ?? null;
 
-      if (!accessToken) {
-        router.replace('/insight/unauthorized');
-        return;
+        if (!accessToken) {
+          router.replace('/insight/unauthorized');
+          setBusy(false);
+          return;
+        }
       }
 
       const newUserMsg: ChatMessage = {
@@ -990,47 +992,62 @@ function InsightChatPageContent() {
       // Set random loading message
       setLoadingMessage(getRandomLoadingMessage());
 
-      if (!currentSessionId) {
-        const autoTitle = newUserMsg.content.slice(0, 60) || 'New Chat';
-        const createRes = await fetch('/api/insight/sessions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            title: autoTitle,
-          }),
-        });
-
-        if (!createRes.ok) {
-          const data = await createRes.json();
-          throw new Error(data.error || 'Nu am putut crea sesiunea.');
-        }
-
-        const createdData = await createRes.json();
-        currentSessionId = createdData.sessionId;
+      if (!isGuest && accessToken) {
         if (!currentSessionId) {
-          throw new Error('Sesiune invalidă creată.');
+          const autoTitle = newUserMsg.content.slice(0, 60) || 'New Chat';
+          const createRes = await fetch('/api/insight/sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              title: autoTitle,
+            }),
+          });
+
+          if (!createRes.ok) {
+            const data = await createRes.json();
+            throw new Error(data.error || 'Nu am putut crea sesiunea.');
+          }
+
+          const createdData = await createRes.json();
+          currentSessionId = createdData.sessionId;
+          if (!currentSessionId) {
+            throw new Error('Sesiune invalidă creată.');
+          }
+          setSessionId(currentSessionId);
+          sessionStorage.setItem('insight-current-session', currentSessionId);
+          await loadSessions(accessToken);
+          sessionInitialized = true;
         }
-        setSessionId(currentSessionId);
-        sessionStorage.setItem('insight-current-session', currentSessionId);
-        await loadSessions(accessToken);
-        sessionInitialized = true;
       }
 
       setIsStreaming(true);
 
+      const fetchHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) {
+        fetchHeaders.Authorization = `Bearer ${accessToken}`;
+      }
+
+      const guestPrior = messages
+        .filter((m) => m.role !== 'system')
+        .filter((m) => !(m.role === 'assistant' && !(m.content || '').trim()));
+
       const res = await fetch('/api/insight/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          sessionId: currentSessionId,
-          input: newUserMsg.content,
-        }),
+        credentials: 'include',
+        headers: fetchHeaders,
+        body: JSON.stringify(
+          isGuest
+            ? { messages: [...guestPrior, newUserMsg] }
+            : {
+                sessionId: currentSessionId,
+                input: newUserMsg.content,
+              }
+        ),
         signal: controller.signal,
       });
 
@@ -1091,7 +1108,7 @@ function InsightChatPageContent() {
               try {
                 const data = JSON.parse(line.slice(6));
                 
-                if (data.type === 'session' && data.sessionId) {
+                if (data.type === 'session' && data.sessionId && accessToken) {
                   currentSessionId = data.sessionId;
                   setSessionId(data.sessionId);
                   sessionStorage.setItem('insight-current-session', data.sessionId);
@@ -1119,13 +1136,27 @@ function InsightChatPageContent() {
                     return newMessages;
                   });
                 } else if (data.type === 'done') {
+                  if (data.anonLimitReached) {
+                    setMessages((prev) => {
+                      const next = [...prev];
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i].role === 'assistant') {
+                          next[i] = { ...next[i], anonLimitLocked: true };
+                          break;
+                        }
+                      }
+                      return next;
+                    });
+                  }
                   // Handle final metadata
-                  if (data.sessionId) {
+                  if (data.sessionId && accessToken) {
                     currentSessionId = data.sessionId;
                     setSessionId(data.sessionId);
                     sessionStorage.setItem('insight-current-session', data.sessionId);
                   }
-                  await loadSessions(accessToken);
+                  if (accessToken) {
+                    await loadSessions(accessToken);
+                  }
                   sessionInitialized = true;
                 } else if (data.type === 'error') {
                   throw new Error(data.error || 'Eroare la procesarea răspunsului.');
@@ -1152,8 +1183,10 @@ function InsightChatPageContent() {
           return newMessages;
         });
         
-        await loadSessions(accessToken);
-        if (data.sessionId) {
+        if (accessToken) {
+          await loadSessions(accessToken);
+        }
+        if (data.sessionId && accessToken) {
           currentSessionId = data.sessionId;
           setSessionId(data.sessionId);
           sessionStorage.setItem('insight-current-session', data.sessionId);
@@ -1195,11 +1228,11 @@ function InsightChatPageContent() {
   }, [send]);
 
   useEffect(() => {
-    if (!pendingPrefill || loadingSession || busy || !sendRef.current || !user) return;
+    if (!pendingPrefill || loadingSession || busy || !sendRef.current || authLoading) return;
     const message = pendingPrefill;
     setPendingPrefill(null);
     void sendRef.current?.(message);
-  }, [pendingPrefill, loadingSession, busy, user]);
+  }, [pendingPrefill, loadingSession, busy, authLoading]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1212,7 +1245,7 @@ function InsightChatPageContent() {
     s.title?.toLowerCase().includes(searchQuery.toLowerCase()) || !searchQuery
   );
 
-  if (authLoading || !user || loadingSession) {
+  if (authLoading || (user && loadingSession)) {
     return (
       <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center">
         <div>Se încarcă...</div>
@@ -1490,14 +1523,14 @@ function InsightChatPageContent() {
                   {profile?.user_icon ? (
                     <AvatarImage
                       src={profile.user_icon}
-                      alt={profile?.nickname || profile?.name || user.email || 'U'}
+                      alt={profile?.nickname || profile?.name || user?.email || 'U'}
                     />
                   ) : null}
                   <AvatarFallback>
                     {(profile?.nickname ||
                       profile?.name ||
-                      user.user_metadata?.name ||
-                      user.email ||
+                      user?.user_metadata?.name ||
+                      user?.email ||
                       'U')
                       .charAt(0)
                       .toUpperCase()}
@@ -1507,8 +1540,9 @@ function InsightChatPageContent() {
                   <span className="font-medium text-white text-sm truncate transition-opacity duration-300">
                     {profile?.nickname ||
                       profile?.name ||
-                      user.user_metadata?.name ||
-                      user.email}
+                      user?.user_metadata?.name ||
+                      user?.email ||
+                      'Vizitator'}
                   </span>
                 )}
               </button>
@@ -1638,7 +1672,11 @@ function InsightChatPageContent() {
                               'Insight'
                             )}
                           </div>
-                          {m.content && <MessageContent content={m.content} />}
+                          {m.content && (
+                            <AnonLimitLockedContent active={Boolean(m.anonLimitLocked)}>
+                              <MessageContent content={m.content} />
+                            </AnonLimitLockedContent>
+                          )}
                         </div>
                       ) : (
                         <div className="max-w-[70%] rounded-3xl bg-[#212121] text-white px-4 py-3 shadow-sm">

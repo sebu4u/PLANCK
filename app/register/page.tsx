@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
+import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
 
 type SubjectOption = "fizica" | "informatica"
 type GradeOption = "9" | "10" | "11" | "12"
@@ -498,6 +499,11 @@ function RegisterPageContent() {
 
     localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
     localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+    try {
+      localStorage.setItem(getPostOnboardingDiscountStorageKey(user.id), String(Date.now()))
+    } catch {
+      // ignore
+    }
     router.push("/dashboard")
   }
 

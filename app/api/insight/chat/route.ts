@@ -12,8 +12,9 @@ import {
   shouldUseRaptorFreeTierLimits,
 } from '@/lib/insight-limits';
 import { logger } from '@/lib/logger';
-import { resolvePlanForRequest, parseAccessToken } from '@/lib/subscription-plan-server';
+import { resolvePlanForRequest } from '@/lib/subscription-plan-server';
 import type { SubscriptionPlan } from '@/lib/subscription-plan';
+import { handleAnonymousInsightChat } from '@/lib/insight-chat-anonymous';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -70,13 +71,29 @@ async function postAlertIfNeeded(totalMonthly: number) {
 }
 
 export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>;
   try {
-    // Extract Bearer token
-    const authHeader = req.headers.get('authorization') || '';
-    const tokenMatch = authHeader.match(/^Bearer (.+)$/i);
-    if (!tokenMatch) {
-      return NextResponse.json({ error: 'Necesită autentificare.' }, { status: 401 });
+    body = await req.json();
+  } catch (jsonError) {
+    logger.error('Failed to parse request body as JSON:', jsonError);
+    return NextResponse.json(
+      { error: 'Formatul cererii este invalid. Verifică JSON-ul trimis.' },
+      { status: 400 }
+    );
+  }
+
+  const authHeader = req.headers.get('authorization') || '';
+  const tokenMatch = authHeader.match(/^Bearer (.+)$/i);
+  if (!tokenMatch) {
+    try {
+      return await handleAnonymousInsightChat(req, body);
+    } catch (err: unknown) {
+      logger.error('Anonymous Insight chat error:', err);
+      return NextResponse.json({ error: 'Eroare internă. Încearcă din nou.' }, { status: 500 });
     }
+  }
+
+  try {
     const accessToken = tokenMatch[1];
 
     // Local JWT expiration check (defensive)
@@ -97,17 +114,6 @@ export async function POST(req: NextRequest) {
     const isFreePlan = userPlan === 'free';
     const isPlusPlan = userPlan === 'plus';
 
-    // Parse request body - support both old format (messages array) and new format (sessionId + input)
-    let body;
-    try {
-      body = await req.json();
-    } catch (jsonError) {
-      logger.error('Failed to parse request body as JSON:', jsonError);
-      return NextResponse.json(
-        { error: 'Formatul cererii este invalid. Verifică JSON-ul trimis.' },
-        { status: 400 }
-      );
-    }
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
 
     // Check if this is from IDE - IDE messages should not be saved to chat history
