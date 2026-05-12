@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import type { Problem } from "@/data/problems"
-import { FREE_LEARNING_PATH_CHAPTER_SLUG } from "@/lib/learning-path-free-plan"
+import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
@@ -31,7 +31,7 @@ export default async function InvataPage() {
       const lessons = await getLearningPathLessonsByChapterId(chapter.id)
       lessonsByChapter[chapter.id] = lessons
 
-      const isFreeAccessibleChapter = chapter.slug === FREE_LEARNING_PATH_CHAPTER_SLUG
+      const isFreeAccessibleChapter = isFreePreviewLearningPathChapterSlug(chapter.slug)
       const canShowRealItems = hasFullAccess || isFreeAccessibleChapter
 
       if (canShowRealItems) {
@@ -61,7 +61,7 @@ export default async function InvataPage() {
   const lockedChapterIds = hasFullAccess
     ? []
     : chapters
-        .filter((chapter) => chapter.slug !== FREE_LEARNING_PATH_CHAPTER_SLUG)
+        .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
         .map((chapter) => chapter.id)
 
   return (

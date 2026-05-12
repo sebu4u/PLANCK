@@ -353,7 +353,7 @@ function PricingPageContent() {
           </div>
 
           <h1 className="max-w-3xl text-[1.65rem] font-semibold leading-[1.15] tracking-[-0.04em] text-[#171717] sm:text-4xl sm:leading-tight">
-            Colegii tăi deja folosesc Insight. Tu?
+            Deblochează note mai mari cu PLANCK
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-600 sm:mt-2.5 sm:text-base sm:leading-relaxed">
             Mai puțin decât o oră de meditații. Fără contracte, fără riscuri.

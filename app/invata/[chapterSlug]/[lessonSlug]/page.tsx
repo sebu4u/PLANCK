@@ -18,8 +18,16 @@ import {
   isUuid,
 } from "@/lib/supabase-learning-paths"
 import { sanitizeTestContentJson } from "@/lib/learning-path-test"
+import { cookies } from "next/headers"
+import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
+import {
+  GUEST_LEARNING_PATH_PROGRESS_COOKIE,
+  countGuestCompletedLearningPathItems,
+  getGuestCompletedItemIdsForLesson,
+  parseGuestLearningPathProgress,
+} from "@/lib/guest-learning-path-cookie"
 
-export const revalidate = 21600
+export const dynamic = "force-dynamic"
 
 export async function generateMetadata({
   params,
@@ -81,12 +89,28 @@ export default async function InvataLessonDetailPage({
   let initialSelectedItemId: string | null = items[0]?.id ?? null
   let completedItemIdList: string[] = []
 
-  if (items.length > 0) {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
+  let guestProgressMap = parseGuestLearningPathProgress(undefined)
+  if (access.mode === "free-preview" && !user) {
+    const cookieStore = await cookies()
+    guestProgressMap = parseGuestLearningPathProgress(
+      cookieStore.get(GUEST_LEARNING_PATH_PROGRESS_COOKIE)?.value
+    )
+  }
+  const guestGlobalSolved =
+    access.mode === "free-preview" && !user
+      ? countGuestCompletedLearningPathItems(guestProgressMap)
+      : 0
+  const guestLessonCompleted =
+    access.mode === "free-preview" && !user
+      ? getGuestCompletedItemIdsForLesson(guestProgressMap, lesson.id)
+      : []
+
+  if (items.length > 0) {
     if (user) {
       const completedItemIds = await getCompletedLearningPathItemIdsForUser(
         supabase,
@@ -96,12 +120,21 @@ export default async function InvataLessonDetailPage({
       completedItemIdList = Array.from(completedItemIds)
       initialSelectedItemId =
         getNextIncompleteLearningPathItem(items, completedItemIds)?.id ?? items[items.length - 1]?.id ?? null
+    } else if (access.mode === "free-preview") {
+      completedItemIdList = guestLessonCompleted
+      initialSelectedItemId =
+        getNextIncompleteLearningPathItem(items, guestLessonCompleted)?.id ?? items[items.length - 1]?.id ?? null
     }
   }
 
   const freeAccess =
     access.mode === "free-preview"
-      ? { itemsSolved: access.itemsSolved, itemsRemaining: access.itemsRemaining }
+      ? {
+          itemsSolved: user ? access.itemsSolved : guestGlobalSolved,
+          itemsRemaining: user
+            ? access.itemsRemaining
+            : Math.max(0, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT - guestGlobalSolved),
+        }
       : null
 
   return (

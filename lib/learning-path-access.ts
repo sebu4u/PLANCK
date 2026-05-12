@@ -1,7 +1,7 @@
 import { isAdminFromDB } from "@/lib/admin-check"
 import {
-  FREE_LEARNING_PATH_CHAPTER_SLUG,
   FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+  isFreePreviewLearningPathChapterSlug,
 } from "@/lib/learning-path-free-plan"
 import { createClient } from "@/lib/supabase/server"
 import {
@@ -27,8 +27,8 @@ interface ChapterLike {
  * Determina nivelul de acces al userului curent pentru un capitol learning-path.
  *
  * - `full`: admini, planuri platite (plus/premium), useri cu `plus_months_remaining > 0`.
- * - `free-preview`: useri free, doar pentru capitolul cinematica; pot vedea graful si pot
- *   intra secvential pe primele 10 itemi rezolvate global.
+ * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru capitolul de cinematică
+ *   (slug `cinematica` sau alias); pot parcurge secvențial până la limita de itemi.
  * - `locked`: orice alt scenariu (afiseaza preview-ul placeholder).
  */
 export async function getLearningPathAccess(chapter?: ChapterLike | null): Promise<LearningPathAccess> {
@@ -43,6 +43,14 @@ export async function getLearningPathAccess(chapter?: ChapterLike | null): Promi
   } = await supabase.auth.getUser()
 
   if (!user) {
+    if (isFreePreviewLearningPathChapterSlug(chapter?.slug ?? null)) {
+      return {
+        mode: "free-preview",
+        itemsSolved: 0,
+        itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+        userId: null,
+      }
+    }
     return { mode: "locked", itemsSolved: 0, itemsRemaining: 0, userId: null }
   }
 
@@ -66,7 +74,7 @@ export async function getLearningPathAccess(chapter?: ChapterLike | null): Promi
     return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: user.id }
   }
 
-  const isFreeChapter = (chapter?.slug ?? null) === FREE_LEARNING_PATH_CHAPTER_SLUG
+  const isFreeChapter = isFreePreviewLearningPathChapterSlug(chapter?.slug ?? null)
   if (!isFreeChapter) {
     return { mode: "locked", itemsSolved: 0, itemsRemaining: 0, userId: user.id }
   }

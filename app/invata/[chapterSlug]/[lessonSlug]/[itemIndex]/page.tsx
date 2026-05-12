@@ -27,8 +27,16 @@ import {
   isUuid,
 } from "@/lib/supabase-learning-paths"
 import { getLessonBySlug } from "@/lib/supabase-physics"
+import { cookies } from "next/headers"
+import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
+import {
+  GUEST_LEARNING_PATH_PROGRESS_COOKIE,
+  countGuestCompletedLearningPathItems,
+  getGuestCompletedItemIdsForLesson,
+  parseGuestLearningPathProgress,
+} from "@/lib/guest-learning-path-cookie"
 
-export const revalidate = 21600
+export const dynamic = "force-dynamic"
 
 async function resolveLessonContext(chapterSlug: string, lessonSlug: string) {
   const chapter = isUuid(chapterSlug)
@@ -121,12 +129,25 @@ export default async function InvataLessonItemPage({
 
   const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
 
-  let initialCurrentItemCompleted = false
-  let completedItemIdsForLesson: string[] = []
   const supabaseForProgress = await createClient()
   const {
     data: { user: progressUser },
   } = await supabaseForProgress.auth.getUser()
+
+  let guestProgressMap = parseGuestLearningPathProgress(undefined)
+  if (access.mode === "free-preview" && !progressUser) {
+    const cookieStore = await cookies()
+    guestProgressMap = parseGuestLearningPathProgress(
+      cookieStore.get(GUEST_LEARNING_PATH_PROGRESS_COOKIE)?.value
+    )
+  }
+  const guestGlobalSolved =
+    access.mode === "free-preview" && !progressUser
+      ? countGuestCompletedLearningPathItems(guestProgressMap)
+      : 0
+
+  let completedItemIdsForLesson: string[] = []
+  let initialCurrentItemCompleted = false
   if (progressUser) {
     completedItemIdsForLesson = await getCompletedLearningPathItemIdsForUser(
       supabaseForProgress,
@@ -134,7 +155,17 @@ export default async function InvataLessonItemPage({
       items.map((i) => i.id)
     )
     initialCurrentItemCompleted = completedItemIdsForLesson.includes(item.id)
+  } else if (access.mode === "free-preview") {
+    completedItemIdsForLesson = getGuestCompletedItemIdsForLesson(guestProgressMap, lesson.id)
+    initialCurrentItemCompleted = completedItemIdsForLesson.includes(item.id)
   }
+
+  const itemsRemainingForFreePreview =
+    access.mode === "free-preview"
+      ? progressUser
+        ? access.itemsRemaining
+        : Math.max(0, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT - guestGlobalSolved)
+      : 0
 
   if (access.mode === "free-preview") {
     const completedSet = new Set(completedItemIdsForLesson)
@@ -144,7 +175,7 @@ export default async function InvataLessonItemPage({
 
     if (!isCurrentItemCompleted) {
       const blockedBySkip = !isCurrentItemNext
-      const blockedByLimit = isCurrentItemNext && access.itemsRemaining <= 0
+      const blockedByLimit = isCurrentItemNext && itemsRemainingForFreePreview <= 0
 
       if (blockedBySkip || blockedByLimit) {
         return (

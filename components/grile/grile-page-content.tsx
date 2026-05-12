@@ -7,7 +7,7 @@ import { GrileInsightChatProvider, useGrileInsightChat } from './grile-insight-c
 import { ClassSelector } from './class-selector';
 import { QuestionCard } from './question-card';
 import { AnswersList } from './answers-list';
-import { NavigationControls } from './navigation-controls';
+import { GrileQuizBottomBar } from './grile-quiz-bottom-bar';
 import { fetchAndShuffleQuestions, fetchQuizQuestionById } from '@/lib/supabase-quiz';
 import { formatGrileCatalogInsightContext } from '@/lib/grile-insight-context';
 import type { GradeLevel, QuizQuestion, UserAnswer } from '@/lib/types/quiz-questions';
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 
 function QuizContent() {
     const router = useRouter();
+    const grileChat = useGrileInsightChat();
+    const insightDesktopOpen = Boolean(grileChat?.grileChatDocked && grileChat?.isDesktopViewport);
     const {
         classLevel,
         questions,
@@ -107,8 +109,8 @@ function QuizContent() {
     if (questionParam && !classLevel && !singleQuestionNotFound) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="h-10 w-10 text-violet-400 animate-spin mb-4" />
-                <p className="text-white/60">Se încarcă grila selectată...</p>
+                <Loader2 className="h-10 w-10 text-violet-600 animate-spin mb-4" />
+                <p className="text-[#6d6d6d]">Se încarcă grila selectată...</p>
             </div>
         );
     }
@@ -116,16 +118,16 @@ function QuizContent() {
     if (questionParam && singleQuestionNotFound) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-                <AlertCircle className="h-12 w-12 text-amber-400 mb-4" />
-                <h2 className="text-xl font-semibold text-white mb-2">
+                <AlertCircle className="h-12 w-12 text-amber-600 mb-4" />
+                <h2 className="text-xl font-semibold text-[#111111] mb-2">
                     Grila selectată nu a fost găsită
                 </h2>
-                <p className="text-white/60 mb-6 max-w-md">
+                <p className="text-[#6d6d6d] mb-6 max-w-md">
                     ID-ul trimis nu corespunde unei întrebări existente.
                 </p>
                 <button
                     onClick={() => router.push('/grile')}
-                    className="text-violet-400 hover:text-violet-300 font-medium transition-colors"
+                    className="text-violet-700 hover:text-violet-600 font-medium transition-colors"
                 >
                     Vezi toate grilele
                 </button>
@@ -142,8 +144,8 @@ function QuizContent() {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="h-10 w-10 text-violet-400 animate-spin mb-4" />
-                <p className="text-white/60">Se încarcă întrebările...</p>
+                <Loader2 className="h-10 w-10 text-violet-600 animate-spin mb-4" />
+                <p className="text-[#6d6d6d]">Se încarcă întrebările...</p>
             </div>
         );
     }
@@ -152,16 +154,16 @@ function QuizContent() {
     if (questions.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-                <AlertCircle className="h-12 w-12 text-amber-400 mb-4" />
-                <h2 className="text-xl font-semibold text-white mb-2">
+                <AlertCircle className="h-12 w-12 text-amber-600 mb-4" />
+                <h2 className="text-xl font-semibold text-[#111111] mb-2">
                     Nu există întrebări disponibile
                 </h2>
-                <p className="text-white/60 mb-6 max-w-md">
+                <p className="text-[#6d6d6d] mb-6 max-w-md">
                     Nu am găsit întrebări pentru această clasă. Te rugăm să încerci mai târziu sau să alegi altă clasă.
                 </p>
                 <button
                     onClick={resetQuiz}
-                    className="text-violet-400 hover:text-violet-300 font-medium transition-colors"
+                    className="text-violet-700 hover:text-violet-600 font-medium transition-colors"
                 >
                     ← Înapoi la selecția clasei
                 </button>
@@ -179,34 +181,29 @@ function QuizContent() {
     }
 
     return (
-        <div className="w-full max-w-4xl mx-auto px-4 lg:px-6">
-            {/* Progress bar */}
-            <div className="mb-4 lg:mb-6">
-                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-300"
-                        style={{ width: `${((currentIndex + 1) / totalQuestions) * 100}%` }}
-                    />
-                </div>
+        <div className="w-full max-w-4xl mx-auto px-4 lg:px-6 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-8">
+                <QuestionCard question={currentQuestion} />
+
+                <AnswersList
+                    answers={currentQuestion.answers}
+                    correctAnswer={currentQuestion.correct_answer}
+                    userAnswer={currentAnswer}
+                    onSelect={selectAnswer}
+                />
             </div>
 
-            {/* Question card */}
-            <QuestionCard
-                question={currentQuestion}
-                questionNumber={currentIndex + 1}
-                totalQuestions={totalQuestions}
-            />
+            <div className="mt-4 text-center lg:mt-5">
+                <button
+                    type="button"
+                    onClick={resetQuiz}
+                    className="text-sm text-gray-500 transition-colors hover:text-gray-700"
+                >
+                    ← Schimbă clasa
+                </button>
+            </div>
 
-            {/* Answers list */}
-            <AnswersList
-                answers={currentQuestion.answers}
-                correctAnswer={currentQuestion.correct_answer}
-                userAnswer={currentAnswer}
-                onSelect={selectAnswer}
-            />
-
-            {/* Navigation controls */}
-            <NavigationControls
+            <GrileQuizBottomBar
                 currentAnswer={currentAnswer}
                 canGoNext={canGoNext}
                 canGoPrevious={canGoPrevious}
@@ -216,6 +213,7 @@ function QuizContent() {
                 onSkip={skipCurrentQuestion}
                 onReset={resetQuiz}
                 isLastQuestion={currentIndex === totalQuestions - 1}
+                insightDesktopOpen={insightDesktopOpen}
             />
 
             <GrileInsightFab
@@ -263,8 +261,8 @@ function GrileInsightFab({
                 })
             }}
             className={cn(
-                'fixed z-[400] flex items-center gap-2 rounded-full border border-violet-400/50 bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/25 transition hover:from-violet-500 hover:to-purple-500',
-                'bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] max-lg:right-[max(1.5rem,env(safe-area-inset-right,0px))]',
+                'fixed z-[400] flex items-center gap-2 rounded-full border border-violet-500/40 bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-900/15 transition hover:from-violet-500 hover:to-purple-500',
+                'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-lg:right-[max(1.5rem,env(safe-area-inset-right,0px))]',
                 grileDesktopChat ? 'lg:right-[calc(1.5rem+25vw)]' : 'lg:right-6',
             )}
         >
@@ -281,7 +279,7 @@ function GrilePageShell() {
     return (
         <div
             className={cn(
-                'min-h-screen lg:h-screen lg:overflow-hidden bg-[#0a0a0f] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col',
+                'min-h-screen lg:h-screen lg:overflow-hidden bg-[#ffffff] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col',
                 insightDesktopOpen && 'lg:mr-[25vw]',
             )}
         >

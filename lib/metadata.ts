@@ -392,14 +392,14 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   pricing: {
-    title: "Prețuri și Planuri - PLANCK",
+    title: "Deblochează note mai mari cu PLANCK",
     description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi individuali și instituții educaționale. Începe gratuit sau alege Plus sau Pro pentru funcții avansate.",
     keywords: "prețuri planck, planuri planck, abonament planck, preț planck, planuri educaționale, planuri școli, planuri elevi",
     alternates: {
       canonical: '/pricing',
     },
     openGraph: {
-      title: "Prețuri și Planuri - PLANCK",
+      title: "Deblochează note mai mari cu PLANCK",
       description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții educaționale.",
       url: 'https://www.planck.academy/pricing',
       type: 'website',
@@ -413,7 +413,7 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: "Prețuri și Planuri - PLANCK",
+      title: "Deblochează note mai mari cu PLANCK",
       description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții.",
       images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
       card: 'summary_large_image',

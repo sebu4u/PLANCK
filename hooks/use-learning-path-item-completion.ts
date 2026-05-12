@@ -20,7 +20,22 @@ export function useLearningPathItemCompletion({
   const pushProgress = useProgressTrigger()
 
   return useCallback(async () => {
-    if (!user?.id || !itemId) return
+    if (!itemId) return
+
+    if (!user?.id) {
+      if (!lessonId) return
+      const response = await fetch("/api/learning-path/guest-item-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonId, itemId }),
+        credentials: "same-origin",
+      })
+      if (!response.ok) {
+        console.error("guest learning path item progress:", await response.text().catch(() => ""))
+      }
+      pushProgress(undefined, itemId)
+      return
+    }
 
     const completedAt = new Date().toISOString()
     const { error: itemError } = await supabase

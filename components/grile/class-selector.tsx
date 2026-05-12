@@ -26,10 +26,10 @@ const classDescriptions: Record<GradeLevel, string> = {
 
 
 const classIconColors: Record<GradeLevel, string> = {
-    9: 'text-emerald-400',
-    10: 'text-blue-400',
-    11: 'text-purple-400',
-    12: 'text-amber-400',
+    9: 'text-emerald-600',
+    10: 'text-blue-600',
+    11: 'text-purple-600',
+    12: 'text-amber-600',
 };
 
 export function ClassSelector({ onSelect }: ClassSelectorProps) {
@@ -38,10 +38,10 @@ export function ClassSelector({ onSelect }: ClassSelectorProps) {
     return (
         <div className="w-full max-w-4xl mx-auto px-4">
             <div className="text-center mb-10">
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
+                <h1 className="text-3xl md:text-4xl font-bold text-[#111111] mb-3">
                     Teste Grilă Fizică
                 </h1>
-                <p className="text-white/60 text-lg">
+                <p className="text-[#6d6d6d] text-lg">
                     Alege clasa pentru a începe testul
                 </p>
             </div>
@@ -53,22 +53,22 @@ export function ClassSelector({ onSelect }: ClassSelectorProps) {
                         onClick={() => onSelect(grade)}
                         className={`
               relative cursor-pointer overflow-hidden
-              border border-white/10 bg-[#13151a]
-              backdrop-blur-sm rounded-2xl p-6
+              border border-gray-200 bg-white
+              rounded-2xl p-6 shadow-sm
               transition-all duration-300 ease-out
-              hover:border-white/20 hover:bg-[#1a1c24] hover:scale-[1.02] hover:shadow-xl
+              hover:border-gray-300 hover:bg-gray-50/80 hover:scale-[1.02] hover:shadow-md
               group
             `}
                     >
                         <div className="flex items-start gap-4">
-                            <div className={`p-3 rounded-xl bg-white/10 ${classIconColors[grade]}`}>
+                            <div className={`p-3 rounded-xl bg-gray-100 ${classIconColors[grade]}`}>
                                 {classIcons[grade]}
                             </div>
                             <div className="flex-1">
-                                <h2 className="text-xl font-semibold text-white mb-1">
+                                <h2 className="text-xl font-semibold text-[#111111] mb-1">
                                     {gradeLabels[grade]}
                                 </h2>
-                                <p className="text-gray-300 text-sm">
+                                <p className="text-[#6d6d6d] text-sm">
                                     {classDescriptions[grade]}
                                 </p>
                             </div>
@@ -76,7 +76,7 @@ export function ClassSelector({ onSelect }: ClassSelectorProps) {
 
                         {/* Hover indicator */}
                         <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-white/60 text-sm font-medium">
+                            <span className="text-violet-700 text-sm font-medium">
                                 Începe →
                             </span>
                         </div>

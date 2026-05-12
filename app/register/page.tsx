@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
+import { getFirstLearningPathItemHref } from "@/lib/supabase-learning-paths"
 
 type SubjectOption = "fizica" | "informatica"
 type GradeOption = "9" | "10" | "11" | "12"
@@ -209,6 +210,7 @@ function RegisterPageContent() {
   const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null)
   const [displayName, setDisplayName] = useState("")
   const [nameSaving, setNameSaving] = useState(false)
+  const [guestFirstItemHref, setGuestFirstItemHref] = useState<string | null>(null)
 
   const { toast } = useToast()
   const router = useRouter()
@@ -319,6 +321,22 @@ function RegisterPageContent() {
     setOnboardingState((prev) => ({ ...prev, step: 6, awaitingPostAuth: false }))
   }, [hydrated, onboardingState.step, user])
 
+  useEffect(() => {
+    if (!hydrated || onboardingState.step !== 6) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const href = await getFirstLearningPathItemHref()
+        if (!cancelled) setGuestFirstItemHref(href)
+      } catch {
+        if (!cancelled) setGuestFirstItemHref(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [hydrated, onboardingState.step])
+
   const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= 6
   const showBackButton =
     isNumericStep(onboardingState.step) && onboardingState.step >= 2 && onboardingState.step <= 5
@@ -428,6 +446,23 @@ function RegisterPageContent() {
   }
 
   const clearOAuthFlag = () => localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+
+  const handleTryWithoutAccount = async () => {
+    try {
+      const target = guestFirstItemHref ?? (await getFirstLearningPathItemHref())
+      if (target) {
+        router.push(target)
+        return
+      }
+    } catch {
+      // toast below
+    }
+    toast({
+      title: "Nu am putut deschide lecția",
+      description: "Încearcă din nou peste câteva secunde.",
+      variant: "destructive",
+    })
+  }
 
   const handleOAuthLogin = async (provider: "google" | "github") => {
     setOauthLoading(provider)
@@ -680,33 +715,42 @@ function RegisterPageContent() {
 
       case 6:
         return (
-          <div className="mx-auto w-full max-w-[420px] rounded-3xl border border-[#ececf1] bg-white px-6 py-8 shadow-[0_30px_70px_-40px_rgba(18,20,28,0.5)]">
-            <h1 className="text-center text-[30px] font-semibold leading-tight text-[#0f1115]">
-              Creează un cont gratuit
-            </h1>
-            <p className="mb-6 mt-2 text-center text-sm text-[#666a73]">ca să salvăm parcursul tău de învățare.</p>
+          <div className="mx-auto w-full max-w-[420px]">
+            <div className="rounded-3xl border border-[#ececf1] bg-white px-6 py-8 shadow-[0_30px_70px_-40px_rgba(18,20,28,0.5)]">
+              <h1 className="text-center text-[30px] font-semibold leading-tight text-[#0f1115]">
+                Creează un cont gratuit
+              </h1>
+              <p className="mb-6 mt-2 text-center text-sm text-[#666a73]">ca să salvăm parcursul tău de învățare.</p>
 
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => handleOAuthLogin("google")}
-                disabled={oauthLoading !== null}
-                className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-              >
-                {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
-                Continuă cu Google
-              </button>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleOAuthLogin("google")}
+                  disabled={oauthLoading !== null}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
+                >
+                  {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
+                  Continuă cu Google
+                </button>
 
-              <button
-                type="button"
-                onClick={() => handleOAuthLogin("github")}
-                disabled={oauthLoading !== null}
-                className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-              >
-                {oauthLoading === "github" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GitHubIcon />}
-                Continuă cu GitHub
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleOAuthLogin("github")}
+                  disabled={oauthLoading !== null}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
+                >
+                  {oauthLoading === "github" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GitHubIcon />}
+                  Continuă cu GitHub
+                </button>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={handleTryWithoutAccount}
+              className="mt-6 w-full bg-transparent py-2 text-center text-sm font-medium text-[#5c5f68] underline-offset-4 transition-colors hover:text-[#1a1c21] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8043f0] focus-visible:ring-offset-2"
+            >
+              Sau încearcă fără cont
+            </button>
           </div>
         )
 

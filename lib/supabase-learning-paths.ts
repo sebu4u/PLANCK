@@ -435,3 +435,20 @@ export async function getCompletedLearningPathItemIdsForUser(
 
   return (data ?? []).map((row) => row.item_id as string)
 }
+
+/** Primul item (după order_index) din prima lecție cu itemi, din primul capitol activ (după order_index). */
+export async function getFirstLearningPathItemHref(): Promise<string | null> {
+  const chapters = await getLearningPathChapters()
+  const firstChapter = chapters[0]
+  if (!firstChapter) return null
+
+  const lessons = await getLearningPathLessonsByChapterId(firstChapter.id)
+  for (const lesson of lessons) {
+    const items = await getLearningPathLessonItems(lesson.id)
+    if (items.length > 0) {
+      return getLearningPathItemHref(firstChapter, lesson, 0)
+    }
+  }
+
+  return null
+}

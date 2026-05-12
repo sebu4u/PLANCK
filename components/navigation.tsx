@@ -36,8 +36,9 @@ export function Navigation() {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Dashboard, /invata, /probleme catalog, and /classrooms share the same white navbar theme.
+  // Dashboard, /invata, /grile, /probleme catalog, and /classrooms share the same white navbar theme.
   const isDashboard = pathname === "/dashboard" || pathname?.startsWith("/invata") === true
+  const isGrileRoute = pathname === "/grile"
   const isDashboardPage = pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
   // Desktop search state
   const [query, setQuery] = useState("")
@@ -379,7 +380,7 @@ export function Navigation() {
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
   const isClassroomsRoute = pathname?.startsWith("/classrooms") ?? false
-  const useLightNav = isDashboard || isProblemsCatalog || isProblemPage || isClassroomsRoute
+  const useLightNav = isDashboard || isProblemsCatalog || isProblemPage || isClassroomsRoute || isGrileRoute
   const isCoursePage = pathname?.startsWith('/cursuri') ?? false
   /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
   const isGuestProblemeOrCursuri =
@@ -448,7 +449,8 @@ export function Navigation() {
   const navHoverBg = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
-  const navDropShadowOnDesktop = pathname?.startsWith('/invata') || (isProblemPage && !isProblemsCatalog)
+  const navDropShadowOnDesktop =
+    pathname?.startsWith('/invata') || isGrileRoute || (isProblemPage && !isProblemsCatalog)
   /** Single-problem page uses a fixed white outline under the bar; shadow is applied there so it sits below that outline */
   const isProblemDetailPage =
     Boolean(pathname && /^\/probleme\/[^/]+$/.test(pathname) && !pathname.startsWith('/probleme/pagina'))

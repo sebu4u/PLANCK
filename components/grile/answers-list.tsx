@@ -48,15 +48,15 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
                         className={cn(
                             'w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-200',
                             // Default state
-                            state === 'default' && 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]',
+                            state === 'default' && 'border-gray-200 bg-gray-50/60 hover:border-gray-300 hover:bg-gray-100',
                             // Selected (before verification)
-                            state === 'selected' && 'border-violet-500/50 bg-violet-500/10',
+                            state === 'selected' && 'border-violet-400 bg-violet-50 ring-1 ring-violet-200/60',
                             // Correct answer (after verification)
-                            state === 'correct' && 'border-emerald-500/60 bg-emerald-500/15',
+                            state === 'correct' && 'border-emerald-300 bg-emerald-50',
                             // Wrong answer selected (after verification)
-                            state === 'incorrect' && 'border-rose-500/60 bg-rose-500/15',
+                            state === 'incorrect' && 'border-rose-300 bg-rose-50',
                             // Disabled (other answers after verification)
-                            state === 'disabled' && 'border-white/5 bg-white/[0.02] opacity-50',
+                            state === 'disabled' && 'border-gray-100 bg-gray-50/40 opacity-55',
                             // Cursor states
                             isVerified ? 'cursor-default' : 'cursor-pointer'
                         )}
@@ -65,11 +65,11 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
                         <div
                             className={cn(
                                 'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-semibold text-sm',
-                                state === 'default' && 'bg-white/10 text-white/70',
-                                state === 'selected' && 'bg-violet-500/30 text-violet-200',
-                                state === 'correct' && 'bg-emerald-500/30 text-emerald-200',
-                                state === 'incorrect' && 'bg-rose-500/30 text-rose-200',
-                                state === 'disabled' && 'bg-white/5 text-white/40'
+                                state === 'default' && 'bg-gray-200 text-gray-700',
+                                state === 'selected' && 'bg-violet-200 text-violet-900',
+                                state === 'correct' && 'bg-emerald-200 text-emerald-800',
+                                state === 'incorrect' && 'bg-rose-200 text-rose-800',
+                                state === 'disabled' && 'bg-gray-100 text-gray-400'
                             )}
                         >
                             {state === 'correct' ? (
@@ -84,12 +84,12 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
                         {/* Answer text */}
                         <div
                             className={cn(
-                                'flex-1 pt-1 text-base leading-relaxed',
-                                state === 'default' && 'text-white/80',
-                                state === 'selected' && 'text-white',
-                                state === 'correct' && 'text-emerald-100',
-                                state === 'incorrect' && 'text-rose-100',
-                                state === 'disabled' && 'text-white/50'
+                                'flex-1 pt-1 text-base leading-relaxed [&_.katex]:text-inherit',
+                                state === 'default' && 'text-gray-800',
+                                state === 'selected' && 'text-gray-900',
+                                state === 'correct' && 'text-emerald-900',
+                                state === 'incorrect' && 'text-rose-900',
+                                state === 'disabled' && 'text-gray-500'
                             )}
                         >
                             <LatexContent content={answerText} />
