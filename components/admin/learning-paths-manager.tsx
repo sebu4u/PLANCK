@@ -589,10 +589,10 @@ export function LearningPathsManager() {
         payload.quiz_question_id = null
         payload.content_json = null
         break
-      case "poll":
+      case "poll": {
+        const pollImageSrc = currentForm.poll_image_src.trim()
+        const pollImageAlt = currentForm.poll_image_alt.trim()
         payload.content_json = {
-          imageSrc: currentForm.poll_image_src.trim(),
-          imageAlt: currentForm.poll_image_alt.trim(),
           question: currentForm.poll_question,
           correctAnswerId: currentForm.poll_correct_answer_id,
           options: currentForm.poll_options.map((option) => ({
@@ -601,11 +601,16 @@ export function LearningPathsManager() {
             feedback: option.feedback,
           })),
         }
+        if (pollImageSrc) {
+          ;(payload.content_json as Record<string, unknown>).imageSrc = pollImageSrc
+          ;(payload.content_json as Record<string, unknown>).imageAlt = pollImageAlt
+        }
         payload.cursuri_lesson_slug = null
         payload.youtube_url = null
         payload.quiz_question_id = null
         payload.problem_id = null
         break
+      }
       case "simulation":
         payload.content_json = {
           embedUrl: currentForm.simulation_embed_url.trim(),

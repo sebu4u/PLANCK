@@ -4,6 +4,7 @@ import React from "react"
 import { ArrowLeft, ArrowRight, CheckCircle, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserAnswer } from "@/lib/types/quiz-questions"
+import { playGrileClickSound } from "@/lib/grile-quiz-audio"
 
 export interface GrileQuizBottomBarProps {
   currentAnswer: UserAnswer | null
@@ -53,10 +54,19 @@ export function GrileQuizBottomBar({
   const newTestBtn =
     "inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_3px_0_#047857] transition-[transform,box-shadow] hover:translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_1px_0_#047857]"
 
+  const click = playGrileClickSound
+
   const rightAction = (() => {
     if (isLastQuestion && isVerified) {
       return (
-        <button type="button" onClick={onReset} className={newTestBtn}>
+        <button
+          type="button"
+          onClick={() => {
+            click()
+            onReset()
+          }}
+          className={newTestBtn}
+        >
           <RotateCcw className="h-4 w-4" aria-hidden />
           Nou test
         </button>
@@ -64,7 +74,15 @@ export function GrileQuizBottomBar({
     }
     if (isVerified) {
       return (
-        <button type="button" onClick={onNext} disabled={!canGoNext} className={nextBtn}>
+        <button
+          type="button"
+          onClick={() => {
+            click()
+            onNext()
+          }}
+          disabled={!canGoNext}
+          className={nextBtn}
+        >
           Următoarea
           <ArrowRight className="h-4 w-4" aria-hidden />
         </button>
@@ -72,14 +90,28 @@ export function GrileQuizBottomBar({
     }
     if (hasSelectedAnswer) {
       return (
-        <button type="button" onClick={onVerify} className={verifyBtnEnabled}>
+        <button
+          type="button"
+          onClick={() => {
+            click()
+            onVerify()
+          }}
+          className={verifyBtnEnabled}
+        >
           <CheckCircle className="h-4 w-4" aria-hidden />
           Verifică
         </button>
       )
     }
     return (
-      <button type="button" onClick={onSkip} className={outlineBtn}>
+      <button
+        type="button"
+        onClick={() => {
+          click()
+          onSkip()
+        }}
+        className={outlineBtn}
+      >
         Skip
         <ArrowRight className="h-4 w-4" aria-hidden />
       </button>
@@ -96,7 +128,15 @@ export function GrileQuizBottomBar({
       style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))" }}
     >
       <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3">
-        <button type="button" onClick={onPrevious} disabled={!canGoPrevious} className={outlineBtn}>
+        <button
+          type="button"
+          onClick={() => {
+            click()
+            onPrevious()
+          }}
+          disabled={!canGoPrevious}
+          className={outlineBtn}
+        >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           Înapoi
         </button>

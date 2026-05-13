@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, lazy, Suspense, useEffect } from "react"
+import { useMemo, useState, lazy, Suspense, useEffect, useCallback } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
@@ -28,6 +28,10 @@ import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
 import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
+import {
+  ProblemWrongAnswerEloCard,
+  type ProblemWrongAnswerPenalty,
+} from "@/components/problems/problem-wrong-answer-elo-card"
 import { ProblemAnswerBottomSheet } from "@/components/problems/problem-answer-bottom-sheet"
 import { RecommendedProblemCard } from "@/components/problems/recommended-problem-card"
 import {
@@ -181,7 +185,20 @@ export default function ProblemDetailClient({
   const [storedCatalogBackHref] = useState(getStoredCatalogBackHref)
   const router = useRouter()
   const [catalogBackLoading, setCatalogBackLoading] = useState(false)
+  const [wrongAnswerPenalty, setWrongAnswerPenalty] = useState<ProblemWrongAnswerPenalty | null>(null)
+  const [wrongPageShake, setWrongPageShake] = useState(false)
   useSocialProofTrigger({ enabled: Boolean(user?.id) && !isClassroomEmbed, problemId: problem.id })
+
+  useEffect(() => {
+    if (!wrongAnswerPenalty) return
+    setWrongPageShake(true)
+    const id = window.setTimeout(() => setWrongPageShake(false), 480)
+    return () => window.clearTimeout(id)
+  }, [wrongAnswerPenalty])
+
+  const handleWrongAnswerPenalty = useCallback((penalty: ProblemWrongAnswerPenalty) => {
+    setWrongAnswerPenalty(penalty)
+  }, [])
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
@@ -191,6 +208,7 @@ export default function ProblemDetailClient({
 
   React.useEffect(() => {
     setCanMarkSolvedByAnswer(false)
+    setWrongAnswerPenalty(null)
   }, [problem.id, problem.answer_type])
 
   useEffect(() => {
@@ -361,6 +379,8 @@ export default function ProblemDetailClient({
       className={cn(
         "flex flex-col text-[#2C2F33]",
         isClassroomEmbed ? "min-h-0 bg-[#f6f5f4]" : "min-h-screen bg-[#f6f5f4] lg:bg-white",
+        wrongAnswerPenalty &&
+          "shadow-[inset_0_0_120px_rgba(244,63,94,0.14)] transition-[box-shadow] duration-300",
       )}
     >
       {!isClassroomEmbed ? <Navigation /> : null}
@@ -371,6 +391,7 @@ export default function ProblemDetailClient({
           isClassroomEmbed
             ? "relative w-full min-h-0"
             : "lg:fixed lg:top-16 lg:left-0 lg:right-[25vw] lg:bottom-0 lg:pb-[6px] lg:pl-[6px] lg:pt-0 lg:pr-0",
+          wrongPageShake && "animate-grile-wrong-shake",
         )}
       >
         <div
@@ -533,6 +554,8 @@ export default function ProblemDetailClient({
                               onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
                               onSolvedCorrectly={handleMarkSolved}
                               isSolved={isSolved}
+                              userId={user?.id ?? null}
+                              onWrongAnswerPenalty={handleWrongAnswerPenalty}
                             />
                           ) : (
                             <NoAnswerCard />
@@ -602,6 +625,8 @@ export default function ProblemDetailClient({
                               onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
                               onSolvedCorrectly={handleMarkSolved}
                               isSolved={isSolved}
+                              userId={user?.id ?? null}
+                              onWrongAnswerPenalty={handleWrongAnswerPenalty}
                             />
                           ) : (
                             <NoAnswerCard />
@@ -665,6 +690,13 @@ export default function ProblemDetailClient({
         </div>
       )}
 
+      {wrongAnswerPenalty && (
+        <ProblemWrongAnswerEloCard
+          penalty={wrongAnswerPenalty}
+          onDismiss={() => setWrongAnswerPenalty(null)}
+        />
+      )}
+
       {showBadgeNotification && newBadge && (
         <BadgeNotification
           badge={newBadge.badge}
@@ -682,6 +714,8 @@ export default function ProblemDetailClient({
           isSolved={isSolved}
           onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
           onSolvedCorrectly={handleMarkSolved}
+          userId={user?.id ?? null}
+          onWrongAnswerPenalty={handleWrongAnswerPenalty}
           onOpenHint={
             isClassroomEmbed
               ? undefined

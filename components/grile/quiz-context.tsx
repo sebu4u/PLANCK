@@ -21,7 +21,7 @@ interface QuizContextValue {
     setQuestions: (questions: QuizQuestion[]) => void;
     setLoading: (loading: boolean) => void;
     selectAnswer: (answer: AnswerKey) => void;
-    verifyAnswer: () => void;
+    verifyAnswer: () => boolean | null;
     goToNext: () => void;
     goToPrevious: () => void;
     goToQuestion: (index: number) => void;
@@ -91,11 +91,11 @@ export function QuizProvider({ children }: QuizProviderProps) {
         });
     }, [currentQuestion, answers]);
 
-    const verifyAnswer = useCallback(() => {
-        if (!currentQuestion) return;
+    const verifyAnswer = useCallback((): boolean | null => {
+        if (!currentQuestion) return null;
 
         const userAnswer = answers.get(currentQuestion.id);
-        if (!userAnswer || userAnswer.selectedAnswer === null || userAnswer.isVerified) return;
+        if (!userAnswer || userAnswer.selectedAnswer === null || userAnswer.isVerified) return null;
 
         const isCorrect = userAnswer.selectedAnswer === currentQuestion.correct_answer;
 
@@ -112,6 +112,7 @@ export function QuizProvider({ children }: QuizProviderProps) {
             });
             return next;
         });
+        return isCorrect;
     }, [currentQuestion, answers]);
 
     const goToNext = useCallback(() => {

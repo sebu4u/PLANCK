@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import "katex/dist/katex.min.css"
 import { InlineMath } from "react-katex"
+import { supabase } from "@/lib/supabaseClient"
+import type { ProblemWrongAnswerPenalty } from "@/components/problems/problem-wrong-answer-elo-card"
 
 interface ProblemAnswerCardProps {
   problem: Problem
@@ -17,6 +19,35 @@ interface ProblemAnswerCardProps {
   /** When true, show a "Hint" button (no border) that opens AI chat with the problem. Used on mobile. */
   showHintButton?: boolean
   onHintClick?: () => void
+  userId?: string | null
+  /** Wrong substantive answer after „Verifică răspunsul” (not invalid empty/format). */
+  onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
+}
+
+async function fetchWrongAnswerPenalty(userId: string | null | undefined): Promise<ProblemWrongAnswerPenalty> {
+  if (!userId) return { kind: "anonymous" }
+
+  const { data, error } = await supabase.rpc("deduct_elo_wrong_problem_answer")
+
+  if (error) {
+    console.error("deduct_elo_wrong_problem_answer:", error)
+    return { kind: "anonymous" }
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    previous_elo?: number
+    new_elo?: number
+    deducted?: number
+  } | null
+
+  if (!row) return { kind: "anonymous" }
+
+  return {
+    kind: "deducted",
+    previousElo: Number(row.previous_elo ?? 0),
+    newElo: Number(row.new_elo ?? 0),
+    deducted: Number(row.deducted ?? 0),
+  }
 }
 
 function getProblemElo(problem: Problem): number | null {
@@ -97,6 +128,8 @@ function ValueAnswerCard({
   eloReward,
   showHintButton,
   onHintClick,
+  userId,
+  onWrongAnswerPenalty,
 }: {
   subpoints: ProblemValueSubpoint[]
   onCanMarkSolvedChange: (canMarkSolved: boolean) => void
@@ -105,6 +138,8 @@ function ValueAnswerCard({
   eloReward?: number | null
   showHintButton?: boolean
   onHintClick?: () => void
+  userId?: string | null
+  onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
 }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [inputValue, setInputValue] = useState("")
@@ -131,6 +166,9 @@ function ValueAnswerCard({
 
     const isCorrect = isWithinTolerance(parsedValue, currentSubpoint.correct_value)
     if (!isCorrect) {
+      void fetchWrongAnswerPenalty(userId).then((penalty) => {
+        onWrongAnswerPenalty?.(penalty)
+      })
       setIsError(true)
       setFeedback("Răspuns incorect. Încearcă din nou.")
       return
@@ -271,6 +309,8 @@ function GrilaAnswerCard({
   eloReward,
   showHintButton,
   onHintClick,
+  userId,
+  onWrongAnswerPenalty,
 }: {
   options: string[]
   correctIndex: number
@@ -280,6 +320,8 @@ function GrilaAnswerCard({
   eloReward?: number | null
   showHintButton?: boolean
   onHintClick?: () => void
+  userId?: string | null
+  onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
 }) {
   const [selectedValue, setSelectedValue] = useState<string>("")
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -302,6 +344,11 @@ function GrilaAnswerCard({
     setIsCorrect(solved)
     setIsError(!solved)
     setFeedback(solved ? "Corect! Poți marca problema ca rezolvată." : "Răspuns incorect. Încearcă din nou.")
+    if (!solved) {
+      void fetchWrongAnswerPenalty(userId).then((penalty) => {
+        onWrongAnswerPenalty?.(penalty)
+      })
+    }
     if (solved) onSolvedCorrectly?.()
   }
 
@@ -390,7 +437,16 @@ function GrilaAnswerCard({
   )
 }
 
-export function ProblemAnswerCard({ problem, onCanMarkSolvedChange, onSolvedCorrectly, isSolved, showHintButton, onHintClick }: ProblemAnswerCardProps) {
+export function ProblemAnswerCard({
+  problem,
+  onCanMarkSolvedChange,
+  onSolvedCorrectly,
+  isSolved,
+  showHintButton,
+  onHintClick,
+  userId,
+  onWrongAnswerPenalty,
+}: ProblemAnswerCardProps) {
   const normalizedType = problem.answer_type ?? null
 
   const valueSubpoints = useMemo(() => normalizeValueSubpoints(problem), [problem])
@@ -408,6 +464,8 @@ export function ProblemAnswerCard({ problem, onCanMarkSolvedChange, onSolvedCorr
         eloReward={eloReward}
         showHintButton={showHintButton}
         onHintClick={onHintClick}
+        userId={userId}
+        onWrongAnswerPenalty={onWrongAnswerPenalty}
       />
     )
   }
@@ -423,6 +481,8 @@ export function ProblemAnswerCard({ problem, onCanMarkSolvedChange, onSolvedCorr
         eloReward={eloReward}
         showHintButton={showHintButton}
         onHintClick={onHintClick}
+        userId={userId}
+        onWrongAnswerPenalty={onWrongAnswerPenalty}
       />
     )
   }

@@ -128,14 +128,14 @@ function parsePollContent(content: Record<string, unknown> | null | undefined): 
   options: { id: string; label: string; feedback: string }[]
 } | null {
   if (!content || typeof content !== "object") return null
-  const imageSrc = content.imageSrc
-  const imageAlt = content.imageAlt
+  const rawImageSrc = content.imageSrc
+  const rawImageAlt = content.imageAlt
+  const imageSrc = typeof rawImageSrc === "string" ? rawImageSrc : ""
+  const imageAlt = typeof rawImageAlt === "string" ? rawImageAlt : ""
   const question = content.question
   const correctAnswerId = content.correctAnswerId
   const options = content.options
   if (
-    typeof imageSrc !== "string" ||
-    typeof imageAlt !== "string" ||
     typeof question !== "string" ||
     typeof correctAnswerId !== "string" ||
     !Array.isArray(options) ||

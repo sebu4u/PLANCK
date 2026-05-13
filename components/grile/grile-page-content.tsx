@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QuizProvider, useQuiz } from './quiz-context';
 import { GrileInsightChatProvider, useGrileInsightChat } from './grile-insight-chat-provider';
@@ -13,6 +21,22 @@ import { formatGrileCatalogInsightContext } from '@/lib/grile-insight-context';
 import type { GradeLevel, QuizQuestion, UserAnswer } from '@/lib/types/quiz-questions';
 import { Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { fireLearningPathCorrectConfetti } from '@/lib/learning-path-confetti';
+import {
+    playGrileClickSound,
+    playGrileErrorSound,
+    playGrileSuccessSound,
+} from '@/lib/grile-quiz-audio';
+
+type GrileShellFeedbackContextValue = {
+    triggerWrongAnswerFeedback: () => void;
+};
+
+const GrileShellFeedbackContext = createContext<GrileShellFeedbackContextValue | null>(null);
+
+function useGrileShellFeedback() {
+    return useContext(GrileShellFeedbackContext);
+}
 
 function QuizContent() {
     const router = useRouter();
@@ -38,7 +62,19 @@ function QuizContent() {
         canGoNext,
         canGoPrevious,
     } = useQuiz();
+    const shellFeedback = useGrileShellFeedback();
     const [singleQuestionNotFound, setSingleQuestionNotFound] = useState(false);
+
+    const handleVerify = useCallback(() => {
+        const result = verifyAnswer();
+        if (result === true) {
+            playGrileSuccessSound();
+            fireLearningPathCorrectConfetti();
+        } else if (result === false) {
+            playGrileErrorSound();
+            shellFeedback?.triggerWrongAnswerFeedback();
+        }
+    }, [verifyAnswer, shellFeedback]);
 
     const handleClassSelect = useCallback(async (level: GradeLevel) => {
         setClassLevel(level);
@@ -207,7 +243,7 @@ function QuizContent() {
                 currentAnswer={currentAnswer}
                 canGoNext={canGoNext}
                 canGoPrevious={canGoPrevious}
-                onVerify={verifyAnswer}
+                onVerify={handleVerify}
                 onNext={goToNext}
                 onPrevious={goToPrevious}
                 onSkip={skipCurrentQuestion}
@@ -249,6 +285,7 @@ function GrileInsightFab({
         <button
             type="button"
             onClick={() => {
+                playGrileClickSound()
                 grileChat.openGrileChat({
                     problemStatement: formatGrileCatalogInsightContext({
                         question: currentQuestion,
@@ -275,18 +312,46 @@ function GrileInsightFab({
 function GrilePageShell() {
     const chat = useGrileInsightChat()
     const insightDesktopOpen = Boolean(chat?.grileChatDocked && chat?.isDesktopViewport)
+    const [wrongFlash, setWrongFlash] = useState(false)
+    const wrongFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const triggerWrongAnswerFeedback = useCallback(() => {
+        setWrongFlash(true)
+        if (wrongFlashTimeoutRef.current) {
+            clearTimeout(wrongFlashTimeoutRef.current)
+        }
+        wrongFlashTimeoutRef.current = setTimeout(() => {
+            setWrongFlash(false)
+            wrongFlashTimeoutRef.current = null
+        }, 520)
+    }, [])
+
+    const shellFeedbackValue = useMemo(
+        () => ({ triggerWrongAnswerFeedback }),
+        [triggerWrongAnswerFeedback],
+    )
 
     return (
-        <div
-            className={cn(
-                'min-h-screen lg:h-screen lg:overflow-hidden bg-[#ffffff] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col',
-                insightDesktopOpen && 'lg:mr-[25vw]',
-            )}
-        >
-            <div className="flex-1 flex items-start lg:items-center justify-center">
-                <QuizContent />
+        <GrileShellFeedbackContext.Provider value={shellFeedbackValue}>
+            <div
+                className={cn(
+                    'relative min-h-screen lg:h-screen lg:overflow-hidden bg-[#ffffff] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col',
+                    insightDesktopOpen && 'lg:mr-[25vw]',
+                    wrongFlash && 'animate-grile-wrong-shake',
+                )}
+            >
+                <div
+                    className={cn(
+                        'pointer-events-none absolute inset-0 z-[45] transition-[background-color] duration-150 ease-out',
+                        wrongFlash ? 'bg-rose-500/[0.16]' : 'bg-transparent',
+                    )}
+                    aria-hidden
+                />
+                <div className="relative z-10 flex flex-1 items-start justify-center lg:items-center">
+                    <QuizContent />
+                </div>
             </div>
-        </div>
+        </GrileShellFeedbackContext.Provider>
     )
 }
 

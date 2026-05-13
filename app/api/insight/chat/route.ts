@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import type {
+  ChatCompletionContentPart,
+  ChatCompletionMessageParam,
+} from 'openai/resources/chat/completions';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
 import { estimateCostUSD } from '@/lib/insight-cost';
@@ -15,6 +20,12 @@ import { logger } from '@/lib/logger';
 import { resolvePlanForRequest } from '@/lib/subscription-plan-server';
 import type { SubscriptionPlan } from '@/lib/subscription-plan';
 import { handleAnonymousInsightChat } from '@/lib/insight-chat-anonymous';
+import {
+  buildInsightAttachmentRecords,
+  createSignedUrlsForInsightPaths,
+  validateInsightAttachmentPathsForSession,
+  type InsightMessageAttachment,
+} from '@/lib/insight-attachments';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -32,11 +43,68 @@ function getOpenAIClient() {
  */
 function toChatCompletionsMessages(
   messages: Array<{ role: string; content: string }>
-) {
+): ChatCompletionMessageParam[] {
   return messages.map((m) => ({
     role: m.role as 'user' | 'assistant' | 'system',
     content: m.content,
   }));
+}
+
+const PROBLEM_TUTOR_VISION_APPENDIX = `
+
+IMAGINI / REZOLVĂRI PE FOAIĂ (SCRIS DE MÂNĂ):
+Când mesajul utilizatorului include fotografii cu rezolvări scrise de mână, tratează cererea ca VERIFICARE / CORECTARE:
+1) Descrie pe scurt ce observi în imagini (structură, pași, diagrame).
+2) Transcrie cât mai fidel pașii și formulele pe care reușești să le citești; folosește obligatoriu LaTeX în $...$ sau $$...$$ pentru orice expresie matematică.
+3) Compară raționamentul și rezultatele cu enunțul problemei din context (dacă există) și cu fizica corectă.
+4) Listează clar erorile, omisiunile sau ambiguitățile; dacă ceva e ilizibil, spune exact ce zonă nu poți citi și ce ai nevoie (ex. o poză mai clară).
+5) Răspunde concis și util; nu forța modul socratic dacă utilizatorul cere verificare. NU genera blocul ---SUGGESTIONS--- pentru acest tip de cerere, decât dacă utilizatorul cere explicit ghidare pas cu pas.`;
+
+type InsightHistoryRow = {
+  role: string;
+  content: string;
+  attachments?: InsightMessageAttachment[] | null;
+};
+
+async function openAIUserMessageFromRow(
+  supabase: SupabaseClient,
+  content: string,
+  attachments: InsightMessageAttachment[] | null | undefined
+): Promise<ChatCompletionMessageParam> {
+  if (!attachments?.length) {
+    return { role: 'user', content };
+  }
+  const urls = await createSignedUrlsForInsightPaths(supabase, attachments);
+  const textPart =
+    content.trim() ||
+    '(Utilizatorul a trimis imagini cu rezolvarea — verifică și corectează ce este scris pe foaie.)';
+  const parts: ChatCompletionContentPart[] = [
+    { type: 'text', text: textPart },
+    ...urls.map((url) => ({
+      type: 'image_url' as const,
+      image_url: { url, detail: 'high' as const },
+    })),
+  ];
+  return { role: 'user', content: parts };
+}
+
+async function insightHistoryToOpenAIMessages(
+  supabase: SupabaseClient,
+  rows: InsightHistoryRow[]
+): Promise<ChatCompletionMessageParam[]> {
+  const out: ChatCompletionMessageParam[] = [];
+  for (const m of rows) {
+    if (m.role === 'user') {
+      out.push(await openAIUserMessageFromRow(supabase, m.content, m.attachments));
+    } else {
+      out.push({ role: m.role as 'assistant' | 'system', content: m.content });
+    }
+  }
+  return out;
+}
+
+function threadHasVisionAttachments(rows: InsightHistoryRow[]): boolean {
+  return rows.some((r) => r.role === 'user' && Array.isArray(r.attachments) && r.attachments.length > 0);
 }
 
 /**
@@ -116,15 +184,30 @@ export async function POST(req: NextRequest) {
 
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
 
+    const rawAttachmentPaths = Array.isArray((body as Record<string, unknown>).attachmentPaths)
+      ? ((body as Record<string, unknown>).attachmentPaths as unknown[])
+          .filter((x): x is string => typeof x === 'string')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
     // Check if this is from IDE - IDE messages should not be saved to chat history
     const isIdeRequest = persona === 'ide';
+
+    if (isIdeRequest && rawAttachmentPaths.length > 0) {
+      return NextResponse.json(
+        { error: 'Atașarea de imagini nu este disponibilă în IDE.' },
+        { status: 400 }
+      );
+    }
     // Raptor1 free-tier rules (monthly gpt-4o vs daily mini) apply only in PlanckCode IDE.
     // Insight on problem pages, lessons, and /insight/chat uses the general daily Insight limit, not the Raptor1 monthly bucket.
     const useRaptorFreeTierLimits = shouldUseRaptorFreeTierLimits(persona);
 
     // Support legacy format (messages array) for backward compatibility
     let userInput: string;
-    let resolvedSessionId: string | undefined = sessionId;
+    let resolvedSessionId: string | undefined =
+      typeof sessionId === 'string' && sessionId.trim() ? sessionId.trim() : undefined;
 
     if (Array.isArray(messages) && messages.length > 0) {
       // Legacy format: extract last user message
@@ -132,9 +215,15 @@ export async function POST(req: NextRequest) {
       if (!lastUserMsg) {
         return NextResponse.json({ error: 'Mesaje lipsă.' }, { status: 400 });
       }
-      userInput = lastUserMsg.content;
-    } else if (typeof input === 'string' && input.trim()) {
-      // New format: sessionId + input
+      userInput = String(lastUserMsg.content ?? '');
+      if (rawAttachmentPaths.length > 0) {
+        return NextResponse.json(
+          { error: 'Formatul cu imagini nu este suportat în modul vechi de mesaje.' },
+          { status: 400 }
+        );
+      }
+    } else if (typeof input === 'string' && (input.trim() || rawAttachmentPaths.length > 0)) {
+      // New format: sessionId + input (input may be empty when only images are sent)
       userInput = input.trim();
     } else {
       return NextResponse.json({ error: 'Mesajul utilizatorului este necesar.' }, { status: 400 });
@@ -254,7 +343,8 @@ export async function POST(req: NextRequest) {
     if (!isIdeRequest) {
       if (!resolvedSessionId) {
         // Create new session with auto-generated title from first message
-        const autoTitle = userInput.slice(0, 60);
+        const autoTitle =
+          userInput.slice(0, 60) || (rawAttachmentPaths.length ? 'Insight — imagini' : 'Insight');
         const { data: newSession, error: sessErr } = await supabase
           .from('insight_chat_sessions')
           .insert({
@@ -283,15 +373,36 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Save user message to database (only for non-IDE requests)
-      const { error: insUserMsgErr } = await supabase
-        .from('insight_chat_messages')
-        .insert({
-          session_id: resolvedSessionId,
-          user_id: user.id,
-          role: 'user',
-          content: userInput,
+      let attachmentsPayload: InsightMessageAttachment[] | null = null;
+      if (rawAttachmentPaths.length > 0) {
+        const sid = resolvedSessionId;
+        if (!sid) {
+          return NextResponse.json({ error: 'Sesiune invalidă pentru atașamente.' }, { status: 500 });
+        }
+        if (!validateInsightAttachmentPathsForSession(rawAttachmentPaths, user.id, sid)) {
+          return NextResponse.json(
+            { error: 'Căile atașamentelor sunt invalide sau nu aparțin sesiunii curente.' },
+            { status: 400 }
+          );
+        }
+        attachmentsPayload = buildInsightAttachmentRecords(rawAttachmentPaths);
+        if (attachmentsPayload.length !== rawAttachmentPaths.length) {
+          return NextResponse.json({ error: 'Atașamentele nu au putut fi validate.' }, { status: 400 });
+        }
+        logger.info('Insight chat: user message with image attachments', {
+          count: rawAttachmentPaths.length,
+          sessionId: resolvedSessionId,
         });
+      }
+
+      // Save user message to database (only for non-IDE requests)
+      const { error: insUserMsgErr } = await supabase.from('insight_chat_messages').insert({
+        session_id: resolvedSessionId,
+        user_id: user.id,
+        role: 'user',
+        content: userInput,
+        attachments: attachmentsPayload,
+      });
 
       if (insUserMsgErr) {
         logger.error('Failed to save user message:', insUserMsgErr);
@@ -301,11 +412,11 @@ export async function POST(req: NextRequest) {
 
     // Load message history from database for context (last 30 messages)
     // For IDE requests, skip loading history as they maintain their own local state
-    let history: Array<{ role: string; content: string }> = [];
+    let history: InsightHistoryRow[] = [];
     if (!isIdeRequest && resolvedSessionId) {
       const { data: historyData, error: historyErr } = await supabase
         .from('insight_chat_messages')
-        .select('role, content')
+        .select('role, content, attachments')
         .eq('session_id', resolvedSessionId)
         .order('created_at', { ascending: true })
         .limit(30);
@@ -315,7 +426,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Nu am putut încărca istoricul.' }, { status: 500 });
       }
 
-      history = historyData || [];
+      history = (historyData || []).map((row: any) => ({
+        role: row.role,
+        content: row.content,
+        attachments: Array.isArray(row.attachments)
+          ? (row.attachments as InsightMessageAttachment[])
+          : null,
+      }));
     }
 
     // Build messages array for OpenAI (include system message + history)
@@ -421,6 +538,9 @@ Asigură-te că JSON-ul este valid.`;
 
       // Override system message
       systemMessage.content = problemTutorContent;
+      if (threadHasVisionAttachments(history)) {
+        systemMessage.content += PROBLEM_TUTOR_VISION_APPENDIX;
+      }
     }
 
     const sanitizedContextMessages = Array.isArray(contextMessages)
@@ -439,63 +559,78 @@ Asigură-te că JSON-ul este valid.`;
         }))
       : [];
 
-    const historyMessages = (history || []).map((m) => ({
-      role: m.role as 'user' | 'assistant' | 'system',
-      content: m.content,
-    }));
+    const lastHistoryMessage = history.length > 0 ? history[history.length - 1] : null;
+    const isLastMessageCurrentUser =
+      lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === userInput;
 
-    // Check if the last message in history is the current user message
-    // (it might be included if the database query happened after the insert)
-    const lastHistoryMessage = historyMessages.length > 0 ? historyMessages[historyMessages.length - 1] : null;
-    const isLastMessageCurrentUser = lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === userInput;
+    let historyOpenAI: ChatCompletionMessageParam[] = [];
+    let trailingUser: ChatCompletionMessageParam[] = [];
+    try {
+      historyOpenAI = await insightHistoryToOpenAIMessages(supabase, history);
+      if (!isLastMessageCurrentUser) {
+        const trailingAttachments =
+          rawAttachmentPaths.length > 0 ? buildInsightAttachmentRecords(rawAttachmentPaths) : null;
+        trailingUser = [
+          await openAIUserMessageFromRow(supabase, userInput, trailingAttachments),
+        ];
+      }
+    } catch (visionErr: unknown) {
+      logger.error('Insight vision / signed URL error:', visionErr);
+      return NextResponse.json(
+        { error: 'Nu am putut pregăti imaginile pentru analiză. Încearcă din nou.' },
+        { status: 502 }
+      );
+    }
 
-    // Prepare messages for OpenAI Chat Completions API
-    // Note: history may not include the just-inserted user message due to timing,
-    // so we explicitly add the current user input as the last message if it's not already there
-    const chatMessages = [
+    const finalMessages: ChatCompletionMessageParam[] = [
       systemMessage,
       ...toChatCompletionsMessages(sanitizedContextMessages),
-      ...toChatCompletionsMessages(historyMessages),
-      // Explicitly add current user message only if it's not already in history
-      ...(isLastMessageCurrentUser ? [] : [{
-        role: 'user' as const,
-        content: userInput,
-      }]),
+      ...historyOpenAI,
+      ...trailingUser,
     ];
 
     // Validate that messages array is not empty and has at least one user message
-    if (!chatMessages || chatMessages.length === 0) {
-      logger.error('Empty chatMessages array');
+    if (!finalMessages || finalMessages.length === 0) {
+      logger.error('Empty finalMessages array');
       return NextResponse.json(
         { error: 'Nu am putut pregăti mesajele pentru chat.' },
         { status: 500 }
       );
     }
 
-    const hasUserMessage = chatMessages.some((m) => m.role === 'user');
+    const hasUserMessage = finalMessages.some((m) => m.role === 'user');
     if (!hasUserMessage) {
-      logger.error('No user message in chatMessages array');
+      logger.error('No user message in finalMessages array');
       return NextResponse.json(
         { error: 'Mesajul utilizatorului lipsește.' },
         { status: 400 }
       );
     }
 
-    const activeModel = modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
+    const hasAnyImagesInContext =
+      threadHasVisionAttachments(history) || rawAttachmentPaths.length > 0;
+
+    let activeModel = modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
+    if (hasAnyImagesInContext && !isIdeRequest) {
+      activeModel = 'gpt-4o';
+    }
 
     // For "deep-thinking" mode, inject Chain of Thought instructions
     if (modelToUseParam === 'deep-thinking') {
-      systemContent += '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
-      // Update system message content
-      systemMessage.content = systemContent;
+      const deepBlock =
+        '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
+      if (personaKey === 'problem_tutor') {
+        systemMessage.content += deepBlock;
+      } else {
+        systemContent += deepBlock;
+        systemMessage.content = systemContent;
+      }
     }
 
     // Prepare parameters for OpenAI (standard models only, o1 removed)
     const maxTokensParam = {
       max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
     };
-
-    let finalMessages = chatMessages;
 
     // Call OpenAI Chat Completions API with streaming
     const t0 = Date.now();
@@ -702,7 +837,24 @@ Asigură-te că JSON-ul este valid.`;
           }
 
           // Calculate cost
-          const costUSD = estimateCostUSD(inputTokens, outputTokens);
+          const imagesInThread = history.reduce(
+            (n, r) =>
+              n +
+              (r.role === 'user' && Array.isArray(r.attachments) && r.attachments.length > 0
+                ? r.attachments.length
+                : 0),
+            0
+          );
+          if (imagesInThread > 0) {
+            logger.info('Insight chat completed (thread includes images)', {
+              imagesInThread,
+              inputTokens,
+              outputTokens,
+            });
+          }
+          const costUSD = estimateCostUSD(inputTokens, outputTokens, {
+            insightVisionImagesApprox: imagesInThread,
+          });
 
           // Log individual request
           await supabase.from('insight_logs').insert({

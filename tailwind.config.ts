@@ -95,12 +95,22 @@ const config: Config = {
   			'stats-marquee': {
   				'0%': { transform: 'translateX(0)' },
   				'100%': { transform: 'translateX(-50%)' }
+  			},
+  			'grile-wrong-shake': {
+  				'0%, 100%': { transform: 'translateX(0)' },
+  				'15%': { transform: 'translateX(-7px)' },
+  				'30%': { transform: 'translateX(7px)' },
+  				'45%': { transform: 'translateX(-5px)' },
+  				'60%': { transform: 'translateX(5px)' },
+  				'75%': { transform: 'translateX(-3px)' },
+  				'90%': { transform: 'translateX(3px)' }
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
-  			'stats-marquee': 'stats-marquee 50s linear infinite'
+  			'stats-marquee': 'stats-marquee 50s linear infinite',
+  			'grile-wrong-shake': 'grile-wrong-shake 0.48s ease-in-out both'
   		}
   	}
   },

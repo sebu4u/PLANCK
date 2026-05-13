@@ -6,6 +6,7 @@ import { ChevronUp, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Problem } from "@/data/problems"
 import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
+import type { ProblemWrongAnswerPenalty } from "@/components/problems/problem-wrong-answer-elo-card"
 import { Input } from "@/components/ui/input"
 
 const SWIPE_THRESHOLD = 40
@@ -34,6 +35,8 @@ interface ProblemAnswerBottomSheetProps {
   onOpenHint?: () => void
   /** Opens AI chat sidebar (for mobile chat button above drawer). */
   onOpenChat?: () => void
+  userId?: string | null
+  onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
 }
 
 const CHAT_BUTTON_GAP = 16
@@ -46,6 +49,8 @@ export function ProblemAnswerBottomSheet({
   onSolvedCorrectly,
   onOpenHint,
   onOpenChat,
+  userId,
+  onWrongAnswerPenalty,
 }: ProblemAnswerBottomSheetProps) {
   const [expanded, setExpanded] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -319,6 +324,8 @@ export function ProblemAnswerBottomSheet({
               isSolved={isSolved}
               showHintButton={!!onOpenHint}
               onHintClick={onOpenHint}
+              userId={userId}
+              onWrongAnswerPenalty={onWrongAnswerPenalty}
             />
           ) : (
             <NoAnswerCardMobile />

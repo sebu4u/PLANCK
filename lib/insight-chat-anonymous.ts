@@ -95,6 +95,21 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
 
   const { sessionId: _sid, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
 
+  const anonAttachmentPaths = Array.isArray((body as Record<string, unknown>)?.attachmentPaths)
+    ? ((body as Record<string, unknown>).attachmentPaths as unknown[]).filter(
+        (x): x is string => typeof x === 'string' && x.trim().length > 0
+      )
+    : [];
+
+  if (anonAttachmentPaths.length > 0) {
+    return new Response(
+      JSON.stringify({
+        error: 'Imaginile în Insight sunt disponibile doar cu cont. Creează un cont pentru a atașa poze.',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   const isIdeRequest = persona === 'ide';
   const useRaptorFreeTierLimits = shouldUseRaptorFreeTierLimits(persona);
 

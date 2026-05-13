@@ -523,7 +523,7 @@ export function Navigation() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                       <DropdownMenuItem asChild>
-                        <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
+                        <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Profil</a>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
@@ -654,7 +654,7 @@ export function Navigation() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                     <DropdownMenuItem asChild>
-                      <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Settings</a>
+                      <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Profil</a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>

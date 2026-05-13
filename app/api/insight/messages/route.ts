@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     // RLS will ensure user can only access their own sessions
     const { data, error } = await supabase
       .from('insight_chat_messages')
-      .select('role, content, created_at')
+      .select('role, content, attachments, created_at')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
 

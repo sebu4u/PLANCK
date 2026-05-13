@@ -46,12 +46,19 @@ import InsightProblemsDialog from '@/components/insight-problems-dialog';
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay';
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content';
 import { BlockMath, InlineMath } from 'react-katex';
+import { INSIGHT_ATTACHMENTS_BUCKET } from '@/lib/insight-attachments';
+
+type InsightChatImageRef = {
+  storagePath: string
+  previewUrl: string
+}
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
   /** Vizitatori fără cont: răspuns simulat blur-at după limită zilnică */
   anonLimitLocked?: boolean;
+  attachments?: InsightChatImageRef[];
 };
 
 type Session = {
@@ -467,10 +474,34 @@ function InsightChatPageContent() {
       }
 
       const data = await res.json();
-      const loadedMessages = (data.messages || []).map((m: any) => ({
-        role: m.role as 'user' | 'assistant' | 'system',
-        content: m.content,
-      }));
+      const loadedMessages: ChatMessage[] = await Promise.all(
+        (data.messages || []).map(async (m: Record<string, unknown>) => {
+          const role = m.role as 'user' | 'assistant' | 'system';
+          const content = String(m.content ?? '');
+          const base: ChatMessage = { role, content };
+          if (
+            role === 'user' &&
+            Array.isArray(m.attachments) &&
+            (m.attachments as unknown[]).length > 0
+          ) {
+            const imgs: InsightChatImageRef[] = [];
+            for (const raw of m.attachments as Array<Record<string, unknown>>) {
+              const bucket =
+                typeof raw.bucket === 'string' ? raw.bucket : INSIGHT_ATTACHMENTS_BUCKET;
+              const path = typeof raw.path === 'string' ? raw.path : '';
+              if (!path) continue;
+              const { data: signed, error } = await supabase.storage
+                .from(bucket)
+                .createSignedUrl(path, 3600);
+              if (!error && signed?.signedUrl) {
+                imgs.push({ storagePath: path, previewUrl: signed.signedUrl });
+              }
+            }
+            if (imgs.length) base.attachments = imgs;
+          }
+          return base;
+        })
+      );
 
       setMessages([
         {
@@ -1683,9 +1714,31 @@ function InsightChatPageContent() {
                           <div className="text-xs uppercase tracking-wide text-gray-400 mb-2 opacity-70">
                             Tu
                           </div>
+                          {m.attachments && m.attachments.length > 0 && (
+                            <div className="mb-3 flex flex-wrap gap-2">
+                              {m.attachments.map((att) => (
+                                <a
+                                  key={att.storagePath}
+                                  href={att.previewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block shrink-0 overflow-hidden rounded-lg border border-white/10"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={att.previewUrl}
+                                    alt="Atașament"
+                                    className="max-h-40 max-w-[200px] object-contain"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          {(m.content || '').trim() ? (
                           <p className="whitespace-pre-wrap break-words leading-relaxed">
                             {m.content}
                           </p>
+                          ) : null}
                         </div>
                       )}
                     </div>

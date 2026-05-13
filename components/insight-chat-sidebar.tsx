@@ -15,12 +15,34 @@ import 'katex/dist/katex.min.css'
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content'
 import { cn } from '@/lib/utils'
+import {
+  INSIGHT_ATTACHMENTS_BUCKET,
+  MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE,
+} from '@/lib/insight-attachments'
+import {
+  MAX_INSIGHT_ATTACHMENT_BYTES,
+  prepareInsightImageForUpload,
+} from '@/lib/insight-client-image'
+
+type InsightChatImageRef = {
+  storagePath: string
+  /** Object URL (just sent) or signed URL (from history) */
+  previewUrl: string
+}
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'system'
   content: string
   /** Vizitatori fără cont: placeholder blur-at după limită */
   anonLimitLocked?: boolean
+  attachments?: InsightChatImageRef[]
+}
+
+type PendingInsightImage = {
+  id: string
+  file: File
+  preview: string
+  compressedFile?: File
 }
 
 interface InsightChatSidebarProps {
@@ -232,6 +254,9 @@ export default function InsightChatSidebar({
   const [viewportModeResolved, setViewportModeResolved] = useState(false)
   const pendingStreamAnchorRef = useRef(false)
   const streamingAssistantRef = useRef<HTMLDivElement | null>(null)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const [pendingAttachments, setPendingAttachments] = useState<PendingInsightImage[]>([])
+  const [uploadingAttachments, setUploadingAttachments] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
@@ -421,10 +446,34 @@ export default function InsightChatSidebar({
       }
 
       const data = await res.json()
-      const loadedMessages = (data.messages || []).map((m: any) => ({
-        role: m.role as 'user' | 'assistant' | 'system',
-        content: m.content,
-      }))
+      const loadedMessages: ChatMessage[] = await Promise.all(
+        (data.messages || []).map(async (m: Record<string, unknown>) => {
+          const role = m.role as 'user' | 'assistant' | 'system'
+          const content = String(m.content ?? '')
+          const base: ChatMessage = { role, content }
+          if (
+            role === 'user' &&
+            Array.isArray(m.attachments) &&
+            (m.attachments as unknown[]).length > 0
+          ) {
+            const imgs: InsightChatImageRef[] = []
+            for (const raw of m.attachments as Array<Record<string, unknown>>) {
+              const bucket =
+                typeof raw.bucket === 'string' ? raw.bucket : INSIGHT_ATTACHMENTS_BUCKET
+              const path = typeof raw.path === 'string' ? raw.path : ''
+              if (!path) continue
+              const { data: signed, error } = await supabase.storage
+                .from(bucket)
+                .createSignedUrl(path, 3600)
+              if (!error && signed?.signedUrl) {
+                imgs.push({ storagePath: path, previewUrl: signed.signedUrl })
+              }
+            }
+            if (imgs.length) base.attachments = imgs
+          }
+          return base
+        })
+      )
 
       setMessages([
         {
@@ -573,6 +622,12 @@ export default function InsightChatSidebar({
     ])
     setInput('')
     setError(null)
+    setPendingAttachments((prev) => {
+      for (const p of prev) {
+        if (p.preview.startsWith('blob:')) URL.revokeObjectURL(p.preview)
+      }
+      return []
+    })
     // We don't necessarily set context here because the main effect will do it if isOpen is true
     // or we can set it here if we want it ready before opening.
     // But typically isOpen drives the flow.
@@ -584,10 +639,15 @@ export default function InsightChatSidebar({
     }
   }, [problemId])
 
-
   // Cleanup only on unmount
   useEffect(() => {
     return () => {
+      setPendingAttachments((prev) => {
+        for (const p of prev) {
+          if (p.preview.startsWith('blob:')) URL.revokeObjectURL(p.preview)
+        }
+        return []
+      })
       // Reset state when component unmounts
       setSessionId(null)
       setMessages([
@@ -708,9 +768,131 @@ export default function InsightChatSidebar({
     submitMessage(question, question)
   }
 
+  const revokePendingPreview = useCallback((preview: string) => {
+    if (preview.startsWith('blob:')) URL.revokeObjectURL(preview)
+  }, [])
+
+  const removePendingAttachment = useCallback(
+    (id: string) => {
+      setPendingAttachments((prev) => {
+        const found = prev.find((p) => p.id === id)
+        if (found) revokePendingPreview(found.preview)
+        return prev.filter((p) => p.id !== id)
+      })
+    },
+    [revokePendingPreview]
+  )
+
+  const handleInsightAttachmentInput = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files?.length || !user) {
+        if (!user) {
+          toast({
+            title: 'Cont necesar',
+            description: 'Atașarea imaginilor în Insight este disponibilă doar după autentificare.',
+            variant: 'destructive',
+          })
+        }
+        e.target.value = ''
+        return
+      }
+      const additions: PendingInsightImage[] = []
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]
+        if (!f || !f.type.startsWith('image/')) continue
+        let prepared: File
+        try {
+          prepared = await prepareInsightImageForUpload(f)
+        } catch (err) {
+          const code = err instanceof Error ? err.message : ''
+          if (code === 'FILE_TOO_LARGE') {
+            toast({
+              title: 'Fișier prea mare',
+              description: `Maxim ${Math.round(MAX_INSIGHT_ATTACHMENT_BYTES / (1024 * 1024))} MB per imagine înainte de procesare.`,
+              variant: 'destructive',
+            })
+          } else if (code === 'INVALID_TYPE') {
+            toast({
+              title: 'Fișier invalid',
+              description: 'Selectează doar imagini.',
+              variant: 'destructive',
+            })
+          } else if (code === 'ENCODE_TOO_LARGE') {
+            toast({
+              title: 'Imaginea nu a putut fi redusă suficient',
+              description: 'Încearcă o poză cu rezoluție mai mică sau mai puțin detaliu.',
+              variant: 'destructive',
+            })
+          } else {
+            toast({
+              title: 'Eroare la procesarea imaginii',
+              description: 'Încearcă alt format sau o imagine mai mică.',
+              variant: 'destructive',
+            })
+          }
+          continue
+        }
+        if (prepared.size > MAX_INSIGHT_ATTACHMENT_BYTES) {
+          toast({
+            title: 'Fișier prea mare',
+            description: `După compresie imaginea depășește ${Math.round(MAX_INSIGHT_ATTACHMENT_BYTES / (1024 * 1024))} MB.`,
+            variant: 'destructive',
+          })
+          continue
+        }
+        const preview = URL.createObjectURL(prepared)
+        additions.push({
+          id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+          file: f,
+          compressedFile: prepared,
+          preview,
+        })
+      }
+      if (additions.length === 0) {
+        e.target.value = ''
+        return
+      }
+      setPendingAttachments((prev) => {
+        const room = MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE - prev.length
+        if (room <= 0) {
+          additions.forEach((a) => revokePendingPreview(a.preview))
+          toast({
+            title: 'Prea multe imagini',
+            description: `Maxim ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE} imagini per mesaj.`,
+            variant: 'destructive',
+          })
+          return prev
+        }
+        const take = additions.slice(0, room)
+        if (additions.length > room) {
+          additions.slice(room).forEach((a) => revokePendingPreview(a.preview))
+          toast({
+            title: 'Prea multe imagini',
+            description: `Maxim ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE} imagini per mesaj.`,
+            variant: 'destructive',
+          })
+        }
+        return [...prev, ...take]
+      })
+      e.target.value = ''
+    },
+    [user, toast, revokePendingPreview]
+  )
+
   const submitMessage = async (textOverride?: string, displayContentOverride?: string) => {
     const textToSend = textOverride ?? input
-    if ((!textToSend.trim() && !problemContext) || busy) return
+    const attachmentsSnapshot = [...pendingAttachments]
+    if ((!textToSend.trim() && !problemContext && attachmentsSnapshot.length === 0) || busy) return
+
+    if (!user && attachmentsSnapshot.length > 0) {
+      toast({
+        title: 'Cont necesar',
+        description: 'Atașarea imaginilor necesită autentificare.',
+        variant: 'destructive',
+      })
+      return
+    }
 
     setBusy(true)
     setError(null)
@@ -762,32 +944,10 @@ export default function InsightChatSidebar({
         }
       }
 
-      // Combine context and input if context exists (this is what we send to the API)
-      let finalContent = textToSend.trim()
-      if (problemContext) {
-        finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
-      }
-
-      const priorForApi = messages
-        .filter((m) => m.role !== 'system')
-        .filter((m) => !(m.role === 'assistant' && !(m.content || '').trim()))
-
-      const newUserMsg: ChatMessage = {
-        role: 'user',
-        content: displayContentOverride !== undefined && displayContentOverride !== null ? displayContentOverride : finalContent,
-      }
-
-      setMessages((prev) => [...prev, newUserMsg])
-      if (!textOverride) setInput('')
-      setProblemContext(null) // Clear context after it's sent
-      setShouldAutoScroll(true)
-      setFollowStreamToLatest(false)
-
-      // If no session, create one with problem title (authenticated only)
       let currentSessionId = sessionId
       if (!isGuest && accessToken && !currentSessionId) {
         const problemSessionTitle = `Problem: ${problemId}`
-        const res = await fetch('/api/insight/sessions', {
+        const sessRes = await fetch('/api/insight/sessions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -798,14 +958,83 @@ export default function InsightChatSidebar({
           }),
         })
 
-        if (!res.ok) {
+        if (!sessRes.ok) {
           throw new Error('Nu am putut crea sesiunea.')
         }
 
-        const data = await res.json()
-        currentSessionId = data.sessionId
+        const sessData = await sessRes.json()
+        currentSessionId = sessData.sessionId
         setSessionId(currentSessionId)
       }
+
+      let uploadedPaths: string[] = []
+      if (!isGuest && attachmentsSnapshot.length > 0) {
+        if (!currentSessionId) {
+          throw new Error('Sesiunea lipsește pentru încărcarea imaginilor.')
+        }
+        setUploadingAttachments(true)
+        try {
+          const { data: userData } = await supabase.auth.getUser()
+          const uid = userData.user?.id
+          if (!uid) {
+            throw new Error('Utilizator necunoscut.')
+          }
+          for (const item of attachmentsSnapshot) {
+            const file = item.compressedFile ?? item.file
+            const ext =
+              file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+            const path = `${uid}/${currentSessionId}/${crypto.randomUUID()}.${ext}`
+            const { error: upErr } = await supabase.storage
+              .from(INSIGHT_ATTACHMENTS_BUCKET)
+              .upload(path, file, {
+                contentType: file.type || 'image/jpeg',
+                upsert: false,
+              })
+            if (upErr) {
+              throw new Error(upErr.message || 'Eroare la încărcarea imaginii.')
+            }
+            uploadedPaths.push(path)
+          }
+        } finally {
+          setUploadingAttachments(false)
+        }
+      }
+
+      // Combine context and input if context exists (this is what we send to the API)
+      let finalContent = textToSend.trim()
+      if (problemContext) {
+        finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
+      }
+
+      const priorForApi = messages
+        .filter((m) => m.role !== 'system')
+        .filter((m) => !(m.role === 'assistant' && !(m.content || '').trim()))
+
+      const displayContent =
+        displayContentOverride !== undefined && displayContentOverride !== null
+          ? displayContentOverride
+          : finalContent
+
+      const attachmentRefs: InsightChatImageRef[] =
+        uploadedPaths.length > 0
+          ? uploadedPaths.map((path, idx) => ({
+              storagePath: path,
+              previewUrl: attachmentsSnapshot[idx]!.preview,
+            }))
+          : []
+
+      const newUserMsg: ChatMessage = {
+        role: 'user',
+        content: displayContent,
+        ...(attachmentRefs.length ? { attachments: attachmentRefs } : {}),
+      }
+
+      setMessages((prev) => [...prev, newUserMsg])
+      if (!textOverride) setInput('')
+      setPendingAttachments([])
+      setProblemContext(null) // Clear context after it's sent
+      setShouldAutoScroll(true)
+      setFollowStreamToLatest(false)
 
       // Add empty assistant message that will be updated incrementally
       streamingAssistantRef.current = null
@@ -836,6 +1065,7 @@ export default function InsightChatSidebar({
                 sessionId: currentSessionId,
                 input: finalContent,
                 persona,
+                ...(uploadedPaths.length ? { attachmentPaths: uploadedPaths } : {}),
               }
         ),
         signal: controller.signal,
@@ -850,8 +1080,15 @@ export default function InsightChatSidebar({
           setError(data.error || 'Limită zilnică atinsă.')
         }
 
-        // Remove the empty assistant message we added tentatively
-        setMessages((prev) => prev.slice(0, -1))
+        // Remove the user message and empty assistant message we added tentatively
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          const secondLast = prev[prev.length - 2]
+          if (last?.role === 'assistant' && secondLast?.role === 'user') {
+            return prev.slice(0, -2)
+          }
+          return prev.slice(0, -1)
+        })
 
         pendingStreamAnchorRef.current = false
         setBusy(false)
@@ -861,6 +1098,14 @@ export default function InsightChatSidebar({
 
       if (!res.ok) {
         const data = await res.json()
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          const secondLast = prev[prev.length - 2]
+          if (last?.role === 'assistant' && secondLast?.role === 'user') {
+            return prev.slice(0, -2)
+          }
+          return prev
+        })
         throw new Error(data.error || 'Eroare la Insight.')
       }
 
@@ -988,6 +1233,19 @@ export default function InsightChatSidebar({
       if (e?.name === 'AbortError') {
         return
       }
+
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        const secondLast = prev[prev.length - 2]
+        if (
+          last?.role === 'assistant' &&
+          secondLast?.role === 'user' &&
+          !(last.content || '').trim()
+        ) {
+          return prev.slice(0, -2)
+        }
+        return prev
+      })
 
       const errorMsg = e.message || 'Eroare la comunicarea cu Insight.'
       setError(errorMsg)
@@ -1323,6 +1581,27 @@ export default function InsightChatSidebar({
                         >
                           Tu
                         </div>
+                        {m.attachments && m.attachments.length > 0 && (
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            {m.attachments.map((att) => (
+                              <a
+                                key={att.storagePath}
+                                href={att.previewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block shrink-0 overflow-hidden rounded-lg border border-black/10"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={att.previewUrl}
+                                  alt="Atașament trimis"
+                                  className="max-h-40 max-w-[200px] object-contain"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        {(m.content || '').trim() ? (
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm, remarkMath]}
                           rehypePlugins={[rehypeKatex]}
@@ -1331,6 +1610,7 @@ export default function InsightChatSidebar({
                         >
                           {normalizeLatexDelimiters(m.content)}
                         </ReactMarkdown>
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -1484,6 +1764,35 @@ export default function InsightChatSidebar({
                     </div>
                   )}
 
+                {/* Pending image attachments */}
+                {pendingAttachments.length > 0 && !busy && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {pendingAttachments.map((p) => (
+                      <div
+                        key={p.id}
+                        className={cn(
+                          'relative inline-block overflow-hidden rounded-lg border',
+                          isProblemLightTheme ? 'border-[#0b0d10]/15' : 'border-white/15'
+                        )}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.preview} alt="" className="h-20 w-auto max-w-[140px] object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removePendingAttachment(p.id)}
+                          className={cn(
+                            'absolute right-1 top-1 rounded-full p-0.5 shadow',
+                            isProblemLightTheme ? 'bg-white/90 text-[#111827]' : 'bg-black/60 text-white'
+                          )}
+                          aria-label="Elimină imaginea"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Input Area */}
                 <div className={`relative flex items-end gap-2 ${isProblemLightTheme ? "bg-white border border-[#0b0d10]/12" : "bg-[#212121] border border-white/10"} p-2.5 sm:p-3 shadow-lg transition-all duration-200 ${problemContext
                   ? 'rounded-b-2xl rounded-t-none border-t-0'
@@ -1491,15 +1800,30 @@ export default function InsightChatSidebar({
                     ? 'rounded-b-2xl rounded-tr-none rounded-tl-2xl border-t-0'
                     : 'rounded-2xl'
                   }`}>
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={handleInsightAttachmentInput}
+                  />
                   <button
+                    type="button"
                     className={cn(
-                      "h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end",
-                      isProblemLightTheme ? "hover:bg-[#f3f4f6]" : "hover:bg-gray-700"
+                      'h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end',
+                      isProblemLightTheme ? 'hover:bg-[#f3f4f6]' : 'hover:bg-gray-700',
+                      (!user || busy || uploadingAttachments) && 'opacity-40 cursor-not-allowed'
                     )}
-                    disabled
-                    title="Atașează fișier (în curând)"
+                    disabled={!user || busy || uploadingAttachments}
+                    title={
+                      user
+                        ? `Atașează imagini (max. ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE}, max ${Math.round(MAX_INSIGHT_ATTACHMENT_BYTES / (1024 * 1024))} MB/fișier, convertite la WebP sau JPEG)`
+                        : 'Autentifică-te pentru a atașa imagini'
+                    }
+                    onClick={() => user && !busy && !uploadingAttachments && attachmentInputRef.current?.click()}
                   >
-                    <Paperclip className={cn("w-5 h-5", isProblemLightTheme ? "text-[#6b7280]" : "text-gray-400")} />
+                    <Paperclip className={cn('w-5 h-5', isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400')} />
                   </button>
                   <Textarea
                     ref={textareaRef}
@@ -1533,7 +1857,11 @@ export default function InsightChatSidebar({
                   ) : (
                     <button
                       onClick={send}
-                      disabled={isInputDisabled || (!input.trim() && !problemContext)}
+                      disabled={
+                        isInputDisabled ||
+                        uploadingAttachments ||
+                        (!input.trim() && !problemContext && pendingAttachments.length === 0)
+                      }
                       className={cn(
                         "h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end",
                         isProblemLightTheme ? "hover:bg-[#f3f4f6]" : "hover:bg-gray-700"
