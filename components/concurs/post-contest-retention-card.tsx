@@ -121,7 +121,7 @@ export function PostContestRetentionCard({ imageSrc = "/dashboard-card.png" }: P
                   </>
                 ) : (
                   <>
-                    <span className="min-w-0">Încearcă Premium gratuit 7 zile</span>
+                    <span className="min-w-0">Descoperă planul Premium</span>
                     <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
                   </>
                 )}

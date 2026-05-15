@@ -36,6 +36,8 @@ interface DashboardSidebarProps {
   onTaskToggle?: (taskId: string) => void
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  dashboardHomeHref?: string
+  sidebarVariant?: "standard" | "dev"
 }
 
 function DashboardSidebarComponent({
@@ -46,10 +48,13 @@ function DashboardSidebarComponent({
   onTaskToggle,
   open,
   onOpenChange,
+  dashboardHomeHref = "/dashboard",
+  sidebarVariant = "standard",
 }: DashboardSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const isDevSidebar = sidebarVariant === "dev"
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -71,14 +76,17 @@ function DashboardSidebarComponent({
     }
   }, [tasks])
 
-  const navLinks = [
-    { href: "/dashboard", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
-    { href: "/cursuri", label: "Cursuri de fizica", icon: <BookOpen className="w-4 h-4" /> },
-    { href: "/insight/chat", label: "Insight", icon: <Sparkles className="w-4 h-4" /> },
-    { href: "/grile", label: "Teste Grila", icon: <ListChecks className="w-4 h-4" /> },
-    { href: "/simulari-bac", label: "Simulari Bac", icon: <GraduationCap className="w-4 h-4" /> },
-    { href: "/space", label: "Memorator", icon: <Brain className="w-4 h-4" /> },
-  ]
+  const navLinks = useMemo(
+    () => [
+      { href: dashboardHomeHref, label: "Dashboard", icon: <Home className="w-4 h-4" /> },
+      { href: "/cursuri", label: "Cursuri de fizica", icon: <BookOpen className="w-4 h-4" /> },
+      { href: "/insight/chat", label: "Insight", icon: <Sparkles className="w-4 h-4" /> },
+      { href: "/grile", label: "Teste Grila", icon: <ListChecks className="w-4 h-4" /> },
+      { href: "/simulari-bac", label: "Simulari Bac", icon: <GraduationCap className="w-4 h-4" /> },
+      { href: "/space", label: "Memorator", icon: <Brain className="w-4 h-4" /> },
+    ],
+    [dashboardHomeHref],
+  )
 
 
 
@@ -147,7 +155,8 @@ function DashboardSidebarComponent({
             {/* Main Navigation */}
             <nav className="space-y-1">
               {navLinks.map((link, index) => {
-                const isActive = link.href && pathname === link.href
+                const isActive =
+                  link.href && (pathname === link.href || (index === 0 && isDevSidebar && pathname?.startsWith("/dashboard/dev")))
                 const key = link.href || `nav-${index}`
 
                 // Render Dashboard first
@@ -212,7 +221,8 @@ function DashboardSidebarComponent({
               })}
             </nav>
 
-            {/* Section 2: Today Overview */}
+            {/* Section 2: Today Overview (ascuns în modul dev) */}
+            {!isDevSidebar && (
             <div className="space-y-3">
               <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Today</h4>
               <div className="space-y-2 text-sm text-gray-700">
@@ -225,6 +235,7 @@ function DashboardSidebarComponent({
                 <p>• Timp învățat: {stats.total_time_minutes} min</p>
               </div>
             </div>
+            )}
 
             {/* Section 3: Continue Learning */}
             {continueItems.length > 0 && (
@@ -245,7 +256,7 @@ function DashboardSidebarComponent({
 
 
             {/* Section 5: Tasks Today */}
-            {TasksSection}
+            {!isDevSidebar && TasksSection}
 
             {/* Mobile Only: Profile & Sign Out Buttons */}
             <div className="lg:hidden grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-200">
@@ -271,6 +282,7 @@ function DashboardSidebarComponent({
       </div>
 
       {/* Fixed Invite Friend Card */}
+      {!isDevSidebar && (
       <div className="p-4 border-t border-gray-200 bg-[#ffffff]">
         <Link href="/profil/referral">
           <div className="bg-transparent border border-gray-300 rounded-xl p-3 hover:border-blue-500/40 transition-all group cursor-pointer">
@@ -287,6 +299,7 @@ function DashboardSidebarComponent({
           </div>
         </Link>
       </div>
+      )}
     </div>
   )
 
@@ -354,6 +367,14 @@ export const DashboardSidebar = memo(DashboardSidebarComponent, (prevProps, next
   // Compare other props
   if (prevProps.open !== nextProps.open) {
     return false // Props changed, re-render needed
+  }
+
+  if (prevProps.dashboardHomeHref !== nextProps.dashboardHomeHref) {
+    return false
+  }
+
+  if (prevProps.sidebarVariant !== nextProps.sidebarVariant) {
+    return false
   }
 
   // All props are equal, no re-render needed

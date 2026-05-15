@@ -26,6 +26,13 @@ interface AuthContextType {
   subscriptionPlan: string
   userElo: number | null
   isAdmin: boolean
+  /** true dacă profiles.is_dev = true (setat în DB / de admin) */
+  isDev: boolean
+  /**
+   * După login, `user.id` există înainte să avem profil din DB.
+   * Cât timp `profileSyncedUserId !== user.id`, nu te baza pe `isDev` pentru redirect (ex. către /dashboard/dev).
+   */
+  profileSyncedUserId: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -39,6 +46,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>(FREE_PLAN_IDENTIFIER)
   const [userElo, setUserElo] = useState<number | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const [isDev, setIsDev] = useState<boolean>(false)
+  const [profileSyncedUserId, setProfileSyncedUserId] = useState<string | null>(null)
 
   const isInvalidRefreshTokenError = (message?: string) => {
     if (!message) return false
@@ -54,6 +63,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
     setUserElo(null)
     setIsAdmin(false)
+    setIsDev(false)
+    setProfileSyncedUserId(null)
   }, [])
 
   useEffect(() => {
@@ -98,6 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
         setUserElo(null)
         setIsAdmin(false)
+        setIsDev(false)
+        setProfileSyncedUserId(null)
       } else {
         // Other events (SIGNED_IN, USER_UPDATED, etc.)
         setUser(session?.user ?? null)
@@ -161,12 +174,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSubscriptionPlan(FREE_PLAN_IDENTIFIER)
       setUserElo(null)
       setIsAdmin(false)
+      setIsDev(false)
+      setProfileSyncedUserId(null)
       return
     }
 
+    setProfileSyncedUserId(null)
     const { data } = await supabase
       .from("profiles")
-      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, is_admin")
+      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, is_admin, is_dev")
       .eq("user_id", user.id)
       .single()
 
@@ -191,8 +207,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSubscriptionPlan("plus")
       }
 
-      // Setează starea de admin din baza de date
+      // Setează starea de admin / dev din baza de date
       setIsAdmin(data.is_admin === true)
+      setIsDev(data.is_dev === true)
+      setProfileSyncedUserId(user.id)
       return
     }
 
@@ -209,7 +227,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!insertError) {
       const { data: created } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade, plan")
+        .select("name, nickname, user_icon, grade, plan, plus_months_remaining, is_admin, is_dev")
         .eq("user_id", user.id)
         .single()
       if (created) {
@@ -227,8 +245,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             ? created.plan
             : FREE_PLAN_IDENTIFIER
         )
+        setIsAdmin(created.is_admin === true)
+        setIsDev(created.is_dev === true)
+      } else {
+        setIsAdmin(false)
+        setIsDev(false)
       }
+    } else {
+      setIsAdmin(false)
+      setIsDev(false)
     }
+    setProfileSyncedUserId(user.id)
   }, [user])
 
   const fetchUserStats = useCallback(async () => {
@@ -328,6 +355,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         subscriptionPlan,
         userElo,
         isAdmin,
+        isDev,
+        profileSyncedUserId,
       }}
     >
       {children}

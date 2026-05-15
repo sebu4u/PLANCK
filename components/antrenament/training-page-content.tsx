@@ -274,7 +274,7 @@ export function TrainingPageContent() {
             {showPlusModal && (
                 <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
                     <PlanckPlusTrialModal
-                        title="Accesează modul AI pentru testele de antrenament. Încearcă 7 zile GRATUIT"
+                        title="Modulul AI pentru testele de antrenament este disponibil cu Planck Plus+. Vezi planurile."
                         description="Primești soluții pas cu pas pentru întrebările la care ai greșit și înțelegi rapid unde ai pierdut puncte."
                         onClose={() => setShowPlusModal(false)}
                     />

@@ -811,7 +811,7 @@ export default function ProblemDetailClient({
       {showMobileUpgradeModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
           <PlanckPlusTrialModal
-            title="Rezolvarea video este disponibilă cu Planck Plus+. Încearcă 7 zile GRATUIT"
+            title="Rezolvarea video este disponibilă cu Planck Plus+. Vezi planurile pentru a o debloca."
             onClose={() => setShowMobileUpgradeModal(false)}
           />
         </div>

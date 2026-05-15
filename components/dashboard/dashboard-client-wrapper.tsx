@@ -17,6 +17,10 @@ interface DashboardClientWrapperProps {
   continueItems: ContinueLearningItem[]
   recentAchievements: Achievement[]
   updates: DashboardUpdate[]
+  /** Ruta pentru link-ul „Dashboard” din sidebar (implicit /dashboard) */
+  dashboardHomeHref?: string
+  /** Sidebar fără Today / tasks / referral — pentru /dashboard/dev */
+  sidebarVariant?: "standard" | "dev"
 }
 
 export function DashboardClientWrapper({
@@ -26,6 +30,8 @@ export function DashboardClientWrapper({
   continueItems,
   recentAchievements,
   updates,
+  dashboardHomeHref = "/dashboard",
+  sidebarVariant = "standard",
 }: DashboardClientWrapperProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const { isOpen, setIsOpen } = useDashboardSidebar()
@@ -50,6 +56,8 @@ export function DashboardClientWrapper({
       onTaskToggle={handleTaskToggle}
       open={isOpen}
       onOpenChange={setIsOpen}
+      dashboardHomeHref={dashboardHomeHref}
+      sidebarVariant={sidebarVariant}
     />
   )
 }

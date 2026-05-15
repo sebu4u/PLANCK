@@ -37,7 +37,10 @@ export function Navigation() {
   const pathname = usePathname()
 
   // Dashboard, /invata, /grile, /probleme catalog, and /classrooms share the same white navbar theme.
-  const isDashboard = pathname === "/dashboard" || pathname?.startsWith("/invata") === true
+  const isDashboard =
+    pathname === "/dashboard" ||
+    pathname?.startsWith("/dashboard/") === true ||
+    pathname?.startsWith("/invata") === true
   const isGrileRoute = pathname === "/grile"
   const isDashboardPage = pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
   // Desktop search state

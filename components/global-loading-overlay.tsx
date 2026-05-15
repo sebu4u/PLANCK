@@ -13,7 +13,10 @@ export function GlobalLoadingOverlay() {
   }, [])
 
   // Sesiunea inițială e acoperită de AuthSessionGate; aici rămâne doar primul frame înainte de hidratare.
-  const shouldShow = isInitialMount && pathname !== '/dashboard'
+  const shouldShow =
+    isInitialMount &&
+    pathname !== "/dashboard" &&
+    pathname !== "/dashboard/dev"
 
   if (!shouldShow) return null
 

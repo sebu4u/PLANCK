@@ -14,7 +14,7 @@ export function FreePlanUpgradeModal({ imageSrc, onClose, ctaHref = "/pricing" }
   return (
     <DashboardPromoCardLayout
       imageSrc={imageSrc}
-      imageAlt="Planck trial"
+      imageAlt="Planck Plus"
       imagePriority
       footer={
         <>
@@ -24,7 +24,7 @@ export function FreePlanUpgradeModal({ imageSrc, onClose, ctaHref = "/pricing" }
             style={{ "--start-glow-tint": "rgba(221, 211, 255, 0.84)" } as CSSProperties}
           >
             <span className="relative z-[1] inline-flex items-center justify-center gap-2">
-              Incearca 7 zile
+              Vezi planurile
               <ArrowRight className="h-4 w-4" />
             </span>
           </Link>
