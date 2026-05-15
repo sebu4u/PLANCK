@@ -5,7 +5,6 @@ import type { QuizAnswers, AnswerKey, UserAnswer } from '@/lib/types/quiz-questi
 import { LatexContent } from './question-card';
 import { cn } from '@/lib/utils';
 import { Check, X } from 'lucide-react';
-import { playGrileClickSound } from '@/lib/grile-quiz-audio';
 
 interface AnswersListProps {
     answers: QuizAnswers;
@@ -45,9 +44,6 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
                     <button
                         key={key}
                         onClick={() => {
-                            if (!isVerified) {
-                                playGrileClickSound();
-                            }
                             onSelect(key);
                         }}
                         disabled={isVerified}

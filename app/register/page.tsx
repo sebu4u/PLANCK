@@ -10,7 +10,10 @@ import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
-import { getFirstLearningPathItemHref } from "@/lib/supabase-learning-paths"
+import {
+  getCinematicaFirstLearningPathItemHref,
+  getFirstLearningPathItemHref,
+} from "@/lib/supabase-learning-paths"
 
 type SubjectOption = "fizica" | "informatica"
 type GradeOption = "9" | "10" | "11" | "12"
@@ -539,7 +542,13 @@ function RegisterPageContent() {
     } catch {
       // ignore
     }
-    router.push("/dashboard")
+
+    let destination = "/dashboard"
+    if (onboardingState.grade === "9") {
+      const cinematicaHref = await getCinematicaFirstLearningPathItemHref()
+      if (cinematicaHref) destination = cinematicaHref
+    }
+    router.push(destination)
   }
 
   const renderStepContent = () => {
@@ -792,6 +801,8 @@ function RegisterPageContent() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Salvăm...
                   </span>
+                ) : onboardingState.grade === "9" ? (
+                  "Începe Cinematică"
                 ) : (
                   "Mergi la dashboard"
                 )}

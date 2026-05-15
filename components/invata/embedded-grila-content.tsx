@@ -7,6 +7,7 @@ import type { QuizQuestion, AnswerKey, QuizAnswers } from "@/lib/types/quiz-ques
 import { useGrilaLesson } from "@/components/invata/grila-lesson-context"
 import { Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { hasMixedLatexDelimiters, splitMixedLatex } from "@/lib/parse-mixed-latex"
 
 interface EmbeddedGrilaContentProps {
   question: QuizQuestion
@@ -16,39 +17,21 @@ const answerKeys: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
 
 function LatexContent({ content }: { content: string }) {
   if (!content) return null
-  const hasBlockMath = content.includes("$$")
-  const hasInlineMath = content.includes("$")
-
-  if (!hasBlockMath && !hasInlineMath) {
+  if (!hasMixedLatexDelimiters(content)) {
     return <span>{content}</span>
   }
 
-  if (hasBlockMath) {
-    const parts = content.split(/(\$\$[^$]+\$\$)/g)
-    return (
-      <>
-        {parts.map((part, idx) => {
-          if (part.startsWith("$$") && part.endsWith("$$")) {
-            return <BlockMath key={idx} math={part.slice(2, -2)} />
-          }
-          return <InlineLatexContent key={idx} content={part} />
-        })}
-      </>
-    )
-  }
-
-  return <InlineLatexContent content={content} />
-}
-
-function InlineLatexContent({ content }: { content: string }) {
-  const parts = content.split(/(\$[^$]+\$)/g)
+  const pieces = splitMixedLatex(content)
   return (
     <>
-      {parts.map((part, idx) => {
-        if (part.startsWith("$") && part.endsWith("$")) {
-          return <InlineMath key={idx} math={part.slice(1, -1)} />
+      {pieces.map((part, idx) => {
+        if (part.type === "text") {
+          return <span key={idx}>{part.value}</span>
         }
-        return <span key={idx}>{part}</span>
+        if (part.type === "inline") {
+          return <InlineMath key={idx} math={part.value} />
+        }
+        return <BlockMath key={idx} math={part.value} />
       })}
     </>
   )

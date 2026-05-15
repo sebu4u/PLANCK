@@ -3,6 +3,7 @@
 import React, { Suspense, lazy } from 'react';
 import type { QuizQuestion } from '@/lib/types/quiz-questions';
 import 'katex/dist/katex.min.css';
+import { hasMixedLatexDelimiters, splitMixedLatex } from '@/lib/parse-mixed-latex';
 
 // Lazy load KaTeX components
 const LazyInlineMath = lazy(() =>
@@ -18,45 +19,21 @@ interface QuestionCardProps {
 
 // Component for rendering LaTeX content
 function LatexContent({ content }: { content: string }) {
-    // Check if the content contains LaTeX delimiters
-    const hasBlockMath = content.includes('$$');
-    const hasInlineMath = content.includes('$') && !hasBlockMath;
-
-    if (!hasBlockMath && !hasInlineMath) {
+    if (!hasMixedLatexDelimiters(content)) {
         return <span>{content}</span>;
     }
 
-    // Split by block math first ($$...$$)
-    if (hasBlockMath) {
-        const parts = content.split(/(\$\$[^$]+\$\$)/g);
-        return (
-            <Suspense fallback={<span className="animate-pulse text-gray-500">Loading...</span>}>
-                {parts.map((part, idx) => {
-                    if (part.startsWith('$$') && part.endsWith('$$')) {
-                        const math = part.slice(2, -2);
-                        return <LazyBlockMath key={idx} math={math} />;
-                    }
-                    // Process inline math within non-block parts
-                    return <InlineLatexContent key={idx} content={part} />;
-                })}
-            </Suspense>
-        );
-    }
-
-    return <InlineLatexContent content={content} />;
-}
-
-function InlineLatexContent({ content }: { content: string }) {
-    const parts = content.split(/(\$[^$]+\$)/g);
-
+    const pieces = splitMixedLatex(content);
     return (
         <Suspense fallback={<span className="animate-pulse text-gray-500">Loading...</span>}>
-            {parts.map((part, idx) => {
-                if (part.startsWith('$') && part.endsWith('$')) {
-                    const math = part.slice(1, -1);
-                    return <LazyInlineMath key={idx} math={math} />;
+            {pieces.map((part, idx) => {
+                if (part.type === 'text') {
+                    return <span key={idx}>{part.value}</span>;
                 }
-                return <span key={idx}>{part}</span>;
+                if (part.type === 'inline') {
+                    return <LazyInlineMath key={idx} math={part.value} />;
+                }
+                return <LazyBlockMath key={idx} math={part.value} />;
             })}
         </Suspense>
     );

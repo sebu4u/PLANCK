@@ -5,7 +5,7 @@ import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabaseClient'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { X, Paperclip, Send, Chrome, Github, Loader2 } from 'lucide-react'
+import { X, Paperclip, Send, Chrome, Github, Loader2, Camera } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -255,6 +255,7 @@ export default function InsightChatSidebar({
   const pendingStreamAnchorRef = useRef(false)
   const streamingAssistantRef = useRef<HTMLDivElement | null>(null)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const cameraAttachmentInputRef = useRef<HTMLInputElement>(null)
   const [pendingAttachments, setPendingAttachments] = useState<PendingInsightImage[]>([])
   const [uploadingAttachments, setUploadingAttachments] = useState(false)
 
@@ -1490,13 +1491,24 @@ export default function InsightChatSidebar({
           </div>
           {(!isDesktopEmbedded || showCloseWhenDesktopEmbedded) && (
             <button
+              type="button"
               onClick={onClose}
               className={cn(
-                'shrink-0 p-2 rounded transition-colors',
-                isProblemLightTheme ? 'hover:bg-[#e5e7eb]' : 'hover:bg-white/10'
+                'group shrink-0 p-2 rounded transition-colors',
+                isProblemLightTheme
+                  ? 'max-lg:active:bg-transparent lg:hover:bg-[#e5e7eb]'
+                  : 'max-lg:active:bg-transparent lg:hover:bg-white/10'
               )}
+              aria-label="Închide chat-ul"
             >
-              <X className={cn('w-5 h-5', isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400')} />
+              <X
+                className={cn(
+                  'w-5 h-5 transition-colors duration-150',
+                  isProblemLightTheme
+                    ? 'text-[#6b7280] max-lg:group-active:text-[#d1d5db]'
+                    : 'text-gray-400 max-lg:group-active:text-gray-200'
+                )}
+              />
             </button>
           )}
         </div>
@@ -1808,11 +1820,21 @@ export default function InsightChatSidebar({
                     className="hidden"
                     onChange={handleInsightAttachmentInput}
                   />
+                  <input
+                    ref={cameraAttachmentInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleInsightAttachmentInput}
+                  />
                   <button
                     type="button"
                     className={cn(
-                      'h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end',
-                      isProblemLightTheme ? 'hover:bg-[#f3f4f6]' : 'hover:bg-gray-700',
+                      'group h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end',
+                      isProblemLightTheme
+                        ? 'max-lg:active:bg-transparent lg:hover:bg-[#f3f4f6]'
+                        : 'max-lg:active:bg-transparent lg:hover:bg-gray-700',
                       (!user || busy || uploadingAttachments) && 'opacity-40 cursor-not-allowed'
                     )}
                     disabled={!user || busy || uploadingAttachments}
@@ -1823,8 +1845,45 @@ export default function InsightChatSidebar({
                     }
                     onClick={() => user && !busy && !uploadingAttachments && attachmentInputRef.current?.click()}
                   >
-                    <Paperclip className={cn('w-5 h-5', isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400')} />
+                    <Paperclip
+                      className={cn(
+                        'w-5 h-5 transition-colors duration-150',
+                        isProblemLightTheme
+                          ? 'text-[#6b7280] max-lg:group-active:text-[#d1d5db]'
+                          : 'text-gray-400 max-lg:group-active:text-gray-200'
+                      )}
+                    />
                   </button>
+                  {isMobile ? (
+                    <button
+                      type="button"
+                      className={cn(
+                        'group h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end active:bg-transparent',
+                        (!user || busy || uploadingAttachments) && 'opacity-40 cursor-not-allowed'
+                      )}
+                      disabled={!user || busy || uploadingAttachments}
+                      title={
+                        user
+                          ? 'Fă o poză la caiet / problemă (cameră)'
+                          : 'Autentifică-te pentru a atașa imagini'
+                      }
+                      onClick={() =>
+                        user &&
+                        !busy &&
+                        !uploadingAttachments &&
+                        cameraAttachmentInputRef.current?.click()
+                      }
+                    >
+                      <Camera
+                        className={cn(
+                          'w-5 h-5 transition-colors duration-150',
+                          isProblemLightTheme
+                            ? 'text-[#6b7280] group-active:text-[#d1d5db]'
+                            : 'text-gray-400 group-active:text-gray-200'
+                        )}
+                      />
+                    </button>
+                  ) : null}
                   <Textarea
                     ref={textareaRef}
                     placeholder={problemContext ? (isMobile ? "Scrie..." : "Adaugă detalii sau întreabă...") : "Scrie un mesaj..."}
@@ -1863,11 +1922,20 @@ export default function InsightChatSidebar({
                         (!input.trim() && !problemContext && pendingAttachments.length === 0)
                       }
                       className={cn(
-                        "h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end",
-                        isProblemLightTheme ? "hover:bg-[#f3f4f6]" : "hover:bg-gray-700"
+                        'group h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end',
+                        isProblemLightTheme
+                          ? 'max-lg:active:bg-transparent lg:hover:bg-[#f3f4f6]'
+                          : 'max-lg:active:bg-transparent lg:hover:bg-gray-700'
                       )}
                     >
-                      <Send className={cn("w-5 h-5", isProblemLightTheme ? "text-[#6b7280]" : "text-gray-400")} />
+                      <Send
+                        className={cn(
+                          'w-5 h-5 transition-colors duration-150',
+                          isProblemLightTheme
+                            ? 'text-[#6b7280] max-lg:group-active:text-[#d1d5db]'
+                            : 'text-gray-400 max-lg:group-active:text-gray-200'
+                        )}
+                      />
                     </button>
                   )}
                 </div>

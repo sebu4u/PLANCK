@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  FREE_LEARNING_PATH_CHAPTER_SLUG,
+  FREE_PREVIEW_CHAPTER_SLUG_ALIASES,
+} from "@/lib/learning-path-free-plan"
 import { supabase } from "@/lib/supabaseClient"
 import type { Problem } from "@/data/problems"
 
@@ -450,5 +454,33 @@ export async function getFirstLearningPathItemHref(): Promise<string | null> {
     }
   }
 
+  return null
+}
+
+/** Primul item din capitolul identificat prin slug (ex. `cinematica`). */
+export async function getFirstLearningPathItemHrefForChapterSlug(
+  chapterSlug: string
+): Promise<string | null> {
+  const chapter = await getLearningPathChapterBySlug(chapterSlug.trim())
+  if (!chapter) return null
+
+  const lessons = await getLearningPathLessonsByChapterId(chapter.id)
+  for (const lesson of lessons) {
+    const items = await getLearningPathLessonItems(lesson.id)
+    if (items.length > 0) {
+      return getLearningPathItemHref(chapter, lesson, 0)
+    }
+  }
+
+  return null
+}
+
+/** Primul item din parcursul de Cinematică (slug principal + aliasuri din planul free). */
+export async function getCinematicaFirstLearningPathItemHref(): Promise<string | null> {
+  const slugsToTry = [FREE_LEARNING_PATH_CHAPTER_SLUG, ...FREE_PREVIEW_CHAPTER_SLUG_ALIASES]
+  for (const slug of slugsToTry) {
+    const href = await getFirstLearningPathItemHrefForChapterSlug(slug)
+    if (href) return href
+  }
   return null
 }

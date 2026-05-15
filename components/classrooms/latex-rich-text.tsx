@@ -3,55 +3,50 @@
 import { BlockMath, InlineMath } from "react-katex"
 import "katex/dist/katex.min.css"
 import { cn } from "@/lib/utils"
-
-function InlineLatexContent({ content }: { content: string }) {
-  const parts = content.split(/(\$[^$]+\$)/g)
-  return (
-    <>
-      {parts.map((part, idx) => {
-        if (part.startsWith("$") && part.endsWith("$") && part.length > 1) {
-          return <InlineMath key={idx} math={part.slice(1, -1)} />
-        }
-        return (
-          <span key={idx} className="whitespace-pre-wrap">
-            {part}
-          </span>
-        )
-      })}
-    </>
-  )
-}
+import { hasMixedLatexDelimiters, splitMixedLatex } from "@/lib/parse-mixed-latex"
 
 /**
- * Renders text with `$...$` inline and `$$...$$` block LaTeX, consistent with catalog / problem pages.
+ * Renders text with `$...$` / `\(...\)` inline and `$$...$$` / `\[...\]` block LaTeX.
  */
 export function LatexRichText({ content, className }: { content: string; className?: string }) {
   if (!content) return null
 
-  const hasBlockMath = content.includes("$$")
-  const hasInlineMath = content.includes("$")
-
-  if (!hasBlockMath && !hasInlineMath) {
+  if (!hasMixedLatexDelimiters(content)) {
     return <span className={cn("whitespace-pre-wrap", className)}>{content}</span>
   }
 
-  if (hasBlockMath) {
-    const parts = content.split(/(\$\$[^$]+\$\$)/g)
+  const pieces = splitMixedLatex(content)
+  const hasBlock = pieces.some((p) => p.type === "block")
+
+  const inner = (
+    <>
+      {pieces.map((part, idx) => {
+        if (part.type === "text") {
+          return (
+            <span key={idx} className="whitespace-pre-wrap">
+              {part.value}
+            </span>
+          )
+        }
+        if (part.type === "inline") {
+          return <InlineMath key={idx} math={part.value} />
+        }
+        return <BlockMath key={idx} math={part.value} />
+      })}
+    </>
+  )
+
+  if (hasBlock) {
     return (
       <div className={cn("latex-rich-text [&_.katex-display]:my-3", className)}>
-        {parts.map((part, idx) => {
-          if (part.startsWith("$$") && part.endsWith("$$") && part.length > 4) {
-            return <BlockMath key={idx} math={part.slice(2, -2)} />
-          }
-          return <InlineLatexContent key={idx} content={part} />
-        })}
+        {inner}
       </div>
     )
   }
 
   return (
     <span className={cn("inline-block max-w-full whitespace-pre-wrap", className)}>
-      <InlineLatexContent content={content} />
+      {inner}
     </span>
   )
 }

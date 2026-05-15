@@ -22,11 +22,7 @@ import type { GradeLevel, QuizQuestion, UserAnswer } from '@/lib/types/quiz-ques
 import { Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fireLearningPathCorrectConfetti } from '@/lib/learning-path-confetti';
-import {
-    playGrileClickSound,
-    playGrileErrorSound,
-    playGrileSuccessSound,
-} from '@/lib/grile-quiz-audio';
+import { playGrileErrorSound, playGrileSuccessSound } from '@/lib/grile-quiz-audio';
 
 type GrileShellFeedbackContextValue = {
     triggerWrongAnswerFeedback: () => void;
@@ -285,7 +281,6 @@ function GrileInsightFab({
         <button
             type="button"
             onClick={() => {
-                playGrileClickSound()
                 grileChat.openGrileChat({
                     problemStatement: formatGrileCatalogInsightContext({
                         question: currentQuestion,

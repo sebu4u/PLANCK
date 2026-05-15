@@ -16,6 +16,7 @@ import { RealVHProvider } from "@/components/real-vh-provider"
 import { EngagementProvider } from "@/components/engagement/notification-provider"
 import { EngagementNotificationToaster } from "@/components/engagement/notification-toaster"
 
+import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
@@ -108,6 +109,7 @@ export default function RootLayout({
           <RealVHProvider />
           <MobileViewportFix />
           <ScrollToTop />
+          <DashboardStartGlowClickSound />
           <TopLoader />
           <AuthProvider>
             <GlobalLoadingOverlay />

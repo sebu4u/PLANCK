@@ -430,9 +430,14 @@ function PricingPageContent() {
                           <div className="flex items-end justify-between gap-2">
                             <div className="flex min-w-0 items-end gap-1.5">
                               <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
-                                {isYearly && plan.priceValue != null
-                                  ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
-                                  : plan.description}
+                                {plan.priceValue != null ? (
+                                  <>
+                                    <AnimatedPrice value={plan.priceValue} /> {plan.currency}{" "}
+                                    {plan.period}
+                                  </>
+                                ) : (
+                                  plan.priceLabel
+                                )}
                               </span>
                             </div>
                             {plan.yearlySavingsRon != null && (
@@ -449,13 +454,11 @@ function PricingPageContent() {
                           </div>
 
                           <p className="mt-2 max-w-[18rem] text-xs font-normal leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
-                            {plan.priceValue != null ? (
-                              <>
-                                <AnimatedPrice value={plan.priceValue} /> {plan.currency} {plan.period}
-                              </>
-                            ) : (
-                              plan.priceLabel
-                            )}
+                            {plan.priceValue != null
+                              ? isYearly
+                                ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
+                                : plan.description
+                              : null}
                           </p>
                         </>
                       ) : (

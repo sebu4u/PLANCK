@@ -8,24 +8,7 @@ import { cn } from "@/lib/utils"
 import { EloGainCard } from "@/components/invata/elo-gain-card"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
-
-function playClickSound() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = 800
-    osc.type = "sine"
-    gain.gain.setValueAtTime(0.15, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.08)
-  } catch {
-    // Ignore
-  }
-}
+import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
 
 type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -62,7 +45,7 @@ export function PollFeedbackBar({
 
   const handleContinue = async (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
-    playClickSound()
+    playDashboardStartButtonClickSound()
     if (shouldShowEloCard && !showEloCard) {
       setShowEloCard(true)
       return
@@ -72,7 +55,7 @@ export function PollFeedbackBar({
   }
 
   const continueAfterEloCard = async () => {
-    playClickSound()
+    playDashboardStartButtonClickSound()
     await onContinue?.()
     router.push(nextItemHref)
   }
