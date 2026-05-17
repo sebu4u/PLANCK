@@ -255,6 +255,16 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                               {metaText}
                             </span>
                           )}
+                          {loadedProblem?.language === "python" && (
+                            <span className="font-vt323 rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-amber-100">
+                              Python
+                            </span>
+                          )}
+                          {loadedProblem?.language !== "python" && (
+                            <span className="font-vt323 rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-sky-100/90">
+                              C++
+                            </span>
+                          )}
                           {loadedProblem?.isFreeMonthly && (
                             <span className="font-vt323 text-xs uppercase tracking-[0.3em] text-emerald-300">
                               Free luna aceasta
@@ -271,7 +281,15 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
 
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-[50vh]">
                   <div className="h-full overflow-hidden bg-black">
-                    <EmbeddedIDE initialCode={loadedProblem?.boilerplate_cpp || undefined} />
+                    <EmbeddedIDE
+                      defaultLanguage={loadedProblem.language === "python" ? "python" : "cpp"}
+                      initialCode={
+                        loadedProblem.language === "python"
+                          ? loadedProblem.boilerplate_python ?? undefined
+                          : loadedProblem.boilerplate_cpp ?? undefined
+                      }
+                      problemSlug={loadedProblem.language === "python" ? slug : undefined}
+                    />
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>

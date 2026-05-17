@@ -16,6 +16,14 @@ import {
   type TestProblem,
   type TestProblemOption,
 } from "@/lib/learning-path-test"
+import { InteractiveItemContentEditor } from "@/components/admin/interactive-item-content-editor"
+import {
+  getDefaultInteractiveItemContent,
+  isInteractiveLessonItemType,
+  validateInteractiveItemContent,
+  type LearningPathInteractiveItemType,
+} from "@/lib/learning-path-interactive-items"
+import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
 import {
   AlertCircle,
   ArrowDown,
@@ -84,6 +92,7 @@ interface ItemFormState {
   test_difficulty: number
   test_time_limit_seconds: number
   test_problems: TestProblem[]
+  interactive_json: string
 }
 
 const ITEM_TYPES: LearningPathLessonType[] = [
@@ -95,6 +104,18 @@ const ITEM_TYPES: LearningPathLessonType[] = [
   "poll",
   "simulation",
   "test",
+  "card_sort",
+  "fill_slot",
+  "match",
+  "graph_build",
+  "code_trace",
+  "swipe_classify",
+  "flow_build",
+  "slider_explore",
+  "table_fill",
+  "memory_flip",
+  "speed_round",
+  "reveal_steps",
 ]
 
 const MARKERS = ["FORMULA", "ENUNT", "IMPORTANT", "DEFINITIE", "EXEMPLU", "INDENT"] as const
@@ -226,6 +247,7 @@ function createEmptyForm(lessonId: string, nextOrderIndex: number): ItemFormStat
     test_difficulty: 3,
     test_time_limit_seconds: 600,
     test_problems: [createTestProblem()],
+    interactive_json: "{}",
   }
 }
 
@@ -269,6 +291,9 @@ function createFormFromItem(item: LearningPathLessonItem): ItemFormState {
     test_difficulty: testDifficulty,
     test_time_limit_seconds: testTime,
     test_problems: testProblems.length > 0 ? testProblems : [createTestProblem()],
+    interactive_json: isInteractiveLessonItemType(item.item_type)
+      ? JSON.stringify(item.content_json ?? {}, null, 2)
+      : "{}",
   }
 }
 
@@ -289,7 +314,14 @@ function validateSimulationUrl(url: string): boolean {
   }
 }
 
-export function LearningPathsManager() {
+export interface LearningPathsManagerProps {
+  /** implicit `admin` — folosește `/api/admin/...` */
+  mode?: "admin" | "dev"
+  /** obligatoriu dacă `mode === "dev"` */
+  devSubject?: "physics" | "informatics"
+}
+
+export function LearningPathsManager({ mode = "admin", devSubject }: LearningPathsManagerProps = {}) {
   const [chapters, setChapters] = useState<LearningPathChapter[]>([])
   const [lessons, setLessons] = useState<LearningPathLesson[]>([])
   const [items, setItems] = useState<LearningPathLessonItem[]>([])
@@ -301,6 +333,7 @@ export function LearningPathsManager() {
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null)
   const [formMode, setFormMode] = useState<FormMode>("none")
   const [form, setForm] = useState<ItemFormState | null>(null)
+  const [interactiveEditorNonce, setInteractiveEditorNonce] = useState(0)
 
   const [problemSearch, setProblemSearch] = useState("")
   const [problemResults, setProblemResults] = useState<ProblemResult[]>([])
@@ -311,6 +344,24 @@ export function LearningPathsManager() {
   const [quizLoading, setQuizLoading] = useState(false)
   const [previewCustomText, setPreviewCustomText] = useState(false)
   const [previewSimulationIntro, setPreviewSimulationIntro] = useState(false)
+
+  const isDev = mode === "dev"
+  const apiBase = isDev ? "/api/dev/learning-paths" : "/api/admin/learning-paths"
+  const itemTypesForForm = useMemo(() => {
+    if (isDev && devSubject === "informatics") {
+      return ITEM_TYPES.filter((t) => t !== "problem")
+    }
+    return ITEM_TYPES
+  }, [isDev, devSubject])
+
+  const [chapterForm, setChapterForm] = useState({
+    title: "",
+    slug: "",
+    description: "",
+    icon_url: "",
+    problem_category: "",
+    order_index: "",
+  })
 
   const customTextRef = useRef<HTMLTextAreaElement>(null)
   const simulationIntroRef = useRef<HTMLTextAreaElement>(null)
@@ -330,7 +381,7 @@ export function LearningPathsManager() {
         return
       }
 
-      const response = await fetch("/api/admin/learning-paths", {
+      const response = await fetch(isDev && devSubject ? `${apiBase}?subject=${devSubject}` : apiBase, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
 
@@ -344,20 +395,30 @@ export function LearningPathsManager() {
       setLessons(data.lessons || [])
       setItems(data.items || [])
 
-      const chapterIds = new Set((data.chapters || []).map((chapter: LearningPathChapter) => chapter.id))
+      const chapterIds = new Set<string>((data.chapters || []).map((chapter: LearningPathChapter) => chapter.id))
       setExpandedChapters(chapterIds)
     } catch (err: any) {
       setError(err.message || "Eroare la încărcarea datelor.")
     } finally {
       setLoading(false)
     }
-  }, [getAccessToken])
+  }, [getAccessToken, isDev, devSubject, apiBase])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
   const sortedChapters = useMemo(() => [...chapters].sort((a, b) => a.order_index - b.order_index), [chapters])
+
+  const nextChapterOrderDefault = useMemo(() => {
+    if (!chapters.length) return 0
+    return Math.max(...chapters.map((c) => c.order_index ?? 0)) + 1
+  }, [chapters])
+
+  const physicsCategoryOptions = useMemo(
+    () => allPhysicsCatalogCategories().sort((a, b) => a.localeCompare(b, "ro")),
+    []
+  )
 
   useEffect(() => {
     if (!selectedLessonId && lessons.length > 0) {
@@ -538,6 +599,19 @@ export function LearningPathsManager() {
       }
     }
 
+    if (isInteractiveLessonItemType(currentForm.item_type)) {
+      try {
+        const parsed: unknown = JSON.parse(currentForm.interactive_json || "{}")
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          return "JSON-ul pentru item interactiv trebuie să fie un obiect."
+        }
+        const err = validateInteractiveItemContent(currentForm.item_type, parsed)
+        if (err) return err
+      } catch {
+        return "JSON invalid — verifică sintaxa content_json."
+      }
+    }
+
     return null
   }
 
@@ -646,6 +720,15 @@ export function LearningPathsManager() {
         break
     }
 
+    if (isInteractiveLessonItemType(currentForm.item_type)) {
+      const parsed = JSON.parse(currentForm.interactive_json) as Record<string, unknown>
+      payload.content_json = parsed
+      payload.cursuri_lesson_slug = null
+      payload.youtube_url = null
+      payload.quiz_question_id = null
+      payload.problem_id = null
+    }
+
     return payload
   }
 
@@ -665,13 +748,17 @@ export function LearningPathsManager() {
       if (!accessToken) throw new Error("Sesiune expirată.")
 
       const method = form.id ? "PUT" : "POST"
-      const response = await fetch("/api/admin/learning-paths", {
+      const payload = buildItemPayload(form)
+      if (isDev && devSubject) {
+        ;(payload as Record<string, unknown>).subject = devSubject
+      }
+      const response = await fetch(apiBase, {
         method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(buildItemPayload(form)),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -691,6 +778,10 @@ export function LearningPathsManager() {
   }
 
   const deleteItem = async (itemId: string, hardDelete = false) => {
+    if (isDev) {
+      setError("În modul dev nu poți șterge sau dezactiva itemi. Folosește panoul admin pentru asta.")
+      return
+    }
     const confirmed = window.confirm(
       hardDelete
         ? "Sigur vrei să ștergi definitiv acest item?"
@@ -750,29 +841,29 @@ export function LearningPathsManager() {
       if (!accessToken) throw new Error("Sesiune expirată.")
 
       const requests = [
-        fetch("/api/admin/learning-paths", {
+        fetch(apiBase, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({
-            type: "item",
-            id: current.id,
-            order_index: target.order_index,
-          }),
+          body: JSON.stringify(
+            isDev && devSubject
+              ? { type: "item", id: current.id, order_index: target.order_index, subject: devSubject }
+              : { type: "item", id: current.id, order_index: target.order_index }
+          ),
         }),
-        fetch("/api/admin/learning-paths", {
+        fetch(apiBase, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({
-            type: "item",
-            id: target.id,
-            order_index: current.order_index,
-          }),
+          body: JSON.stringify(
+            isDev && devSubject
+              ? { type: "item", id: target.id, order_index: current.order_index, subject: devSubject }
+              : { type: "item", id: target.id, order_index: current.order_index }
+          ),
         }),
       ]
 
@@ -791,6 +882,80 @@ export function LearningPathsManager() {
     }
   }
 
+  const handleCreateChapter = async () => {
+    const title = chapterForm.title.trim()
+    if (!title) {
+      setError("Introdu titlul capitolului.")
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error("Sesiune expirată.")
+
+      const orderFromInput = chapterForm.order_index.trim()
+      const orderParsed = orderFromInput ? Number.parseInt(orderFromInput, 10) : Number.NaN
+      const order_index = Number.isFinite(orderParsed) ? orderParsed : nextChapterOrderDefault
+
+      let problem_category: string | null = chapterForm.problem_category.trim() || null
+      if (isDev && devSubject === "informatics") {
+        problem_category = null
+      }
+
+      const payload: Record<string, unknown> = {
+        type: "chapter",
+        title,
+        slug: chapterForm.slug.trim() || null,
+        description: chapterForm.description.trim() || null,
+        icon_url: chapterForm.icon_url.trim() || null,
+        problem_category,
+        order_index,
+        is_active: true,
+      }
+      if (isDev && devSubject) {
+        payload.subject = devSubject
+      }
+
+      const response = await fetch(apiBase, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut crea capitolul.")
+      }
+
+      const data = await response.json()
+      const newId = data.chapter?.id as string | undefined
+      if (newId) {
+        setExpandedChapters((prev) => new Set([...prev, newId]))
+      }
+
+      setSuccessMessage("Capitol creat.")
+      setTimeout(() => setSuccessMessage(null), 3000)
+      setChapterForm({
+        title: "",
+        slug: "",
+        description: "",
+        icon_url: "",
+        problem_category: "",
+        order_index: "",
+      })
+      await fetchData()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Eroare la crearea capitolului.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const fetchProblems = useCallback(async () => {
     if (!form || form.item_type !== "problem") return
 
@@ -800,11 +965,15 @@ export function LearningPathsManager() {
       if (!accessToken) return
 
       const params = new URLSearchParams()
+      if (isDev && devSubject) {
+        params.set("catalog", devSubject === "informatics" ? "informatics" : "physics")
+      }
       if (problemSearch.trim()) {
         params.set("search", problemSearch.trim())
       }
 
-      const response = await fetch(`/api/admin/problems?${params.toString()}`, {
+      const problemsPath = isDev ? "/api/dev/problems" : "/api/admin/problems"
+      const response = await fetch(`${problemsPath}?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -816,13 +985,25 @@ export function LearningPathsManager() {
       }
 
       const data = await response.json()
-      setProblemResults(data.problems || [])
+      let rows: ProblemResult[] = data.problems || []
+      if (isDev && devSubject === "informatics") {
+        rows = (data.problems || []).map(
+          (p: { id: string; title: string; difficulty: string; chapter?: string | null; class?: number }) => ({
+            id: p.id,
+            title: p.title,
+            difficulty: p.difficulty,
+            category: (typeof p.chapter === "string" && p.chapter.trim() ? p.chapter : "") || "",
+            class: p.class,
+          })
+        )
+      }
+      setProblemResults(rows)
     } catch (err: any) {
       setError(err.message || "Eroare la căutarea problemelor.")
     } finally {
       setProblemLoading(false)
     }
-  }, [form, getAccessToken, problemSearch])
+  }, [form, getAccessToken, problemSearch, isDev, devSubject])
 
   const fetchQuizQuestions = useCallback(async () => {
     if (!form || form.item_type !== "grila") return
@@ -833,6 +1014,9 @@ export function LearningPathsManager() {
       if (!accessToken) return
 
       const params = new URLSearchParams()
+      if (isDev && devSubject) {
+        params.set("subject", devSubject)
+      }
       params.set("action", "quiz-questions")
       if (quizSearch.trim()) {
         params.set("search", quizSearch.trim())
@@ -841,7 +1025,7 @@ export function LearningPathsManager() {
         params.set("class", quizClass.trim())
       }
 
-      const response = await fetch(`/api/admin/learning-paths?${params.toString()}`, {
+      const response = await fetch(`${apiBase}?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -859,7 +1043,7 @@ export function LearningPathsManager() {
     } finally {
       setQuizLoading(false)
     }
-  }, [form, getAccessToken, quizClass, quizSearch])
+  }, [form, getAccessToken, quizClass, quizSearch, isDev, devSubject, apiBase])
 
   useEffect(() => {
     if (!form || form.item_type !== "problem") return
@@ -1516,6 +1700,38 @@ export function LearningPathsManager() {
       )
     }
 
+    if (isInteractiveLessonItemType(form.item_type)) {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-300">
+            Completează câmpurile de mai jos — conținutul este salvat ca <code className="text-white">content_json</code> și validat automat.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              updateForm(
+                "interactive_json",
+                JSON.stringify(getDefaultInteractiveItemContent(form.item_type as LearningPathInteractiveItemType), null, 2),
+              )
+              setInteractiveEditorNonce((n) => n + 1)
+            }}
+            className="border-white/20 bg-white/5 text-gray-200 hover:bg-white/10 hover:text-white"
+          >
+            Încarcă șablon implicit ({ITEM_TYPE_LABEL[form.item_type]})
+          </Button>
+          <InteractiveItemContentEditor
+            itemType={form.item_type as LearningPathInteractiveItemType}
+            formItemId={form.id}
+            jsonValue={form.interactive_json}
+            remountNonce={interactiveEditorNonce}
+            onJsonChange={(next) => updateForm("interactive_json", next)}
+          />
+        </div>
+      )
+    }
+
     return null
   }
 
@@ -1527,12 +1743,108 @@ export function LearningPathsManager() {
     )
   }
 
+  if (isDev && !devSubject) {
+    return (
+      <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
+        Configurare invalidă: pentru modul dev este necesar <code className="text-white">devSubject</code> (
+        <code className="text-white">physics</code> sau <code className="text-white">informatics</code>).
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-12rem)]">
+    <div className="space-y-4">
+      {isDev ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <strong>Mod dev:</strong> același editor ca la admin (preview lecție, itemi, reordonare, salvare).{" "}
+          <strong>Nu poți șterge sau dezactiva</strong> itemi din această interfață.
+        </div>
+      ) : null}
+      <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-12rem)]">
       <aside className="w-full lg:w-[420px] flex-shrink-0">
         <div className="rounded-lg border border-white/10 bg-white/5 overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Structură learning paths</h3>
+          </div>
+
+          <div className="space-y-2 border-b border-white/10 bg-black/30 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-300">Capitol nou</p>
+            <Input
+              value={chapterForm.title}
+              onChange={(e) => setChapterForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Titlu capitol *"
+              className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+            />
+            <Input
+              value={chapterForm.slug}
+              onChange={(e) => setChapterForm((f) => ({ ...f, slug: e.target.value }))}
+              placeholder="Slug URL (opțional)"
+              className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+            />
+            <Textarea
+              value={chapterForm.description}
+              onChange={(e) => setChapterForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Descriere (opțional)"
+              rows={2}
+              className="border-white/20 bg-black/40 text-sm text-gray-100"
+            />
+            <Input
+              value={chapterForm.icon_url}
+              onChange={(e) => setChapterForm((f) => ({ ...f, icon_url: e.target.value }))}
+              placeholder="Icon URL (opțional)"
+              className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+            />
+            {isDev && devSubject === "informatics" ? (
+              <p className="text-[11px] leading-snug text-gray-500">
+                Capitolul va fi marcat automat pentru parcursul de informatică (<code className="text-gray-400">problem_category</code>).
+              </p>
+            ) : isDev && devSubject === "physics" ? (
+              <label className="block text-[11px] text-gray-400">
+                Capitol catalog (opțional)
+                <select
+                  className="mt-1 w-full rounded-md border border-white/20 bg-black/40 px-2 py-2 text-sm text-gray-100"
+                  value={chapterForm.problem_category}
+                  onChange={(e) => setChapterForm((f) => ({ ...f, problem_category: e.target.value }))}
+                >
+                  <option value="">(lăsat gol)</option>
+                  {physicsCategoryOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <Input
+                value={chapterForm.problem_category}
+                onChange={(e) => setChapterForm((f) => ({ ...f, problem_category: e.target.value }))}
+                placeholder="problem_category (opțional, ex. Lentile — legătură /probleme?capitol=)"
+                className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+              />
+            )}
+            <Input
+              type="number"
+              value={chapterForm.order_index}
+              onChange={(e) => setChapterForm((f) => ({ ...f, order_index: e.target.value }))}
+              placeholder={`order_index (implicit ${nextChapterOrderDefault})`}
+              className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={saving}
+              onClick={() => void handleCreateChapter()}
+              className="w-full bg-emerald-600 text-white hover:bg-emerald-500"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="mr-2 inline h-4 w-4" />
+                  Creează capitol
+                </>
+              )}
+            </Button>
           </div>
 
           <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">
@@ -1756,26 +2068,30 @@ export function LearningPathsManager() {
                               >
                                 <FileText className="w-4 h-4" />
                               </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
-                                onClick={() => deleteItem(item.id, false)}
-                                title="Dezactivează item"
-                              >
-                                <EyeOff className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-300 hover:text-red-200 hover:bg-red-500/10"
-                                onClick={() => deleteItem(item.id, true)}
-                                title="Șterge definitiv"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {!isDev ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                                    onClick={() => deleteItem(item.id, false)}
+                                    title="Dezactivează item"
+                                  >
+                                    <EyeOff className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-red-300 hover:text-red-200 hover:bg-red-500/10"
+                                    onClick={() => deleteItem(item.id, true)}
+                                    title="Șterge definitiv"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -1842,10 +2158,23 @@ export function LearningPathsManager() {
                       <p className="text-xs text-gray-300">Tip item</p>
                       <select
                         value={form.item_type}
-                        onChange={(e) => updateForm("item_type", e.target.value as LearningPathLessonType)}
+                        onChange={(e) => {
+                          const next = e.target.value as LearningPathLessonType
+                          setForm((prev) => {
+                            if (!prev) return prev
+                            if (isInteractiveLessonItemType(next)) {
+                              return {
+                                ...prev,
+                                item_type: next,
+                                interactive_json: JSON.stringify(getDefaultInteractiveItemContent(next), null, 2),
+                              }
+                            }
+                            return { ...prev, item_type: next }
+                          })
+                        }}
                         className="w-full rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"
                       >
-                        {ITEM_TYPES.map((type) => (
+                        {itemTypesForForm.map((type) => (
                           <option key={type} value={type}>
                             {ITEM_TYPE_LABEL[type]}
                           </option>
@@ -1912,6 +2241,7 @@ export function LearningPathsManager() {
           )}
         </div>
       </section>
+    </div>
     </div>
   )
 }

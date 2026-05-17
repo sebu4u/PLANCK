@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
 import type { LearningPathChapter, LearningPathLesson } from "@/lib/supabase-learning-paths"
 import type { Problem } from "@/data/problems"
+import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { LearningPathSegmentedProgress } from "@/components/invata/learning-path-segmented-progress"
 import {
   InvataChapterSectionIndicator,
@@ -387,9 +388,12 @@ export function LearningPathsList({
       {chapters.map((chapter, chapterIndex) => {
         const chapterLessons = lessonsByChapter[chapter.id] || []
         const chapterProblems = problemsByChapterId[chapter.id] || []
-        const discoverHref = chapter.problem_category
-          ? `/probleme?capitol=${encodeURIComponent(chapter.problem_category)}`
-          : "/probleme"
+        const discoverHref =
+          chapter.problem_category === INFORMATICA_LEARNING_PATH_MARKER
+            ? "/informatica/probleme"
+            : chapter.problem_category
+              ? `/probleme?capitol=${encodeURIComponent(chapter.problem_category)}`
+              : "/probleme"
 
         return (
           <section

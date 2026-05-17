@@ -35,6 +35,35 @@ const EMPTY_CONTINUE: ContinueLearningItem[] = []
 const EMPTY_ACHIEVEMENTS: Achievement[] = []
 const EMPTY_UPDATES: DashboardUpdate[] = []
 
+const DEV_SUBJECT_CARDS: {
+  title: string
+  className: string
+  href?: string
+}[] = [
+  {
+    title: "Matematică",
+    className: "border-sky-200 bg-sky-50/80 text-sky-950",
+  },
+  {
+    title: "Informatică",
+    className: "border-indigo-200 bg-indigo-50/80 text-indigo-950",
+    href: "/dashboard/dev/catalog/informatica",
+  },
+  {
+    title: "AI",
+    className: "border-violet-200 bg-violet-50/80 text-violet-950",
+  },
+  {
+    title: "Fizică",
+    className: "border-amber-200 bg-amber-50/80 text-amber-950",
+    href: "/dashboard/dev/catalog/fizica",
+  },
+  {
+    title: "Biologie",
+    className: "border-emerald-200 bg-emerald-50/80 text-emerald-950",
+  },
+]
+
 export function DevDashboard() {
   const router = useRouter()
   const { user, loading: authLoading, profile } = useAuth()
@@ -124,7 +153,7 @@ export function DevDashboard() {
                       })()}
                     </p>
                     <p className="mt-2 text-xs font-medium text-amber-800/90">
-                      Mod dev — fără carduri de progres pentru studenți.
+                      Mod dev — Fizică și Informatică: adăugare conținut. Celelalte materii, în curând.
                     </p>
                   </div>
 
@@ -138,37 +167,34 @@ export function DevDashboard() {
                       </span>
                     </div>
                     <p className="text-gray-600">
-                      Mod dev — același layout ca dashboard-ul principal, fără carduri pentru userii
-                      obișnuiți.
+                      Mod dev — Fizică și Informatică: deschide cardul pentru catalog și learning path (doar adăugare).
                     </p>
                   </div>
 
                   <div className="rounded-xl border border-dashed border-gray-300 bg-white/60 p-5 md:p-6">
-                    <p className="mb-4 text-sm text-gray-600">
-                      Linkuri rapide (nu sunt carduri de streak, premium, trasee sau recomandări).
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Link
-                        href="/probleme"
-                        className="rounded-xl border border-gray-200 bg-[#f8f9fa] px-4 py-4 text-sm font-semibold text-gray-900 transition hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        Probleme
-                      </Link>
-                      <Link
-                        href="/cursuri"
-                        className="rounded-xl border border-gray-200 bg-[#f8f9fa] px-4 py-4 text-sm font-semibold text-gray-900 transition hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        Cursuri
-                      </Link>
-                      {isAdmin ? (
-                        <Link
-                          href="/admin/lessons"
-                          className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-4 text-sm font-semibold text-violet-950 transition hover:border-violet-300 hover:bg-violet-100 sm:col-span-2"
-                        >
-                          Admin — Lecții
-                        </Link>
-                      ) : null}
+                    <div className="grid grid-cols-2 gap-3">
+                      {DEV_SUBJECT_CARDS.map((card) => {
+                        const cls = `flex min-h-[100px] flex-col justify-end rounded-xl border px-4 py-4 shadow-sm transition hover:opacity-95 ${card.className}`
+                        const inner = <p className="text-base font-bold tracking-tight">{card.title}</p>
+                        return card.href ? (
+                          <Link key={card.title} href={card.href} className={cls}>
+                            {inner}
+                          </Link>
+                        ) : (
+                          <div key={card.title} className={`${cls} cursor-default opacity-90`}>
+                            {inner}
+                          </div>
+                        )
+                      })}
                     </div>
+                    {isAdmin ? (
+                      <Link
+                        href="/admin/lessons"
+                        className="mt-4 block rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-semibold text-violet-950 transition hover:border-violet-300 hover:bg-violet-100"
+                      >
+                        Admin — Lecții
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </main>

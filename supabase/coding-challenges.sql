@@ -29,6 +29,8 @@ create table if not exists public.coding_problems (
   sample_output text,
   explanation_markdown text,
   boilerplate_cpp text,
+  language text not null default 'cpp',
+  boilerplate_python text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -37,6 +39,34 @@ alter table if exists public.coding_problems
   add column if not exists difficulty text default 'Ușor',
   add column if not exists class integer default 9,
   add column if not exists chapter text default 'Capitol neclasificat';
+
+alter table if exists public.coding_problems
+  add column if not exists language text default 'cpp',
+  add column if not exists boilerplate_python text;
+
+update public.coding_problems
+set language = 'cpp'
+where language is null or trim(language) = '';
+
+do $$
+begin
+  alter table public.coding_problems
+    add constraint coding_problems_language_check
+      check (language in ('cpp', 'python'))
+    not valid;
+exception
+  when duplicate_object then null;
+end;
+$$;
+
+alter table if exists public.coding_problems
+  alter column language set default 'cpp';
+
+alter table if exists public.coding_problems
+  validate constraint coding_problems_language_check;
+
+alter table if exists public.coding_problems
+  alter column language set not null;
 
 alter table if exists public.coding_problems
   alter column difficulty set default 'Ușor',

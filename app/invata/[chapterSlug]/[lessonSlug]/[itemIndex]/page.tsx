@@ -212,6 +212,19 @@ export default async function InvataLessonItemPage({
   const isProblem = item.item_type === "problem" && !!sourceProblem
   const isSimulation = item.item_type === "simulation"
   const isTest = item.item_type === "test"
+  const isCardSort = item.item_type === "card_sort"
+  const isFillSlot = item.item_type === "fill_slot"
+  const isMatch = item.item_type === "match"
+  const isBareInteractiveItem =
+    isCardSort ||
+    isFillSlot ||
+    isMatch ||
+    item.item_type === "graph_build" ||
+    item.item_type === "code_trace" ||
+    item.item_type === "swipe_classify" ||
+    item.item_type === "slider_explore" ||
+    item.item_type === "memory_flip" ||
+    item.item_type === "reveal_steps"
   const problemHasAnswer =
     sourceProblem &&
     (sourceProblem.answer_type === "value" || sourceProblem.answer_type === "grila")
@@ -227,7 +240,7 @@ export default async function InvataLessonItemPage({
       initialCurrentItemCompleted={initialCurrentItemCompleted}
       lessonBaseHref={lessonBaseHref}
       isTextLesson={isLinkedTextItem || isCustomTextItem}
-      hideBottomCta={isPoll || isTest || (isProblem && !!problemHasAnswer)}
+      hideBottomCta={isPoll || isTest || (isProblem && !!problemHasAnswer) || isBareInteractiveItem}
       overflowHidden={isProblem}
       fullWidth={isProblem}
       grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
@@ -291,6 +304,18 @@ export default async function InvataLessonItemPage({
         </div>
       ) : isSimulation ? (
         <section className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10">
+          <LearningPathItemBody
+            item={item}
+            sourceLesson={sourceLesson}
+            sourceProblem={sourceProblem}
+            sourceQuizQuestion={sourceQuizQuestion}
+            nextItemHref={nextItemHref}
+            lessonId={lesson.id}
+            isLastItem={parsedIndex >= items.length}
+          />
+        </section>
+      ) : isBareInteractiveItem ? (
+        <section className="mt-6 pb-2 sm:mt-8">
           <LearningPathItemBody
             item={item}
             sourceLesson={sourceLesson}

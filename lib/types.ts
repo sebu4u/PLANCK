@@ -1,8 +1,10 @@
+export type PlanckCodeFileKind = 'cpp' | 'txt' | 'python'
+
 export interface FileItem {
     id: string
     name: string
     content: string
-    type: 'cpp' | 'txt'
+    type: PlanckCodeFileKind
 }
 
 export interface Project {

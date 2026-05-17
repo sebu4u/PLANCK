@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 
@@ -13,7 +13,7 @@ const Editor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.de
     </div>
   ),
 })
-import { Loader2, Play, Plus, X, File, FileCode, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, Play, File, FileCode, ChevronDown, ChevronUp, SendHorizontal } from "lucide-react"
 import axios from "axios"
 import type { editor as MonacoEditor } from "monaco-editor"
 import {
@@ -22,35 +22,53 @@ import {
   usePlanckCodeSettings,
 } from "@/components/planckcode-settings-provider"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable"
+import type { FileItem } from "@/lib/types"
+import {
+  mergePlanckIdeFiles,
+  runPythonProject,
+} from "@/lib/planckcode-python-run"
+import { supabase } from "@/lib/supabaseClient"
+import type { CodingSubmitResponse } from "./types"
+import { CodingSubmitResultOverlay } from "./coding-submit-result-overlay"
 
-const defaultCode = `#include <iostream>
+const defaultCppCode = `#include <iostream>
 using namespace std;
 
 int main() {
     cout << "Hello World!" << endl;
     return 0;
 }`
+
+const defaultPythonCode = `print("Hello, Planck!")\n`
+
+function createInitialFiles(
+  defaultLanguage: "cpp" | "python",
+  initialCode?: string
+): FileItem[] {
+  if (defaultLanguage === "python") {
+    const body =
+      initialCode && initialCode.trim().length > 0 ? initialCode : defaultPythonCode
+    return [{ id: "1", name: "main.py", content: body, type: "python" }]
+  }
+  return [
+    {
+      id: "1",
+      name: "main.cpp",
+      content: initialCode || defaultCppCode,
+      type: "cpp",
+    },
+  ]
+}
+
+function monacoLanguageForFile(file: FileItem): string {
+  if (file.type === "cpp") return "cpp"
+  if (file.type === "python") return "python"
+  return "plaintext"
+}
 
 const MONACO_THEME_DEFINITIONS: Record<PlanckCodeThemeId, MonacoEditor.IStandaloneThemeData> = {
   "planck-dark": {
@@ -137,13 +155,6 @@ const ensureMonacoThemes = (monaco: typeof import("monaco-editor")) => {
   })
 }
 
-interface FileItem {
-  id: string
-  name: string
-  content: string
-  type: "cpp" | "txt"
-}
-
 interface RunResponse {
   stdout: string | null
   stderr: string | null
@@ -156,27 +167,34 @@ interface RunResponse {
   memory: number | null
 }
 
-interface EmbeddedIDEProps {
+export interface EmbeddedIDEProps {
   initialCode?: string
+  /** Limbajul problemei — controlează fișierul implicit (main.cpp vs main.py). */
+  defaultLanguage?: "cpp" | "python"
+  /** Dacă e setat (slug), apare butonul „Trimite” pentru evaluare oficială Python. */
+  problemSlug?: string | null
 }
 
-export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
+export default function EmbeddedIDE({
+  initialCode,
+  defaultLanguage = "cpp",
+  problemSlug = null,
+}: EmbeddedIDEProps) {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
-  const [files, setFiles] = useState<FileItem[]>([
-    {
-      id: "1",
-      name: "main.cpp",
-      content: initialCode || defaultCode,
-      type: "cpp",
-    },
-  ])
+  const [files, setFiles] = useState<FileItem[]>(() =>
+    createInitialFiles(defaultLanguage, initialCode)
+  )
   const [activeFileId, setActiveFileId] = useState<string>("1")
   const [output, setOutput] = useState<RunResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
   const [stdin, setStdin] = useState<string>("")
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitResult, setSubmitResult] = useState<CodingSubmitResponse | null>(null)
+  const submitDismissedRef = useRef(false)
 
   const editorRef = useRef<import("monaco-editor").editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
@@ -196,11 +214,7 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
     let model = monaco.editor.getModel(uri)
 
     if (!model) {
-      model = monaco.editor.createModel(
-        file.content,
-        file.type === "cpp" ? "cpp" : "plaintext",
-        uri
-      )
+      model = monaco.editor.createModel(file.content, monacoLanguageForFile(file), uri)
     } else if (model.getValue() !== file.content) {
       model.setValue(file.content)
     }
@@ -219,7 +233,7 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
       editor.setModel(model)
     }
 
-    const language = file.type === "cpp" ? "cpp" : "plaintext"
+    const language = monacoLanguageForFile(file)
     if (monacoRef.current && model.getLanguageId() !== language) {
       monacoRef.current.editor.setModelLanguage(model, language)
     }
@@ -261,6 +275,81 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
     )
   }
 
+  const getPythonMainSource = (): string | null => {
+    const main = files.find((f) => f.name === "main.py" && f.type === "python")
+    if (main) return main.content
+    const anyPy = files.find((f) => f.type === "python")
+    return anyPy?.content ?? null
+  }
+
+  const handleOfficialSubmit = async () => {
+    if (!problemSlug || defaultLanguage !== "python") return
+    submitDismissedRef.current = false
+    setIsTerminalOpen(true)
+    setSubmitLoading(true)
+    setSubmitError(null)
+    setSubmitResult(null)
+
+    const source = getPythonMainSource()
+    if (!source || !source.trim()) {
+      if (!submitDismissedRef.current) {
+        setSubmitError("Nu există cod Python de trimis (main.py).")
+      }
+      setSubmitLoading(false)
+      return
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    if (!token) {
+      if (!submitDismissedRef.current) {
+        setSubmitError("Trebuie să fii autentificat pentru a trimite soluția la evaluare.")
+      }
+      setSubmitLoading(false)
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/coding-problems/${encodeURIComponent(problemSlug)}/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sourceCode: source }),
+      })
+      const payload = (await res.json().catch(() => ({}))) as CodingSubmitResponse & { error?: string }
+
+      if (!res.ok) {
+        if (!submitDismissedRef.current) {
+          setSubmitError(payload.error || `Evaluare eșuată (HTTP ${res.status}).`)
+        }
+        setSubmitLoading(false)
+        return
+      }
+
+      if (!submitDismissedRef.current) {
+        setSubmitResult({
+          submissionId: payload.submissionId,
+          status: payload.status,
+          scorePercent: payload.scorePercent,
+          passedTests: payload.passedTests,
+          totalTests: payload.totalTests,
+          judge0PythonLanguageId: payload.judge0PythonLanguageId,
+          tests: Array.isArray(payload.tests) ? payload.tests : [],
+          elo: payload.elo ?? null,
+          eloError: payload.eloError ?? null,
+        })
+      }
+    } catch (e) {
+      if (!submitDismissedRef.current) {
+        setSubmitError(e instanceof Error ? e.message : "Eroare la trimiterea soluției.")
+      }
+    } finally {
+      setSubmitLoading(false)
+    }
+  }
+
   const handleRunCode = async () => {
     if (!isTerminalOpen) {
       setIsTerminalOpen(true)
@@ -269,6 +358,54 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
     setLoading(true)
     setError(null)
     setOutput(null)
+
+    if (!activeFile) {
+      setLoading(false)
+      return
+    }
+
+    if (activeFile.type === "txt") {
+      setError("Fișierele text nu pot fi rulate. Deschide un fișier .cpp sau .py.")
+      setLoading(false)
+      return
+    }
+
+    if (activeFile.type === "python") {
+      const needsInput = /\binput\s*\(/.test(activeFile.content)
+      if (needsInput && !stdin.trim()) {
+        setError(
+          'Programul folosește input(), dar caseta „Input (stdin)” este goală. Completeaz-o înainte de rulare (o valoare pe linie).'
+        )
+        setLoading(false)
+        return
+      }
+      try {
+        const result = await runPythonProject({
+          files: files.map((f) => ({ name: f.name, content: f.content })),
+          entryFileName: activeFile.name,
+          stdinText: stdin,
+        })
+        setOutput({
+          stdout: result.stdout || null,
+          stderr: result.stderr || null,
+          compile_output: null,
+          status: {
+            id: result.exitCode === 0 ? 3 : 11,
+            description: result.exitCode === 0 ? "Accepted" : "Runtime Error",
+          },
+          time: null,
+          memory: null,
+        })
+        if (Object.keys(result.fileUpdates).length > 0) {
+          setFiles((prev) => mergePlanckIdeFiles(prev, result.fileUpdates))
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Eroare la rularea Python.")
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
     try {
       const response = await axios.post<RunResponse>("/api/run", {
@@ -318,10 +455,15 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
     switchToFileModel(activeFile)
   }
 
+  const runHint =
+    activeFile?.type === "python"
+      ? "Python rulează în browser (prima rulare poate descărca interpretorul)."
+      : "Compiling and running your code..."
+
   return (
-    <div 
+    <div
       className="h-full flex flex-col overflow-hidden bg-black"
-      style={{ touchAction: 'pan-y' }}
+      style={{ touchAction: "pan-y" }}
     >
       {/* File Tabs */}
       <div className="flex items-center justify-between gap-1 px-4 py-2 bg-[#1e1e1e] border-b border-[#3b3b3b] overflow-x-auto">
@@ -336,13 +478,19 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
               }`}
               onClick={() => setActiveFileId(file.id)}
             >
-              {file.type === "cpp" ? <FileCode className="w-4 h-4" /> : <File className="w-4 h-4" />}
+              {file.type === "python" ? (
+                <FileCode className="w-4 h-4 text-amber-300/90" />
+              ) : file.type === "cpp" ? (
+                <FileCode className="w-4 h-4" />
+              ) : (
+                <File className="w-4 h-4" />
+              )}
               <span>{file.name}</span>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 ml-4">
+        <div className="flex items-center gap-2 ml-4 shrink-0">
           <Button
             onClick={handleRunCode}
             disabled={loading}
@@ -360,6 +508,27 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
               </>
             )}
           </Button>
+          {problemSlug && defaultLanguage === "python" ? (
+            <Button
+              type="button"
+              onClick={() => void handleOfficialSubmit()}
+              disabled={submitLoading || loading}
+              variant="outline"
+              className="h-8 border-amber-500/40 bg-amber-500/10 px-3 text-xs font-semibold text-amber-100 hover:bg-amber-500/20"
+            >
+              {submitLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Evaluare...
+                </>
+              ) : (
+                <>
+                  <SendHorizontal className="w-4 h-4" />
+                  Trimite
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -369,7 +538,7 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
           <div className="h-full overflow-hidden">
             <Editor
               height="100%"
-              language={activeFile?.type === "cpp" ? "cpp" : "plaintext"}
+              language={activeFile ? monacoLanguageForFile(activeFile) : "plaintext"}
               theme={settings.theme}
               defaultValue={activeFile?.content || ""}
               path={activeFile ? `${activeFile.id}/${activeFile.name}` : undefined}
@@ -421,7 +590,7 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
                       {loading && (
                         <div className="flex items-center gap-2 text-gray-400">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Compiling and running your code...</span>
+                          <span>{runHint}</span>
                         </div>
                       )}
 
@@ -467,7 +636,9 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
 
                       {!loading && !error && !output && (
                         <div className="text-gray-500 text-sm italic">
-                          Click "Run Code" to execute your program
+                          {problemSlug && defaultLanguage === "python"
+                            ? "Apasă „Run Code” pentru test local sau „Trimite” pentru evaluare pe server."
+                            : 'Click "Run Code" to execute your program'}
                         </div>
                       )}
                     </div>
@@ -511,7 +682,21 @@ export default function EmbeddedIDE({ initialCode }: EmbeddedIDEProps) {
           </button>
         </div>
       )}
+
+      {problemSlug && defaultLanguage === "python" ? (
+        <CodingSubmitResultOverlay
+          open={submitLoading || Boolean(submitError) || Boolean(submitResult)}
+          loading={submitLoading}
+          error={submitError}
+          result={submitResult}
+          onClose={() => {
+            submitDismissedRef.current = true
+            setSubmitLoading(false)
+            setSubmitResult(null)
+            setSubmitError(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
-

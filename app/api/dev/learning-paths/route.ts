@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { createServerClientWithToken } from "@/lib/supabaseServer"
-import { isJwtExpired } from "@/lib/auth-validate"
-import { isAdminFromDB, getAccessTokenFromRequest } from "@/lib/admin-check"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { validateTestContent } from "@/lib/learning-path-test"
 import {
   isInteractiveLessonItemType,
   validateInteractiveItemContent,
 } from "@/lib/learning-path-interactive-items"
+import { requireDevSession } from "@/lib/dev-api-session"
+import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
+import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
+type DevSubject = "physics" | "informatics"
 
 const LESSON_TYPES = ["text", "video", "grila", "problem"] as const
 const ITEM_TYPES = [
@@ -36,37 +37,12 @@ const ITEM_TYPES = [
   "reveal_steps",
 ] as const
 
-async function verifyAdmin(req: NextRequest) {
-  const accessToken = getAccessTokenFromRequest(req.headers.get("authorization"))
-  if (!accessToken) {
-    return { error: NextResponse.json({ error: "Necesită autentificare." }, { status: 401 }) }
-  }
-
-  if (isJwtExpired(accessToken)) {
-    return { error: NextResponse.json({ error: "Sesiune expirată." }, { status: 401 }) }
-  }
-
-  const supabase = createServerClientWithToken(accessToken)
-  const { data: userData, error: userErr } = await supabase.auth.getUser()
-  if (userErr || !userData?.user) {
-    return { error: NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 }) }
-  }
-
-  if (!(await isAdminFromDB(supabase, userData.user))) {
-    return { error: NextResponse.json({ error: "Acces interzis. Doar adminii pot accesa această resursă." }, { status: 403 }) }
-  }
-
-  return { supabase, user: userData.user }
-}
-
-function createAdminSupabaseClient() {
+function createServiceClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
   if (!url || !serviceRoleKey) {
     throw new Error("Missing Supabase service role configuration.")
   }
-
   return createClient(url, serviceRoleKey)
 }
 
@@ -85,7 +61,7 @@ function formatDbError(error: unknown): string {
 }
 
 async function shiftItemOrderRange(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  supabase: SupabaseClient,
   lessonId: string,
   fromIndex: number,
   delta: 1 | -1,
@@ -116,7 +92,7 @@ async function shiftItemOrderRange(
 }
 
 async function shiftItemOrderBand(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  supabase: SupabaseClient,
   lessonId: string,
   minIndex: number,
   maxIndex: number,
@@ -145,6 +121,25 @@ async function shiftItemOrderBand(
       throw new Error(`Failed to shift item order band: ${formatDbError(error)}`)
     }
   }
+}
+
+async function getChapterForLesson(
+  supabase: SupabaseClient,
+  lessonId: string
+): Promise<{ id: string; problem_category: string | null } | null> {
+  const { data: lesson, error: lErr } = await supabase
+    .from("learning_path_lessons")
+    .select("chapter_id")
+    .eq("id", lessonId)
+    .maybeSingle()
+  if (lErr || !lesson?.chapter_id) return null
+  const { data: chapter, error: cErr } = await supabase
+    .from("learning_path_chapters")
+    .select("id, problem_category")
+    .eq("id", lesson.chapter_id)
+    .maybeSingle()
+  if (cErr || !chapter) return null
+  return chapter as { id: string; problem_category: string | null }
 }
 
 function toNullableString(value: unknown): string | null {
@@ -238,13 +233,41 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   return null
 }
 
+function parseSubject(raw: string | null): DevSubject | null {
+  const s = raw?.trim()
+  if (s === "physics" || s === "informatics") return s
+  return null
+}
+
+function chapterVisibleForSubject(
+  chapter: { problem_category: string | null },
+  subject: DevSubject
+): boolean {
+  const pc = chapter.problem_category?.trim() || null
+  if (subject === "informatics") {
+    return pc === INFORMATICA_LEARNING_PATH_MARKER
+  }
+  return pc !== INFORMATICA_LEARNING_PATH_MARKER
+}
+
+/**
+ * GET ?subject=physics|informatics — structură filtrată (doar citire).
+ * GET ?subject=...&action=quiz-questions — pentru itemi grilă (ca admin).
+ * POST — creare capitol/lecție/item.
+ * PUT — actualizare / reordonare (fără DELETE).
+ */
 export async function GET(req: NextRequest) {
   try {
-    const auth = await verifyAdmin(req)
-    if ("error" in auth) return auth.error
-    const supabase = createAdminSupabaseClient()
+    const auth = await requireDevSession(req.headers)
+    if (auth instanceof NextResponse) return auth
 
     const { searchParams } = new URL(req.url)
+    const subject = parseSubject(searchParams.get("subject"))
+    if (!subject) {
+      return NextResponse.json({ error: "Parametrul subject trebuie să fie physics sau informatics." }, { status: 400 })
+    }
+
+    const supabase = createServiceClient()
     const action = searchParams.get("action")
 
     if (action === "quiz-questions") {
@@ -271,61 +294,74 @@ export async function GET(req: NextRequest) {
 
       const { data: quizQuestions, error: quizError } = await query
       if (quizError) {
-        logger.error("[admin/learning-paths] Failed to fetch quiz questions:", quizError)
+        logger.error("[dev/learning-paths] quiz questions:", quizError)
         return NextResponse.json({ error: "Nu am putut încărca întrebările grilă." }, { status: 500 })
       }
 
       return NextResponse.json({ quizQuestions: quizQuestions || [] })
     }
 
-    const { data: chapters, error: chaptersErr } = await supabase
+    const { data: allChapters, error: chaptersErr } = await supabase
       .from("learning_path_chapters")
       .select("*")
       .order("order_index")
 
     if (chaptersErr) {
-      logger.error("[admin/learning-paths] Failed to fetch chapters:", chaptersErr)
-      return NextResponse.json({ error: "Nu am putut încărca capitolele de learning path." }, { status: 500 })
+      logger.error("[dev/learning-paths] chapters:", chaptersErr)
+      return NextResponse.json({ error: "Nu am putut încărca capitolele." }, { status: 500 })
     }
 
-    const { data: lessons, error: lessonsErr } = await supabase
+    const chapters = (allChapters || []).filter((c) => chapterVisibleForSubject(c, subject))
+    const chapterIds = new Set(chapters.map((c) => c.id))
+
+    const { data: allLessons, error: lessonsErr } = await supabase
       .from("learning_path_lessons")
       .select("*")
       .order("order_index")
 
     if (lessonsErr) {
-      logger.error("[admin/learning-paths] Failed to fetch lessons:", lessonsErr)
-      return NextResponse.json({ error: "Nu am putut încărca lecțiile de learning path." }, { status: 500 })
+      logger.error("[dev/learning-paths] lessons:", lessonsErr)
+      return NextResponse.json({ error: "Nu am putut încărca lecțiile." }, { status: 500 })
     }
 
-    const { data: items, error: itemsErr } = await supabase
+    const lessons = (allLessons || []).filter((l) => chapterIds.has(l.chapter_id))
+    const lessonIds = new Set(lessons.map((l) => l.id))
+
+    const { data: allItems, error: itemsErr } = await supabase
       .from("learning_path_lesson_items")
       .select("*")
       .order("order_index")
 
     if (itemsErr) {
-      logger.error("[admin/learning-paths] Failed to fetch lesson items:", itemsErr)
-      return NextResponse.json({ error: "Nu am putut încărca itemii lecțiilor." }, { status: 500 })
+      logger.error("[dev/learning-paths] items:", itemsErr)
+      return NextResponse.json({ error: "Nu am putut încărca itemii." }, { status: 500 })
     }
 
+    const items = (allItems || []).filter((it) => lessonIds.has(it.lesson_id))
+
     return NextResponse.json({
-      chapters: chapters || [],
-      lessons: lessons || [],
-      items: items || [],
+      chapters,
+      lessons,
+      items,
     })
-  } catch (err: any) {
-    logger.error("[admin/learning-paths] GET error:", err)
+  } catch (err) {
+    logger.error("[dev/learning-paths] GET:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await verifyAdmin(req)
-    if ("error" in auth) return auth.error
-    const supabase = createAdminSupabaseClient()
+    const auth = await requireDevSession(req.headers)
+    if (auth instanceof NextResponse) return auth
 
     const body = await req.json()
+    const subject = parseSubject(typeof body.subject === "string" ? body.subject : null)
+    if (!subject) {
+      return NextResponse.json({ error: "subject în body trebuie să fie physics sau informatics." }, { status: 400 })
+    }
+
+    const supabase = createServiceClient()
     const type = parseAdminEntityType(body?.type)
     if (!type) {
       return NextResponse.json({ error: "Tip invalid. Folosește 'chapter', 'lesson' sau 'item'." }, { status: 400 })
@@ -335,19 +371,39 @@ export async function POST(req: NextRequest) {
       const title = toNullableString(body.title)
       if (!title) return NextResponse.json({ error: "title este obligatoriu." }, { status: 400 })
 
+      let problem_category: string | null
+      if (subject === "informatics") {
+        problem_category = INFORMATICA_LEARNING_PATH_MARKER
+      } else {
+        const rawPc = toNullableString(body.problem_category)
+        if (rawPc === INFORMATICA_LEARNING_PATH_MARKER) {
+          return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de informatică." }, { status: 400 })
+        }
+        if (!rawPc) {
+          problem_category = null
+        } else if (isPhysicsCatalogCategory(rawPc)) {
+          problem_category = rawPc
+        } else {
+          return NextResponse.json(
+            { error: "problem_category trebuie lăsat gol sau să fie un capitol valid din catalogul de fizică." },
+            { status: 400 }
+          )
+        }
+      }
+
       const payload = {
         title,
         slug: toNullableString(body.slug),
         description: toNullableString(body.description),
         icon_url: toNullableString(body.icon_url),
-        problem_category: toNullableString(body.problem_category),
+        problem_category,
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
       }
 
       const { data, error } = await supabase.from("learning_path_chapters").insert(payload).select().single()
       if (error) {
-        logger.error("[admin/learning-paths] Failed to create chapter:", error)
+        logger.error("[dev/learning-paths] create chapter:", error)
         return NextResponse.json({ error: "Nu am putut crea capitolul." }, { status: 500 })
       }
       return NextResponse.json({ success: true, chapter: data })
@@ -360,9 +416,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "chapter_id și title sunt obligatorii." }, { status: 400 })
       }
 
+      const { data: chapterRow, error: chErr } = await supabase
+        .from("learning_path_chapters")
+        .select("id, problem_category")
+        .eq("id", chapterId)
+        .maybeSingle()
+
+      if (chErr || !chapterRow) {
+        return NextResponse.json({ error: "Capitolul nu există." }, { status: 404 })
+      }
+
+      if (!chapterVisibleForSubject(chapterRow, subject)) {
+        return NextResponse.json({ error: "Capitolul nu aparține domeniului selectat (fizică / informatică)." }, { status: 403 })
+      }
+
       const lessonType = toNullableString(body.lesson_type) || "text"
       if (!LESSON_TYPES.includes(lessonType as (typeof LESSON_TYPES)[number])) {
         return NextResponse.json({ error: "lesson_type invalid." }, { status: 400 })
+      }
+
+      if (subject === "informatics" && lessonType === "problem") {
+        return NextResponse.json({ error: "Pentru parcursuri de informatică nu se adaugă lecții de tip problem (catalog fizică)." }, { status: 400 })
       }
 
       const payload = {
@@ -382,7 +456,7 @@ export async function POST(req: NextRequest) {
 
       const { data, error } = await supabase.from("learning_path_lessons").insert(payload).select().single()
       if (error) {
-        logger.error("[admin/learning-paths] Failed to create lesson:", error)
+        logger.error("[dev/learning-paths] create lesson:", error)
         return NextResponse.json({ error: "Nu am putut crea lecția." }, { status: 500 })
       }
       return NextResponse.json({ success: true, lesson: data })
@@ -398,9 +472,64 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "item_type invalid." }, { status: 400 })
     }
 
+    if (subject === "informatics" && itemType === "problem") {
+      return NextResponse.json(
+        { error: "Itemii de tip problem din learning path folosesc catalogul de fizică; nu sunt permiși pentru informatică." },
+        { status: 400 }
+      )
+    }
+
+    const { data: lessonRow, error: lessonErr } = await supabase
+      .from("learning_path_lessons")
+      .select("id, chapter_id")
+      .eq("id", lessonId)
+      .maybeSingle()
+
+    if (lessonErr || !lessonRow) {
+      return NextResponse.json({ error: "Lecția nu există." }, { status: 404 })
+    }
+
+    const { data: chapterRow, error: ch2Err } = await supabase
+      .from("learning_path_chapters")
+      .select("id, problem_category")
+      .eq("id", lessonRow.chapter_id)
+      .maybeSingle()
+
+    if (ch2Err || !chapterRow) {
+      return NextResponse.json({ error: "Capitolul lecției nu există." }, { status: 404 })
+    }
+
+    if (!chapterVisibleForSubject(chapterRow, subject)) {
+      return NextResponse.json({ error: "Lecția nu aparține domeniului selectat." }, { status: 403 })
+    }
+
     const validationError = validateItemBody(itemType, body as Record<string, unknown>)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    if (subject === "physics" && itemType === "problem") {
+      const problemId = toNullableString(body.problem_id)
+      if (!problemId) {
+        return NextResponse.json({ error: "problem_id lipsă." }, { status: 400 })
+      }
+      const { data: problemRow, error: pErr } = await supabase
+        .from("problems")
+        .select("id, category")
+        .eq("id", problemId)
+        .maybeSingle()
+      if (pErr || !problemRow) {
+        return NextResponse.json({ error: "Problema (fizică) nu există în catalog." }, { status: 400 })
+      }
+      const chCat = chapterRow.problem_category?.trim() || null
+      if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER) {
+        if (problemRow.category !== chCat) {
+          return NextResponse.json(
+            { error: `Problema are categoria „${problemRow.category}”, dar capitolul cere „${chCat}”."` },
+            { status: 400 }
+          )
+        }
+      }
     }
 
     const requestedOrderIndex = toInt(body.order_index, 0)
@@ -421,24 +550,29 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase.from("learning_path_lesson_items").insert(payload).select().single()
     if (error) {
-      logger.error("[admin/learning-paths] Failed to create lesson item:", formatDbError(error))
+      logger.error("[dev/learning-paths] create item:", formatDbError(error))
       return NextResponse.json({ error: "Nu am putut crea itemul." }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, item: data })
-  } catch (err: any) {
-    logger.error("[admin/learning-paths] POST error:", err)
+  } catch (err) {
+    logger.error("[dev/learning-paths] POST:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }
 
 export async function PUT(req: NextRequest) {
   try {
-    const auth = await verifyAdmin(req)
-    if ("error" in auth) return auth.error
-    const supabase = createAdminSupabaseClient()
+    const auth = await requireDevSession(req.headers)
+    if (auth instanceof NextResponse) return auth
 
     const body = await req.json()
+    const subject = parseSubject(typeof body.subject === "string" ? body.subject : null)
+    if (!subject) {
+      return NextResponse.json({ error: "subject în body trebuie să fie physics sau informatics." }, { status: 400 })
+    }
+
+    const supabase = createServiceClient()
     const type = parseAdminEntityType(body?.type)
     const id = toNullableString(body?.id)
     if (!type || !id) {
@@ -446,14 +580,44 @@ export async function PUT(req: NextRequest) {
     }
 
     if (type === "chapter") {
+      const { data: existing, error: exErr } = await supabase
+        .from("learning_path_chapters")
+        .select("id, problem_category")
+        .eq("id", id)
+        .maybeSingle()
+      if (exErr || !existing) {
+        return NextResponse.json({ error: "Capitolul nu există." }, { status: 404 })
+      }
+      if (!chapterVisibleForSubject(existing, subject)) {
+        return NextResponse.json({ error: "Capitolul nu este în domeniul tău dev." }, { status: 403 })
+      }
+
       const updateData: Record<string, unknown> = {}
       if (body.title !== undefined) updateData.title = toNullableString(body.title)
       if (body.slug !== undefined) updateData.slug = toNullableString(body.slug)
       if (body.description !== undefined) updateData.description = toNullableString(body.description)
       if (body.icon_url !== undefined) updateData.icon_url = toNullableString(body.icon_url)
-      if (body.problem_category !== undefined) updateData.problem_category = toNullableString(body.problem_category)
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
+
+      if (body.problem_category !== undefined) {
+        const rawPc = toNullableString(body.problem_category)
+        if (subject === "informatics") {
+          if (rawPc && rawPc !== INFORMATICA_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Capitolele de informatică păstrează marcatorul fix." }, { status: 400 })
+          }
+          updateData.problem_category = INFORMATICA_LEARNING_PATH_MARKER
+        } else {
+          if (rawPc === INFORMATICA_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Nu poți seta marcatorul de informatică pe un capitol de fizică." }, { status: 400 })
+          }
+          if (rawPc && !isPhysicsCatalogCategory(rawPc)) {
+            return NextResponse.json({ error: "problem_category invalid pentru fizică." }, { status: 400 })
+          }
+          updateData.problem_category = rawPc
+        }
+      }
+
       updateData.updated_at = new Date().toISOString()
 
       const { data, error } = await supabase
@@ -463,13 +627,40 @@ export async function PUT(req: NextRequest) {
         .select()
         .single()
       if (error) {
-        logger.error("[admin/learning-paths] Failed to update chapter:", error)
+        logger.error("[dev/learning-paths] PUT chapter:", error)
         return NextResponse.json({ error: "Nu am putut actualiza capitolul." }, { status: 500 })
       }
       return NextResponse.json({ success: true, chapter: data })
     }
 
     if (type === "lesson") {
+      const { data: existingLesson, error: l0 } = await supabase
+        .from("learning_path_lessons")
+        .select("id, chapter_id")
+        .eq("id", id)
+        .maybeSingle()
+      if (l0 || !existingLesson) {
+        return NextResponse.json({ error: "Lecția nu există." }, { status: 404 })
+      }
+      const ch0 = await getChapterForLesson(supabase, existingLesson.id)
+      if (!ch0 || !chapterVisibleForSubject(ch0, subject)) {
+        return NextResponse.json({ error: "Lecția nu este în domeniul tău dev." }, { status: 403 })
+      }
+
+      if (body.chapter_id !== undefined) {
+        const newChId = toNullableString(body.chapter_id)
+        if (newChId) {
+          const { data: newCh, error: ncErr } = await supabase
+            .from("learning_path_chapters")
+            .select("id, problem_category")
+            .eq("id", newChId)
+            .maybeSingle()
+          if (ncErr || !newCh || !chapterVisibleForSubject(newCh, subject)) {
+            return NextResponse.json({ error: "Capitolul țintă nu este permis." }, { status: 400 })
+          }
+        }
+      }
+
       const updateData: Record<string, unknown> = {}
       if (body.chapter_id !== undefined) updateData.chapter_id = toNullableString(body.chapter_id)
       if (body.slug !== undefined) updateData.slug = toNullableString(body.slug)
@@ -480,6 +671,9 @@ export async function PUT(req: NextRequest) {
         const lessonType = toNullableString(body.lesson_type)
         if (!lessonType || !LESSON_TYPES.includes(lessonType as (typeof LESSON_TYPES)[number])) {
           return NextResponse.json({ error: "lesson_type invalid." }, { status: 400 })
+        }
+        if (subject === "informatics" && lessonType === "problem") {
+          return NextResponse.json({ error: "Lecția problem nu e permisă pentru informatică." }, { status: 400 })
         }
         updateData.lesson_type = lessonType
       }
@@ -498,10 +692,25 @@ export async function PUT(req: NextRequest) {
         .select()
         .single()
       if (error) {
-        logger.error("[admin/learning-paths] Failed to update lesson:", error)
+        logger.error("[dev/learning-paths] PUT lesson:", error)
         return NextResponse.json({ error: "Nu am putut actualiza lecția." }, { status: 500 })
       }
       return NextResponse.json({ success: true, lesson: data })
+    }
+
+    const { data: currentItem, error: currentItemErr } = await supabase
+      .from("learning_path_lesson_items")
+      .select("id, lesson_id, order_index, item_type")
+      .eq("id", id)
+      .single()
+    if (currentItemErr || !currentItem) {
+      logger.error("[dev/learning-paths] PUT item fetch:", formatDbError(currentItemErr))
+      return NextResponse.json({ error: "Itemul nu există sau nu poate fi citit." }, { status: 404 })
+    }
+
+    const chForItem = await getChapterForLesson(supabase, currentItem.lesson_id)
+    if (!chForItem || !chapterVisibleForSubject(chForItem, subject)) {
+      return NextResponse.json({ error: "Itemul nu este în domeniul tău dev." }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -510,6 +719,9 @@ export async function PUT(req: NextRequest) {
       const itemType = toNullableString(body.item_type)
       if (!itemType || !ITEM_TYPES.includes(itemType as (typeof ITEM_TYPES)[number])) {
         return NextResponse.json({ error: "item_type invalid." }, { status: 400 })
+      }
+      if (subject === "informatics" && itemType === "problem") {
+        return NextResponse.json({ error: "Tipul problem nu e permis pentru informatică." }, { status: 400 })
       }
       const validationError = validateItemBody(itemType, body as Record<string, unknown>)
       if (validationError) {
@@ -529,14 +741,43 @@ export async function PUT(req: NextRequest) {
     if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
     updateData.updated_at = new Date().toISOString()
 
-    const { data: currentItem, error: currentItemErr } = await supabase
-      .from("learning_path_lesson_items")
-      .select("id, lesson_id, order_index")
-      .eq("id", id)
-      .single()
-    if (currentItemErr || !currentItem) {
-      logger.error("[admin/learning-paths] Failed to fetch lesson item before update:", formatDbError(currentItemErr))
-      return NextResponse.json({ error: "Itemul nu există sau nu poate fi citit." }, { status: 404 })
+    const effectiveItemType = (updateData.item_type as string | undefined) ?? (currentItem as { item_type: string }).item_type
+    if (subject === "informatics" && effectiveItemType === "problem") {
+      return NextResponse.json({ error: "Itemul problem nu e permis pentru informatică." }, { status: 400 })
+    }
+
+    const targetLessonIdForScope =
+      typeof updateData.lesson_id === "string" && updateData.lesson_id.trim()
+        ? updateData.lesson_id
+        : currentItem.lesson_id
+    const chTarget = await getChapterForLesson(supabase, targetLessonIdForScope)
+    if (!chTarget || !chapterVisibleForSubject(chTarget, subject)) {
+      return NextResponse.json({ error: "Lecția țintă nu este permisă." }, { status: 400 })
+    }
+
+    if (subject === "physics" && (effectiveItemType === "problem" || toNullableString(body.problem_id))) {
+      const pid = toNullableString(body.problem_id) ?? null
+      const { data: rowFull } = await supabase.from("learning_path_lesson_items").select("problem_id").eq("id", id).single()
+      const effectivePid = pid ?? (rowFull as { problem_id?: string | null } | null)?.problem_id
+      if (effectiveItemType === "problem" && effectivePid) {
+        const { data: problemRow, error: pErr } = await supabase
+          .from("problems")
+          .select("id, category")
+          .eq("id", effectivePid)
+          .maybeSingle()
+        if (pErr || !problemRow) {
+          return NextResponse.json({ error: "Problema (fizică) nu există în catalog." }, { status: 400 })
+        }
+        const chCat = chTarget.problem_category?.trim() || null
+        if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER) {
+          if (problemRow.category !== chCat) {
+            return NextResponse.json(
+              { error: `Problema are categoria „${problemRow.category}”, dar capitolul cere „${chCat}”."` },
+              { status: 400 }
+            )
+          }
+        }
+      }
     }
 
     const targetLessonId =
@@ -552,7 +793,7 @@ export async function PUT(req: NextRequest) {
         .order("order_index", { ascending: false })
         .limit(1)
       if (maxOrderErr) {
-        logger.error("[admin/learning-paths] Failed to compute temporary order index:", formatDbError(maxOrderErr))
+        logger.error("[dev/learning-paths] PUT reorder step 1:", formatDbError(maxOrderErr))
         return NextResponse.json({ error: "Nu am putut reordona itemul (pas 1)." }, { status: 500 })
       }
 
@@ -562,7 +803,7 @@ export async function PUT(req: NextRequest) {
         .update({ order_index: tempOrderIndex, updated_at: new Date().toISOString() })
         .eq("id", id)
       if (tempMoveErr) {
-        logger.error("[admin/learning-paths] Failed to move item to temporary index:", formatDbError(tempMoveErr))
+        logger.error("[dev/learning-paths] PUT reorder step 2:", formatDbError(tempMoveErr))
         return NextResponse.json({ error: "Nu am putut reordona itemul (pas 2)." }, { status: 500 })
       }
 
@@ -584,8 +825,8 @@ export async function PUT(req: NextRequest) {
           )
           await shiftItemOrderRange(supabase, targetLessonId, targetOrderIndex, 1, id)
         }
-      } catch (reorderErr: any) {
-        logger.error("[admin/learning-paths] Failed during reorder operation:", reorderErr?.message || reorderErr)
+      } catch (reorderErr: unknown) {
+        logger.error("[dev/learning-paths] PUT reorder:", reorderErr)
         return NextResponse.json({ error: "Nu am putut reordona itemul." }, { status: 500 })
       }
     }
@@ -597,69 +838,12 @@ export async function PUT(req: NextRequest) {
       .select()
       .single()
     if (error) {
-      logger.error("[admin/learning-paths] Failed to update lesson item:", formatDbError(error))
+      logger.error("[dev/learning-paths] PUT item:", formatDbError(error))
       return NextResponse.json({ error: "Nu am putut actualiza itemul." }, { status: 500 })
     }
     return NextResponse.json({ success: true, item: data })
-  } catch (err: any) {
-    logger.error("[admin/learning-paths] PUT error:", err)
-    return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    const auth = await verifyAdmin(req)
-    if ("error" in auth) return auth.error
-    const supabase = createAdminSupabaseClient()
-
-    const { searchParams } = new URL(req.url)
-    let body: Record<string, unknown> = {}
-    try {
-      body = await req.json()
-    } catch {
-      body = {}
-    }
-
-    const type = parseAdminEntityType(body.type ?? searchParams.get("type"))
-    const id = toNullableString(body.id ?? searchParams.get("id"))
-    const hardDelete = (body.hard ?? searchParams.get("hard")) === true || (body.hard ?? searchParams.get("hard")) === "true"
-
-    if (!type || !id) {
-      return NextResponse.json({ error: "type și id sunt obligatorii." }, { status: 400 })
-    }
-
-    if (type === "item" && !hardDelete) {
-      const { data, error } = await supabase
-        .from("learning_path_lesson_items")
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) {
-        logger.error("[admin/learning-paths] Failed to soft-delete lesson item:", error)
-        return NextResponse.json({ error: "Nu am putut dezactiva itemul." }, { status: 500 })
-      }
-
-      return NextResponse.json({ success: true, item: data, mode: "soft" })
-    }
-
-    const tableByType: Record<AdminEntityType, string> = {
-      chapter: "learning_path_chapters",
-      lesson: "learning_path_lessons",
-      item: "learning_path_lesson_items",
-    }
-
-    const { error } = await supabase.from(tableByType[type]).delete().eq("id", id)
-    if (error) {
-      logger.error("[admin/learning-paths] Failed to hard-delete row:", error)
-      return NextResponse.json({ error: "Nu am putut șterge elementul." }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true, mode: "hard" })
-  } catch (err: any) {
-    logger.error("[admin/learning-paths] DELETE error:", err)
+  } catch (err) {
+    logger.error("[dev/learning-paths] PUT:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }

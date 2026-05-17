@@ -1,13 +1,25 @@
 import Link from "next/link"
 import {
   BarChart2,
+  Binary,
   CirclePlay,
   ClipboardList,
   FileText,
+  Layers,
+  LineChart,
+  Link2,
   ListChecks,
+  ListOrdered,
+  ListTree,
+  MoveHorizontal,
   Orbit,
   PenSquare,
+  SlidersHorizontal,
+  SquareDashedBottom,
+  Table2,
   Type,
+  Workflow,
+  Zap,
 } from "lucide-react"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { EmbeddedProblemContent } from "@/components/invata/embedded-problem-content"
@@ -16,7 +28,12 @@ import { LessonPollClientWrapper } from "@/components/invata/lesson-poll-client-
 import { PollSection } from "@/components/invata/poll-section"
 import { LearningPathSimulationCard } from "@/components/invata/learning-path-simulation-card"
 import { LearningPathTestSection } from "@/components/invata/learning-path-test-section"
+import { LearningPathInteractiveLessonItem } from "@/components/invata/learning-path-interactive-lesson-item"
 import { parseTestContent, toPublicTestContent } from "@/lib/learning-path-test"
+import {
+  isInteractiveLessonItemType,
+  parseInteractiveItemContent,
+} from "@/lib/learning-path-interactive-items"
 import { resolveTestIcon } from "@/components/invata/test-icons"
 import type { LearningPathLessonItem, LearningPathLessonType } from "@/lib/supabase-learning-paths"
 import type { Lesson as PhysicsLesson } from "@/lib/supabase-physics"
@@ -33,6 +50,18 @@ export const ITEM_TYPE_LABEL: Record<LearningPathLessonType, string> = {
   custom_text: "Text personalizat",
   simulation: "Simulare interactivă",
   test: "Test",
+  card_sort: "Ordonare carduri",
+  fill_slot: "Completare sloturi (LaTeX)",
+  match: "Asociere concepte",
+  graph_build: "Construiește graficul",
+  code_trace: "Urmărire execuție cod",
+  swipe_classify: "Clasificare rapidă",
+  flow_build: "Flowchart",
+  slider_explore: "Explorare parametru",
+  table_fill: "Completare tabel",
+  memory_flip: "Memory — perechi",
+  speed_round: "Sprint cu timer",
+  reveal_steps: "Demonstrație pas cu pas",
 }
 
 export function getItemIcon(type: LearningPathLessonType) {
@@ -51,6 +80,30 @@ export function getItemIcon(type: LearningPathLessonType) {
       return Orbit
     case "test":
       return ClipboardList
+    case "card_sort":
+      return ListOrdered
+    case "fill_slot":
+      return SquareDashedBottom
+    case "match":
+      return Link2
+    case "graph_build":
+      return LineChart
+    case "code_trace":
+      return Binary
+    case "swipe_classify":
+      return MoveHorizontal
+    case "flow_build":
+      return Workflow
+    case "slider_explore":
+      return SlidersHorizontal
+    case "table_fill":
+      return Table2
+    case "memory_flip":
+      return Layers
+    case "speed_round":
+      return Zap
+    case "reveal_steps":
+      return ListTree
     case "text":
     default:
       return FileText
@@ -299,6 +352,25 @@ export function LearningPathItemBody({
       <LearningPathSimulationCard
         embedUrl={simulationData.embedUrl}
         title={item.title || "Simulare interactivă"}
+      />
+    )
+  }
+
+  if (isInteractiveLessonItemType(item.item_type)) {
+    const parsed = parseInteractiveItemContent(item.item_type, item.content_json ?? null)
+    if (!parsed.ok) {
+      return <p className="text-sm text-[#777777]">Itemul interactiv nu este configurat corect încă.</p>
+    }
+    if (!nextItemHref || !lessonId) {
+      return <p className="text-sm text-[#777777]">Continuarea lecției nu este disponibilă pentru acest item.</p>
+    }
+    return (
+      <LearningPathInteractiveLessonItem
+        parsed={parsed.value}
+        itemId={item.id}
+        lessonId={lessonId}
+        nextItemHref={nextItemHref}
+        isLastItem={isLastItem}
       />
     )
   }

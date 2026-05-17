@@ -3,18 +3,21 @@ import {
   FREE_LEARNING_PATH_CHAPTER_SLUG,
   FREE_PREVIEW_CHAPTER_SLUG_ALIASES,
 } from "@/lib/learning-path-free-plan"
+import type { LearningPathInteractiveItemType } from "@/lib/learning-path-interactive-items"
 import { supabase } from "@/lib/supabaseClient"
 import type { Problem } from "@/data/problems"
 
+/** Row-level `learning_path_lessons.lesson_type` (subset). */
+export type LearningPathLessonKind = "text" | "video" | "grila" | "problem"
+
+/** `learning_path_lesson_items.item_type` — includes interactive practice kinds. */
 export type LearningPathLessonType =
-  | "text"
-  | "video"
-  | "grila"
-  | "problem"
+  | LearningPathLessonKind
   | "poll"
   | "custom_text"
   | "simulation"
   | "test"
+  | LearningPathInteractiveItemType
 
 export interface LearningPathChapter {
   id: string
@@ -36,7 +39,7 @@ export interface LearningPathLesson {
   title: string
   description: string | null
   image_url: string | null
-  lesson_type: LearningPathLessonType
+  lesson_type: LearningPathLessonKind
   cursuri_lesson_slug: string | null
   youtube_url: string | null
   quiz_question_id: string | null

@@ -19,6 +19,9 @@ export interface CodingProblem {
   sample_output?: string | null;
   explanation_markdown?: string | null;
   boilerplate_cpp?: string | null;
+  /** Limbajul oficial al problemei (starter + IDE embed). */
+  language?: "cpp" | "python";
+  boilerplate_python?: string | null;
   created_at: string;
   updated_at?: string;
   isFreeMonthly?: boolean;
@@ -68,5 +71,39 @@ export interface CodingProblemFiltersState {
   class: ClassFilterValue;
   difficulty: DifficultyFilterValue;
   chapter: string | "Toate";
+}
+
+/** Răspuns POST `/api/coding-problems/[slug]/submit` — evaluare oficială Python */
+export interface CodingSubmitTestResult {
+  testId: string;
+  orderIndex: number;
+  isSample: boolean;
+  passed: boolean;
+  status: string;
+  stdin?: string;
+  expectedStdout?: string;
+  stdout?: string;
+  stderr?: string;
+}
+
+export interface CodingSubmitEloPayload {
+  previousElo: number;
+  newElo: number;
+  delta: number;
+  oldBest: number;
+  newBest: number;
+  maxGain: number;
+}
+
+export interface CodingSubmitResponse {
+  submissionId: string;
+  status: string;
+  scorePercent: number;
+  passedTests: number;
+  totalTests: number;
+  judge0PythonLanguageId?: number;
+  tests: CodingSubmitTestResult[];
+  elo: CodingSubmitEloPayload | null;
+  eloError: string | null;
 }
 

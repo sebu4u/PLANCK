@@ -52,6 +52,7 @@ import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import { supabase } from "@/lib/supabaseClient"
 import { FileItem } from "@/lib/types"
+import { mergePlanckIdeFiles, runPythonProject } from "@/lib/planckcode-python-run"
 import { SaveProjectDialog } from "@/components/save-project-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from 'next/navigation'
@@ -201,6 +202,12 @@ interface PendingInsightEdit {
 }
 
 const normalizeNewlines = (content: string) => content.replace(/\r\n/g, '\n')
+
+function monacoLanguageForFile(file: FileItem): string {
+  if (file.type === 'cpp') return 'cpp'
+  if (file.type === 'python') return 'python'
+  return 'plaintext'
+}
 
 const splitLines = (content: string): string[] => normalizeNewlines(content).split('\n')
 
@@ -413,7 +420,7 @@ function IDEPageContent() {
           // Ensure all required fields exist
           const validFiles = parsed.files.every((f: any) =>
             f && typeof f.id === 'string' && typeof f.name === 'string' &&
-            typeof f.content === 'string' && (f.type === 'cpp' || f.type === 'txt')
+            typeof f.content === 'string' && (f.type === 'cpp' || f.type === 'txt' || f.type === 'python')
           )
 
           if (validFiles) {
@@ -671,6 +678,7 @@ function IDEPageContent() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [compilerAvailable, setCompilerAvailable] = useState<boolean | null>(null)
+  const [preferClassicTerminal, setPreferClassicTerminal] = useState(false)
   const [pendingInsightEdit, setPendingInsightEdit] = useState<PendingInsightEdit | null>(null)
 
   // Save state to localStorage whenever files or activeFileId changes
@@ -699,7 +707,7 @@ function IDEPageContent() {
   // New file dialog state
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState<boolean>(false)
   const [newFileName, setNewFileName] = useState<string>('')
-  const [newFileType, setNewFileType] = useState<'cpp' | 'txt'>('txt')
+  const [newFileType, setNewFileType] = useState<'cpp' | 'txt' | 'python'>('cpp')
 
   // Editor references
   const editorRef = useRef<import('monaco-editor').editor.IStandaloneCodeEditor | null>(null)
@@ -737,7 +745,7 @@ function IDEPageContent() {
     if (!model) {
       model = monaco.editor.createModel(
         file.content,
-        file.type === 'cpp' ? 'cpp' : 'plaintext',
+        monacoLanguageForFile(file),
         uri
       )
     } else if (!options?.skipValueSync && model.getValue() !== file.content) {
@@ -758,7 +766,7 @@ function IDEPageContent() {
       editor.setModel(model)
     }
 
-    const language = file.type === 'cpp' ? 'cpp' : 'plaintext'
+    const language = monacoLanguageForFile(file)
     if (monacoRef.current && model.getLanguageId() !== language) {
       monacoRef.current.editor.setModelLanguage(model, language)
     }
@@ -823,7 +831,7 @@ function IDEPageContent() {
 
     if (Object.keys(updates).length > 0) {
       setFiles(prev => prev.map(f => {
-        if (f.type === 'txt' && updates[f.name] !== undefined) {
+        if ((f.type === 'txt' || f.type === 'python') && updates[f.name] !== undefined) {
           return { ...f, content: updates[f.name] }
         }
         return f
@@ -872,6 +880,10 @@ function IDEPageContent() {
       fileName = trimmedName.endsWith('.cpp')
         ? trimmedName
         : trimmedName + '.cpp'
+    } else if (newFileType === 'python') {
+      fileName = trimmedName.endsWith('.py')
+        ? trimmedName
+        : trimmedName + '.py'
     } else {
       // For text files, check if filename already has an extension
       // If it contains a dot (not at the start), assume it has an extension
@@ -892,7 +904,9 @@ function IDEPageContent() {
       name: fileName,
       content: newFileType === 'cpp'
         ? '// Write your C++ code here\n'
-        : '',
+        : newFileType === 'python'
+          ? '# Write your Python code here\n'
+          : '',
       type: newFileType
     }
 
@@ -900,7 +914,7 @@ function IDEPageContent() {
     setActiveFileId(newFile.id)
     setIsNewFileDialogOpen(false)
     setNewFileName('')
-    setNewFileType('txt')
+    setNewFileType('cpp')
   }
 
   const handleDeleteFile = (fileId: string) => {
@@ -1327,6 +1341,90 @@ function IDEPageContent() {
   }
 
   const handleRunCode = async () => {
+    const active = files.find((f) => f.id === activeFileId) || files[0]
+    if (!active) return
+
+    if (active.type === 'txt') {
+      if (!isTerminalOpen) {
+        setIsTerminalOpen(true)
+      }
+      setError('Fișierele text nu pot fi rulate. Deschide un fișier .cpp sau .py.')
+      setOutput(null)
+      setInteractiveOutput('')
+      return
+    }
+
+    if (active.type === 'python') {
+      const needsInput = /\binput\s*\(/.test(active.content)
+      if (needsInput && !stdin.trim()) {
+        if (!isTerminalOpen) {
+          setIsTerminalOpen(true)
+        }
+        setError(
+          'Programul folosește input(), dar nu ai furnizat valori în "Input (stdin)". Completează-le înainte de rulare (o valoare pe linie).'
+        )
+        registerIdeFailure()
+        setOutput(null)
+        setInteractiveOutput('')
+        setWaitingForInput(false)
+        setCurrentStdinInput('')
+        return
+      }
+
+      if (abortController) {
+        abortController.abort()
+      }
+
+      if (!isTerminalOpen) {
+        setIsTerminalOpen(true)
+      }
+
+      setLoading(true)
+      setError(null)
+      setOutput(null)
+      setInteractiveOutput('')
+      setWaitingForInput(false)
+      setCurrentStdinInput('')
+      setCurrentSessionId(null)
+      setPreferClassicTerminal(true)
+
+      try {
+        const result = await runPythonProject({
+          files: files.map((f) => ({ name: f.name, content: f.content })),
+          entryFileName: active.name,
+          stdinText: stdin,
+        })
+        setOutput({
+          stdout: result.stdout || null,
+          stderr: result.stderr || null,
+          compile_output: null,
+          status: {
+            id: result.exitCode === 0 ? 3 : 11,
+            description: result.exitCode === 0 ? 'Accepted' : 'Runtime Error',
+          },
+          time: null,
+          memory: null,
+        })
+        if (result.exitCode === 0) {
+          resetIdeFailures()
+        } else {
+          registerIdeFailure()
+        }
+        if (Object.keys(result.fileUpdates).length > 0) {
+          setFiles((prev) => mergePlanckIdeFiles(prev, result.fileUpdates))
+        }
+        parseFileUpdates(result.stdout || '')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Eroare la rularea Python.')
+        registerIdeFailure()
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    setPreferClassicTerminal(false)
+
     const codeRequiresStdin = files.some(
       (file) =>
         file.type === 'cpp' &&
@@ -1685,7 +1783,9 @@ function IDEPageContent() {
                     }
                   }}
                 >
-                  {file.type === 'cpp' ? (
+                  {file.type === 'python' ? (
+                    <FileCode className="w-4 h-4 text-amber-300/90" />
+                  ) : file.type === 'cpp' ? (
                     <FileCode className="w-4 h-4" />
                   ) : (
                     <File className="w-4 h-4" />
@@ -1775,7 +1875,7 @@ function IDEPageContent() {
               >
                 <Editor
                   height="100%"
-                  language={activeFile?.type === 'cpp' ? 'cpp' : 'plaintext'}
+                  language={activeFile ? monacoLanguageForFile(activeFile) : 'plaintext'}
                   theme={settings.theme}
                   defaultValue={activeFile?.content || ''}
                   path={activeFile ? `${activeFile.id}/${activeFile.name}` : undefined}
@@ -1812,8 +1912,8 @@ function IDEPageContent() {
                     <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b3b3b]">
                       <div className="text-sm font-semibold text-gray-300">Console</div>
                       <div className="flex items-center gap-2">
-                        <div className="text-xs text-gray-500">
-                          💡 Files created with ofstream are automatically displayed
+                        <div className="text-xs text-gray-500 max-w-[min(420px,45vw)] text-right leading-snug">
+                          💡 Fișierele scrise din cod se sincronizează în arbore (C++: ofstream; Python: open/write).
                         </div>
                         <button
                           onClick={() => setIsTerminalOpen(false)}
@@ -1836,7 +1936,11 @@ function IDEPageContent() {
                           {loading && (
                             <div className="flex items-center gap-2 text-gray-400">
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Compiling and running your code...</span>
+                              <span>
+                                {activeFile?.type === 'python'
+                                  ? 'Pornire Python în browser (prima rulare poate descărca Pyodide)...'
+                                  : 'Compiling and running your code...'}
+                              </span>
                             </div>
                           )}
 
@@ -1854,8 +1958,8 @@ function IDEPageContent() {
                             </div>
                           )}
 
-                          {/* Standard output */}
-                          {(!isInteractiveMode || compilerAvailable === false) && !loading && !error && output && (
+                          {/* Standard output (Judge0 / Pyodide) */}
+                          {(preferClassicTerminal || !isInteractiveMode || compilerAvailable === false) && !loading && !error && output && (
                             <div className="space-y-2">
                               {output.compile_output && (
                                 <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
@@ -2006,7 +2110,9 @@ function IDEPageContent() {
           onRejectCodeChanges={handleUndoInsightEdit}
           activeFileName={activeFile?.name}
           activeFileContent={activeFile?.content}
-          activeFileLanguage={activeFile?.type === 'cpp' ? 'cpp' : 'plaintext'}
+          activeFileLanguage={
+            activeFile?.type === 'cpp' ? 'cpp' : activeFile?.type === 'python' ? 'python' : 'plaintext'
+          }
           onMessageSent={handleMessageSent}
         />
       </aside>
@@ -2016,7 +2122,7 @@ function IDEPageContent() {
           <DialogHeader>
             <DialogTitle>Create New File</DialogTitle>
             <DialogDescription className="text-gray-400">
-              Create a new C++ or text file for your project.
+              Create a new C++, Python, or text file for your project.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -2037,12 +2143,13 @@ function IDEPageContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="filetype">File Type</Label>
-              <Select value={newFileType} onValueChange={(value: 'cpp' | 'txt') => setNewFileType(value)}>
+              <Select value={newFileType} onValueChange={(value: 'cpp' | 'txt' | 'python') => setNewFileType(value)}>
                 <SelectTrigger className="bg-[#2d2d2d] border-[#3b3b3b] text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[350] bg-[#2d2d2d] border-[#3b3b3b] text-white">
                   <SelectItem value="cpp">C++ (.cpp)</SelectItem>
+                  <SelectItem value="python">Python (.py)</SelectItem>
                   <SelectItem value="txt">Text (.txt)</SelectItem>
                 </SelectContent>
               </Select>

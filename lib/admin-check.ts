@@ -78,6 +78,22 @@ export async function isAdminFromDB(
 }
 
 /**
+ * Dev conținut (profiles.is_dev): poate adăuga în catalog / learning paths prin rute dedicate,
+ * fără drepturi de admin general.
+ */
+export async function isDevFromDB(supabase: SupabaseClient, userId?: string | null): Promise<boolean> {
+  const uid =
+    userId ??
+    (await supabase.auth.getUser()).data.user?.id ??
+    null
+  if (!uid) return false
+
+  const { data: profile } = await supabase.from("profiles").select("is_dev").eq("user_id", uid).maybeSingle()
+
+  return profile?.is_dev === true
+}
+
+/**
  * Helper pentru a extrage token-ul din request header
  */
 export function getAccessTokenFromRequest(authHeader: string | null): string | null {

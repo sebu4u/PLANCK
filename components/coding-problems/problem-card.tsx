@@ -96,6 +96,15 @@ export function CodingProblemCard({ problem, onSelect, isLocked = false }: Codin
           <Badge className={`rounded-full border px-4 py-1 text-xs font-semibold ${difficultyStyle}`}>
             {problem.difficulty}
           </Badge>
+          <Badge
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+              problem.language === "python"
+                ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
+                : "border-sky-400/35 bg-sky-500/10 text-sky-100/90"
+            }`}
+          >
+            {problem.language === "python" ? "Python" : "C++"}
+          </Badge>
           <Badge className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/70">
             {problem.points} puncte
           </Badge>

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation";
-import { isPaidPlan } from "@/lib/subscription-plan";
-import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan-server";
+import { parseAccessToken } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
-import { ALLOW_ALL_CODING_PROBLEMS } from "@/lib/access-config";
+import { getActiveCodingProblemBySlug, isCodingProblemUnlocked } from "@/lib/coding-problems-access";
 
 // Server-side: access environment variables directly
 // These are validated at build time in next.config.mjs
@@ -25,12 +23,7 @@ export async function GET(
   const accessToken = parseAccessToken(request);
   const authedSupabase = accessToken ? createServerClientWithToken(accessToken) : supabase;
 
-  const { data: problem, error: problemError } = await supabase
-    .from("coding_problems")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .single();
+  const { data: problem, error: problemError } = await getActiveCodingProblemBySlug(supabase, slug);
 
   if (problemError || !problem) {
     return NextResponse.json(
@@ -39,14 +32,13 @@ export async function GET(
     );
   }
 
-  const [monthlyFreeSet, userPlan] = await Promise.all([
-    getMonthlyFreeProblemSet(supabase),
-    resolvePlanForRequest(authedSupabase, accessToken),
-  ]);
-
-  const isFreeMonthly = monthlyFreeSet.has(problem.id);
-  // Access controlled by centralized config - see lib/access-config.ts
-  if (!ALLOW_ALL_CODING_PROBLEMS && !isPaidPlan(userPlan)) {
+  const { ok: unlocked, isFreeMonthly } = await isCodingProblemUnlocked(
+    supabase,
+    authedSupabase,
+    accessToken,
+    problem.id
+  );
+  if (!unlocked) {
     return NextResponse.json(
       { error: "Problem locked", code: "PROBLEM_LOCKED" },
       { status: 403 }
