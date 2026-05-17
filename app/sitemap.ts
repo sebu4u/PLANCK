@@ -5,9 +5,56 @@ import {
 } from '@/lib/supabase-physics'
 import { slugify } from '@/lib/slug'
 import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@supabase/supabase-js'
+
+async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<MetadataRoute.Sitemap> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return []
+  }
+
+  const client = createClient(supabaseUrl, supabaseAnonKey)
+  const pageSize = 1000
+  const accumulated: Array<{ id: string; created_at: string }> = []
+
+  for (;;) {
+    const from = accumulated.length
+    const to = from + pageSize - 1
+    const { data, error } = await client
+      .from('problems')
+      .select('id, created_at')
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    if (error || !data?.length) {
+      break
+    }
+
+    for (const row of data) {
+      accumulated.push({
+        id: String((row as { id: string }).id),
+        created_at: (row as { created_at?: string | null }).created_at || new Date().toISOString(),
+      })
+    }
+
+    if (data.length < pageSize) {
+      break
+    }
+  }
+
+  return accumulated.map((row) => ({
+    url: `${baseUrl}/probleme/${encodeURIComponent(row.id)}`,
+    lastModified: new Date(row.created_at),
+    changeFrequency: 'monthly' as const,
+    priority: 0.55 as const,
+  }))
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://www.planck.academy'
+
+  const problemEntries = await fetchPhysicsProblemsSitemapEntries(baseUrl)
 
   // Get all lessons for dynamic sitemap with updated_at
   const grades = await getAllGrades()
@@ -133,5 +180,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     })),
+    ...problemEntries,
   ]
 }

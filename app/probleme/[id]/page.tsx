@@ -1,8 +1,20 @@
+import { cache } from "react"
+import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { createClient } from "@supabase/supabase-js"
-import { Problem } from "@/data/problems"
+import type { Problem } from "@/data/problems"
 import ProblemDetailClient from "./ProblemDetailClient"
+import { baseMetadata } from "@/lib/metadata"
+import { StructuredData } from "@/components/structured-data"
+import {
+  buildProblemKeywords,
+  buildProblemMetaDescription,
+  buildProblemPageTitle,
+  buildProblemPlainExcerpt,
+  problemEducationalLevel,
+  stripMarkupForSeo,
+} from "@/lib/physics-problem-seo"
 
 interface ProblemPageProps {
   params: Promise<{
@@ -22,6 +34,8 @@ const difficultyColors = {
   Mediu: "border-yellow-500 text-yellow-600 bg-yellow-50",
   Avansat: "border-red-500 text-red-600 bg-red-50",
 }
+
+const DEFAULT_OG_IMAGE = "https://i.ibb.co/DHgVg7gr/Untitled-design-4.png"
 
 // High-cardinality route: keep ISR, but revalidate rarely to reduce Vercel ISR writes.
 export const revalidate = 604800 // 7 days
@@ -52,14 +66,93 @@ async function getProblemFromSupabase(id: string): Promise<Problem | null> {
   return data as Problem
 }
 
+const getProblemCached = cache(getProblemFromSupabase)
+
+export async function generateMetadata({ params }: ProblemPageProps): Promise<Metadata> {
+  const { id } = await params
+  const problem = await getProblemCached(id)
+  if (!problem) {
+    return { title: { absolute: "Problemă negăsită | PLANCK" } }
+  }
+
+  const description = buildProblemMetaDescription(problem)
+  const pageTitleAbsolute = buildProblemPageTitle(problem)
+  const canonicalPath = `/probleme/${id}`
+  const canonicalUrl = `https://www.planck.academy${canonicalPath}`
+  const keywords = buildProblemKeywords(problem)
+
+  const ogImage =
+    typeof problem.image_url === "string" &&
+    problem.image_url.trim() !== "" &&
+    /^https?:\/\//i.test(problem.image_url.trim().replace(/^@/, ""))
+      ? problem.image_url.trim().replace(/^@/, "")
+      : DEFAULT_OG_IMAGE
+
+  return {
+    ...baseMetadata,
+    title: { absolute: pageTitleAbsolute },
+    description,
+    keywords,
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      ...baseMetadata.openGraph,
+      title: pageTitleAbsolute,
+      description,
+      url: canonicalUrl,
+      type: "article",
+      images: [{ url: ogImage, width: 1200, height: 630 }],
+    },
+    twitter: {
+      ...baseMetadata.twitter,
+      title: pageTitleAbsolute,
+      description,
+      images: [ogImage],
+    },
+  }
+}
+
+function problemLearningResourceJsonLd(problem: Problem, pageUrl: string) {
+  const level = problemEducationalLevel(problem)
+  return {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    name: stripMarkupForSeo(problem.title) || `Problemă ${problem.id}`,
+    description: buildProblemPlainExcerpt(problem, 500),
+    url: pageUrl,
+    inLanguage: "ro",
+    learningResourceType: "Problemă de fizică",
+    ...(level ? { educationalLevel: level } : {}),
+    isPartOf: {
+      "@type": "WebSite",
+      name: "Planck Academy",
+      url: "https://www.planck.academy",
+    },
+  }
+}
+
 export default async function ProblemPage({ params }: ProblemPageProps) {
   const { id } = await params
-  const problem = await getProblemFromSupabase(id)
+  const problem = await getProblemCached(id)
   if (!problem) {
     notFound()
   }
+
+  const pageUrl = `https://www.planck.academy/probleme/${id}`
+  const excerpt = buildProblemPlainExcerpt(problem)
+
   return (
     <div className="bg-[#f6f5f4]">
+      <StructuredData data={problemLearningResourceJsonLd(problem, pageUrl)} id={`problem-ld-json-${problem.id}`} />
+      {excerpt ? (
+        <section
+          className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 pt-16 pb-3 text-sm leading-relaxed text-neutral-700 border-b border-neutral-200/90"
+          aria-label="Fragment din enunț"
+        >
+          <p className="whitespace-pre-wrap max-w-3xl">{excerpt}</p>
+        </section>
+      ) : null}
       <ProblemDetailClient problem={problem} categoryIcons={categoryIcons} difficultyColors={difficultyColors} />
     </div>
   )
