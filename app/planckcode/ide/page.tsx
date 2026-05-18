@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { flushSync } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
@@ -52,7 +53,13 @@ import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import { supabase } from "@/lib/supabaseClient"
 import { FileItem } from "@/lib/types"
-import { mergePlanckIdeFiles, runPythonProject } from "@/lib/planckcode-python-run"
+import {
+  mergePlanckIdeFiles,
+  runPythonProject,
+  createPlanckInteractiveStdinPump,
+  planckPythonUsesConsoleInput,
+  type PlanckInteractiveStdinPump,
+} from "@/lib/planckcode-python-run"
 import { SaveProjectDialog } from "@/components/save-project-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from 'next/navigation'
@@ -657,6 +664,11 @@ function IDEPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
   const [stdin, setStdin] = useState<string>('')
+  const [pythonLiveStdout, setPythonLiveStdout] = useState<string | null>(null)
+  const [pythonLiveStderr, setPythonLiveStderr] = useState<string | null>(null)
+  const [waitingForPythonConsoleLine, setWaitingForPythonConsoleLine] = useState(false)
+  const [pythonConsoleLineInput, setPythonConsoleLineInput] = useState('')
+  const pythonStdinPumpRef = useRef<PlanckInteractiveStdinPump | null>(null)
   const [isInsightOpen, setIsInsightOpen] = useState<boolean>(true)
   const [showPromoCard, setShowPromoCard] = useState(false)
   const [hasShownPromoCard, setHasShownPromoCard] = useState(false)
@@ -719,6 +731,7 @@ function IDEPageContent() {
   const streamingActiveRef = useRef<Set<string>>(new Set())
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0]
+  const stdinSidebarVisible = activeFile?.type !== 'python' || waitingForInput
   const {
     registerFailure: registerIdeFailure,
     resetFailures: resetIdeFailures,
@@ -839,7 +852,25 @@ function IDEPageContent() {
     }
   }
 
+  const submitPythonTerminalLine = () => {
+    const pump = pythonStdinPumpRef.current
+    if (!pump || !waitingForPythonConsoleLine) return
+
+    const line = pythonConsoleLineInput
+    pump.submitLine(line)
+    flushSync(() => {
+      setPythonLiveStdout((prev) => (prev ?? '') + line + '\n')
+    })
+    setPythonConsoleLineInput('')
+    setWaitingForPythonConsoleLine(false)
+  }
+
   const handleSendStdin = async () => {
+    if (pythonStdinPumpRef.current && waitingForPythonConsoleLine) {
+      submitPythonTerminalLine()
+      return
+    }
+
     if (!currentSessionId || !currentStdinInput.trim()) return
 
     try {
@@ -1355,25 +1386,13 @@ function IDEPageContent() {
     }
 
     if (active.type === 'python') {
-      const needsInput = /\binput\s*\(/.test(active.content)
-      if (needsInput && !stdin.trim()) {
-        if (!isTerminalOpen) {
-          setIsTerminalOpen(true)
-        }
-        setError(
-          'Programul folosește input(), dar nu ai furnizat valori în "Input (stdin)". Completează-le înainte de rulare (o valoare pe linie).'
-        )
-        registerIdeFailure()
-        setOutput(null)
-        setInteractiveOutput('')
-        setWaitingForInput(false)
-        setCurrentStdinInput('')
-        return
-      }
+      const wantsConsoleStdin = planckPythonUsesConsoleInput(active.content)
 
       if (abortController) {
         abortController.abort()
       }
+
+      pythonStdinPumpRef.current?.cancel()
 
       if (!isTerminalOpen) {
         setIsTerminalOpen(true)
@@ -1387,13 +1406,48 @@ function IDEPageContent() {
       setCurrentStdinInput('')
       setCurrentSessionId(null)
       setPreferClassicTerminal(true)
+      setWaitingForPythonConsoleLine(false)
+      setPythonConsoleLineInput('')
+
+      const pump = wantsConsoleStdin
+        ? createPlanckInteractiveStdinPump(() => {
+          flushSync(() => {
+            setWaitingForPythonConsoleLine(true)
+          })
+        })
+        : null
+      pythonStdinPumpRef.current = pump
+
+      if (wantsConsoleStdin) {
+        setPythonLiveStdout('')
+        setPythonLiveStderr('')
+      } else {
+        setPythonLiveStdout(null)
+        setPythonLiveStderr(null)
+      }
 
       try {
-        const result = await runPythonProject({
-          files: files.map((f) => ({ name: f.name, content: f.content })),
-          entryFileName: active.name,
-          stdinText: stdin,
-        })
+        const result = await runPythonProject(
+          {
+            files: files.map((f) => ({ name: f.name, content: f.content })),
+            entryFileName: active.name,
+            stdinText: stdin,
+          },
+          pump
+            ? {
+              interactiveStdin: pump,
+              onStdoutChunk: (s) =>
+                flushSync(() => {
+                  setPythonLiveStdout((p) => (p ?? '') + s)
+                }),
+              onStderrChunk: (s) =>
+                flushSync(() => {
+                  setPythonLiveStderr((p) => (p ?? '') + s)
+                }),
+            }
+            : undefined,
+        )
+
         setOutput({
           stdout: result.stdout || null,
           stderr: result.stderr || null,
@@ -1405,6 +1459,7 @@ function IDEPageContent() {
           time: null,
           memory: null,
         })
+
         if (result.exitCode === 0) {
           resetIdeFailures()
         } else {
@@ -1418,6 +1473,11 @@ function IDEPageContent() {
         setError(err instanceof Error ? err.message : 'Eroare la rularea Python.')
         registerIdeFailure()
       } finally {
+        pump?.cancel()
+        pythonStdinPumpRef.current = null
+        setWaitingForPythonConsoleLine(false)
+        setPythonLiveStdout(null)
+        setPythonLiveStderr(null)
         setLoading(false)
       }
       return
@@ -1928,19 +1988,39 @@ function IDEPageContent() {
                     {/* Split layout: Output (left) and Input (right) */}
                     <div className="flex-1 flex min-h-0">
                       {/* Left side - Output */}
-                      <div className="flex-1 flex flex-col border-r border-[#3b3b3b]">
+                      <div className={`flex-1 flex flex-col min-h-0 ${stdinSidebarVisible ? 'border-r border-[#3b3b3b]' : ''}`}>
                         <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
                           <div className="text-xs font-semibold text-gray-400">Output:</div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4">
-                          {loading && (
-                            <div className="flex items-center gap-2 text-gray-400">
+                        <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                          {loading && pythonLiveStdout === null && (
+                            <div className="flex items-center gap-2 text-gray-400 mb-2">
                               <Loader2 className="w-4 h-4 animate-spin" />
                               <span>
                                 {activeFile?.type === 'python'
                                   ? 'Pornire Python în browser (prima rulare poate descărca Pyodide)...'
                                   : 'Compiling and running your code...'}
                               </span>
+                            </div>
+                          )}
+
+                          {loading && pythonLiveStdout !== null && (
+                            <div className="flex items-center gap-2 text-amber-200/90 text-xs mb-2 font-mono">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Rulează — răspunde în zona „Consolă” de mai jos când apare.
+                            </div>
+                          )}
+
+                          {pythonLiveStdout !== null && (
+                            <div className="space-y-2 mb-2">
+                              {pythonLiveStderr !== null && pythonLiveStderr.length > 0 ? (
+                                <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                                  <span className="font-semibold">Stderr:</span>
+                                  {'\n'}
+                                  {pythonLiveStderr}
+                                </div>
+                              ) : null}
+                              <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">{pythonLiveStdout}</div>
                             </div>
                           )}
 
@@ -1959,7 +2039,7 @@ function IDEPageContent() {
                           )}
 
                           {/* Standard output (Judge0 / Pyodide) */}
-                          {(preferClassicTerminal || !isInteractiveMode || compilerAvailable === false) && !loading && !error && output && (
+                          {(preferClassicTerminal || !isInteractiveMode || compilerAvailable === false) && !loading && !error && output && pythonLiveStdout === null && (
                             <div className="space-y-2">
                               {output.compile_output && (
                                 <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
@@ -1993,76 +2073,107 @@ function IDEPageContent() {
                             </div>
                           )}
 
-                          {!loading && !error && !output && !interactiveOutput && (
+                          {!loading && !error && !output && !interactiveOutput && pythonLiveStdout === null && (
                             <div className="text-gray-500 text-sm italic">
                               Click "Run Code" to execute your program
                             </div>
                           )}
                         </div>
-                      </div>
 
-                      {/* Right side - Input */}
-                      <div className="w-[480px] flex flex-col bg-[#1a1a1a]">
-                        <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
-                          <div className="text-xs font-semibold text-gray-400">
-                            Input (stdin):
-                            {compilerAvailable === false && (
-                              <span className="ml-2 text-yellow-400 text-xs">
-                                (Judge0 - provide all inputs upfront)
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex-1 flex flex-col p-4 gap-3">
-                          {/* Interactive Input Section - shown when waiting for input */}
-                          {waitingForInput && (
-                            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-3">
-                              <label className="text-xs font-semibold text-yellow-400 mb-2 block">
-                                ⏳ Program is waiting for input:
-                              </label>
-                              <div className="flex gap-2">
-                                <Input
-                                  value={currentStdinInput}
-                                  onChange={(e) => setCurrentStdinInput(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                      e.preventDefault()
-                                      handleSendStdin()
-                                    }
-                                  }}
-                                  placeholder="Enter value and press Enter..."
-                                  className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
-                                  autoFocus
-                                />
-                                <Button
-                                  onClick={handleSendStdin}
-                                  disabled={!currentStdinInput.trim()}
-                                  className="bg-green-600 hover:bg-green-700 text-white px-4"
-                                >
-                                  Send
-                                </Button>
-                              </div>
+                        {waitingForPythonConsoleLine && activeFile?.type === 'python' ? (
+                          <div className="border-t border-[#3b3b3b] bg-[#1e1e1e]/90 px-4 py-2 shrink-0">
+                            <div className="text-xs font-semibold text-yellow-400 mb-2">
+                              Introdu o linie (ca la input() în consolă locală):
                             </div>
-                          )}
+                            <div className="flex gap-2">
+                              <Input
+                                value={pythonConsoleLineInput}
+                                onChange={(e) => setPythonConsoleLineInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    submitPythonTerminalLine()
+                                  }
+                                }}
+                                placeholder='Ex: 42 și Enter (poți trimite și linie goală pentru input() gol)'
+                                className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
+                                autoFocus
+                              />
+                              <Button
+                                type="button"
+                                onClick={submitPythonTerminalLine}
+                                className="bg-green-600 hover:bg-green-700 text-white shrink-0"
+                              >
+                                Trimite linia
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
 
-                          {/* Standard Input textarea */}
-                          <div className="flex-1 flex flex-col">
-                            <label className="text-xs text-gray-400 mb-2">
-                              {waitingForInput
-                                ? 'Pre-prepared inputs (for next run):'
-                                : 'Enter program inputs (one per line):'}
-                            </label>
-                            <textarea
-                              value={stdin}
-                              onChange={(e) => setStdin(e.target.value)}
-                              placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
-                              className="flex-1 px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
-                              disabled={waitingForInput}
-                            />
+                      {stdinSidebarVisible ? (
+                        <div className="w-[480px] shrink-0 flex flex-col bg-[#1a1a1a]">
+                          <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
+                            <div className="text-xs font-semibold text-gray-400">
+                              Input (stdin):
+                              {compilerAvailable === false && (
+                                <span className="ml-2 text-yellow-400 text-xs">
+                                  (Judge0 - provide all inputs upfront)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+                            {/* Interactive Input Section - shown when waiting for input */}
+                            {waitingForInput && (
+                              <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-3">
+                                <label className="text-xs font-semibold text-yellow-400 mb-2 block">
+                                  ⏳ Program is waiting for input:
+                                </label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={currentStdinInput}
+                                    onChange={(e) => setCurrentStdinInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSendStdin()
+                                      }
+                                    }}
+                                    placeholder="Enter value and press Enter..."
+                                    className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
+                                    autoFocus
+                                  />
+                                  <Button
+                                    onClick={handleSendStdin}
+                                    disabled={!currentStdinInput.trim()}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-4"
+                                  >
+                                    Send
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Standard Input textarea */}
+                            <div className="flex-1 flex flex-col min-h-0">
+                              <label className="text-xs text-gray-400 mb-2">
+                                {waitingForInput
+                                  ? 'Pre-prepared inputs (for next run):'
+                                  : 'Enter program inputs (one per line):'}
+                              </label>
+                              <textarea
+                                value={stdin}
+                                onChange={(e) => setStdin(e.target.value)}
+                                placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
+                                className="flex-1 min-h-[120px] px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
+                                disabled={waitingForInput}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                   </div>
                 </ResizablePanel>

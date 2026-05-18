@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { flushSync } from "react-dom"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 // Lazy load Monaco Editor to reduce initial bundle size
 const Editor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.default), {
@@ -30,6 +32,9 @@ import type { FileItem } from "@/lib/types"
 import {
   mergePlanckIdeFiles,
   runPythonProject,
+  createPlanckInteractiveStdinPump,
+  planckPythonUsesConsoleInput,
+  type PlanckInteractiveStdinPump,
 } from "@/lib/planckcode-python-run"
 import { supabase } from "@/lib/supabaseClient"
 import type { CodingSubmitResponse } from "./types"
@@ -191,6 +196,11 @@ export default function EmbeddedIDE({
   const [error, setError] = useState<string | null>(null)
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
   const [stdin, setStdin] = useState<string>("")
+  const [pythonLiveStdout, setPythonLiveStdout] = useState<string | null>(null)
+  const [pythonLiveStderr, setPythonLiveStderr] = useState<string | null>(null)
+  const [waitingForPythonConsoleLine, setWaitingForPythonConsoleLine] = useState(false)
+  const [pythonConsoleLineInput, setPythonConsoleLineInput] = useState("")
+  const pythonStdinPumpRef = useRef<PlanckInteractiveStdinPump | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitResult, setSubmitResult] = useState<CodingSubmitResponse | null>(null)
@@ -200,6 +210,7 @@ export default function EmbeddedIDE({
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
 
   const activeFile = files.find((f) => f.id === activeFileId) || files[0]
+  const stdinSidebarVisible = activeFile?.type !== "python"
 
   const getModelUri = (file: FileItem) => {
     return monacoRef.current?.Uri.parse(`inmemory://model/${file.id}/${file.name}`)
@@ -350,6 +361,19 @@ export default function EmbeddedIDE({
     }
   }
 
+  const submitPythonTerminalLine = () => {
+    const pump = pythonStdinPumpRef.current
+    if (!pump || !waitingForPythonConsoleLine) return
+
+    const line = pythonConsoleLineInput
+    pump.submitLine(line)
+    flushSync(() => {
+      setPythonLiveStdout((prev) => (prev ?? "") + line + "\n")
+    })
+    setPythonConsoleLineInput("")
+    setWaitingForPythonConsoleLine(false)
+  }
+
   const handleRunCode = async () => {
     if (!isTerminalOpen) {
       setIsTerminalOpen(true)
@@ -371,20 +395,52 @@ export default function EmbeddedIDE({
     }
 
     if (activeFile.type === "python") {
-      const needsInput = /\binput\s*\(/.test(activeFile.content)
-      if (needsInput && !stdin.trim()) {
-        setError(
-          'Programul folosește input(), dar caseta „Input (stdin)” este goală. Completeaz-o înainte de rulare (o valoare pe linie).'
-        )
-        setLoading(false)
-        return
-      }
-      try {
-        const result = await runPythonProject({
-          files: files.map((f) => ({ name: f.name, content: f.content })),
-          entryFileName: activeFile.name,
-          stdinText: stdin,
+      const wantsConsoleStdin = planckPythonUsesConsoleInput(activeFile.content)
+
+      pythonStdinPumpRef.current?.cancel()
+
+      setWaitingForPythonConsoleLine(false)
+      setPythonConsoleLineInput("")
+
+      const pump = wantsConsoleStdin
+        ? createPlanckInteractiveStdinPump(() => {
+          flushSync(() => {
+            setWaitingForPythonConsoleLine(true)
+          })
         })
+        : null
+      pythonStdinPumpRef.current = pump
+
+      if (wantsConsoleStdin) {
+        setPythonLiveStdout("")
+        setPythonLiveStderr("")
+      } else {
+        setPythonLiveStdout(null)
+        setPythonLiveStderr(null)
+      }
+
+      try {
+        const result = await runPythonProject(
+          {
+            files: files.map((f) => ({ name: f.name, content: f.content })),
+            entryFileName: activeFile.name,
+            stdinText: stdin,
+          },
+          pump
+            ? {
+                interactiveStdin: pump,
+                onStdoutChunk: (s) =>
+                  flushSync(() => {
+                    setPythonLiveStdout((p) => (p ?? "") + s)
+                  }),
+                onStderrChunk: (s) =>
+                  flushSync(() => {
+                    setPythonLiveStderr((p) => (p ?? "") + s)
+                  }),
+              }
+            : undefined,
+        )
+
         setOutput({
           stdout: result.stdout || null,
           stderr: result.stderr || null,
@@ -402,6 +458,11 @@ export default function EmbeddedIDE({
       } catch (err) {
         setError(err instanceof Error ? err.message : "Eroare la rularea Python.")
       } finally {
+        pump?.cancel()
+        pythonStdinPumpRef.current = null
+        setWaitingForPythonConsoleLine(false)
+        setPythonLiveStdout(null)
+        setPythonLiveStderr(null)
         setLoading(false)
       }
       return
@@ -582,15 +643,37 @@ export default function EmbeddedIDE({
                 </div>
 
                 <div className="flex-1 flex min-h-0">
-                  <div className="flex-1 flex flex-col border-r border-[#3b3b3b]">
-                    <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
+                  <div
+                    className={`flex-1 flex flex-col min-h-0 ${stdinSidebarVisible ? "border-r border-[#3b3b3b]" : ""}`}
+                  >
+                    <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e] shrink-0">
                       <div className="text-xs font-semibold text-gray-400">Output:</div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4">
-                      {loading && (
-                        <div className="flex items-center gap-2 text-gray-400">
+                    <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                      {loading && pythonLiveStdout === null && (
+                        <div className="flex items-center gap-2 text-gray-400 mb-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span>{runHint}</span>
+                        </div>
+                      )}
+
+                      {loading && pythonLiveStdout !== null && (
+                        <div className="flex items-center gap-2 text-amber-200/90 text-xs mb-2 font-mono">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Rulează — răspunde în zona de mai jos când apare.
+                        </div>
+                      )}
+
+                      {pythonLiveStdout !== null && (
+                        <div className="space-y-2 mb-2">
+                          {pythonLiveStderr !== null && pythonLiveStderr.length > 0 ? (
+                            <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                              <span className="font-semibold">Stderr:</span>
+                              {"\n"}
+                              {pythonLiveStderr}
+                            </div>
+                          ) : null}
+                          <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">{pythonLiveStdout}</div>
                         </div>
                       )}
 
@@ -600,7 +683,7 @@ export default function EmbeddedIDE({
                         </div>
                       )}
 
-                      {!loading && !error && output && (
+                      {!loading && !error && output && pythonLiveStdout === null && (
                         <div className="space-y-2">
                           {output.compile_output && (
                             <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
@@ -634,7 +717,7 @@ export default function EmbeddedIDE({
                         </div>
                       )}
 
-                      {!loading && !error && !output && (
+                      {!loading && !error && !output && pythonLiveStdout === null && (
                         <div className="text-gray-500 text-sm italic">
                           {problemSlug && defaultLanguage === "python"
                             ? "Apasă „Run Code” pentru test local sau „Trimite” pentru evaluare pe server."
@@ -642,27 +725,59 @@ export default function EmbeddedIDE({
                         </div>
                       )}
                     </div>
+
+                    {waitingForPythonConsoleLine && activeFile?.type === "python" ? (
+                      <div className="border-t border-[#3b3b3b] bg-[#1e1e1e]/90 px-4 py-2 shrink-0">
+                        <div className="text-xs font-semibold text-yellow-400 mb-2">
+                          Introdu o linie (input / sys.stdin.readline):
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={pythonConsoleLineInput}
+                            onChange={(e) => setPythonConsoleLineInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault()
+                                submitPythonTerminalLine()
+                              }
+                            }}
+                            placeholder="Valoarea liniei și Enter"
+                            className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
+                            autoFocus
+                          />
+                          <Button
+                            type="button"
+                            onClick={submitPythonTerminalLine}
+                            className="bg-green-600 hover:bg-green-700 text-white shrink-0 px-4"
+                          >
+                            Trimite
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="w-[480px] flex flex-col bg-[#1a1a1a]">
-                    <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
-                      <div className="text-xs font-semibold text-gray-400">Input (stdin):</div>
-                    </div>
+                  {stdinSidebarVisible ? (
+                    <div className="w-[480px] shrink-0 flex flex-col bg-[#1a1a1a] min-h-0">
+                      <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
+                        <div className="text-xs font-semibold text-gray-400">Input (stdin):</div>
+                      </div>
 
-                    <div className="flex-1 flex flex-col p-4 gap-3">
-                      <div className="flex-1 flex flex-col">
-                        <label className="text-xs text-gray-400 mb-2">
-                          Enter program inputs (one per line):
-                        </label>
-                        <textarea
-                          value={stdin}
-                          onChange={(e) => setStdin(e.target.value)}
-                          placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
-                          className="flex-1 px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
-                        />
+                      <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+                        <div className="flex-1 flex flex-col min-h-0">
+                          <label className="text-xs text-gray-400 mb-2">
+                            Enter program inputs (one per line):
+                          </label>
+                          <textarea
+                            value={stdin}
+                            onChange={(e) => setStdin(e.target.value)}
+                            placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
+                            className="flex-1 min-h-[120px] px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               </div>
             </ResizablePanel>

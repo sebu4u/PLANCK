@@ -25,14 +25,72 @@ const CODING_DIFFICULTY: Record<string, string> = {
 
 const CLASS_SET = new Set([9, 10, 11, 12])
 
+const MATH_DIFFICULTY_SET = new Set(["Ușor", "Mediu", "Avansat"])
+
+function parseMathAnswerSubpoints(raw: unknown):
+  | { ok: true; value: Array<{ label: string; content: string }> }
+  | { ok: false; message: string } {
+  if (raw === undefined || raw === null) {
+    return { ok: true, value: [] }
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, message: "answer_subpoints trebuie să fie un array (max 3 elemente)." }
+  }
+  if (raw.length > 3) {
+    return { ok: false, message: "Cel mult 3 subpuncte pentru răspuns." }
+  }
+  const value: Array<{ label: string; content: string }> = []
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      return { ok: false, message: "Fiecare subpunct trebuie să fie un obiect { label, content }." }
+    }
+    const o = item as Record<string, unknown>
+    const label = typeof o.label === "string" ? o.label.trim() : ""
+    const content = typeof o.content === "string" ? o.content.trim() : ""
+    if (!label || !content) {
+      return { ok: false, message: "label și content sunt obligatorii pentru fiecare subpunct." }
+    }
+    value.push({ label, content })
+  }
+  return { ok: true, value }
+}
+
+function parseCodingTags(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((t): t is string => typeof t === "string")
+      .map((t) => t.trim())
+      .filter(Boolean)
+  }
+  if (typeof raw === "string") {
+    return raw
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function nullableTrimmedString(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const s = raw.trim()
+  return s.length ? s : null
+}
+
+/** String DB opțional păstrată ca trimisă (ex. intrări/ieșiri), gol → null */
+function nullableAsProvidedString(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  return raw.length ? raw : null
+}
+
 function normalizeCodingDifficulty(raw: string): string {
   const key = raw.trim().toLowerCase()
   return CODING_DIFFICULTY[key] ?? raw.trim()
 }
 
 /**
- * GET ?catalog=physics|informatics — listă recentă (dev).
- * POST body: { catalog: "physics"|"informatics", ... } — adaugă o problemă (fără ștergere).
+ * GET ?catalog=physics|informatics|math — listă recentă (dev).
+ * POST body: { catalog: "physics"|"informatics"|"math", ... } — adaugă o problemă (fără ștergere).
  */
 export async function GET(req: NextRequest) {
   try {
@@ -40,11 +98,30 @@ export async function GET(req: NextRequest) {
     if (auth instanceof NextResponse) return auth
 
     const catalog = new URL(req.url).searchParams.get("catalog")?.trim()
-    if (catalog !== "physics" && catalog !== "informatics") {
-      return NextResponse.json({ error: "Parametrul catalog trebuie să fie physics sau informatics." }, { status: 400 })
+    if (catalog !== "physics" && catalog !== "informatics" && catalog !== "math") {
+      return NextResponse.json(
+        { error: "Parametrul catalog trebuie să fie physics, informatics sau math." },
+        { status: 400 }
+      )
     }
 
     const service = createServiceClient()
+
+    if (catalog === "math") {
+      const { data: rows, error } = await service
+        .from("math_problems")
+        .select(
+          "id, title, difficulty, class, tags, answer_subpoints, image_url, youtube_url, is_active, created_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(300)
+
+      if (error) {
+        logger.error("[dev/problems] math list:", error)
+        return NextResponse.json({ error: "Nu am putut încărca problemele de matematică." }, { status: 500 })
+      }
+      return NextResponse.json({ problems: rows || [] })
+    }
 
     if (catalog === "physics") {
       const searchParams = new URL(req.url).searchParams
@@ -101,11 +178,89 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Record<string, unknown>
     const catalog = typeof body.catalog === "string" ? body.catalog.trim() : ""
 
-    if (catalog !== "physics" && catalog !== "informatics") {
-      return NextResponse.json({ error: "catalog trebuie să fie physics sau informatics." }, { status: 400 })
+    if (catalog !== "physics" && catalog !== "informatics" && catalog !== "math") {
+      return NextResponse.json({ error: "catalog trebuie să fie physics, informatics sau math." }, { status: 400 })
     }
 
     const service = createServiceClient()
+
+    if (catalog === "math") {
+      const id = typeof body.id === "string" ? body.id.trim() : ""
+      const title = typeof body.title === "string" ? body.title.trim() : ""
+      const statement = typeof body.statement === "string" ? body.statement.trim() : ""
+      const difficulty = typeof body.difficulty === "string" ? body.difficulty.trim() : ""
+      const description =
+        typeof body.description === "string" && body.description.trim() ? body.description.trim() : ""
+
+      const classRaw = body.class
+      const classNum =
+        typeof classRaw === "number" && Number.isFinite(classRaw)
+          ? Math.floor(classRaw)
+          : typeof classRaw === "string"
+            ? Number.parseInt(classRaw, 10)
+            : NaN
+
+      if (!id || !title || !statement || !difficulty) {
+        return NextResponse.json(
+          { error: "Câmpuri obligatorii: id, title, statement, difficulty." },
+          { status: 400 }
+        )
+      }
+
+      if (!MATH_DIFFICULTY_SET.has(difficulty)) {
+        return NextResponse.json(
+          { error: "Dificultate invalidă (Ușor, Mediu sau Avansat)." },
+          { status: 400 }
+        )
+      }
+
+      if (!CLASS_SET.has(classNum)) {
+        return NextResponse.json({ error: "class trebuie să fie 9, 10, 11 sau 12." }, { status: 400 })
+      }
+
+      const parsedAnswers = parseMathAnswerSubpoints(body.answer_subpoints)
+      if (!parsedAnswers.ok) {
+        return NextResponse.json({ error: parsedAnswers.message }, { status: 400 })
+      }
+
+      const tags = parseCodingTags(body.tags)
+
+      const imageRaw = body.image_url
+      const ytRaw = body.youtube_url
+      const image_url =
+        typeof imageRaw === "string" && imageRaw.trim() ? imageRaw.trim() : null
+      const youtube_url =
+        typeof ytRaw === "string" && ytRaw.trim() ? ytRaw.trim() : null
+
+      const insertRow: Record<string, unknown> = {
+        id,
+        title,
+        description,
+        statement,
+        difficulty,
+        class: classNum,
+        tags,
+        answer_subpoints: parsedAnswers.value,
+        image_url,
+        youtube_url,
+        is_active: body.is_active === false ? false : true,
+      }
+
+      const { data, error } = await service
+        .from("math_problems")
+        .insert(insertRow)
+        .select("id, title, class, difficulty")
+        .single()
+
+      if (error) {
+        logger.error("[dev/problems] math insert:", error)
+        return NextResponse.json(
+          { error: error.message || "Nu am putut crea problema de matematică." },
+          { status: 500 }
+        )
+      }
+      return NextResponse.json({ success: true, problem: data })
+    }
 
     if (catalog === "physics") {
       const id = typeof body.id === "string" ? body.id.trim() : ""
@@ -204,12 +359,16 @@ export async function POST(req: NextRequest) {
     const difficulty = normalizeCodingDifficulty(diffRaw)
 
     const language =
-      body.language === "python" || body.language === "cpp" ? body.language : "cpp"
+      body.language === "python" || body.language === "cpp" ? body.language : "python"
 
     const insertRow: Record<string, unknown> = {
       slug,
       title,
       statement_markdown,
+      requirement_markdown: nullableTrimmedString(body.requirement_markdown),
+      input_format: nullableTrimmedString(body.input_format),
+      output_format: nullableTrimmedString(body.output_format),
+      constraints_markdown: nullableTrimmedString(body.constraints_markdown),
       difficulty,
       class: classNum,
       chapter,
@@ -220,13 +379,13 @@ export async function POST(req: NextRequest) {
         typeof body.memory_limit_kb === "number" && body.memory_limit_kb > 0
           ? Math.floor(body.memory_limit_kb)
           : 256000,
-      tags: Array.isArray(body.tags) ? body.tags : [],
+      tags: parseCodingTags(body.tags),
       is_active: body.is_active === false ? false : true,
-      sample_input: typeof body.sample_input === "string" ? body.sample_input : null,
-      sample_output: typeof body.sample_output === "string" ? body.sample_output : null,
-      explanation_markdown: typeof body.explanation_markdown === "string" ? body.explanation_markdown : null,
-      boilerplate_cpp: typeof body.boilerplate_cpp === "string" ? body.boilerplate_cpp : null,
-      boilerplate_python: typeof body.boilerplate_python === "string" ? body.boilerplate_python : null,
+      sample_input: nullableAsProvidedString(body.sample_input),
+      sample_output: nullableAsProvidedString(body.sample_output),
+      explanation_markdown: nullableTrimmedString(body.explanation_markdown),
+      boilerplate_cpp: nullableAsProvidedString(body.boilerplate_cpp),
+      boilerplate_python: nullableAsProvidedString(body.boilerplate_python),
       language,
     }
 

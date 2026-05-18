@@ -478,6 +478,28 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  "math-problems": {
+    title: "Catalog de Probleme de Matematică",
+    description:
+      "Probleme de matematică pentru liceu, pe clase și nivele de dificultate (Ușor, Mediu, Avansat), cu enunțuri și resurse video opționale.",
+    keywords:
+      "matematică liceu, probleme matematică, clasa a 9-a, clasa a 10-a, algebră, geometrie, planck academy",
+    alternates: {
+      canonical: "/matematica/probleme",
+    },
+    openGraph: {
+      title: "Catalog de Probleme de Matematică – Planck Academy",
+      description:
+        "Probleme structurate pentru pregătire: enunțuri clare, etichete și filtre pe clasă și dificultate.",
+      url: "https://www.planck.academy/matematica/probleme",
+    },
+    twitter: {
+      title: "Catalog de Probleme de Matematică",
+      description:
+        "Probleme de matematică pentru liceu, cu suport pentru formule și catalog filtrabil.",
+    },
+  },
+
   "gratuit-confirmare": {
     title: "Înscriere confirmată – Webinar PLANCK",
     description:

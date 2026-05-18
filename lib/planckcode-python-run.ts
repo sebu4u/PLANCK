@@ -10,7 +10,11 @@ export interface PlanckPythonRunInput {
   files: { name: string; content: string }[]
   /** Active Python file name (e.g. main.py) under /planck */
   entryFileName: string
-  stdinText: string
+  /**
+   * Valori pentru modul buffered (stdin fix).
+   * Ignorat când rularea este interactivă (terminal).
+   */
+  stdinText?: string
 }
 
 export interface PlanckPythonRunResult {
@@ -19,6 +23,62 @@ export interface PlanckPythonRunResult {
   exitCode: number
   /** Relative paths under project root → new content (changed or new files). */
   fileUpdates: Record<string, string>
+}
+
+/** Opțiuni pentru stream stdout/stderr și stdin interactiv (consola din IDE). */
+export interface PlanckPythonStreamingOpts {
+  onStdoutChunk?: (s: string) => void
+  onStderrChunk?: (s: string) => void
+  interactiveStdin?: PlanckInteractiveStdinPump | null
+}
+
+export interface PlanckInteractiveStdinPump {
+  /** Apelată din Python prin pyodide.ffi.run_sync — o linie de text (newline se adaugă dacă lipsește). */
+  waitLineJs(): Promise<string>
+
+  submitLine(line: string): void
+
+  /** Respinge așteptarea curentă (rulare anulată / început rulare nou). */
+  cancel(reason?: Error): void
+}
+
+export function createPlanckInteractiveStdinPump(onAwaitStdin?: () => void): PlanckInteractiveStdinPump {
+  let pending: {
+    resolve: (s: string) => void
+    reject: (e: Error) => void
+  } | null = null
+
+  function submitLine(line: string) {
+    if (!pending) return
+    const { resolve } = pending
+    pending = null
+    resolve(line)
+  }
+
+  function cancel(reason?: Error) {
+    if (!pending) return
+    const { reject } = pending
+    pending = null
+    reject(reason ?? new Error("Cancelled"))
+  }
+
+  async function waitLineJs(): Promise<string> {
+    onAwaitStdin?.()
+    return await new Promise<string>((resolve, reject) => {
+      pending = { resolve, reject }
+    })
+  }
+
+  return {
+    waitLineJs,
+    submitLine,
+    cancel,
+  }
+}
+
+/** Heuristic pentru cod care citește de la consolă (nu din textarea-ul „stdin”). */
+export function planckPythonUsesConsoleInput(source: string): boolean {
+  return /\binput\s*\(/.test(source) || /\bsys\.stdin\b/.test(source)
 }
 
 /** Suprafață minimă folosită de Planck (fără import din pachetul npm — compatibil Turbopack). */
@@ -175,9 +235,139 @@ export function loadPlanckPyodide(): Promise<PlanckPyodideInstance> {
 
 const PLANCK_ROOT = "/planck"
 
-export async function runPythonProject(input: PlanckPythonRunInput): Promise<PlanckPythonRunResult> {
+const PLANCK_PYTHON_HARNESS = `
+import builtins, io, sys, os, traceback, runpy
+
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+
+try:
+    from pyodide.ffi import run_sync
+except ImportError:
+    run_sync = None
+
+_use_interactive = bool(globals().get("__planck_use_interactive_stdin"))
+_JS_WAIT_STDIN = globals().get("__planck_wait_stdin_js")
+
+_os_out = io.StringIO()
+_os_err = io.StringIO()
+
+# Fiecare print trimite imediat la consolă (comportament apropiat de -u), astfel încât
+# liniile rulează vizibil pe rând până la următorul input().
+_orig_print = builtins.print
+
+def _planck_print(*args, **kwargs):
+    if "flush" not in kwargs:
+        kwargs["flush"] = True
+    return _orig_print(*args, **kwargs)
+
+builtins.print = _planck_print
+
+class _BridgingTextOut(io.TextIOBase):
+    encoding = "utf-8"
+    errors = "replace"
+    __slots__ = ("_buf", "_emit_key")
+
+    def __init__(self, collector: io.StringIO, emit_key: str | None):
+        super().__init__()
+        self._buf = collector
+        self._emit_key = emit_key
+
+    def writable(self):
+        return True
+
+    def write(self, s):
+        if not s:
+            return 0
+        t = str(s)
+        self._buf.write(t)
+        if self._emit_key:
+            emitter = globals().get(self._emit_key)
+            if emitter is not None:
+                try:
+                    emitter(t)
+                except BaseException:
+                    pass
+        return len(t)
+
+    def flush(self):
+        return None
+
+
+_old_out, _old_err, _old_stdin = sys.stdout, sys.stderr, sys.stdin
+sys.stdout = _BridgingTextOut(_os_out, "__planck_stdout_emit_js")
+sys.stderr = _BridgingTextOut(_os_err, "__planck_stderr_emit_js")
+
+if _use_interactive:
+    class _PlanckInteractiveStdin(io.TextIOBase):
+        encoding = "utf-8"
+        errors = "replace"
+
+        def readable(self):
+            return True
+
+        def readline(self, size=-1):
+            if size != -1:
+                raise io.UnsupportedOperation("Planck stdin: readline(size) nesuportat")
+            nl = chr(10)
+            cr = chr(13)
+            if run_sync is None:
+                raise RuntimeError(
+                    "Consola interactivă nu e disponibilă (lipsește pyodide.ffi.run_sync — încearcă un browser actual)."
+                )
+            if _JS_WAIT_STDIN is None:
+                raise RuntimeError("Intrare lipsă pentru modul terminal.")
+            future = _JS_WAIT_STDIN()
+            raw = run_sync(future)
+            if raw is None:
+                s = ""
+            else:
+                s = str(raw)
+                s = s.replace(cr + nl, nl).replace(cr, nl)
+            if not s.endswith(nl):
+                s += nl
+            return s
+
+        def read(self, size=-1):
+            raise io.UnsupportedOperation(
+                "Planck stdin.read() nesuportat — folosește input() sau readline()."
+            )
+
+    sys.stdin = _PlanckInteractiveStdin()
+else:
+    _seed = globals().get("__planck_stdin") or ""
+    sys.stdin = io.StringIO(_seed)
+
+_exit = 0
+try:
+    os.chdir("/planck")
+    runpy.run_path(globals()["__planck_entry"], run_name="__main__")
+except SystemExit as e:
+    if e.code is None:
+        _exit = 0
+    elif isinstance(e.code, int):
+        _exit = e.code
+    else:
+        _exit = 1
+except BaseException:
+    _exit = 1
+    _os_err.write(traceback.format_exc())
+finally:
+    sys.stdout, sys.stderr, sys.stdin = _old_out, _old_err, _old_stdin
+
+globals()["_planck_stdout"] = _os_out.getvalue()
+globals()["_planck_stderr"] = _os_err.getvalue()
+globals()["_planck_exit"] = _exit
+`
+
+export async function runPythonProject(
+  input: PlanckPythonRunInput,
+  streaming?: PlanckPythonStreamingOpts | null,
+): Promise<PlanckPythonRunResult> {
   const py = await loadPlanckPyodide()
   const FS = getFS(py)
+
+  const pump = streaming?.interactiveStdin ?? null
+  const interactiveStdin = Boolean(pump)
 
   try {
     rmRecursive(FS, PLANCK_ROOT)
@@ -204,41 +394,32 @@ export async function runPythonProject(input: PlanckPythonRunInput): Promise<Pla
     }
   }
 
+  py.globals.set("__planck_use_interactive_stdin", interactiveStdin)
   py.globals.set("__planck_stdin", input.stdinText ?? "")
   py.globals.set("__planck_entry", `${PLANCK_ROOT}/${input.entryFileName}`)
 
-  const harness = `
-import io, sys, os, traceback, runpy
+  if (streaming?.onStdoutChunk) {
+    py.globals.set("__planck_stdout_emit_js", (chunk: string) => streaming.onStdoutChunk?.(chunk))
+  } else {
+    py.globals.set("__planck_stdout_emit_js", undefined)
+  }
+  if (streaming?.onStderrChunk) {
+    py.globals.set("__planck_stderr_emit_js", (chunk: string) => streaming.onStderrChunk?.(chunk))
+  } else {
+    py.globals.set("__planck_stderr_emit_js", undefined)
+  }
 
-_stdin_val = globals().get("__planck_stdin") or ""
-sys.stdin = io.StringIO(_stdin_val)
-_os_out = io.StringIO()
-_os_err = io.StringIO()
-_old_out, _old_err = sys.stdout, sys.stderr
-sys.stdout, sys.stderr = _os_out, _os_err
-_exit = 0
-try:
-    os.chdir("/planck")
-    runpy.run_path(globals()["__planck_entry"], run_name="__main__")
-except SystemExit as e:
-    if e.code is None:
-        _exit = 0
-    elif isinstance(e.code, int):
-        _exit = e.code
-    else:
-        _exit = 1
-except BaseException:
-    _exit = 1
-    _os_err.write(traceback.format_exc())
-finally:
-    sys.stdout, sys.stderr = _old_out, _old_err
+  if (pump) {
+    py.globals.set("__planck_wait_stdin_js", () => pump.waitLineJs())
+  } else {
+    py.globals.set("__planck_wait_stdin_js", undefined)
+  }
 
-globals()["_planck_stdout"] = _os_out.getvalue()
-globals()["_planck_stderr"] = _os_err.getvalue()
-globals()["_planck_exit"] = _exit
-`
-
-  await py.runPythonAsync(harness)
+  try {
+    await py.runPythonAsync(PLANCK_PYTHON_HARNESS)
+  } finally {
+    pump?.cancel()
+  }
 
   const stdout = pyGlobalToString(py, "_planck_stdout")
   const stderr = pyGlobalToString(py, "_planck_stderr")

@@ -114,6 +114,7 @@ const ITEM_TYPES: LearningPathLessonType[] = [
   "video",
   "grila",
   "problem",
+  "math_problem",
   "poll",
   "simulation",
   "test",
@@ -330,11 +331,11 @@ function validateSimulationUrl(url: string): boolean {
 export interface LearningPathsManagerProps {
   /** implicit `admin` — folosește `/api/admin/...` */
   mode?: "admin" | "dev"
-  /** obligatoriu dacă `mode === "dev"` */
-  devSubject?: "physics" | "informatics"
+  /** Mod dev: opțional; lipsă sau `all` = toate parcursurile (recomandat). */
+  devSubject?: "physics" | "informatics" | "math" | "all"
 }
 
-export function LearningPathsManager({ mode = "admin", devSubject }: LearningPathsManagerProps = {}) {
+export function LearningPathsManager({ mode = "admin", devSubject: devSubjectProp }: LearningPathsManagerProps = {}) {
   const [chapters, setChapters] = useState<LearningPathChapter[]>([])
   const [lessons, setLessons] = useState<LearningPathLesson[]>([])
   const [items, setItems] = useState<LearningPathLessonItem[]>([])
@@ -359,20 +360,12 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
   const [previewSimulationIntro, setPreviewSimulationIntro] = useState(false)
 
   const isDev = mode === "dev"
+  /** În mod dev, fără prop = `all` (toate capitolele/lecțiile/itemii). */
+  const devSubject = isDev ? (devSubjectProp ?? "all") : undefined
   const apiBase = isDev ? "/api/dev/learning-paths" : "/api/admin/learning-paths"
-  const itemTypesForForm = useMemo(() => {
-    if (isDev && devSubject === "informatics") {
-      return ITEM_TYPES.filter((t) => t !== "problem")
-    }
-    return ITEM_TYPES
-  }, [isDev, devSubject])
+  const itemTypesForForm = useMemo(() => ITEM_TYPES, [])
 
-  const newLessonKindOptions = useMemo((): LearningPathLessonKind[] => {
-    if (isDev && devSubject === "informatics") {
-      return ["text", "video", "grila"]
-    }
-    return ["text", "video", "grila", "problem"]
-  }, [isDev, devSubject])
+  const newLessonKindOptions = useMemo((): LearningPathLessonKind[] => ["text", "video", "grila", "problem"], [])
 
   const [lessonCreateChapterId, setLessonCreateChapterId] = useState<string | null>(null)
   const [newLessonTitle, setNewLessonTitle] = useState("")
@@ -408,7 +401,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
         return
       }
 
-      const response = await fetch(isDev && devSubject ? `${apiBase}?subject=${devSubject}` : apiBase, {
+      const response = await fetch(isDev ? `${apiBase}?subject=${devSubject}` : apiBase, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
 
@@ -596,6 +589,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
         if (!currentForm.quiz_question_id.trim()) return "Selectează o întrebare grilă."
         break
       case "problem":
+      case "math_problem":
         if (!currentForm.problem_id.trim()) return "Selectează o problemă."
         break
       case "poll":
@@ -693,6 +687,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
         payload.content_json = null
         break
       case "problem":
+      case "math_problem":
         payload.problem_id = normalizeNullable(currentForm.problem_id)
         payload.cursuri_lesson_slug = null
         payload.youtube_url = null
@@ -798,8 +793,11 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Nu am putut salva itemul.")
+        const data = (await response.json().catch(() => ({}))) as { error?: string; details?: string }
+        const msg = [data.error, data.details]
+          .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          .join(" — ")
+        throw new Error(msg || "Nu am putut salva itemul.")
       }
 
       setSuccessMessage(form.id ? "Item actualizat cu succes." : "Item creat cu succes.")
@@ -936,7 +934,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
       const order_index = Number.isFinite(orderParsed) ? orderParsed : nextChapterOrderDefault
 
       let problem_category: string | null = chapterForm.problem_category.trim() || null
-      if (isDev && devSubject === "informatics") {
+      if (isDev && (devSubject === "informatics" || devSubject === "math")) {
         problem_category = null
       }
 
@@ -1169,7 +1167,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
   }
 
   const fetchProblems = useCallback(async () => {
-    if (!form || form.item_type !== "problem") return
+    if (!form || (form.item_type !== "problem" && form.item_type !== "math_problem")) return
 
     try {
       setProblemLoading(true)
@@ -1178,7 +1176,13 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
 
       const params = new URLSearchParams()
       if (isDev && devSubject) {
-        params.set("catalog", devSubject === "informatics" ? "informatics" : "physics")
+        if (form.item_type === "math_problem") {
+          params.set("catalog", "math")
+        } else {
+          params.set("catalog", devSubject === "informatics" ? "informatics" : "physics")
+        }
+      } else if (form.item_type === "math_problem") {
+        params.set("catalog", "math")
       }
       if (problemSearch.trim()) {
         params.set("search", problemSearch.trim())
@@ -1205,6 +1209,16 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
             title: p.title,
             difficulty: p.difficulty,
             category: (typeof p.chapter === "string" && p.chapter.trim() ? p.chapter : "") || "",
+            class: p.class,
+          })
+        )
+      } else if (form.item_type === "math_problem") {
+        rows = (data.problems || []).map(
+          (p: { id: string; title: string; difficulty: string; class?: number }) => ({
+            id: p.id,
+            title: p.title,
+            difficulty: p.difficulty,
+            category: "Matematică",
             class: p.class,
           })
         )
@@ -1258,7 +1272,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
   }, [form, getAccessToken, quizClass, quizSearch, isDev, devSubject, apiBase])
 
   useEffect(() => {
-    if (!form || form.item_type !== "problem") return
+    if (!form || (form.item_type !== "problem" && form.item_type !== "math_problem")) return
     const timer = setTimeout(() => {
       fetchProblems()
     }, 300)
@@ -1370,7 +1384,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
       )
     }
 
-    if (form.item_type === "problem") {
+    if (form.item_type === "problem" || form.item_type === "math_problem") {
       return (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
@@ -1378,7 +1392,11 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
             <Input
               value={problemSearch}
               onChange={(e) => setProblemSearch(e.target.value)}
-              placeholder="Caută problemă după titlu"
+              placeholder={
+                form.item_type === "math_problem"
+                  ? "Caută problemă de matematică după titlu"
+                  : "Caută problemă după titlu"
+              }
               className="bg-black/40 border-white/20 text-gray-100"
             />
           </div>
@@ -1415,6 +1433,7 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
                   <p className="text-sm font-semibold text-white">{problem.title}</p>
                   <p className="text-xs text-gray-400 mt-1">
                     ID: {problem.id} | Dificultate: {problem.difficulty} | Clasa: {problem.class ?? "-"}
+                    {problem.category ? ` | ${problem.category}` : null}
                   </p>
                 </button>
               ))
@@ -1955,20 +1974,12 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
     )
   }
 
-  if (isDev && !devSubject) {
-    return (
-      <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
-        Configurare invalidă: pentru modul dev este necesar <code className="text-white">devSubject</code> (
-        <code className="text-white">physics</code> sau <code className="text-white">informatics</code>).
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       {isDev ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          <strong>Mod dev:</strong> același editor ca la admin (preview lecție, itemi, reordonare, salvare).{" "}
+          <strong>Mod dev:</strong> același editor ca la admin; vezi <strong>toate</strong> capitolele și lecțiile (fizică, informatică,
+          matematică). Validarea tipurilor de item/lecție ține cont de capitol.{" "}
           <strong>Nu poți șterge sau dezactiva</strong> itemi din această interfață.
         </div>
       ) : null}
@@ -2010,6 +2021,10 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
               <p className="text-[11px] leading-snug text-gray-500">
                 Capitolul va fi marcat automat pentru parcursul de informatică (<code className="text-gray-400">problem_category</code>).
               </p>
+            ) : isDev && devSubject === "math" ? (
+              <p className="text-[11px] leading-snug text-gray-500">
+                Capitolul va fi marcat automat pentru parcursul de matematică (<code className="text-gray-400">problem_category</code>).
+              </p>
             ) : isDev && devSubject === "physics" ? (
               <label className="block text-[11px] text-gray-400">
                 Capitol catalog (opțional)
@@ -2027,12 +2042,20 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
                 </select>
               </label>
             ) : (
-              <Input
-                value={chapterForm.problem_category}
-                onChange={(e) => setChapterForm((f) => ({ ...f, problem_category: e.target.value }))}
-                placeholder="problem_category (opțional, ex. Lentile — legătură /probleme?capitol=)"
-                className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
-              />
+              <>
+                {isDev && devSubject === "all" ? (
+                  <p className="text-[11px] leading-snug text-gray-500">
+                    <code className="text-gray-400">problem_category</code>: lasă gol, sau <code className="text-gray-400">informatica</code>,{" "}
+                    <code className="text-gray-400">matematica</code>, sau un capitol din catalogul de fizică.
+                  </p>
+                ) : null}
+                <Input
+                  value={chapterForm.problem_category}
+                  onChange={(e) => setChapterForm((f) => ({ ...f, problem_category: e.target.value }))}
+                  placeholder="problem_category (opțional, ex. Lentile — legătură /probleme?capitol=)"
+                  className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+                />
+              </>
             )}
             <Input
               type="number"
@@ -2553,16 +2576,30 @@ export function LearningPathsManager({ mode = "admin", devSubject }: LearningPat
                         value={form.item_type}
                         onChange={(e) => {
                           const next = e.target.value as LearningPathLessonType
+                          setProblemSearch("")
                           setForm((prev) => {
                             if (!prev) return prev
+                            const inProblemSlot = prev.item_type === "problem" || prev.item_type === "math_problem"
+                            const nextInProblemSlot = next === "problem" || next === "math_problem"
+                            const crossesPhysicsMathCatalog =
+                              (prev.item_type === "problem" && next === "math_problem") ||
+                              (prev.item_type === "math_problem" && next === "problem")
+                            const shouldClearProblemId =
+                              (inProblemSlot && !nextInProblemSlot) || crossesPhysicsMathCatalog
+
                             if (isInteractiveLessonItemType(next)) {
                               return {
                                 ...prev,
                                 item_type: next,
+                                problem_id: shouldClearProblemId ? "" : prev.problem_id,
                                 interactive_json: JSON.stringify(getDefaultInteractiveItemContent(next), null, 2),
                               }
                             }
-                            return { ...prev, item_type: next }
+                            return {
+                              ...prev,
+                              item_type: next,
+                              problem_id: shouldClearProblemId ? "" : prev.problem_id,
+                            }
                           })
                         }}
                         className="w-full rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"

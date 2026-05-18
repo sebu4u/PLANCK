@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DevCatalogTools } from "@/components/dashboard/dev-catalog-tools"
 
-const ALLOWED = new Set(["fizica", "informatica"])
+const ALLOWED = new Set(["fizica", "informatica", "matematica"])
 
 export default async function DevCatalogSubjectPage({
   params,
@@ -29,5 +29,7 @@ export default async function DevCatalogSubjectPage({
     redirect("/dashboard")
   }
 
-  return <DevCatalogTools subjectKey={subject as "fizica" | "informatica"} />
+  return (
+    <DevCatalogTools subjectKey={subject as "fizica" | "informatica" | "matematica"} />
+  )
 }

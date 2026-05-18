@@ -44,6 +44,12 @@ alter table if exists public.coding_problems
   add column if not exists language text default 'cpp',
   add column if not exists boilerplate_python text;
 
+alter table if exists public.coding_problems
+  add column if not exists requirement_markdown text,
+  add column if not exists input_format text,
+  add column if not exists output_format text,
+  add column if not exists constraints_markdown text;
+
 update public.coding_problems
 set language = 'cpp'
 where language is null or trim(language) = '';
@@ -91,7 +97,7 @@ do $$
 begin
   alter table public.coding_problems
     add constraint coding_problems_difficulty_check
-      check (difficulty in ('Ușor', 'Mediu', 'Avansat', 'Concurs'))
+      check (difficulty in ('Inițiere', 'Ușor', 'Mediu', 'Avansat', 'Concurs'))
     not valid;
 exception
   when duplicate_object then null;

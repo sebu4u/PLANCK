@@ -26,6 +26,8 @@ import {
   getCompletedLearningPathItemIdsForUser,
   isUuid,
 } from "@/lib/supabase-learning-paths"
+import { MATH_PROBLEMS_PUBLIC_COLUMNS } from "@/data/math-problems"
+import { mathProblemRowToProblem } from "@/lib/math-problem-to-learning-path-problem"
 import { getLessonBySlug } from "@/lib/supabase-physics"
 import { cookies } from "next/headers"
 import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
@@ -198,6 +200,16 @@ export default async function InvataLessonItemPage({
   if (item.item_type === "problem" && item.problem_id) {
     const { data } = await supabase.from("problems").select("*").eq("id", item.problem_id).single()
     sourceProblem = data as Problem | null
+  } else if (item.item_type === "math_problem" && item.problem_id) {
+    const { data } = await supabase
+      .from("math_problems")
+      .select(MATH_PROBLEMS_PUBLIC_COLUMNS)
+      .eq("id", item.problem_id)
+      .eq("is_active", true)
+      .maybeSingle()
+    if (data) {
+      sourceProblem = mathProblemRowToProblem(data)
+    }
   }
 
   const sourceQuizQuestion =
@@ -209,7 +221,8 @@ export default async function InvataLessonItemPage({
     parsedIndex < items.length ? `${lessonBaseHref}/${parsedIndex + 1}` : lessonBaseHref
 
   const isPoll = item.item_type === "poll"
-  const isProblem = item.item_type === "problem" && !!sourceProblem
+  const isProblem =
+    (item.item_type === "problem" || item.item_type === "math_problem") && !!sourceProblem
   const isSimulation = item.item_type === "simulation"
   const isTest = item.item_type === "test"
   const isCardSort = item.item_type === "card_sort"

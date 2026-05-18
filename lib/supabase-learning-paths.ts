@@ -13,6 +13,7 @@ export type LearningPathLessonKind = "text" | "video" | "grila" | "problem"
 /** `learning_path_lesson_items.item_type` — includes interactive practice kinds. */
 export type LearningPathLessonType =
   | LearningPathLessonKind
+  | "math_problem"
   | "poll"
   | "custom_text"
   | "simulation"

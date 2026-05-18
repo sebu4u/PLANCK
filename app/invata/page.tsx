@@ -16,6 +16,7 @@ import type { Problem } from "@/data/problems"
 import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
+import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
 export const revalidate = 21600
@@ -44,7 +45,8 @@ export default async function InvataPage() {
       }
 
       problemsByChapterId[chapter.id] =
-        chapter.problem_category === INFORMATICA_LEARNING_PATH_MARKER
+        chapter.problem_category === INFORMATICA_LEARNING_PATH_MARKER ||
+        chapter.problem_category === MATEMATICA_LEARNING_PATH_MARKER
           ? []
           : chapter.problem_category
             ? await getRandomProblemsByCategory(chapter.problem_category, 3)

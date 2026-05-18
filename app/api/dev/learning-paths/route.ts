@@ -8,10 +8,31 @@ import {
 } from "@/lib/learning-path-interactive-items"
 import { requireDevSession } from "@/lib/dev-api-session"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
+import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
-type DevSubject = "physics" | "informatics"
+type DevSubject = "physics" | "informatics" | "math" | "all"
+
+function parseSubjectStrict(trimmedInput: string): DevSubject | null {
+  const s = trimmedInput.trim()
+  if (s === "physics" || s === "informatics" || s === "math" || s === "all") return s
+  return null
+}
+
+/** GET: parametru absent / gol → `all` (toate parcursurile). */
+function resolveQuerySubject(raw: string | null): DevSubject | null {
+  if (raw === null || raw.trim() === "") return "all"
+  return parseSubjectStrict(raw)
+}
+
+/** POST/PUT: lipsește subject → `all`. Valoare invalidă → null. */
+function parseBodySubject(raw: unknown): DevSubject | null {
+  if (raw === undefined || raw === null) return "all"
+  if (typeof raw !== "string") return null
+  if (raw.trim() === "") return "all"
+  return parseSubjectStrict(raw)
+}
 
 const LESSON_TYPES = ["text", "video", "grila", "problem"] as const
 const ITEM_TYPES = [
@@ -19,6 +40,7 @@ const ITEM_TYPES = [
   "video",
   "grila",
   "problem",
+  "math_problem",
   "poll",
   "custom_text",
   "simulation",
@@ -58,6 +80,40 @@ function formatDbError(error: unknown): string {
   const dbError = error as DbErrorLike
   const parts = [dbError.code, dbError.message, dbError.details, dbError.hint].filter(Boolean)
   return parts.join(" | ") || "Unknown database error."
+}
+
+/** Răspuns JSON pentru eșec la insert item — mesaj clar pentru migrări lipsă + detalii Postgres în dev. */
+function jsonLessonItemCreateError(error: unknown): NextResponse {
+  const details = formatDbError(error)
+  const db = error as DbErrorLike
+  const code = db.code
+  const msg = String(db.message || "")
+  const combinedCheck = [msg, db.details, db.hint].filter(Boolean).join(" ")
+
+  if (code === "23514" && combinedCheck.includes("learning_path_lesson_items_item_type_check")) {
+    return NextResponse.json(
+      {
+        error:
+          "Tipul «math_problem» (sau alt tip nou) nu este permis de constraint-ul din Postgres. Aplică migrarea `supabase/migrations/20260518_learning_path_math_problem_item.sql` pe proiectul Supabase, apoi încearcă din nou.",
+        details,
+      },
+      { status: 500 }
+    )
+  }
+
+  if (code === "23505" && combinedCheck.includes("idx_learning_path_lesson_items_lesson_order_unique")) {
+    return NextResponse.json(
+      {
+        error:
+          "Există deja un item la același order_index pentru această lecție. Reîncarcă pagina și alege altă poziție.",
+        details,
+      },
+      { status: 500 }
+    )
+  }
+
+  logger.error("[dev/learning-paths] create item:", details)
+  return NextResponse.json({ error: "Nu am putut crea itemul.", details }, { status: 500 })
 }
 
 async function shiftItemOrderRange(
@@ -195,6 +251,9 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   if (itemType === "problem" && !toNullableString(body.problem_id)) {
     return "Pentru item de tip problem, câmpul problem_id este obligatoriu."
   }
+  if (itemType === "math_problem" && !toNullableString(body.problem_id)) {
+    return "Pentru item de tip math_problem, câmpul problem_id este obligatoriu."
+  }
 
   if (itemType === "custom_text") {
     const content = body.content_json
@@ -233,25 +292,23 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   return null
 }
 
-function parseSubject(raw: string | null): DevSubject | null {
-  const s = raw?.trim()
-  if (s === "physics" || s === "informatics") return s
-  return null
-}
-
 function chapterVisibleForSubject(
   chapter: { problem_category: string | null },
   subject: DevSubject
 ): boolean {
+  if (subject === "all") return true
   const pc = chapter.problem_category?.trim() || null
   if (subject === "informatics") {
     return pc === INFORMATICA_LEARNING_PATH_MARKER
   }
-  return pc !== INFORMATICA_LEARNING_PATH_MARKER
+  if (subject === "math") {
+    return pc === MATEMATICA_LEARNING_PATH_MARKER
+  }
+  return pc !== INFORMATICA_LEARNING_PATH_MARKER && pc !== MATEMATICA_LEARNING_PATH_MARKER
 }
 
 /**
- * GET ?subject=physics|informatics — structură filtrată (doar citire).
+ * GET ?subject=… (opțional) — fără param sau `all` = toate parcursurile; altfel filtrat pe domeniu.
  * GET ?subject=...&action=quiz-questions — pentru itemi grilă (ca admin).
  * POST — creare capitol/lecție/item.
  * PUT — actualizare / reordonare (fără DELETE).
@@ -262,9 +319,12 @@ export async function GET(req: NextRequest) {
     if (auth instanceof NextResponse) return auth
 
     const { searchParams } = new URL(req.url)
-    const subject = parseSubject(searchParams.get("subject"))
+    const subject = resolveQuerySubject(searchParams.get("subject"))
     if (!subject) {
-      return NextResponse.json({ error: "Parametrul subject trebuie să fie physics sau informatics." }, { status: 400 })
+      return NextResponse.json(
+        { error: "Parametrul subject trebuie să fie all, physics, informatics sau math." },
+        { status: 400 }
+      )
     }
 
     const supabase = createServiceClient()
@@ -356,9 +416,12 @@ export async function POST(req: NextRequest) {
     if (auth instanceof NextResponse) return auth
 
     const body = await req.json()
-    const subject = parseSubject(typeof body.subject === "string" ? body.subject : null)
-    if (!subject) {
-      return NextResponse.json({ error: "subject în body trebuie să fie physics sau informatics." }, { status: 400 })
+    const subject = parseBodySubject((body as Record<string, unknown>).subject)
+    if (subject === null) {
+      return NextResponse.json(
+        { error: "subject în body trebuie să fie all, physics, informatics sau math." },
+        { status: 400 }
+      )
     }
 
     const supabase = createServiceClient()
@@ -374,10 +437,34 @@ export async function POST(req: NextRequest) {
       let problem_category: string | null
       if (subject === "informatics") {
         problem_category = INFORMATICA_LEARNING_PATH_MARKER
+      } else if (subject === "math") {
+        problem_category = MATEMATICA_LEARNING_PATH_MARKER
+      } else if (subject === "all") {
+        const rawPc = toNullableString(body.problem_category)
+        if (!rawPc) {
+          problem_category = null
+        } else if (
+          rawPc === INFORMATICA_LEARNING_PATH_MARKER ||
+          rawPc === MATEMATICA_LEARNING_PATH_MARKER ||
+          isPhysicsCatalogCategory(rawPc)
+        ) {
+          problem_category = rawPc
+        } else {
+          return NextResponse.json(
+            {
+              error:
+                "problem_category invalid: lasă gol, sau informatica, matematica, sau un capitol valid din catalogul de fizică.",
+            },
+            { status: 400 }
+          )
+        }
       } else {
         const rawPc = toNullableString(body.problem_category)
         if (rawPc === INFORMATICA_LEARNING_PATH_MARKER) {
           return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de informatică." }, { status: 400 })
+        }
+        if (rawPc === MATEMATICA_LEARNING_PATH_MARKER) {
+          return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de matematică." }, { status: 400 })
         }
         if (!rawPc) {
           problem_category = null
@@ -427,7 +514,10 @@ export async function POST(req: NextRequest) {
       }
 
       if (!chapterVisibleForSubject(chapterRow, subject)) {
-        return NextResponse.json({ error: "Capitolul nu aparține domeniului selectat (fizică / informatică)." }, { status: 403 })
+        return NextResponse.json(
+          { error: "Capitolul nu aparține domeniului selectat (fizică / informatică / matematică)." },
+          { status: 403 }
+        )
       }
 
       const lessonType = toNullableString(body.lesson_type) || "text"
@@ -435,8 +525,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "lesson_type invalid." }, { status: 400 })
       }
 
-      if (subject === "informatics" && lessonType === "problem") {
-        return NextResponse.json({ error: "Pentru parcursuri de informatică nu se adaugă lecții de tip problem (catalog fizică)." }, { status: 400 })
+      const chapterPc = chapterRow.problem_category?.trim() || null
+      if (
+        lessonType === "problem" &&
+        (chapterPc === INFORMATICA_LEARNING_PATH_MARKER || chapterPc === MATEMATICA_LEARNING_PATH_MARKER)
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Lecția de tip problem (catalog fizică) nu se folosește pentru capitole de informatică sau matematică.",
+          },
+          { status: 400 }
+        )
       }
 
       const payload = {
@@ -472,13 +572,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "item_type invalid." }, { status: 400 })
     }
 
-    if (subject === "informatics" && itemType === "problem") {
-      return NextResponse.json(
-        { error: "Itemii de tip problem din learning path folosesc catalogul de fizică; nu sunt permiși pentru informatică." },
-        { status: 400 }
-      )
-    }
-
     const { data: lessonRow, error: lessonErr } = await supabase
       .from("learning_path_lessons")
       .select("id, chapter_id")
@@ -503,12 +596,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Lecția nu aparține domeniului selectat." }, { status: 403 })
     }
 
+    const itemChapterPc = chapterRow.problem_category?.trim() || null
+    if (
+      itemChapterPc === INFORMATICA_LEARNING_PATH_MARKER &&
+      (itemType === "problem" || itemType === "math_problem")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Pe capitole de informatică nu se folosesc itemii problem / math_problem (catalog fizică / matematică).",
+        },
+        { status: 400 }
+      )
+    }
+    if (itemChapterPc === MATEMATICA_LEARNING_PATH_MARKER && itemType === "problem") {
+      return NextResponse.json(
+        {
+          error:
+            "Pe capitole de matematică folosește itemul math_problem (catalog matematică), nu problem (fizică).",
+        },
+        { status: 400 }
+      )
+    }
+
     const validationError = validateItemBody(itemType, body as Record<string, unknown>)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    if (subject === "physics" && itemType === "problem") {
+    if (
+      itemType === "problem" &&
+      itemChapterPc !== INFORMATICA_LEARNING_PATH_MARKER &&
+      itemChapterPc !== MATEMATICA_LEARNING_PATH_MARKER
+    ) {
       const problemId = toNullableString(body.problem_id)
       if (!problemId) {
         return NextResponse.json({ error: "problem_id lipsă." }, { status: 400 })
@@ -522,13 +642,31 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Problema (fizică) nu există în catalog." }, { status: 400 })
       }
       const chCat = chapterRow.problem_category?.trim() || null
-      if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER) {
+      if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER && chCat !== MATEMATICA_LEARNING_PATH_MARKER) {
         if (problemRow.category !== chCat) {
           return NextResponse.json(
             { error: `Problema are categoria „${problemRow.category}”, dar capitolul cere „${chCat}”."` },
             { status: 400 }
           )
         }
+      }
+    }
+
+    if (itemType === "math_problem" && itemChapterPc !== INFORMATICA_LEARNING_PATH_MARKER) {
+      const problemId = toNullableString(body.problem_id)
+      if (!problemId) {
+        return NextResponse.json({ error: "problem_id lipsă." }, { status: 400 })
+      }
+      const { data: mathRow, error: mErr } = await supabase
+        .from("math_problems")
+        .select("id, is_active")
+        .eq("id", problemId)
+        .maybeSingle()
+      if (mErr || !mathRow) {
+        return NextResponse.json({ error: "Problema de matematică nu există în catalog." }, { status: 400 })
+      }
+      if (!mathRow.is_active) {
+        return NextResponse.json({ error: "Problema de matematică nu este activă." }, { status: 400 })
       }
     }
 
@@ -550,8 +688,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase.from("learning_path_lesson_items").insert(payload).select().single()
     if (error) {
-      logger.error("[dev/learning-paths] create item:", formatDbError(error))
-      return NextResponse.json({ error: "Nu am putut crea itemul." }, { status: 500 })
+      return jsonLessonItemCreateError(error)
     }
 
     return NextResponse.json({ success: true, item: data })
@@ -567,9 +704,12 @@ export async function PUT(req: NextRequest) {
     if (auth instanceof NextResponse) return auth
 
     const body = await req.json()
-    const subject = parseSubject(typeof body.subject === "string" ? body.subject : null)
-    if (!subject) {
-      return NextResponse.json({ error: "subject în body trebuie să fie physics sau informatics." }, { status: 400 })
+    const subject = parseBodySubject((body as Record<string, unknown>).subject)
+    if (subject === null) {
+      return NextResponse.json(
+        { error: "subject în body trebuie să fie all, physics, informatics sau math." },
+        { status: 400 }
+      )
     }
 
     const supabase = createServiceClient()
@@ -606,10 +746,39 @@ export async function PUT(req: NextRequest) {
           if (rawPc && rawPc !== INFORMATICA_LEARNING_PATH_MARKER) {
             return NextResponse.json({ error: "Capitolele de informatică păstrează marcatorul fix." }, { status: 400 })
           }
+          if (rawPc === MATEMATICA_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Nu poți seta marcatorul de matematică pe un capitol de informatică." }, { status: 400 })
+          }
           updateData.problem_category = INFORMATICA_LEARNING_PATH_MARKER
+        } else if (subject === "math") {
+          if (rawPc && rawPc !== MATEMATICA_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Capitolele de matematică păstrează marcatorul fix." }, { status: 400 })
+          }
+          updateData.problem_category = MATEMATICA_LEARNING_PATH_MARKER
+        } else if (subject === "all") {
+          if (!rawPc) {
+            updateData.problem_category = null
+          } else if (
+            rawPc === INFORMATICA_LEARNING_PATH_MARKER ||
+            rawPc === MATEMATICA_LEARNING_PATH_MARKER ||
+            isPhysicsCatalogCategory(rawPc)
+          ) {
+            updateData.problem_category = rawPc
+          } else {
+            return NextResponse.json(
+              {
+                error:
+                  "problem_category invalid: informatica, matematica, gol, sau capitol din catalogul de fizică.",
+              },
+              { status: 400 }
+            )
+          }
         } else {
           if (rawPc === INFORMATICA_LEARNING_PATH_MARKER) {
             return NextResponse.json({ error: "Nu poți seta marcatorul de informatică pe un capitol de fizică." }, { status: 400 })
+          }
+          if (rawPc === MATEMATICA_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Nu poți seta marcatorul de matematică pe un capitol de fizică." }, { status: 400 })
           }
           if (rawPc && !isPhysicsCatalogCategory(rawPc)) {
             return NextResponse.json({ error: "problem_category invalid pentru fizică." }, { status: 400 })
@@ -672,8 +841,27 @@ export async function PUT(req: NextRequest) {
         if (!lessonType || !LESSON_TYPES.includes(lessonType as (typeof LESSON_TYPES)[number])) {
           return NextResponse.json({ error: "lesson_type invalid." }, { status: 400 })
         }
-        if (subject === "informatics" && lessonType === "problem") {
-          return NextResponse.json({ error: "Lecția problem nu e permisă pentru informatică." }, { status: 400 })
+        const targetChapterId =
+          body.chapter_id !== undefined ? toNullableString(body.chapter_id) : existingLesson.chapter_id
+        if (targetChapterId) {
+          const { data: chForLessonType } = await supabase
+            .from("learning_path_chapters")
+            .select("problem_category")
+            .eq("id", targetChapterId)
+            .maybeSingle()
+          const lpc = chForLessonType?.problem_category?.trim() || null
+          if (
+            lessonType === "problem" &&
+            (lpc === INFORMATICA_LEARNING_PATH_MARKER || lpc === MATEMATICA_LEARNING_PATH_MARKER)
+          ) {
+            return NextResponse.json(
+              {
+                error:
+                  "Lecția de tip problem (catalog fizică) nu se folosește pentru capitole de informatică sau matematică.",
+              },
+              { status: 400 }
+            )
+          }
         }
         updateData.lesson_type = lessonType
       }
@@ -720,8 +908,34 @@ export async function PUT(req: NextRequest) {
       if (!itemType || !ITEM_TYPES.includes(itemType as (typeof ITEM_TYPES)[number])) {
         return NextResponse.json({ error: "item_type invalid." }, { status: 400 })
       }
-      if (subject === "informatics" && itemType === "problem") {
-        return NextResponse.json({ error: "Tipul problem nu e permis pentru informatică." }, { status: 400 })
+      const lessonIdForItemPut =
+        body.lesson_id !== undefined ? toNullableString(body.lesson_id) : currentItem.lesson_id
+      if (!lessonIdForItemPut) {
+        return NextResponse.json({ error: "lesson_id invalid." }, { status: 400 })
+      }
+      const chForIncomingItem = await getChapterForLesson(supabase, lessonIdForItemPut)
+      if (!chForIncomingItem) {
+        return NextResponse.json({ error: "Capitolul lecției nu a putut fi rezolvat." }, { status: 400 })
+      }
+      const pcPut = chForIncomingItem.problem_category?.trim() || null
+      if (
+        pcPut === INFORMATICA_LEARNING_PATH_MARKER &&
+        (itemType === "problem" || itemType === "math_problem")
+      ) {
+        return NextResponse.json(
+          {
+            error: "Pe capitole de informatică nu se folosesc itemii problem / math_problem.",
+          },
+          { status: 400 }
+        )
+      }
+      if (pcPut === MATEMATICA_LEARNING_PATH_MARKER && itemType === "problem") {
+        return NextResponse.json(
+          {
+            error: "Pe capitole de matematică folosește itemul math_problem, nu problem.",
+          },
+          { status: 400 }
+        )
       }
       const validationError = validateItemBody(itemType, body as Record<string, unknown>)
       if (validationError) {
@@ -742,9 +956,6 @@ export async function PUT(req: NextRequest) {
     updateData.updated_at = new Date().toISOString()
 
     const effectiveItemType = (updateData.item_type as string | undefined) ?? (currentItem as { item_type: string }).item_type
-    if (subject === "informatics" && effectiveItemType === "problem") {
-      return NextResponse.json({ error: "Itemul problem nu e permis pentru informatică." }, { status: 400 })
-    }
 
     const targetLessonIdForScope =
       typeof updateData.lesson_id === "string" && updateData.lesson_id.trim()
@@ -755,7 +966,29 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Lecția țintă nu este permisă." }, { status: 400 })
     }
 
-    if (subject === "physics" && (effectiveItemType === "problem" || toNullableString(body.problem_id))) {
+    const pcTarget = chTarget.problem_category?.trim() || null
+    if (
+      pcTarget === INFORMATICA_LEARNING_PATH_MARKER &&
+      (effectiveItemType === "problem" || effectiveItemType === "math_problem")
+    ) {
+      return NextResponse.json(
+        { error: "Itemul problem / math_problem nu e permis pe capitole de informatică." },
+        { status: 400 }
+      )
+    }
+    if (pcTarget === MATEMATICA_LEARNING_PATH_MARKER && effectiveItemType === "problem") {
+      return NextResponse.json(
+        { error: "Itemul problem (fizică) nu e permis pe capitole de matematică." },
+        { status: 400 }
+      )
+    }
+
+    if (
+      pcTarget !== INFORMATICA_LEARNING_PATH_MARKER &&
+      (effectiveItemType === "problem" ||
+        effectiveItemType === "math_problem" ||
+        toNullableString(body.problem_id))
+    ) {
       const pid = toNullableString(body.problem_id) ?? null
       const { data: rowFull } = await supabase.from("learning_path_lesson_items").select("problem_id").eq("id", id).single()
       const effectivePid = pid ?? (rowFull as { problem_id?: string | null } | null)?.problem_id
@@ -769,13 +1002,26 @@ export async function PUT(req: NextRequest) {
           return NextResponse.json({ error: "Problema (fizică) nu există în catalog." }, { status: 400 })
         }
         const chCat = chTarget.problem_category?.trim() || null
-        if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER) {
+        if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER && chCat !== MATEMATICA_LEARNING_PATH_MARKER) {
           if (problemRow.category !== chCat) {
             return NextResponse.json(
               { error: `Problema are categoria „${problemRow.category}”, dar capitolul cere „${chCat}”."` },
               { status: 400 }
             )
           }
+        }
+      }
+      if (effectiveItemType === "math_problem" && effectivePid) {
+        const { data: mathRow, error: mErr } = await supabase
+          .from("math_problems")
+          .select("id, is_active")
+          .eq("id", effectivePid)
+          .maybeSingle()
+        if (mErr || !mathRow) {
+          return NextResponse.json({ error: "Problema de matematică nu există în catalog." }, { status: 400 })
+        }
+        if (!mathRow.is_active) {
+          return NextResponse.json({ error: "Problema de matematică nu este activă." }, { status: 400 })
         }
       }
     }

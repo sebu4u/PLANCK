@@ -18,6 +18,7 @@ const ITEM_TYPES = [
   "video",
   "grila",
   "problem",
+  "math_problem",
   "poll",
   "custom_text",
   "simulation",
@@ -199,6 +200,9 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   }
   if (itemType === "problem" && !toNullableString(body.problem_id)) {
     return "Pentru item de tip problem, câmpul problem_id este obligatoriu."
+  }
+  if (itemType === "math_problem" && !toNullableString(body.problem_id)) {
+    return "Pentru item de tip math_problem, câmpul problem_id este obligatoriu."
   }
 
   if (itemType === "custom_text") {
@@ -403,6 +407,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
+    if (itemType === "math_problem") {
+      const mid = toNullableString(body.problem_id)
+      if (mid) {
+        const { data: mathRow, error: mErr } = await supabase
+          .from("math_problems")
+          .select("id, is_active")
+          .eq("id", mid)
+          .maybeSingle()
+        if (mErr || !mathRow) {
+          return NextResponse.json({ error: "Problema de matematică nu există în catalog." }, { status: 400 })
+        }
+        if (!mathRow.is_active) {
+          return NextResponse.json({ error: "Problema de matematică nu este activă." }, { status: 400 })
+        }
+      }
+    }
+
     const requestedOrderIndex = toInt(body.order_index, 0)
     const payload = {
       lesson_id: lessonId,
@@ -531,12 +552,30 @@ export async function PUT(req: NextRequest) {
 
     const { data: currentItem, error: currentItemErr } = await supabase
       .from("learning_path_lesson_items")
-      .select("id, lesson_id, order_index")
+      .select("id, lesson_id, order_index, item_type, problem_id")
       .eq("id", id)
       .single()
     if (currentItemErr || !currentItem) {
       logger.error("[admin/learning-paths] Failed to fetch lesson item before update:", formatDbError(currentItemErr))
       return NextResponse.json({ error: "Itemul nu există sau nu poate fi citit." }, { status: 404 })
+    }
+
+    const effectiveItemType = (updateData.item_type as string | undefined) ?? currentItem.item_type
+    const effectiveProblemId =
+      body.problem_id !== undefined ? toNullableString(body.problem_id) : currentItem.problem_id
+
+    if (effectiveItemType === "math_problem" && effectiveProblemId) {
+      const { data: mathRow, error: mErr } = await supabase
+        .from("math_problems")
+        .select("id, is_active")
+        .eq("id", effectiveProblemId)
+        .maybeSingle()
+      if (mErr || !mathRow) {
+        return NextResponse.json({ error: "Problema de matematică nu există în catalog." }, { status: 400 })
+      }
+      if (!mathRow.is_active) {
+        return NextResponse.json({ error: "Problema de matematică nu este activă." }, { status: 400 })
+      }
     }
 
     const targetLessonId =

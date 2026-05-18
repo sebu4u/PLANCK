@@ -43,6 +43,7 @@ const DEV_SUBJECT_CARDS: {
   {
     title: "Matematică",
     className: "border-sky-200 bg-sky-50/80 text-sky-950",
+    href: "/dashboard/dev/catalog/matematica",
   },
   {
     title: "Informatică",
