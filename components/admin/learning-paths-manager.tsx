@@ -333,9 +333,15 @@ export interface LearningPathsManagerProps {
   mode?: "admin" | "dev"
   /** Mod dev: opțional; lipsă sau `all` = toate parcursurile (recomandat). */
   devSubject?: "physics" | "informatics" | "math" | "all"
+  /** Mod dev: apelat după crearea unui item nou (card motivațional). */
+  onDevCelebrate?: () => void
 }
 
-export function LearningPathsManager({ mode = "admin", devSubject: devSubjectProp }: LearningPathsManagerProps = {}) {
+export function LearningPathsManager({
+  mode = "admin",
+  devSubject: devSubjectProp,
+  onDevCelebrate,
+}: LearningPathsManagerProps = {}) {
   const [chapters, setChapters] = useState<LearningPathChapter[]>([])
   const [lessons, setLessons] = useState<LearningPathLesson[]>([])
   const [items, setItems] = useState<LearningPathLessonItem[]>([])
@@ -802,6 +808,9 @@ export function LearningPathsManager({ mode = "admin", devSubject: devSubjectPro
 
       setSuccessMessage(form.id ? "Item actualizat cu succes." : "Item creat cu succes.")
       setTimeout(() => setSuccessMessage(null), 3000)
+      if (isDev && !form.id) {
+        onDevCelebrate?.()
+      }
       await fetchData()
       resetForm()
     } catch (err: any) {

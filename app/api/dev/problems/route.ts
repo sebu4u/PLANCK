@@ -55,6 +55,72 @@ function parseMathAnswerSubpoints(raw: unknown):
   return { ok: true, value }
 }
 
+type ParsedCodingTest = {
+  stdin: string
+  expected_stdout: string
+  is_sample: boolean
+  weight: number
+  order_index: number
+}
+
+function parseCodingProblemTests(raw: unknown):
+  | { ok: true; value: ParsedCodingTest[] }
+  | { ok: false; message: string } {
+  if (raw === undefined || raw === null) {
+    return { ok: false, message: "Adaugă cel puțin un test (stdin + ieșire așteptată)." }
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, message: "tests trebuie să fie un array de obiecte." }
+  }
+  if (raw.length === 0) {
+    return { ok: false, message: "Problema trebuie să aibă cel puțin un test pentru judge." }
+  }
+
+  const value: ParsedCodingTest[] = []
+  let totalWeight = 0
+
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i]
+    if (!item || typeof item !== "object") {
+      return { ok: false, message: `Testul #${i + 1} trebuie să fie un obiect.` }
+    }
+    const o = item as Record<string, unknown>
+    if (typeof o.stdin !== "string" || typeof o.expected_stdout !== "string") {
+      return {
+        ok: false,
+        message: `Testul #${i + 1}: stdin și expected_stdout trebuie să fie stringuri (pot fi goale).`,
+      }
+    }
+
+    const weightRaw = o.weight
+    const weight =
+      typeof weightRaw === "number" && Number.isFinite(weightRaw) && weightRaw >= 0
+        ? weightRaw
+        : typeof weightRaw === "string" && weightRaw.trim()
+          ? Number.parseFloat(weightRaw)
+          : 1
+
+    if (!Number.isFinite(weight) || weight < 0) {
+      return { ok: false, message: `Testul #${i + 1}: weight trebuie să fie un număr ≥ 0.` }
+    }
+
+    totalWeight += weight
+    value.push({
+      stdin: o.stdin,
+      expected_stdout: o.expected_stdout,
+      is_sample: o.is_sample === true,
+      weight,
+      order_index: i,
+    })
+  }
+
+  if (totalWeight <= 0) {
+    return { ok: false, message: "Suma ponderilor testelor trebuie să fie mai mare decât 0." }
+  }
+
+  return { ok: true, value }
+}
+
 function parseCodingTags(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw
@@ -389,12 +455,37 @@ export async function POST(req: NextRequest) {
       language,
     }
 
+    const parsedTests = parseCodingProblemTests(body.tests)
+    if (!parsedTests.ok) {
+      return NextResponse.json({ error: parsedTests.message }, { status: 400 })
+    }
+
     const { data, error } = await service.from("coding_problems").insert(insertRow).select("id, slug, title").single()
     if (error) {
       logger.error("[dev/problems] coding insert:", error)
       return NextResponse.json({ error: error.message || "Nu am putut crea problema de informatică." }, { status: 500 })
     }
-    return NextResponse.json({ success: true, problem: data })
+
+    const testRows = parsedTests.value.map((t) => ({
+      problem_id: data.id,
+      stdin: t.stdin,
+      expected_stdout: t.expected_stdout,
+      is_sample: t.is_sample,
+      weight: t.weight,
+      order_index: t.order_index,
+    }))
+
+    const { error: testsError } = await service.from("coding_problem_tests").insert(testRows)
+    if (testsError) {
+      logger.error("[dev/problems] coding tests insert:", testsError)
+      await service.from("coding_problems").delete().eq("id", data.id)
+      return NextResponse.json(
+        { error: testsError.message || "Nu am putut salva testele problemei." },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true, problem: data, tests_count: testRows.length })
   } catch (e) {
     logger.error("[dev/problems] POST:", e)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })

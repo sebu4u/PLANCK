@@ -10,7 +10,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
 import { LearningPathsManager } from "@/components/admin/learning-paths-manager"
-import { Loader2, ArrowLeft } from "lucide-react"
+import { DevCelebrationCard } from "@/components/dashboard/dev-celebration-card"
+import { pickRandomDevCelebrationMessage, type DevCelebrationMessage } from "@/lib/dev-celebration-messages"
+import { Loader2, ArrowLeft, Plus, Trash2, ExternalLink } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type SubjectKey = "fizica" | "informatica" | "matematica"
 type ApiSubject = "physics" | "informatics" | "math"
@@ -19,6 +23,12 @@ function toApiSubject(key: SubjectKey): ApiSubject {
   if (key === "fizica") return "physics"
   if (key === "informatica") return "informatics"
   return "math"
+}
+
+function publicCatalogHref(key: SubjectKey): string {
+  if (key === "fizica") return "/probleme"
+  if (key === "informatica") return "/informatica/probleme"
+  return "/matematica/probleme"
 }
 
 const CODING_DIFFICULTIES = ["Inițiere", "Ușor", "Mediu", "Avansat", "Concurs"] as const
@@ -42,6 +52,17 @@ function initialMathForm() {
   }
 }
 
+type InformaticsTestRow = {
+  stdin: string
+  expected_stdout: string
+  is_sample: boolean
+  weight: number
+}
+
+function initialInformaticsTestRow(isSample = false): InformaticsTestRow {
+  return { stdin: "", expected_stdout: "", is_sample: isSample, weight: 1 }
+}
+
 function initialInformaticsForm() {
   return {
     slug: "",
@@ -63,6 +84,7 @@ function initialInformaticsForm() {
     explanation_markdown: "",
     boilerplate_cpp: "",
     boilerplate_python: "",
+    tests: [initialInformaticsTestRow(true)],
   }
 }
 
@@ -107,6 +129,12 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   const [infoForm, setInfoForm] = useState(initialInformaticsForm)
 
   const [mathForm, setMathForm] = useState(initialMathForm)
+
+  const [celebration, setCelebration] = useState<DevCelebrationMessage | null>(null)
+
+  const triggerDevCelebration = useCallback(() => {
+    setCelebration(pickRandomDevCelebrationMessage())
+  }, [])
 
   const reloadProblems = useCallback(async () => {
     const headers = await getAuthJsonHeaders()
@@ -164,6 +192,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         return
       }
       setFlash("Problema de fizică a fost adăugată.")
+      triggerDevCelebration()
       setPhysForm((f) => ({ ...f, id: "", title: "", statement: "" }))
       await reloadProblems()
     })
@@ -179,6 +208,23 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean)
+
+      const tests = infoForm.tests.map((t) => ({
+        stdin: t.stdin,
+        expected_stdout: t.expected_stdout,
+        is_sample: t.is_sample,
+        weight: t.weight,
+      }))
+      const totalWeight = tests.reduce((sum, t) => sum + (Number.isFinite(t.weight) && t.weight >= 0 ? t.weight : 0), 0)
+      if (tests.length === 0) {
+        setErr("Adaugă cel puțin un test pentru judge.")
+        return
+      }
+      if (totalWeight <= 0) {
+        setErr("Suma ponderilor testelor trebuie să fie mai mare decât 0.")
+        return
+      }
+
       const res = await fetch("/api/dev/problems", {
         method: "POST",
         headers,
@@ -203,6 +249,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
           explanation_markdown: infoForm.explanation_markdown.trim(),
           boilerplate_cpp: infoForm.boilerplate_cpp,
           boilerplate_python: infoForm.boilerplate_python,
+          tests,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -210,7 +257,9 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         setErr(data.error || "Eroare la salvare.")
         return
       }
-      setFlash("Problema de informatică a fost adăugată.")
+      const count = typeof data.tests_count === "number" ? data.tests_count : tests.length
+      setFlash(`Problema de informatică a fost adăugată (${count} teste).`)
+      triggerDevCelebration()
       setInfoForm(initialInformaticsForm())
       await reloadProblems()
     })
@@ -256,6 +305,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         return
       }
       setFlash("Problema de matematică a fost adăugată.")
+      triggerDevCelebration()
       setMathForm(initialMathForm())
       await reloadProblems()
     })
@@ -263,7 +313,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   return (
     <>
       <Navigation />
-      <main className="mx-auto max-w-4xl px-4 pb-10 pt-24">
+      <main className="mx-auto max-w-[1500px] px-4 pb-10 pt-24">
         <Link
           href="/dashboard/dev"
           className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -282,8 +332,9 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
             </>
           ) : (
             <>
-              Mai jos poți <strong>adăuga probleme</strong> în catalog. Secțiunea learning path folosește același editor ca la
-              admin (preview, itemi, salvare, reordonare), dar <strong>fără ștergere sau dezactivare</strong> itemi.
+              Poți <strong>adăuga probleme</strong> în catalog sau edita <strong>learning path</strong>-urile din tab-urile de
+              mai jos. Editorul de learning path este același ca la admin (preview, itemi, salvare, reordonare), dar{" "}
+              <strong>fără ștergere sau dezactivare</strong> itemi.
             </>
           )}
         </p>
@@ -297,8 +348,23 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
           <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{err}</p>
         ) : null}
 
-        <section className="mt-10 space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Catalog probleme</h2>
+        <Tabs defaultValue="catalog" className="mt-10">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="catalog">Catalog probleme</TabsTrigger>
+            <TabsTrigger value="learning-paths">Learning paths</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="catalog" className="mt-6">
+            <section className="mx-auto max-w-4xl space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-900">Catalog probleme</h2>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={publicCatalogHref(subjectKey)} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                    Deschide catalogul public
+                  </Link>
+                </Button>
+              </div>
           {subjectKey === "fizica" ? (
             <div className="space-y-3">
               <div className="grid gap-2 sm:grid-cols-2">
@@ -487,8 +553,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
           ) : (
             <div className="space-y-8">
               <p className="text-xs text-gray-500">
-                Completează câmpurile obligatorii (slug, titlu, enunț). Restul sunt opționale. După creare, adaugă testele în
-                Supabase (<span className="font-mono">coding_problem_tests</span>) ca problema să poată fi judecată.
+                Completează câmpurile obligatorii (slug, titlu, enunț) și cel puțin un test judge. Restul sunt opționale.
               </p>
 
               <div className="space-y-3">
@@ -748,6 +813,134 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                 </div>
               </div>
 
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">Teste judge</p>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Fiecare test are intrare (<span className="font-mono">stdin</span>) și ieșire așteptată. Marchează
+                      „Exemplu” pentru teste vizibile în enunț (pondere 0 = nu contează la scor).
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      setInfoForm((f) => ({
+                        ...f,
+                        tests: [...f.tests, initialInformaticsTestRow(false)],
+                      }))
+                    }
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Adaugă test
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {infoForm.tests.map((test, index) => (
+                    <div key={index} className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-800">Test #{index + 1}</p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className="flex items-center gap-2 text-xs text-gray-700">
+                            <Checkbox
+                              checked={test.is_sample}
+                              onCheckedChange={(checked) =>
+                                setInfoForm((f) => ({
+                                  ...f,
+                                  tests: f.tests.map((row, i) =>
+                                    i === index ? { ...row, is_sample: checked === true } : row
+                                  ),
+                                }))
+                              }
+                            />
+                            Exemplu
+                          </label>
+                          <label className="flex items-center gap-2 text-xs text-gray-700">
+                            Pondere
+                            <Input
+                              type="number"
+                              min={0}
+                              step={0.5}
+                              className="h-8 w-20"
+                              value={test.weight}
+                              onChange={(e) =>
+                                setInfoForm((f) => ({
+                                  ...f,
+                                  tests: f.tests.map((row, i) =>
+                                    i === index
+                                      ? { ...row, weight: Number.parseFloat(e.target.value) || 0 }
+                                      : row
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                          {infoForm.tests.length > 1 ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-red-600 hover:text-red-700"
+                              disabled={busy}
+                              onClick={() =>
+                                setInfoForm((f) => ({
+                                  ...f,
+                                  tests: f.tests.filter((_, i) => i !== index),
+                                }))
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`info-test-stdin-${index}`}>Intrare (stdin)</Label>
+                          <Textarea
+                            id={`info-test-stdin-${index}`}
+                            rows={4}
+                            className="font-mono text-xs"
+                            placeholder={"2\n3\n"}
+                            value={test.stdin}
+                            onChange={(e) =>
+                              setInfoForm((f) => ({
+                                ...f,
+                                tests: f.tests.map((row, i) =>
+                                  i === index ? { ...row, stdin: e.target.value } : row
+                                ),
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`info-test-stdout-${index}`}>Ieșire așteptată</Label>
+                          <Textarea
+                            id={`info-test-stdout-${index}`}
+                            rows={4}
+                            className="font-mono text-xs"
+                            placeholder="5"
+                            value={test.expected_stdout}
+                            onChange={(e) =>
+                              setInfoForm((f) => ({
+                                ...f,
+                                tests: f.tests.map((row, i) =>
+                                  i === index ? { ...row, expected_stdout: e.target.value } : row
+                                ),
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <Button type="button" disabled={busy} onClick={() => void submitInfoProblem()} className="w-full sm:w-auto">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Adaugă problema de informatică"}
               </Button>
@@ -769,20 +962,28 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               })}
             </ul>
           </div>
-        </section>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="learning-paths" className="mt-6">
+            <div className="rounded-xl border border-gray-800 bg-black pb-8 pt-6 text-white">
+              <div className="px-4 sm:px-6">
+                <h2 className="text-xl font-bold text-white">Learning paths (/invata)</h2>
+                <p className="mt-2 text-sm text-gray-400">
+                  Același panou ca la admin: structură, preview lecție, formulare pentru toate tipurile de itemi. Pentru capitole
+                  noi sau alte operații doar admin, folosește contul admin.
+                </p>
+              </div>
+              <div className="mt-6 px-4 sm:px-6">
+                <LearningPathsManager mode="dev" onDevCelebrate={triggerDevCelebration} />
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
-      {subjectKey === "fizica" || subjectKey === "informatica" || subjectKey === "matematica" ? (
-        <div className="min-h-screen bg-black pb-16 pt-8 text-white">
-          <div className="container mx-auto max-w-[1500px] px-4">
-            <h2 className="mb-2 text-xl font-bold text-white">Learning paths (/invata)</h2>
-            <p className="mb-6 text-sm text-gray-400">
-              Același panou ca la admin: structură, preview lecție, formulare pentru toate tipurile de itemi. Pentru capitole
-              noi sau alte operații doar admin, folosește contul admin.
-            </p>
-            <LearningPathsManager mode="dev" />
-          </div>
-        </div>
+      {celebration ? (
+        <DevCelebrationCard message={celebration} onContinue={() => setCelebration(null)} />
       ) : null}
     </>
   )
