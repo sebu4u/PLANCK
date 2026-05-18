@@ -15,6 +15,8 @@ import {
   getItemIcon,
 } from "@/components/invata/learning-path-item-body"
 import { ProblemSection } from "@/components/invata/problem-section"
+import { LearningPathCodingProblemSection } from "@/components/invata/learning-path-coding-problem-section"
+import type { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import {
   getLearningPathLessonHref,
@@ -212,6 +214,29 @@ export default async function InvataLessonItemPage({
     }
   }
 
+  let sourceCodingProblem: CodingProblem | null = null
+  let sourceCodingExamples: CodingProblemExample[] = []
+  if (item.item_type === "coding_problem" && item.problem_id) {
+    const { data: codingRow } = await supabase
+      .from("coding_problems")
+      .select("*")
+      .eq("id", item.problem_id)
+      .eq("is_active", true)
+      .maybeSingle()
+    if (codingRow) {
+      sourceCodingProblem = {
+        ...(codingRow as CodingProblem),
+        tags: Array.isArray(codingRow.tags) ? codingRow.tags : [],
+      }
+      const { data: examples } = await supabase
+        .from("coding_problem_examples")
+        .select("*")
+        .eq("problem_id", codingRow.id)
+        .order("order_index", { ascending: true })
+      sourceCodingExamples = (examples ?? []) as CodingProblemExample[]
+    }
+  }
+
   const sourceQuizQuestion =
     item.item_type === "grila" && item.quiz_question_id
       ? await fetchQuizQuestionById(item.quiz_question_id)
@@ -223,6 +248,7 @@ export default async function InvataLessonItemPage({
   const isPoll = item.item_type === "poll"
   const isProblem =
     (item.item_type === "problem" || item.item_type === "math_problem") && !!sourceProblem
+  const isCodingProblem = item.item_type === "coding_problem" && !!sourceCodingProblem
   const isSimulation = item.item_type === "simulation"
   const isTest = item.item_type === "test"
   const isCardSort = item.item_type === "card_sort"
@@ -253,9 +279,15 @@ export default async function InvataLessonItemPage({
       initialCurrentItemCompleted={initialCurrentItemCompleted}
       lessonBaseHref={lessonBaseHref}
       isTextLesson={isLinkedTextItem || isCustomTextItem}
-      hideBottomCta={isPoll || isTest || (isProblem && !!problemHasAnswer) || isBareInteractiveItem}
-      overflowHidden={isProblem}
-      fullWidth={isProblem}
+      hideBottomCta={
+        isPoll ||
+        isTest ||
+        (isProblem && !!problemHasAnswer) ||
+        isCodingProblem ||
+        isBareInteractiveItem
+      }
+      overflowHidden={isProblem || isCodingProblem}
+      fullWidth={isProblem || isCodingProblem}
       grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
     >
       {isTest ? (
@@ -288,6 +320,17 @@ export default async function InvataLessonItemPage({
           lessonId={lesson.id}
           currentItemId={item.id}
           isLastItem={parsedIndex >= items.length}
+        />
+      ) : isCodingProblem && sourceCodingProblem ? (
+        <LearningPathCodingProblemSection
+          problem={sourceCodingProblem}
+          examples={sourceCodingExamples}
+          itemIndex={parsedIndex}
+          lessonId={lesson.id}
+          currentItemId={item.id}
+          isLastItem={parsedIndex >= items.length}
+          nextItemHref={nextItemHref}
+          initialCompleted={initialCurrentItemCompleted}
         />
       ) : isCustomTextItem ? (
         <div className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col justify-center py-6 sm:py-10">

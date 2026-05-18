@@ -47,6 +47,7 @@ export const ITEM_TYPE_LABEL: Record<LearningPathLessonType, string> = {
   grila: "Exercițiu grilă",
   problem: "Exercițiu problemă",
   math_problem: "Exercițiu problemă (matematică)",
+  coding_problem: "Exercițiu problemă (informatică)",
   poll: "Sondaj",
   custom_text: "Text personalizat",
   simulation: "Simulare interactivă",
@@ -75,6 +76,7 @@ export function getItemIcon(type: LearningPathLessonType) {
       return ListChecks
     case "problem":
     case "math_problem":
+    case "coding_problem":
       return PenSquare
     case "poll":
       return BarChart2

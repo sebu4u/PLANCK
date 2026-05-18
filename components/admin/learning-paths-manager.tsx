@@ -115,6 +115,7 @@ const ITEM_TYPES: LearningPathLessonType[] = [
   "grila",
   "problem",
   "math_problem",
+  "coding_problem",
   "poll",
   "simulation",
   "test",
@@ -369,7 +370,16 @@ export function LearningPathsManager({
   /** În mod dev, fără prop = `all` (toate capitolele/lecțiile/itemii). */
   const devSubject = isDev ? (devSubjectProp ?? "all") : undefined
   const apiBase = isDev ? "/api/dev/learning-paths" : "/api/admin/learning-paths"
-  const itemTypesForForm = useMemo(() => ITEM_TYPES, [])
+  const itemTypesForForm = useMemo(() => {
+    if (!isDev || devSubject === "all") return ITEM_TYPES
+    if (devSubject === "informatics") {
+      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem")
+    }
+    if (devSubject === "math") {
+      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "coding_problem")
+    }
+    return ITEM_TYPES.filter((t) => t !== "math_problem" && t !== "coding_problem")
+  }, [isDev, devSubject])
 
   const newLessonKindOptions = useMemo((): LearningPathLessonKind[] => ["text", "video", "grila", "problem"], [])
 
@@ -596,6 +606,7 @@ export function LearningPathsManager({
         break
       case "problem":
       case "math_problem":
+      case "coding_problem":
         if (!currentForm.problem_id.trim()) return "Selectează o problemă."
         break
       case "poll":
@@ -694,6 +705,7 @@ export function LearningPathsManager({
         break
       case "problem":
       case "math_problem":
+      case "coding_problem":
         payload.problem_id = normalizeNullable(currentForm.problem_id)
         payload.cursuri_lesson_slug = null
         payload.youtube_url = null
@@ -1176,7 +1188,14 @@ export function LearningPathsManager({
   }
 
   const fetchProblems = useCallback(async () => {
-    if (!form || (form.item_type !== "problem" && form.item_type !== "math_problem")) return
+    if (
+      !form ||
+      (form.item_type !== "problem" &&
+        form.item_type !== "math_problem" &&
+        form.item_type !== "coding_problem")
+    ) {
+      return
+    }
 
     try {
       setProblemLoading(true)
@@ -1187,11 +1206,15 @@ export function LearningPathsManager({
       if (isDev && devSubject) {
         if (form.item_type === "math_problem") {
           params.set("catalog", "math")
+        } else if (form.item_type === "coding_problem" || devSubject === "informatics") {
+          params.set("catalog", "informatics")
         } else {
-          params.set("catalog", devSubject === "informatics" ? "informatics" : "physics")
+          params.set("catalog", "physics")
         }
       } else if (form.item_type === "math_problem") {
         params.set("catalog", "math")
+      } else if (form.item_type === "coding_problem") {
+        params.set("catalog", "informatics")
       }
       if (problemSearch.trim()) {
         params.set("search", problemSearch.trim())
@@ -1211,7 +1234,10 @@ export function LearningPathsManager({
 
       const data = await response.json()
       let rows: ProblemResult[] = data.problems || []
-      if (isDev && devSubject === "informatics") {
+      if (
+        (isDev && devSubject === "informatics") ||
+        form.item_type === "coding_problem"
+      ) {
         rows = (data.problems || []).map(
           (p: { id: string; title: string; difficulty: string; chapter?: string | null; class?: number }) => ({
             id: p.id,
@@ -1281,7 +1307,14 @@ export function LearningPathsManager({
   }, [form, getAccessToken, quizClass, quizSearch, isDev, devSubject, apiBase])
 
   useEffect(() => {
-    if (!form || (form.item_type !== "problem" && form.item_type !== "math_problem")) return
+    if (
+      !form ||
+      (form.item_type !== "problem" &&
+        form.item_type !== "math_problem" &&
+        form.item_type !== "coding_problem")
+    ) {
+      return
+    }
     const timer = setTimeout(() => {
       fetchProblems()
     }, 300)
@@ -1393,7 +1426,11 @@ export function LearningPathsManager({
       )
     }
 
-    if (form.item_type === "problem" || form.item_type === "math_problem") {
+    if (
+      form.item_type === "problem" ||
+      form.item_type === "math_problem" ||
+      form.item_type === "coding_problem"
+    ) {
       return (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
@@ -1404,7 +1441,9 @@ export function LearningPathsManager({
               placeholder={
                 form.item_type === "math_problem"
                   ? "Caută problemă de matematică după titlu"
-                  : "Caută problemă după titlu"
+                  : form.item_type === "coding_problem"
+                    ? "Caută problemă de informatică după titlu"
+                    : "Caută problemă după titlu"
               }
               className="bg-black/40 border-white/20 text-gray-100"
             />
@@ -2588,11 +2627,19 @@ export function LearningPathsManager({
                           setProblemSearch("")
                           setForm((prev) => {
                             if (!prev) return prev
-                            const inProblemSlot = prev.item_type === "problem" || prev.item_type === "math_problem"
-                            const nextInProblemSlot = next === "problem" || next === "math_problem"
+                            const inProblemSlot =
+                              prev.item_type === "problem" ||
+                              prev.item_type === "math_problem" ||
+                              prev.item_type === "coding_problem"
+                            const nextInProblemSlot =
+                              next === "problem" || next === "math_problem" || next === "coding_problem"
                             const crossesPhysicsMathCatalog =
                               (prev.item_type === "problem" && next === "math_problem") ||
-                              (prev.item_type === "math_problem" && next === "problem")
+                              (prev.item_type === "math_problem" && next === "problem") ||
+                              (inProblemSlot &&
+                                nextInProblemSlot &&
+                                prev.item_type !== next &&
+                                (prev.item_type === "coding_problem" || next === "coding_problem"))
                             const shouldClearProblemId =
                               (inProblemSlot && !nextInProblemSlot) || crossesPhysicsMathCatalog
 

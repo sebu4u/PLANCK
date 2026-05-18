@@ -41,6 +41,7 @@ const ITEM_TYPES = [
   "grila",
   "problem",
   "math_problem",
+  "coding_problem",
   "poll",
   "custom_text",
   "simulation",
@@ -94,7 +95,7 @@ function jsonLessonItemCreateError(error: unknown): NextResponse {
     return NextResponse.json(
       {
         error:
-          "Tipul «math_problem» (sau alt tip nou) nu este permis de constraint-ul din Postgres. Aplică migrarea `supabase/migrations/20260518_learning_path_math_problem_item.sql` pe proiectul Supabase, apoi încearcă din nou.",
+          "Tipul itemului nu este permis de constraint-ul din Postgres. Aplică migrările `20260518_learning_path_math_problem_item.sql` și `20260518_learning_path_coding_problem_item.sql` pe proiectul Supabase, apoi încearcă din nou.",
         details,
       },
       { status: 500 }
@@ -253,6 +254,9 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   }
   if (itemType === "math_problem" && !toNullableString(body.problem_id)) {
     return "Pentru item de tip math_problem, câmpul problem_id este obligatoriu."
+  }
+  if (itemType === "coding_problem" && !toNullableString(body.problem_id)) {
+    return "Pentru item de tip coding_problem, câmpul problem_id este obligatoriu."
   }
 
   if (itemType === "custom_text") {
@@ -604,7 +608,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Pe capitole de informatică nu se folosesc itemii problem / math_problem (catalog fizică / matematică).",
+            "Pe capitole de informatică folosește itemul coding_problem (catalog informatică), nu problem / math_problem.",
         },
         { status: 400 }
       )
@@ -667,6 +671,31 @@ export async function POST(req: NextRequest) {
       }
       if (!mathRow.is_active) {
         return NextResponse.json({ error: "Problema de matematică nu este activă." }, { status: 400 })
+      }
+    }
+
+    if (itemType === "coding_problem" && itemChapterPc !== INFORMATICA_LEARNING_PATH_MARKER) {
+      return NextResponse.json(
+        { error: "Itemul coding_problem se folosește doar pe capitole de informatică." },
+        { status: 400 }
+      )
+    }
+
+    if (itemType === "coding_problem" && itemChapterPc === INFORMATICA_LEARNING_PATH_MARKER) {
+      const problemId = toNullableString(body.problem_id)
+      if (!problemId) {
+        return NextResponse.json({ error: "problem_id lipsă." }, { status: 400 })
+      }
+      const { data: codingRow, error: cErr } = await supabase
+        .from("coding_problems")
+        .select("id, is_active")
+        .eq("id", problemId)
+        .maybeSingle()
+      if (cErr || !codingRow) {
+        return NextResponse.json({ error: "Problema de informatică nu există în catalog." }, { status: 400 })
+      }
+      if (!codingRow.is_active) {
+        return NextResponse.json({ error: "Problema de informatică nu este activă." }, { status: 400 })
       }
     }
 
@@ -924,7 +953,7 @@ export async function PUT(req: NextRequest) {
       ) {
         return NextResponse.json(
           {
-            error: "Pe capitole de informatică nu se folosesc itemii problem / math_problem.",
+            error: "Pe capitole de informatică folosește coding_problem, nu problem / math_problem.",
           },
           { status: 400 }
         )
@@ -972,13 +1001,47 @@ export async function PUT(req: NextRequest) {
       (effectiveItemType === "problem" || effectiveItemType === "math_problem")
     ) {
       return NextResponse.json(
-        { error: "Itemul problem / math_problem nu e permis pe capitole de informatică." },
+        { error: "Itemul problem / math_problem nu e permis pe capitole de informatică. Folosește coding_problem." },
         { status: 400 }
       )
     }
     if (pcTarget === MATEMATICA_LEARNING_PATH_MARKER && effectiveItemType === "problem") {
       return NextResponse.json(
         { error: "Itemul problem (fizică) nu e permis pe capitole de matematică." },
+        { status: 400 }
+      )
+    }
+
+    if (
+      pcTarget === INFORMATICA_LEARNING_PATH_MARKER &&
+      effectiveItemType === "coding_problem"
+    ) {
+      const pid =
+        toNullableString(body.problem_id) ??
+        (await supabase.from("learning_path_lesson_items").select("problem_id").eq("id", id).single()).data
+          ?.problem_id ??
+        null
+      if (pid) {
+        const { data: codingRow, error: cErr } = await supabase
+          .from("coding_problems")
+          .select("id, is_active")
+          .eq("id", pid)
+          .maybeSingle()
+        if (cErr || !codingRow) {
+          return NextResponse.json({ error: "Problema de informatică nu există în catalog." }, { status: 400 })
+        }
+        if (!codingRow.is_active) {
+          return NextResponse.json({ error: "Problema de informatică nu este activă." }, { status: 400 })
+        }
+      }
+    }
+
+    if (
+      pcTarget !== INFORMATICA_LEARNING_PATH_MARKER &&
+      effectiveItemType === "coding_problem"
+    ) {
+      return NextResponse.json(
+        { error: "Itemul coding_problem se folosește doar pe capitole de informatică." },
         { status: 400 }
       )
     }

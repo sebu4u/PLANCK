@@ -71,6 +71,47 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    if (catalog === "informatics") {
+      const search = searchParams.get("search") || ""
+      const difficulty = searchParams.get("difficulty")
+
+      let query = supabase
+        .from("coding_problems")
+        .select("id, title, difficulty, class, chapter, created_at")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+
+      if (search) {
+        query = query.ilike("title", `%${search}%`)
+      }
+
+      if (difficulty && difficulty !== "Toate") {
+        query = query.eq("difficulty", difficulty)
+      }
+
+      const { data: problems, error: problemsError } = await query
+
+      if (problemsError) {
+        logger.error("[admin/problems] Failed to fetch coding problems:", problemsError)
+        return NextResponse.json({ error: "Nu am putut încărca problemele de informatică." }, { status: 500 })
+      }
+
+      const rows =
+        problems?.map((p) => ({
+          id: p.id,
+          title: p.title,
+          difficulty: p.difficulty,
+          class: p.class,
+          chapter: p.chapter,
+          created_at: p.created_at,
+        })) || []
+
+      return NextResponse.json({
+        problems: rows,
+        count: rows.length,
+      })
+    }
+
     const search = searchParams.get("search") || ""
     const difficulty = searchParams.get("difficulty")
     const category = searchParams.get("category")

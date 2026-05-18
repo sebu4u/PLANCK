@@ -178,12 +178,15 @@ export interface EmbeddedIDEProps {
   defaultLanguage?: "cpp" | "python"
   /** Dacă e setat (slug), apare butonul „Trimite” pentru evaluare oficială Python. */
   problemSlug?: string | null
+  /** Apelat după o trimitere acceptată (status `accepted`). */
+  onAcceptedSubmit?: () => void
 }
 
 export default function EmbeddedIDE({
   initialCode,
   defaultLanguage = "cpp",
   problemSlug = null,
+  onAcceptedSubmit,
 }: EmbeddedIDEProps) {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
@@ -351,6 +354,9 @@ export default function EmbeddedIDE({
           elo: payload.elo ?? null,
           eloError: payload.eloError ?? null,
         })
+        if (payload.status === "accepted") {
+          onAcceptedSubmit?.()
+        }
       }
     } catch (e) {
       if (!submitDismissedRef.current) {

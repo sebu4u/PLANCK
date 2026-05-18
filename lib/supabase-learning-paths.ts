@@ -14,6 +14,7 @@ export type LearningPathLessonKind = "text" | "video" | "grila" | "problem"
 export type LearningPathLessonType =
   | LearningPathLessonKind
   | "math_problem"
+  | "coding_problem"
   | "poll"
   | "custom_text"
   | "simulation"

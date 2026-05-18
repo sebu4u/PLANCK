@@ -41,6 +41,7 @@ const ICON_TYPE_CYCLE: LearningPathLessonType[] = [
   "grila",
   "problem",
   "math_problem",
+  "coding_problem",
   "poll",
   "simulation",
   "custom_text",

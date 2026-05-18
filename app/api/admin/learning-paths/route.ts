@@ -19,6 +19,7 @@ const ITEM_TYPES = [
   "grila",
   "problem",
   "math_problem",
+  "coding_problem",
   "poll",
   "custom_text",
   "simulation",
@@ -203,6 +204,9 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   }
   if (itemType === "math_problem" && !toNullableString(body.problem_id)) {
     return "Pentru item de tip math_problem, câmpul problem_id este obligatoriu."
+  }
+  if (itemType === "coding_problem" && !toNullableString(body.problem_id)) {
+    return "Pentru item de tip coding_problem, câmpul problem_id este obligatoriu."
   }
 
   if (itemType === "custom_text") {
@@ -424,6 +428,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (itemType === "coding_problem") {
+      const cid = toNullableString(body.problem_id)
+      if (cid) {
+        const { data: codingRow, error: cErr } = await supabase
+          .from("coding_problems")
+          .select("id, is_active")
+          .eq("id", cid)
+          .maybeSingle()
+        if (cErr || !codingRow) {
+          return NextResponse.json({ error: "Problema de informatică nu există în catalog." }, { status: 400 })
+        }
+        if (!codingRow.is_active) {
+          return NextResponse.json({ error: "Problema de informatică nu este activă." }, { status: 400 })
+        }
+      }
+    }
+
     const requestedOrderIndex = toInt(body.order_index, 0)
     const payload = {
       lesson_id: lessonId,
@@ -575,6 +596,20 @@ export async function PUT(req: NextRequest) {
       }
       if (!mathRow.is_active) {
         return NextResponse.json({ error: "Problema de matematică nu este activă." }, { status: 400 })
+      }
+    }
+
+    if (effectiveItemType === "coding_problem" && effectiveProblemId) {
+      const { data: codingRow, error: cErr } = await supabase
+        .from("coding_problems")
+        .select("id, is_active")
+        .eq("id", effectiveProblemId)
+        .maybeSingle()
+      if (cErr || !codingRow) {
+        return NextResponse.json({ error: "Problema de informatică nu există în catalog." }, { status: 400 })
+      }
+      if (!codingRow.is_active) {
+        return NextResponse.json({ error: "Problema de informatică nu este activă." }, { status: 400 })
       }
     }
 

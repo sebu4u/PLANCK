@@ -140,19 +140,9 @@ export default async function ProblemPage({ params }: ProblemPageProps) {
   }
 
   const pageUrl = `https://www.planck.academy/probleme/${id}`
-  const excerpt = buildProblemPlainExcerpt(problem)
-
   return (
     <div className="bg-[#f6f5f4]">
       <StructuredData data={problemLearningResourceJsonLd(problem, pageUrl)} id={`problem-ld-json-${problem.id}`} />
-      {excerpt ? (
-        <section
-          className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 pt-16 pb-3 text-sm leading-relaxed text-neutral-700 border-b border-neutral-200/90"
-          aria-label="Fragment din enunț"
-        >
-          <p className="whitespace-pre-wrap max-w-3xl">{excerpt}</p>
-        </section>
-      ) : null}
       <ProblemDetailClient problem={problem} categoryIcons={categoryIcons} difficultyColors={difficultyColors} />
     </div>
   )
