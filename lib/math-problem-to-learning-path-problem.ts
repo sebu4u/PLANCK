@@ -1,4 +1,23 @@
-import type { Problem } from "@/data/problems"
+import type { Problem, ProblemValueSubpoint } from "@/data/problems"
+
+function normalizeValueSubpoints(raw: unknown): ProblemValueSubpoint[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((subpoint) => {
+      if (!subpoint || typeof subpoint !== "object") return null
+      const o = subpoint as Record<string, unknown>
+      const correct_value = Number(o.correct_value)
+      if (!Number.isFinite(correct_value)) return null
+      return {
+        label: String(o.label ?? "").trim(),
+        text_before: String(o.text_before ?? ""),
+        text_after: String(o.text_after ?? ""),
+        correct_value,
+      }
+    })
+    .filter((s): s is ProblemValueSubpoint => s !== null)
+    .slice(0, 3)
+}
 
 /** Adaptează un rând `math_problems` la forma `Problem` folosită de ProblemSection / EmbeddedProblemContent. */
 export function mathProblemRowToProblem(row: {
@@ -12,6 +31,8 @@ export function mathProblemRowToProblem(row: {
   image_url?: string | null
   youtube_url?: string | null
   created_at: string
+  answer_type?: string | null
+  value_subpoints?: unknown
 }): Problem {
   let tagsStr = ""
   if (Array.isArray(row.tags)) {
@@ -23,6 +44,8 @@ export function mathProblemRowToProblem(row: {
   }
 
   const yt = typeof row.youtube_url === "string" ? row.youtube_url.trim() : ""
+  const valueSubpoints = normalizeValueSubpoints(row.value_subpoints)
+  const hasValueAnswer = row.answer_type === "value" && valueSubpoints.length > 0
 
   return {
     id: row.id,
@@ -36,8 +59,8 @@ export function mathProblemRowToProblem(row: {
     created_at: row.created_at,
     class: row.class,
     image_url: row.image_url ?? undefined,
-    answer_type: null,
-    value_subpoints: null,
+    answer_type: hasValueAnswer ? "value" : null,
+    value_subpoints: hasValueAnswer ? valueSubpoints : null,
     grila_options: null,
     grila_correct_index: null,
   }

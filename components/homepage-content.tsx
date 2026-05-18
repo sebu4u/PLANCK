@@ -30,6 +30,7 @@ import { HomePageInteractiveSchoolSection } from "@/components/homepage-interact
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
 import { ReviewsSection } from "@/components/homepage-reviews"
+import { HomepageMobileReviewsBar } from "@/components/homepage-mobile-reviews-bar"
 import { FAQSection } from "@/components/faq-section"
 
 // Lazy load heavy Three.js components to reduce initial bundle size
@@ -169,7 +170,7 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden bg-white pb-[3.75rem] text-gray-900 max-md:pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">
       <HomePageScrollNavbar />
       <HomeSectionIndicator />
 
@@ -213,6 +214,8 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
 
       {/* Progress Notification */}
       <ProgressNotification />
+
+      <HomepageMobileReviewsBar />
     </div>
   )
 }

@@ -27,30 +27,57 @@ const CLASS_SET = new Set([9, 10, 11, 12])
 
 const MATH_DIFFICULTY_SET = new Set(["Ușor", "Mediu", "Avansat"])
 
-function parseMathAnswerSubpoints(raw: unknown):
-  | { ok: true; value: Array<{ label: string; content: string }> }
+function parseMathValueSubpoints(raw: unknown):
+  | {
+      ok: true
+      value: Array<{
+        label: string
+        text_before: string
+        text_after: string
+        correct_value: number
+      }>
+    }
   | { ok: false; message: string } {
   if (raw === undefined || raw === null) {
     return { ok: true, value: [] }
   }
   if (!Array.isArray(raw)) {
-    return { ok: false, message: "answer_subpoints trebuie să fie un array (max 3 elemente)." }
+    return { ok: false, message: "value_subpoints trebuie să fie un array (max 3 elemente)." }
   }
   if (raw.length > 3) {
     return { ok: false, message: "Cel mult 3 subpuncte pentru răspuns." }
   }
-  const value: Array<{ label: string; content: string }> = []
+  const value: Array<{
+    label: string
+    text_before: string
+    text_after: string
+    correct_value: number
+  }> = []
   for (const item of raw) {
     if (!item || typeof item !== "object") {
-      return { ok: false, message: "Fiecare subpunct trebuie să fie un obiect { label, content }." }
+      return {
+        ok: false,
+        message: "Fiecare subpunct trebuie să fie un obiect { label, text_before, text_after, correct_value }.",
+      }
     }
     const o = item as Record<string, unknown>
     const label = typeof o.label === "string" ? o.label.trim() : ""
-    const content = typeof o.content === "string" ? o.content.trim() : ""
-    if (!label || !content) {
-      return { ok: false, message: "label și content sunt obligatorii pentru fiecare subpunct." }
+    const text_before = typeof o.text_before === "string" ? o.text_before : ""
+    const text_after = typeof o.text_after === "string" ? o.text_after : ""
+    const correctRaw = o.correct_value
+    const correct_value =
+      typeof correctRaw === "number" && Number.isFinite(correctRaw)
+        ? correctRaw
+        : typeof correctRaw === "string" && correctRaw.trim()
+          ? Number.parseFloat(correctRaw.trim().replace(",", "."))
+          : NaN
+    if (!label) {
+      return { ok: false, message: "label este obligatoriu pentru fiecare subpunct." }
     }
-    value.push({ label, content })
+    if (!Number.isFinite(correct_value)) {
+      return { ok: false, message: `Subpunctul «${label}»: correct_value trebuie să fie un număr.` }
+    }
+    value.push({ label, text_before, text_after, correct_value })
   }
   return { ok: true, value }
 }
@@ -177,7 +204,7 @@ export async function GET(req: NextRequest) {
       const { data: rows, error } = await service
         .from("math_problems")
         .select(
-          "id, title, difficulty, class, tags, answer_subpoints, image_url, youtube_url, is_active, created_at"
+          "id, title, difficulty, class, tags, answer_type, value_subpoints, image_url, youtube_url, is_active, created_at"
         )
         .order("created_at", { ascending: false })
         .limit(300)
@@ -284,9 +311,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "class trebuie să fie 9, 10, 11 sau 12." }, { status: 400 })
       }
 
-      const parsedAnswers = parseMathAnswerSubpoints(body.answer_subpoints)
+      const parsedAnswers = parseMathValueSubpoints(body.value_subpoints)
       if (!parsedAnswers.ok) {
         return NextResponse.json({ error: parsedAnswers.message }, { status: 400 })
+      }
+      if (parsedAnswers.value.length === 0) {
+        return NextResponse.json(
+          { error: "Adaugă cel puțin un subpunct de răspuns (text înainte/după + valoare corectă)." },
+          { status: 400 }
+        )
       }
 
       const tags = parseCodingTags(body.tags)
@@ -306,7 +339,8 @@ export async function POST(req: NextRequest) {
         difficulty,
         class: classNum,
         tags,
-        answer_subpoints: parsedAnswers.value,
+        answer_type: "value",
+        value_subpoints: parsedAnswers.value,
         image_url,
         youtube_url,
         is_active: body.is_active === false ? false : true,

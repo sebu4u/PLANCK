@@ -35,6 +35,17 @@ const CODING_DIFFICULTIES = ["Inițiere", "Ușor", "Mediu", "Avansat", "Concurs"
 
 const MATH_DIFFICULTIES = ["Ușor", "Mediu", "Avansat"] as const
 
+type MathValueSubpointForm = {
+  label: string
+  text_before: string
+  text_after: string
+  correct_value: string
+}
+
+function initialMathValueSubpoint(label: string): MathValueSubpointForm {
+  return { label, text_before: "", text_after: "", correct_value: "" }
+}
+
 function initialMathForm() {
   return {
     id: "",
@@ -46,9 +57,9 @@ function initialMathForm() {
     class: "10",
     image_url: "",
     youtube_url: "",
-    sub1: { label: "a)", content: "" },
-    sub2: { label: "b)", content: "" },
-    sub3: { label: "c)", content: "" },
+    sub1: initialMathValueSubpoint("a)"),
+    sub2: initialMathValueSubpoint("b)"),
+    sub3: initialMathValueSubpoint("c)"),
   }
 }
 
@@ -271,13 +282,37 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         setErr("Sesiune indisponibilă.")
         return
       }
-      const subpoints: { label: string; content: string }[] = []
+      const subpoints: {
+        label: string
+        text_before: string
+        text_after: string
+        correct_value: number
+      }[] = []
       for (const s of [mathForm.sub1, mathForm.sub2, mathForm.sub3]) {
         const label = s.label.trim()
-        const content = s.content.trim()
-        if (label && content) {
-          subpoints.push({ label, content })
+        const text_before = s.text_before
+        const text_after = s.text_after
+        const correctRaw = s.correct_value.trim().replace(",", ".")
+        const hasAny =
+          label.length > 0 ||
+          text_before.trim().length > 0 ||
+          text_after.trim().length > 0 ||
+          correctRaw.length > 0
+        if (!hasAny) continue
+        if (!label) {
+          setErr("Fiecare subpunct completat trebuie să aibă o etichetă (ex. a)).")
+          return
         }
+        const correct_value = Number.parseFloat(correctRaw)
+        if (!Number.isFinite(correct_value)) {
+          setErr(`Subpunctul «${label}»: valoarea corectă trebuie să fie un număr.`)
+          return
+        }
+        subpoints.push({ label, text_before, text_after, correct_value })
+      }
+      if (subpoints.length === 0) {
+        setErr("Adaugă cel puțin un subpunct de răspuns (text înainte/după + valoare corectă).")
+        return
       }
       const res = await fetch("/api/dev/problems", {
         method: "POST",
@@ -294,7 +329,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean),
-          answer_subpoints: subpoints,
+          value_subpoints: subpoints,
           image_url: mathForm.image_url.trim(),
           youtube_url: mathForm.youtube_url.trim(),
         }),
@@ -326,9 +361,9 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         <p className="mt-2 text-sm text-gray-600">
           {subjectKey === "matematica" ? (
             <>
-              Adaugă probleme în catalogul de matematică.{" "}
-              <strong>Răspunsurile (subpunctele)</strong> sunt stocate în baza de date dar{" "}
-              <strong>nu apar</strong> în paginile publice ale site-ului.
+              Adaugă probleme în catalogul de matematică. Răspunsurile (valoare numerică între text
+              înainte/după, ca la fizică) sunt folosite în learning path pentru verificare;{" "}
+              <strong>nu apar</strong> în catalogul public.
             </>
           ) : (
             <>
@@ -440,8 +475,9 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
           ) : subjectKey === "matematica" ? (
             <div className="space-y-4">
               <p className="text-xs text-gray-500">
-                ID-ul este definit de tine (ex. <span className="font-mono">GEO001</span>). Poți adăuga până la trei subpuncte
-                pentru răspuns; acestea nu apar în catalogul public.
+                ID-ul este definit de tine (ex. <span className="font-mono">GEO001</span>). Fiecare subpunct are text înainte
+                și după câmpul numeric (LaTeX cu <span className="font-mono">$...$</span> OK), plus valoarea corectă — ca la
+                problemele de fizică. Minim un subpunct obligatoriu.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <Input
@@ -518,10 +554,12 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                   onChange={(e) => setMathForm({ ...mathForm, youtube_url: e.target.value })}
                 />
               </div>
-              <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-                <p className="text-xs font-semibold text-gray-700">Răspunsuri (max. 3, doar dev)</p>
-                {(["sub1", "sub2", "sub3"] as const).map((key) => (
-                  <div key={key} className="grid gap-2 sm:grid-cols-[100px_1fr]">
+              <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                <p className="text-xs font-semibold text-gray-700">Răspunsuri numerice (max. 3)</p>
+                {(["sub1", "sub2", "sub3"] as const).map((key, index) => (
+                  <div key={key} className="space-y-2 rounded-md border border-gray-200 bg-white p-3">
+                    <p className="text-xs font-medium text-gray-600">Subpunct {index + 1}</p>
+                    <div className="grid gap-2 sm:grid-cols-[88px_1fr_1fr]">
                     <Input
                       placeholder="Etichetă"
                       value={mathForm[key].label}
@@ -532,14 +570,36 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                         })
                       }
                     />
-                    <Textarea
-                      placeholder="Conținut (markdown)"
-                      rows={2}
-                      value={mathForm[key].content}
+                      <Input
+                        placeholder="Text înainte ($...$ OK)"
+                        value={mathForm[key].text_before}
+                        onChange={(e) =>
+                          setMathForm({
+                            ...mathForm,
+                            [key]: { ...mathForm[key], text_before: e.target.value },
+                          })
+                        }
+                      />
+                      <Input
+                        placeholder="Text după"
+                        value={mathForm[key].text_after}
+                        onChange={(e) =>
+                          setMathForm({
+                            ...mathForm,
+                            [key]: { ...mathForm[key], text_after: e.target.value },
+                          })
+                        }
+                      />
+                    </div>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Valoare corectă (ex: 12.5)"
+                      value={mathForm[key].correct_value}
                       onChange={(e) =>
                         setMathForm({
                           ...mathForm,
-                          [key]: { ...mathForm[key], content: e.target.value },
+                          [key]: { ...mathForm[key], correct_value: e.target.value },
                         })
                       }
                     />

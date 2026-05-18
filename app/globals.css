@@ -1386,6 +1386,27 @@
   }
 }
 
+/* Homepage mobile reviews bar */
+@keyframes homepage-mobile-reviews-marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.homepage-mobile-reviews-marquee {
+  animation: homepage-mobile-reviews-marquee 65s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-mobile-reviews-marquee {
+    animation: none;
+  }
+}
+
 /* Scrolling Marquee Animations */
 @keyframes scroll-left {
   0% {
