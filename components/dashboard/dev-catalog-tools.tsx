@@ -16,13 +16,22 @@ import { Loader2, ArrowLeft, Plus, Trash2, ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 
-type SubjectKey = "fizica" | "informatica" | "matematica"
+type SubjectKey = "fizica" | "informatica" | "matematica" | "biologie"
 type ApiSubject = "physics" | "informatics" | "math"
+type DevLearningPathSubject = "physics" | "informatics" | "math" | "biology"
 
 function toApiSubject(key: SubjectKey): ApiSubject {
   if (key === "fizica") return "physics"
   if (key === "informatica") return "informatics"
   return "math"
+}
+
+function toDevLearningPathSubject(key: SubjectKey): DevLearningPathSubject | undefined {
+  if (key === "fizica") return "physics"
+  if (key === "informatica") return "informatics"
+  if (key === "matematica") return "math"
+  if (key === "biologie") return "biology"
+  return undefined
 }
 
 function publicCatalogHref(key: SubjectKey): string {
@@ -111,12 +120,16 @@ async function getAuthJsonHeaders(): Promise<Record<string, string> | null> {
 
 export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   const apiSubject = toApiSubject(subjectKey)
+  const devLearningPathSubject = toDevLearningPathSubject(subjectKey)
+  const learningPathsOnly = subjectKey === "biologie"
   const title =
     subjectKey === "fizica"
       ? "Fizică — catalog & learning path"
       : subjectKey === "informatica"
         ? "Informatică — catalog & learning path"
-        : "Matematică — catalog"
+        : subjectKey === "biologie"
+          ? "Biologie — learning path"
+          : "Matematică — catalog"
 
   const physicsChapters = useMemo(() => allPhysicsCatalogCategories().sort((a, b) => a.localeCompare(b, "ro")), [])
 
@@ -365,6 +378,12 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               înainte/după, ca la fizică) sunt folosite în learning path pentru verificare;{" "}
               <strong>nu apar</strong> în catalogul public.
             </>
+          ) : learningPathsOnly ? (
+            <>
+              Adaugă și editează capitole, lecții și itemi pentru parcursul de biologie (/invata). Editorul este același
+              ca la admin (preview, itemi interactive, salvare, reordonare), dar <strong>fără ștergere sau dezactivare</strong>{" "}
+              itemi.
+            </>
           ) : (
             <>
               Poți <strong>adăuga probleme</strong> în catalog sau edita <strong>learning path</strong>-urile din tab-urile de
@@ -383,12 +402,15 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
           <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{err}</p>
         ) : null}
 
-        <Tabs defaultValue="catalog" className="mt-10">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="catalog">Catalog probleme</TabsTrigger>
-            <TabsTrigger value="learning-paths">Learning paths</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue={learningPathsOnly ? "learning-paths" : "catalog"} className="mt-10">
+          {!learningPathsOnly ? (
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="catalog">Catalog probleme</TabsTrigger>
+              <TabsTrigger value="learning-paths">Learning paths</TabsTrigger>
+            </TabsList>
+          ) : null}
 
+          {!learningPathsOnly ? (
           <TabsContent value="catalog" className="mt-6">
             <section className="mx-auto max-w-4xl space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1024,6 +1046,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
           </div>
             </section>
           </TabsContent>
+          ) : null}
 
           <TabsContent value="learning-paths" className="mt-6">
             <div className="rounded-xl border border-gray-800 bg-black pb-8 pt-6 text-white">
@@ -1035,7 +1058,11 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                 </p>
               </div>
               <div className="mt-6 px-4 sm:px-6">
-                <LearningPathsManager mode="dev" onDevCelebrate={triggerDevCelebration} />
+                <LearningPathsManager
+                  mode="dev"
+                  devSubject={devLearningPathSubject}
+                  onDevCelebrate={triggerDevCelebration}
+                />
               </div>
             </div>
           </TabsContent>

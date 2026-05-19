@@ -62,6 +62,7 @@ const DEV_SUBJECT_CARDS: {
   {
     title: "Biologie",
     className: "border-emerald-200 bg-emerald-50/80 text-emerald-950",
+    href: "/dashboard/dev/catalog/biologie",
   },
 ]
 
@@ -154,7 +155,7 @@ export function DevDashboard() {
                       })()}
                     </p>
                     <p className="mt-2 text-xs font-medium text-amber-800/90">
-                      Mod dev — Fizică și Informatică: adăugare conținut. Celelalte materii, în curând.
+                      Mod dev — Fizică, Informatică, Matematică și Biologie: adăugare conținut. Celelalte materii, în curând.
                     </p>
                   </div>
 
@@ -168,7 +169,7 @@ export function DevDashboard() {
                       </span>
                     </div>
                     <p className="text-gray-600">
-                      Mod dev — Fizică și Informatică: deschide cardul pentru catalog și learning path (doar adăugare).
+                      Mod dev — Fizică, Informatică, Matematică și Biologie: deschide cardul pentru catalog sau learning path (doar adăugare).
                     </p>
                   </div>
 

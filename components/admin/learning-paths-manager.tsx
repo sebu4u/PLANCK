@@ -333,7 +333,7 @@ export interface LearningPathsManagerProps {
   /** implicit `admin` — folosește `/api/admin/...` */
   mode?: "admin" | "dev"
   /** Mod dev: opțional; lipsă sau `all` = toate parcursurile (recomandat). */
-  devSubject?: "physics" | "informatics" | "math" | "all"
+  devSubject?: "physics" | "informatics" | "math" | "biology" | "all"
   /** Mod dev: apelat după crearea unui item nou (card motivațional). */
   onDevCelebrate?: () => void
 }
@@ -377,6 +377,9 @@ export function LearningPathsManager({
     }
     if (devSubject === "math") {
       return ITEM_TYPES.filter((t) => t !== "problem" && t !== "coding_problem")
+    }
+    if (devSubject === "biology") {
+      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem" && t !== "coding_problem")
     }
     return ITEM_TYPES.filter((t) => t !== "math_problem" && t !== "coding_problem")
   }, [isDev, devSubject])
@@ -955,7 +958,7 @@ export function LearningPathsManager({
       const order_index = Number.isFinite(orderParsed) ? orderParsed : nextChapterOrderDefault
 
       let problem_category: string | null = chapterForm.problem_category.trim() || null
-      if (isDev && (devSubject === "informatics" || devSubject === "math")) {
+      if (isDev && (devSubject === "informatics" || devSubject === "math" || devSubject === "biology")) {
         problem_category = null
       }
 
@@ -2073,6 +2076,10 @@ export function LearningPathsManager({
               <p className="text-[11px] leading-snug text-gray-500">
                 Capitolul va fi marcat automat pentru parcursul de matematică (<code className="text-gray-400">problem_category</code>).
               </p>
+            ) : isDev && devSubject === "biology" ? (
+              <p className="text-[11px] leading-snug text-gray-500">
+                Capitolul va fi marcat automat pentru parcursul de biologie (<code className="text-gray-400">problem_category</code>).
+              </p>
             ) : isDev && devSubject === "physics" ? (
               <label className="block text-[11px] text-gray-400">
                 Capitol catalog (opțional)
@@ -2094,7 +2101,7 @@ export function LearningPathsManager({
                 {isDev && devSubject === "all" ? (
                   <p className="text-[11px] leading-snug text-gray-500">
                     <code className="text-gray-400">problem_category</code>: lasă gol, sau <code className="text-gray-400">informatica</code>,{" "}
-                    <code className="text-gray-400">matematica</code>, sau un capitol din catalogul de fizică.
+                    <code className="text-gray-400">matematica</code>, <code className="text-gray-400">biologie</code>, sau un capitol din catalogul de fizică.
                   </p>
                 ) : null}
                 <Input

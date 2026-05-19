@@ -7,17 +7,26 @@ import {
   validateInteractiveItemContent,
 } from "@/lib/learning-path-interactive-items"
 import { requireDevSession } from "@/lib/dev-api-session"
+import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
-type DevSubject = "physics" | "informatics" | "math" | "all"
+type DevSubject = "physics" | "informatics" | "math" | "biology" | "all"
 
 function parseSubjectStrict(trimmedInput: string): DevSubject | null {
   const s = trimmedInput.trim()
-  if (s === "physics" || s === "informatics" || s === "math" || s === "all") return s
+  if (s === "physics" || s === "informatics" || s === "math" || s === "biology" || s === "all") return s
   return null
+}
+
+function isReservedLearningPathMarker(pc: string | null): boolean {
+  return (
+    pc === INFORMATICA_LEARNING_PATH_MARKER ||
+    pc === MATEMATICA_LEARNING_PATH_MARKER ||
+    pc === BIOLOGIE_LEARNING_PATH_MARKER
+  )
 }
 
 /** GET: parametru absent / gol → `all` (toate parcursurile). */
@@ -308,7 +317,10 @@ function chapterVisibleForSubject(
   if (subject === "math") {
     return pc === MATEMATICA_LEARNING_PATH_MARKER
   }
-  return pc !== INFORMATICA_LEARNING_PATH_MARKER && pc !== MATEMATICA_LEARNING_PATH_MARKER
+  if (subject === "biology") {
+    return pc === BIOLOGIE_LEARNING_PATH_MARKER
+  }
+  return !isReservedLearningPathMarker(pc)
 }
 
 /**
@@ -326,7 +338,7 @@ export async function GET(req: NextRequest) {
     const subject = resolveQuerySubject(searchParams.get("subject"))
     if (!subject) {
       return NextResponse.json(
-        { error: "Parametrul subject trebuie să fie all, physics, informatics sau math." },
+        { error: "Parametrul subject trebuie să fie all, physics, informatics, math sau biology." },
         { status: 400 }
       )
     }
@@ -423,7 +435,7 @@ export async function POST(req: NextRequest) {
     const subject = parseBodySubject((body as Record<string, unknown>).subject)
     if (subject === null) {
       return NextResponse.json(
-        { error: "subject în body trebuie să fie all, physics, informatics sau math." },
+        { error: "subject în body trebuie să fie all, physics, informatics, math sau biology." },
         { status: 400 }
       )
     }
@@ -443,6 +455,8 @@ export async function POST(req: NextRequest) {
         problem_category = INFORMATICA_LEARNING_PATH_MARKER
       } else if (subject === "math") {
         problem_category = MATEMATICA_LEARNING_PATH_MARKER
+      } else if (subject === "biology") {
+        problem_category = BIOLOGIE_LEARNING_PATH_MARKER
       } else if (subject === "all") {
         const rawPc = toNullableString(body.problem_category)
         if (!rawPc) {
@@ -450,6 +464,7 @@ export async function POST(req: NextRequest) {
         } else if (
           rawPc === INFORMATICA_LEARNING_PATH_MARKER ||
           rawPc === MATEMATICA_LEARNING_PATH_MARKER ||
+          rawPc === BIOLOGIE_LEARNING_PATH_MARKER ||
           isPhysicsCatalogCategory(rawPc)
         ) {
           problem_category = rawPc
@@ -457,7 +472,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "problem_category invalid: lasă gol, sau informatica, matematica, sau un capitol valid din catalogul de fizică.",
+                "problem_category invalid: lasă gol, sau informatica, matematica, biologie, sau un capitol valid din catalogul de fizică.",
             },
             { status: 400 }
           )
@@ -469,6 +484,9 @@ export async function POST(req: NextRequest) {
         }
         if (rawPc === MATEMATICA_LEARNING_PATH_MARKER) {
           return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de matematică." }, { status: 400 })
+        }
+        if (rawPc === BIOLOGIE_LEARNING_PATH_MARKER) {
+          return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de biologie." }, { status: 400 })
         }
         if (!rawPc) {
           problem_category = null
@@ -519,7 +537,7 @@ export async function POST(req: NextRequest) {
 
       if (!chapterVisibleForSubject(chapterRow, subject)) {
         return NextResponse.json(
-          { error: "Capitolul nu aparține domeniului selectat (fizică / informatică / matematică)." },
+          { error: "Capitolul nu aparține domeniului selectat (fizică / informatică / matematică / biologie)." },
           { status: 403 }
         )
       }
@@ -532,12 +550,12 @@ export async function POST(req: NextRequest) {
       const chapterPc = chapterRow.problem_category?.trim() || null
       if (
         lessonType === "problem" &&
-        (chapterPc === INFORMATICA_LEARNING_PATH_MARKER || chapterPc === MATEMATICA_LEARNING_PATH_MARKER)
+        isReservedLearningPathMarker(chapterPc)
       ) {
         return NextResponse.json(
           {
             error:
-              "Lecția de tip problem (catalog fizică) nu se folosește pentru capitole de informatică sau matematică.",
+              "Lecția de tip problem (catalog fizică) nu se folosește pentru capitole de informatică, matematică sau biologie.",
           },
           { status: 400 }
         )
@@ -622,17 +640,25 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+    if (
+      itemChapterPc === BIOLOGIE_LEARNING_PATH_MARKER &&
+      (itemType === "problem" || itemType === "math_problem" || itemType === "coding_problem")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Pe capitole de biologie nu se folosesc itemi din cataloagele de probleme (problem / math_problem / coding_problem).",
+        },
+        { status: 400 }
+      )
+    }
 
     const validationError = validateItemBody(itemType, body as Record<string, unknown>)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    if (
-      itemType === "problem" &&
-      itemChapterPc !== INFORMATICA_LEARNING_PATH_MARKER &&
-      itemChapterPc !== MATEMATICA_LEARNING_PATH_MARKER
-    ) {
+    if (itemType === "problem" && !isReservedLearningPathMarker(itemChapterPc)) {
       const problemId = toNullableString(body.problem_id)
       if (!problemId) {
         return NextResponse.json({ error: "problem_id lipsă." }, { status: 400 })
@@ -646,7 +672,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Problema (fizică) nu există în catalog." }, { status: 400 })
       }
       const chCat = chapterRow.problem_category?.trim() || null
-      if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER && chCat !== MATEMATICA_LEARNING_PATH_MARKER) {
+      if (chCat && !isReservedLearningPathMarker(chCat)) {
         if (problemRow.category !== chCat) {
           return NextResponse.json(
             { error: `Problema are categoria „${problemRow.category}”, dar capitolul cere „${chCat}”."` },
@@ -736,7 +762,7 @@ export async function PUT(req: NextRequest) {
     const subject = parseBodySubject((body as Record<string, unknown>).subject)
     if (subject === null) {
       return NextResponse.json(
-        { error: "subject în body trebuie să fie all, physics, informatics sau math." },
+        { error: "subject în body trebuie să fie all, physics, informatics, math sau biology." },
         { status: 400 }
       )
     }
@@ -784,12 +810,18 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ error: "Capitolele de matematică păstrează marcatorul fix." }, { status: 400 })
           }
           updateData.problem_category = MATEMATICA_LEARNING_PATH_MARKER
+        } else if (subject === "biology") {
+          if (rawPc && rawPc !== BIOLOGIE_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Capitolele de biologie păstrează marcatorul fix." }, { status: 400 })
+          }
+          updateData.problem_category = BIOLOGIE_LEARNING_PATH_MARKER
         } else if (subject === "all") {
           if (!rawPc) {
             updateData.problem_category = null
           } else if (
             rawPc === INFORMATICA_LEARNING_PATH_MARKER ||
             rawPc === MATEMATICA_LEARNING_PATH_MARKER ||
+            rawPc === BIOLOGIE_LEARNING_PATH_MARKER ||
             isPhysicsCatalogCategory(rawPc)
           ) {
             updateData.problem_category = rawPc
@@ -797,7 +829,7 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json(
               {
                 error:
-                  "problem_category invalid: informatica, matematica, gol, sau capitol din catalogul de fizică.",
+                  "problem_category invalid: informatica, matematica, biologie, gol, sau capitol din catalogul de fizică.",
               },
               { status: 400 }
             )
@@ -808,6 +840,9 @@ export async function PUT(req: NextRequest) {
           }
           if (rawPc === MATEMATICA_LEARNING_PATH_MARKER) {
             return NextResponse.json({ error: "Nu poți seta marcatorul de matematică pe un capitol de fizică." }, { status: 400 })
+          }
+          if (rawPc === BIOLOGIE_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Nu poți seta marcatorul de biologie pe un capitol de fizică." }, { status: 400 })
           }
           if (rawPc && !isPhysicsCatalogCategory(rawPc)) {
             return NextResponse.json({ error: "problem_category invalid pentru fizică." }, { status: 400 })
@@ -879,14 +914,11 @@ export async function PUT(req: NextRequest) {
             .eq("id", targetChapterId)
             .maybeSingle()
           const lpc = chForLessonType?.problem_category?.trim() || null
-          if (
-            lessonType === "problem" &&
-            (lpc === INFORMATICA_LEARNING_PATH_MARKER || lpc === MATEMATICA_LEARNING_PATH_MARKER)
-          ) {
+          if (lessonType === "problem" && isReservedLearningPathMarker(lpc)) {
             return NextResponse.json(
               {
                 error:
-                  "Lecția de tip problem (catalog fizică) nu se folosește pentru capitole de informatică sau matematică.",
+                  "Lecția de tip problem (catalog fizică) nu se folosește pentru capitole de informatică, matematică sau biologie.",
               },
               { status: 400 }
             )
@@ -966,6 +998,18 @@ export async function PUT(req: NextRequest) {
           { status: 400 }
         )
       }
+      if (
+        pcPut === BIOLOGIE_LEARNING_PATH_MARKER &&
+        (itemType === "problem" || itemType === "math_problem" || itemType === "coding_problem")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Pe capitole de biologie nu se folosesc itemi din cataloagele de probleme (problem / math_problem / coding_problem).",
+          },
+          { status: 400 }
+        )
+      }
       const validationError = validateItemBody(itemType, body as Record<string, unknown>)
       if (validationError) {
         return NextResponse.json({ error: validationError }, { status: 400 })
@@ -1011,6 +1055,20 @@ export async function PUT(req: NextRequest) {
         { status: 400 }
       )
     }
+    if (
+      pcTarget === BIOLOGIE_LEARNING_PATH_MARKER &&
+      (effectiveItemType === "problem" ||
+        effectiveItemType === "math_problem" ||
+        effectiveItemType === "coding_problem")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Pe capitole de biologie nu se folosesc itemi din cataloagele de probleme (problem / math_problem / coding_problem).",
+        },
+        { status: 400 }
+      )
+    }
 
     if (
       pcTarget === INFORMATICA_LEARNING_PATH_MARKER &&
@@ -1047,7 +1105,7 @@ export async function PUT(req: NextRequest) {
     }
 
     if (
-      pcTarget !== INFORMATICA_LEARNING_PATH_MARKER &&
+      !isReservedLearningPathMarker(pcTarget) &&
       (effectiveItemType === "problem" ||
         effectiveItemType === "math_problem" ||
         toNullableString(body.problem_id))
@@ -1065,7 +1123,7 @@ export async function PUT(req: NextRequest) {
           return NextResponse.json({ error: "Problema (fizică) nu există în catalog." }, { status: 400 })
         }
         const chCat = chTarget.problem_category?.trim() || null
-        if (chCat && chCat !== INFORMATICA_LEARNING_PATH_MARKER && chCat !== MATEMATICA_LEARNING_PATH_MARKER) {
+        if (chCat && !isReservedLearningPathMarker(chCat)) {
           if (problemRow.category !== chCat) {
             return NextResponse.json(
               { error: `Problema are categoria „${problemRow.category}”, dar capitolul cere „${chCat}”."` },
