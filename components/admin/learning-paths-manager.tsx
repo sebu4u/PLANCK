@@ -334,6 +334,8 @@ export interface LearningPathsManagerProps {
   mode?: "admin" | "dev"
   /** Mod dev: opțional; lipsă sau `all` = toate parcursurile (recomandat). */
   devSubject?: "physics" | "informatics" | "math" | "biology" | "all"
+  /** Mod dev: filtru la încărcare; implicit = devSubject. Poate fi `all` pentru vizualizare cross-materie. */
+  devViewSubject?: "physics" | "informatics" | "math" | "biology" | "all"
   /** Mod dev: apelat după crearea unui item nou (card motivațional). */
   onDevCelebrate?: () => void
 }
@@ -341,6 +343,7 @@ export interface LearningPathsManagerProps {
 export function LearningPathsManager({
   mode = "admin",
   devSubject: devSubjectProp,
+  devViewSubject: devViewSubjectProp,
   onDevCelebrate,
 }: LearningPathsManagerProps = {}) {
   const [chapters, setChapters] = useState<LearningPathChapter[]>([])
@@ -369,6 +372,7 @@ export function LearningPathsManager({
   const isDev = mode === "dev"
   /** În mod dev, fără prop = `all` (toate capitolele/lecțiile/itemii). */
   const devSubject = isDev ? (devSubjectProp ?? "all") : undefined
+  const devViewSubject = isDev ? (devViewSubjectProp ?? devSubject) : undefined
   const apiBase = isDev ? "/api/dev/learning-paths" : "/api/admin/learning-paths"
   const itemTypesForForm = useMemo(() => {
     if (!isDev || devSubject === "all") return ITEM_TYPES
@@ -420,7 +424,7 @@ export function LearningPathsManager({
         return
       }
 
-      const response = await fetch(isDev ? `${apiBase}?subject=${devSubject}` : apiBase, {
+      const response = await fetch(isDev ? `${apiBase}?subject=${devViewSubject}` : apiBase, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
 
@@ -441,7 +445,7 @@ export function LearningPathsManager({
     } finally {
       setLoading(false)
     }
-  }, [getAccessToken, isDev, devSubject, apiBase])
+  }, [getAccessToken, isDev, devViewSubject, apiBase])
 
   useEffect(() => {
     fetchData()

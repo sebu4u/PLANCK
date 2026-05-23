@@ -1061,6 +1061,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                 <LearningPathsManager
                   mode="dev"
                   devSubject={devLearningPathSubject}
+                  devViewSubject={subjectKey === "matematica" ? "all" : devLearningPathSubject}
                   onDevCelebrate={triggerDevCelebration}
                 />
               </div>
