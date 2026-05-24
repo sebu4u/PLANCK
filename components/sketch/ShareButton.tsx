@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Copy, Check, Share2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/sonner';
 
 interface ShareButtonProps {
   boardId: string;

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Editor, TLPage, TLPageId, TLShapeId } from '@tldraw/tldraw';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/sonner';
 
 interface PageNavigatorProps {
   editor: Editor | null;

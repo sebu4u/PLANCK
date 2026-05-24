@@ -6,7 +6,7 @@ import { Navigation } from '@/components/navigation';
 import { BoardCard } from '@/components/sketch/BoardCard';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/sonner';
 import { useAuth } from '@/components/auth-provider';
 import { useSubscriptionPlan } from '@/hooks/use-subscription-plan';
 import { supabase } from '@/lib/supabaseClient';

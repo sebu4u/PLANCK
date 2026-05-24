@@ -499,3 +499,86 @@ export async function getCinematicaFirstLearningPathItemHref(): Promise<string |
   }
   return null
 }
+
+/** Unde continuă userul într-un capitol: primul item necompletat, sau ultima lecție dacă totul e parcurs. */
+export async function getLearningPathResumeHrefForChapter(
+  client: SupabaseClient,
+  userId: string,
+  chapter: LearningPathChapter,
+  lessons: LearningPathLesson[]
+): Promise<string> {
+  const firstLesson = lessons[0]
+  if (!firstLesson) return "/invata"
+
+  const lessonIds = lessons.map((lesson) => lesson.id)
+  const completedLessonIds = new Set(
+    await getCompletedLearningPathLessonIdsForUser(client, userId, lessonIds)
+  )
+
+  for (const lesson of lessons) {
+    const items = await getLearningPathLessonItems(lesson.id)
+    const lessonHref = getLearningPathLessonHref(chapter, lesson)
+
+    if (!items.length) {
+      if (!completedLessonIds.has(lesson.id)) return lessonHref
+      continue
+    }
+
+    const completedItemIds = await getCompletedLearningPathItemIdsForUser(
+      client,
+      userId,
+      items.map((item) => item.id)
+    )
+    const nextItem = getNextIncompleteLearningPathItem(items, completedItemIds)
+
+    if (nextItem) {
+      const nextItemIndex = items.findIndex((item) => item.id === nextItem.id)
+      return getLearningPathItemHref(chapter, lesson, Math.max(nextItemIndex, 0))
+    }
+  }
+
+  const lastLesson = lessons[lessons.length - 1] ?? firstLesson
+  return getLearningPathLessonHref(chapter, lastLesson)
+}
+
+/** Unde continuă userul în parcurs: primul capitol cu itemi necompletați, altfel Cinematică. */
+export async function getLearningPathResumeHrefForUser(
+  userId: string,
+  client: SupabaseClient = supabase
+): Promise<string> {
+  const chapters = await getLearningPathChapters()
+
+  for (const chapter of chapters) {
+    const lessons = await getLearningPathLessonsByChapterId(chapter.id)
+    if (!lessons.length) continue
+
+    for (const lesson of lessons) {
+      const items = await getLearningPathLessonItems(lesson.id)
+      if (!items.length) continue
+
+      const completedItemIds = await getCompletedLearningPathItemIdsForUser(
+        client,
+        userId,
+        items.map((item) => item.id)
+      )
+      const nextItem = getNextIncompleteLearningPathItem(items, completedItemIds)
+      if (nextItem) {
+        return getLearningPathResumeHrefForChapter(client, userId, chapter, lessons)
+      }
+    }
+  }
+
+  const lastChapter = chapters[chapters.length - 1]
+  if (lastChapter) {
+    const lessons = await getLearningPathLessonsByChapterId(lastChapter.id)
+    if (lessons.length) {
+      return getLearningPathResumeHrefForChapter(client, userId, lastChapter, lessons)
+    }
+  }
+
+  const cinematicaHref = await getCinematicaFirstLearningPathItemHref()
+  if (cinematicaHref) return cinematicaHref
+
+  const fallback = await getFirstLearningPathItemHref()
+  return fallback ?? "/invata"
+}

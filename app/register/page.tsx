@@ -12,7 +12,6 @@ import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimu
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
 import {
   getCinematicaFirstLearningPathItemHref,
-  getFirstLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
 
 type SubjectOption = "fizica" | "informatica"
@@ -329,7 +328,7 @@ function RegisterPageContent() {
     let cancelled = false
     void (async () => {
       try {
-        const href = await getFirstLearningPathItemHref()
+        const href = await getCinematicaFirstLearningPathItemHref()
         if (!cancelled) setGuestFirstItemHref(href)
       } catch {
         if (!cancelled) setGuestFirstItemHref(null)
@@ -452,7 +451,7 @@ function RegisterPageContent() {
 
   const handleTryWithoutAccount = async () => {
     try {
-      const target = guestFirstItemHref ?? (await getFirstLearningPathItemHref())
+      const target = guestFirstItemHref ?? (await getCinematicaFirstLearningPathItemHref())
       if (target) {
         router.push(target)
         return
@@ -543,12 +542,8 @@ function RegisterPageContent() {
       // ignore
     }
 
-    let destination = "/dashboard"
-    if (onboardingState.grade === "9") {
-      const cinematicaHref = await getCinematicaFirstLearningPathItemHref()
-      if (cinematicaHref) destination = cinematicaHref
-    }
-    router.push(destination)
+    const cinematicaHref = await getCinematicaFirstLearningPathItemHref()
+    router.push(cinematicaHref ?? "/dashboard")
   }
 
   const renderStepContent = () => {
@@ -801,10 +796,8 @@ function RegisterPageContent() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Salvăm...
                   </span>
-                ) : onboardingState.grade === "9" ? (
-                  "Începe Cinematică"
                 ) : (
-                  "Mergi la dashboard"
+                  "Începe Cinematică"
                 )}
               </button>
             </form>

@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Download, FileImage, FileCode, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/sonner';
 import { Editor } from '@tldraw/tldraw';
 
 interface ExportButtonProps {

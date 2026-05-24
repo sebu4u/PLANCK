@@ -13,6 +13,7 @@ import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-co
 import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
+import { playErrorSound } from "@/lib/platform-sounds"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import {
@@ -194,6 +195,7 @@ export function ProblemSection({
           setValueInput("")
         }
       } else {
+        playErrorSound()
         setVerified(true)
         setIsCorrect(false)
         registerFailure()
@@ -210,6 +212,7 @@ export function ProblemSection({
         setEloAward(award?.awarded ? award : null)
         resetFailures()
       } else {
+        playErrorSound()
         registerFailure()
       }
       setVerified(true)

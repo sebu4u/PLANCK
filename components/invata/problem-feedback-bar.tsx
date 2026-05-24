@@ -9,22 +9,10 @@ import { EloGainCard } from "@/components/invata/elo-gain-card"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 
+import { playButtonClickSound } from "@/lib/platform-sounds"
+
 function playClickSound() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = 800
-    osc.type = "sine"
-    gain.gain.setValueAtTime(0.15, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.08)
-  } catch {
-    // Ignore
-  }
+  playButtonClickSound()
 }
 
 type ProblemBarState = "verify" | "correct" | "incorrect"

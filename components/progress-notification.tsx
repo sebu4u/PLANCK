@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { EngagementCard } from "@/components/engagement/engagement-card"
+import { playNotificationSound } from "@/lib/platform-sounds"
 import type { EngagementNotification } from "@/lib/engagement/types"
 
 interface Problem {
@@ -114,6 +115,7 @@ export function ProgressNotification() {
   }, [user, isDismissed])
 
   // Efect separat pentru a gestiona afișarea notificării
+  const playedSoundRef = useRef(false)
   useEffect(() => {
     if (suggestedProblem && !loading && !isDismissed) {
       const timer = setTimeout(() => {
@@ -123,6 +125,12 @@ export function ProgressNotification() {
       return () => clearTimeout(timer)
     }
   }, [suggestedProblem, loading, isDismissed])
+
+  useEffect(() => {
+    if (!isVisible || playedSoundRef.current) return
+    playedSoundRef.current = true
+    playNotificationSound()
+  }, [isVisible])
 
   const handleDismiss = () => {
     setIsVisible(false)

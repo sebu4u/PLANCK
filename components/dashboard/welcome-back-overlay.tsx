@@ -67,7 +67,7 @@ export function WelcomeBackOverlay({
               </>
             ) : (
               <>
-                Rezolvă o problemă
+                Continuă lecția
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

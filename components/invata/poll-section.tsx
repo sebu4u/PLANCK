@@ -7,6 +7,7 @@ import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-co
 import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
+import { playErrorSound } from "@/lib/platform-sounds"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import {
@@ -108,6 +109,7 @@ export function PollSection({
       setEloAward(award?.awarded ? award : null)
       resetFailures()
     } else {
+      playErrorSound()
       registerFailure()
     }
     setDisplayText(selectedOption.feedback)

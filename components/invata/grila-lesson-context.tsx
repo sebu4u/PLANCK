@@ -10,6 +10,7 @@ import {
 } from "react"
 import type { AnswerKey, QuizQuestion } from "@/lib/types/quiz-questions"
 import { markQuestionAsSolved } from "@/lib/supabase-quiz"
+import { playErrorSound } from "@/lib/platform-sounds"
 
 function playSuccessSound() {
   try {
@@ -70,6 +71,8 @@ export function GrilaLessonProvider({
     if (correct) {
       playSuccessSound()
       await markQuestionAsSolved(question.id)
+    } else {
+      playErrorSound()
     }
     return correct
   }, [selectedAnswer, isVerified, question.correct_answer, question.id])

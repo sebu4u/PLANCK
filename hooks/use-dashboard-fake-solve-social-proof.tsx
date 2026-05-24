@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
+import { toast } from "@/lib/sonner"
 import { FakeSolveSocialContent } from "@/components/dashboard/fake-solve-social-content"
 import {
   buildFakeSolveNotification,

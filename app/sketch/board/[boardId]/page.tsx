@@ -29,7 +29,7 @@ const MathGraphPanel = dynamic(
 );
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Loader2, Calculator, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/sonner';
 import { Editor } from '@tldraw/tldraw';
 import { cn } from '@/lib/utils';
 

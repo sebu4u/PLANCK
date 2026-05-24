@@ -140,10 +140,13 @@ function dispatch(action: Action) {
   })
 }
 
+import { playNotificationSound } from "@/lib/platform-sounds"
+
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  playNotificationSound()
 
   const update = (props: ToasterToast) =>
     dispatch({

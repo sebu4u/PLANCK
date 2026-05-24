@@ -27,14 +27,10 @@ import type {
 } from "@/lib/dashboard-data"
 import { FreePlanSchoolYearPromoModal } from "@/components/dashboard/free-plan-school-year-promo-modal"
 import {
-  getCompletedLearningPathItemIdsForUser,
-  getCompletedLearningPathLessonIdsForUser,
   getLearningPathChapters,
-  getLearningPathItemHref,
-  getLearningPathLessonHref,
-  getLearningPathLessonItems,
   getLearningPathLessonsByChapterId,
-  getNextIncompleteLearningPathItem,
+  getLearningPathResumeHrefForChapter,
+  getLearningPathResumeHrefForUser,
   getProblemsByClass,
   type LearningPathChapter,
   type LearningPathLesson,
@@ -493,12 +489,11 @@ export function DashboardAuth() {
   }
 
   const handleWelcomeCtaClick = async () => {
-    if (welcomeCtaLoading) return
+    if (welcomeCtaLoading || !user) return
 
     setWelcomeCtaLoading(true)
     try {
-      const scopedProblems = await getProblemsByClass(profile?.grade, 1)
-      const targetHref = scopedProblems[0] ? `/probleme/${scopedProblems[0].id}` : "/probleme"
+      const targetHref = await getLearningPathResumeHrefForUser(user.id, supabase)
       persistWelcomeBackDismissState()
       router.prefetch(targetHref)
       router.push(targetHref)
@@ -666,7 +661,7 @@ export function DashboardAuth() {
                   </div>
 
                   <div className={`grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6 ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
-                    <div className="order-1 xl:col-start-1 xl:row-start-1">
+                    <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
                         currentStreak={dashboardData.stats.current_streak}
                         problemsToday={dashboardData.stats.problems_solved_today}
@@ -752,7 +747,7 @@ export function DashboardAuth() {
                       />
                     </div>
 
-                    <div className="order-3 md:order-2 xl:order-none xl:col-start-1 xl:row-start-2">
+                    <div className="order-3 hidden md:block md:order-2 xl:order-none xl:col-start-1 xl:row-start-2">
                       <DashboardRecommendedProblemsCard
                         problems={dashboardData.recommendedProblems}
                         userGrade={profile?.grade}
@@ -1450,45 +1445,6 @@ function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): L
   return picked.slice(0, 3)
 }
 
-async function getLearningPathResumeHref(
-  userId: string,
-  chapter: LearningPathChapter,
-  lessons: LearningPathLesson[]
-): Promise<string> {
-  const firstLesson = lessons[0]
-  if (!firstLesson) return "/invata"
-
-  const lessonIds = lessons.map((lesson) => lesson.id)
-  const completedLessonIds = new Set(
-    await getCompletedLearningPathLessonIdsForUser(supabase, userId, lessonIds)
-  )
-
-  for (const lesson of lessons) {
-    const items = await getLearningPathLessonItems(lesson.id)
-    const lessonHref = getLearningPathLessonHref(chapter, lesson)
-
-    if (!items.length) {
-      if (!completedLessonIds.has(lesson.id)) return lessonHref
-      continue
-    }
-
-    const completedItemIds = await getCompletedLearningPathItemIdsForUser(
-      supabase,
-      userId,
-      items.map((item) => item.id)
-    )
-    const nextItem = getNextIncompleteLearningPathItem(items, completedItemIds)
-
-    if (nextItem) {
-      const nextItemIndex = items.findIndex((item) => item.id === nextItem.id)
-      return getLearningPathItemHref(chapter, lesson, Math.max(nextItemIndex, 0))
-    }
-  }
-
-  const lastLesson = lessons[lessons.length - 1] ?? firstLesson
-  return getLearningPathLessonHref(chapter, lastLesson)
-}
-
 async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLearningPathsData> {
   const chapters = await getLearningPathChapters()
   const selectedChapters = selectDashboardLearningPathChapters(chapters)
@@ -1499,7 +1455,12 @@ async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLea
     selectedChapters.map(async (chapter) => {
       const lessons = await getLearningPathLessonsByChapterId(chapter.id)
       lessonsByChapter[chapter.id] = lessons.slice(0, 2)
-      startHrefByChapterId[chapter.id] = await getLearningPathResumeHref(userId, chapter, lessons)
+      startHrefByChapterId[chapter.id] = await getLearningPathResumeHrefForChapter(
+        supabase,
+        userId,
+        chapter,
+        lessons
+      )
     })
   )
 

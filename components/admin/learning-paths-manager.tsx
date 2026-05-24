@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Reorder, useDragControls } from "framer-motion"
 import { supabase } from "@/lib/supabaseClient"
 import type {
   LearningPathChapter,
@@ -40,6 +41,7 @@ import {
   Eye,
   EyeOff,
   FileText,
+  GripVertical,
   Loader2,
   Plus,
   Save,
@@ -329,6 +331,169 @@ function validateSimulationUrl(url: string): boolean {
   }
 }
 
+interface SortableLessonItemRowProps {
+  item: LearningPathLessonItem
+  index: number
+  totalCount: number
+  saving: boolean
+  isSelected: boolean
+  insertTargetOrder: number
+  isInsertActive: boolean
+  isDev: boolean
+  lessonId: string
+  onInsert: (lessonId: string, orderIndex: number) => void
+  onMoveUp: (itemId: string) => void
+  onMoveDown: (itemId: string) => void
+  onEdit: (item: LearningPathLessonItem) => void
+  onDeactivate: (itemId: string) => void
+  onDelete: (itemId: string) => void
+  onDragEnd: () => void
+}
+
+function SortableLessonItemRow({
+  item,
+  index,
+  totalCount,
+  saving,
+  isSelected,
+  insertTargetOrder,
+  isInsertActive,
+  isDev,
+  lessonId,
+  onInsert,
+  onMoveUp,
+  onMoveDown,
+  onEdit,
+  onDeactivate,
+  onDelete,
+  onDragEnd,
+}: SortableLessonItemRowProps) {
+  const dragControls = useDragControls()
+  const ItemIcon = getItemIcon(item.item_type)
+
+  return (
+    <Reorder.Item
+      value={item.id}
+      as="div"
+      dragListener={false}
+      dragControls={dragControls}
+      onDragEnd={onDragEnd}
+      className="relative list-none"
+    >
+      <div className={`group/insert relative z-10 flex justify-center ${index === 0 ? "h-3 -mb-1.5" : "h-2 -my-1"}`}>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => onInsert(lessonId, insertTargetOrder)}
+          title="Inserează item aici (itemii următori își actualizează order_index automat)"
+          className={`absolute inset-x-0 top-0 flex h-full min-h-[1.25rem] items-center justify-center rounded border border-transparent transition-all ${
+            isInsertActive
+              ? "border-violet-500/60 bg-violet-500/15"
+              : "border-transparent hover:border-violet-500/40 hover:bg-violet-500/10"
+          }`}
+        >
+          <span
+            className={`pointer-events-none flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-violet-200/90 shadow-sm transition-opacity ${
+              isInsertActive
+                ? "bg-violet-600/40 opacity-100"
+                : "bg-violet-600/30 opacity-0 group-hover/insert:opacity-100"
+            }`}
+          >
+            <Plus className="w-3 h-3" />
+            Inserează aici
+          </span>
+        </button>
+      </div>
+
+      <div
+        className={`relative z-0 rounded-md border p-3 flex items-center gap-3 ${
+          isSelected ? "border-violet-400 bg-violet-500/10" : "border-white/10 bg-black/20"
+        } ${saving ? "opacity-70" : ""}`}
+      >
+        <button
+          type="button"
+          disabled={saving}
+          onPointerDown={(event) => dragControls.start(event)}
+          className="flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded text-gray-500 transition-colors hover:bg-white/10 hover:text-gray-200 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+          title="Trage pentru a reordona"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10">
+          <ItemIcon className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-medium ${item.is_active ? "text-white" : "text-gray-500 line-through"}`}>
+            {item.title || ITEM_TYPE_LABEL[item.item_type]}
+          </p>
+          <p className="text-xs text-gray-400">
+            {ITEM_TYPE_LABEL[item.item_type]} | order_index: {item.order_index}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-gray-300 hover:bg-white/10 hover:text-white"
+            onClick={() => onMoveUp(item.id)}
+            disabled={index === 0 || saving}
+            title="Mută sus"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-gray-300 hover:bg-white/10 hover:text-white"
+            onClick={() => onMoveDown(item.id)}
+            disabled={index === totalCount - 1 || saving}
+            title="Mută jos"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200"
+            onClick={() => onEdit(item)}
+            title="Editează"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
+          {!isDev ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+                onClick={() => onDeactivate(item.id)}
+                title="Dezactivează item"
+              >
+                <EyeOff className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                onClick={() => onDelete(item.id)}
+                title="Șterge definitiv"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </Reorder.Item>
+  )
+}
+
 export interface LearningPathsManagerProps {
   /** implicit `admin` — folosește `/api/admin/...` */
   mode?: "admin" | "dev"
@@ -396,6 +561,7 @@ export function LearningPathsManager({
   const [newLessonImageUrl, setNewLessonImageUrl] = useState("")
   const [chapterIconDrafts, setChapterIconDrafts] = useState<Record<string, string>>({})
   const [lessonImageUrlInput, setLessonImageUrlInput] = useState("")
+  const [orderedItemIds, setOrderedItemIds] = useState<string[]>([])
 
   const [chapterForm, setChapterForm] = useState({
     title: "",
@@ -406,6 +572,8 @@ export function LearningPathsManager({
     order_index: "",
   })
 
+  const orderedItemIdsRef = useRef<string[]>([])
+  const serverOrderedItemIdsRef = useRef<string[]>([])
   const customTextRef = useRef<HTMLTextAreaElement>(null)
   const simulationIntroRef = useRef<HTMLTextAreaElement>(null)
 
@@ -504,6 +672,18 @@ export function LearningPathsManager({
     if (!selectedLessonId) return []
     return getItemsForLesson(selectedLessonId)
   }, [getItemsForLesson, selectedLessonId])
+
+  useEffect(() => {
+    const nextIds = selectedLessonItems.map((item) => item.id)
+    setOrderedItemIds(nextIds)
+    orderedItemIdsRef.current = nextIds
+    serverOrderedItemIdsRef.current = nextIds
+  }, [selectedLessonItems])
+
+  const selectedLessonItemsById = useMemo(
+    () => new Map(selectedLessonItems.map((item) => [item.id, item])),
+    [selectedLessonItems]
+  )
 
   const toggleChapter = (chapterId: string) => {
     setExpandedChapters((prev) => {
@@ -884,6 +1064,29 @@ export function LearningPathsManager({
     }
   }
 
+  const updateItemOrderIndex = async (itemId: string, orderIndex: number) => {
+    const accessToken = await getAccessToken()
+    if (!accessToken) throw new Error("Sesiune expirată.")
+
+    const response = await fetch(apiBase, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(
+        isDev && devSubject
+          ? { type: "item", id: itemId, order_index: orderIndex, subject: devSubject }
+          : { type: "item", id: itemId, order_index: orderIndex }
+      ),
+    })
+
+    if (!response.ok) {
+      const failedBody = await response.json()
+      throw new Error(failedBody.error || "Nu am putut reordona itemii.")
+    }
+  }
+
   const moveItem = async (itemId: string, direction: "up" | "down") => {
     if (!selectedLessonId) return
     const lessonItems = getItemsForLesson(selectedLessonId)
@@ -893,51 +1096,52 @@ export function LearningPathsManager({
     const targetIndex = direction === "up" ? index - 1 : index + 1
     if (targetIndex < 0 || targetIndex >= lessonItems.length) return
 
-    const current = lessonItems[index]
     const target = lessonItems[targetIndex]
 
     try {
       setSaving(true)
       setError(null)
-      const accessToken = await getAccessToken()
-      if (!accessToken) throw new Error("Sesiune expirată.")
-
-      const requests = [
-        fetch(apiBase, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(
-            isDev && devSubject
-              ? { type: "item", id: current.id, order_index: target.order_index, subject: devSubject }
-              : { type: "item", id: current.id, order_index: target.order_index }
-          ),
-        }),
-        fetch(apiBase, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(
-            isDev && devSubject
-              ? { type: "item", id: target.id, order_index: current.order_index, subject: devSubject }
-              : { type: "item", id: target.id, order_index: current.order_index }
-          ),
-        }),
-      ]
-
-      const responses = await Promise.all(requests)
-      const failed = responses.find((res) => !res.ok)
-      if (failed) {
-        const failedBody = await failed.json()
-        throw new Error(failedBody.error || "Nu am putut reordona itemii.")
-      }
-
+      await updateItemOrderIndex(itemId, target.order_index)
       await fetchData()
     } catch (err: any) {
+      setError(err.message || "Eroare la reordonare.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleItemReorder = (newIds: string[]) => {
+    if (saving) return
+    setOrderedItemIds(newIds)
+    orderedItemIdsRef.current = newIds
+  }
+
+  const commitItemReorder = async () => {
+    if (!selectedLessonId || saving) return
+
+    const newIds = orderedItemIdsRef.current
+    const previousIds = serverOrderedItemIdsRef.current
+    if (previousIds.length !== newIds.length) return
+    if (previousIds.every((id, index) => id === newIds[index])) return
+
+    const movedId = newIds.find((id, newIndex) => previousIds.indexOf(id) !== newIndex)
+    if (!movedId) return
+
+    const oldIndex = previousIds.indexOf(movedId)
+    const newIndex = newIds.indexOf(movedId)
+    if (oldIndex === newIndex) return
+
+    const targetOrderIndex = selectedLessonItems[newIndex]?.order_index
+    if (targetOrderIndex === undefined) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      await updateItemOrderIndex(movedId, targetOrderIndex)
+      await fetchData()
+    } catch (err: any) {
+      setOrderedItemIds(previousIds)
+      orderedItemIdsRef.current = previousIds
       setError(err.message || "Eroare la reordonare.")
     } finally {
       setSaving(false)
@@ -2391,8 +2595,8 @@ export function LearningPathsManager({
                   <p className="text-xs uppercase tracking-wider text-gray-400">{selectedChapter?.title || "Capitol"}</p>
                   <h3 className="text-xl font-semibold text-white mt-1">{selectedLesson.title}</h3>
                   <p className="text-xs text-gray-400 mt-1">
-                    {selectedLessonItems.length} itemi (ordonați după order_index). Treci cu mouse-ul între itemi pentru
-                    „Inserează aici”.
+                    {selectedLessonItems.length} itemi (ordonați după order_index). Trage un item de mânerul din stânga
+                    pentru a-l muta între altele, sau treci cu mouse-ul între itemi pentru „Inserează aici”.
                   </p>
                 </div>
                 <Button
@@ -2458,120 +2662,43 @@ export function LearningPathsManager({
                   </div>
                 ) : (
                   <>
-                    {selectedLessonItems.map((item, index) => {
-                      const ItemIcon = getItemIcon(item.item_type)
-                      const insertTargetOrder = item.order_index
-                      const isInsertActive =
-                        formMode === "create-item" && form && !form.id && form.order_index === insertTargetOrder
+                    <Reorder.Group
+                      axis="y"
+                      values={orderedItemIds}
+                      onReorder={saving ? () => {} : handleItemReorder}
+                      className="space-y-0"
+                    >
+                      {orderedItemIds.map((itemId, index) => {
+                        const item = selectedLessonItemsById.get(itemId)
+                        if (!item) return null
+                        const insertTargetOrder = item.order_index
+                        const isInsertActive = Boolean(
+                          formMode === "create-item" && form && !form.id && form.order_index === insertTargetOrder
+                        )
 
-                      return (
-                        <div key={item.id} className="relative">
-                          <div
-                            className={`group/insert relative z-10 flex justify-center ${index === 0 ? "h-3 -mb-1.5" : "h-2 -my-1"}`}
-                          >
-                            <button
-                              type="button"
-                              disabled={saving}
-                              onClick={() => openCreateItemAtOrderIndex(selectedLesson.id, insertTargetOrder)}
-                              title="Inserează item aici (itemii următori își actualizează order_index automat)"
-                              className={`absolute inset-x-0 top-0 flex h-full min-h-[1.25rem] items-center justify-center rounded border border-transparent transition-all ${
-                                isInsertActive
-                                  ? "border-violet-500/60 bg-violet-500/15"
-                                  : "border-transparent hover:border-violet-500/40 hover:bg-violet-500/10"
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-violet-200/90 shadow-sm transition-opacity ${
-                                  isInsertActive
-                                    ? "bg-violet-600/40 opacity-100"
-                                    : "bg-violet-600/30 opacity-0 group-hover/insert:opacity-100"
-                                }`}
-                              >
-                                <Plus className="w-3 h-3" />
-                                Inserează aici
-                              </span>
-                            </button>
-                          </div>
-
-                          <div
-                            className={`relative z-0 rounded-md border p-3 flex items-center gap-3 ${
-                              form?.id === item.id ? "border-violet-400 bg-violet-500/10" : "border-white/10 bg-black/20"
-                            }`}
-                          >
-                            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white/10">
-                              <ItemIcon className="w-4 h-4 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className={`text-sm font-medium ${item.is_active ? "text-white" : "text-gray-500 line-through"}`}>
-                                {item.title || ITEM_TYPE_LABEL[item.item_type]}
-                              </p>
-                              <p className="text-xs text-gray-400">
-                                {ITEM_TYPE_LABEL[item.item_type]} | order_index: {item.order_index}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-white/10"
-                                onClick={() => moveItem(item.id, "up")}
-                                disabled={index === 0 || saving}
-                                title="Mută sus"
-                              >
-                                <ArrowUp className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-white/10"
-                                onClick={() => moveItem(item.id, "down")}
-                                disabled={index === selectedLessonItems.length - 1 || saving}
-                                title="Mută jos"
-                              >
-                                <ArrowDown className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-blue-300 hover:text-blue-200 hover:bg-blue-500/10"
-                                onClick={() => openEditItem(item)}
-                                title="Editează"
-                              >
-                                <FileText className="w-4 h-4" />
-                              </Button>
-                              {!isDev ? (
-                                <>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
-                                    onClick={() => deleteItem(item.id, false)}
-                                    title="Dezactivează item"
-                                  >
-                                    <EyeOff className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-red-300 hover:text-red-200 hover:bg-red-500/10"
-                                    onClick={() => deleteItem(item.id, true)}
-                                    title="Șterge definitiv"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                        return (
+                          <SortableLessonItemRow
+                            key={item.id}
+                            item={item}
+                            index={index}
+                            totalCount={orderedItemIds.length}
+                            saving={saving}
+                            isSelected={form?.id === item.id}
+                            insertTargetOrder={insertTargetOrder}
+                            isInsertActive={isInsertActive}
+                            isDev={isDev}
+                            lessonId={selectedLesson.id}
+                            onInsert={openCreateItemAtOrderIndex}
+                            onMoveUp={(id) => void moveItem(id, "up")}
+                            onMoveDown={(id) => void moveItem(id, "down")}
+                            onEdit={openEditItem}
+                            onDeactivate={(id) => void deleteItem(id, false)}
+                            onDelete={(id) => void deleteItem(id, true)}
+                            onDragEnd={() => void commitItemReorder()}
+                          />
+                        )
+                      })}
+                    </Reorder.Group>
 
                     {(() => {
                       const lastOrder = Math.max(...selectedLessonItems.map((i) => i.order_index))

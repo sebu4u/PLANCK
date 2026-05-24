@@ -1,36 +1,12 @@
-/** Sunete pentru pagina /grile — aceleași tipuri ca pe itemii din learning paths (click scurt, succes în trepte). */
-
-function getAudioContext(): AudioContext | null {
-  try {
-    return new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)()
-  } catch {
-    return null
-  }
-}
+import { playButtonClickSound, playErrorSound } from "@/lib/platform-sounds"
 
 export function playGrileClickSound() {
-  const ctx = getAudioContext()
-  if (!ctx) return
-  try {
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = 800
-    osc.type = "sine"
-    gain.gain.setValueAtTime(0.15, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.08)
-  } catch {
-    // autoplay / policy
-  }
+  playButtonClickSound()
 }
 
 export function playGrileSuccessSound() {
-  const ctx = getAudioContext()
-  if (!ctx) return
   try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)()
     const playTone = (freq: number, start: number, duration: number, vol: number) => {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
@@ -53,21 +29,5 @@ export function playGrileSuccessSound() {
 }
 
 export function playGrileErrorSound() {
-  const ctx = getAudioContext()
-  if (!ctx) return
-  try {
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.type = "sawtooth"
-    osc.frequency.setValueAtTime(220, ctx.currentTime)
-    osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.22)
-    gain.gain.setValueAtTime(0.08, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.28)
-  } catch {
-    // ignore
-  }
+  playErrorSound()
 }

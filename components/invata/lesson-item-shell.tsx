@@ -45,22 +45,10 @@ import { LearningPathItemSlideContainer } from "@/components/invata/learning-pat
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
+import { playButtonClickSound } from "@/lib/platform-sounds"
+
 function playClickSound() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = 800
-    osc.type = "sine"
-    gain.gain.setValueAtTime(0.15, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.08)
-  } catch {
-    // Ignore audio errors (e.g. autoplay policy)
-  }
+  playButtonClickSound()
 }
 
 interface LessonItemShellProps {
