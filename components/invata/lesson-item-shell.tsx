@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { X, ChevronLeft, ChevronRight, Flame } from "lucide-react"
@@ -35,6 +35,13 @@ import {
   LearningPathExplainChatProvider,
   useLearningPathExplainChat,
 } from "@/components/invata/learning-path-explain-chat-context"
+import {
+  useNavigateToNextLearningPathItem,
+  useNavigateToPrevLearningPathItem,
+  useOptionalLearningPathItemNavigation,
+} from "@/components/invata/learning-path-item-navigation-context"
+import { LearningPathItemChromeProvider, useLearningPathItemChrome } from "@/components/invata/learning-path-item-chrome-context"
+import { LearningPathItemSlideContainer } from "@/components/invata/learning-path-item-slide-container"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -65,6 +72,8 @@ interface LessonItemShellProps {
   currentItemId: string
   /** Din DB la SSR; shell-ul confirmă din nou la client după login. */
   initialCurrentItemCompleted?: boolean
+  /** Itemii deja marcați ca finalizați în lecția curentă (SSR + API la navigare). */
+  completedItemIdsForLesson?: string[]
   lessonBaseHref: string
   isTextLesson: boolean
   hideBottomCta?: boolean
@@ -83,6 +92,7 @@ function LessonItemShellInner({
   lessonId,
   currentItemId,
   initialCurrentItemCompleted = false,
+  completedItemIdsForLesson = [],
   lessonBaseHref,
   isTextLesson,
   hideBottomCta = false,
@@ -98,12 +108,14 @@ function LessonItemShellInner({
   const { user } = useAuth()
   const router = useRouter()
   const contentRef = useRef<HTMLDivElement>(null)
-  const [scrollProgress, setScrollProgress] = useState(0)
   const [streak, setStreak] = useState<number | null>(null)
   const [showQuitDialog, setShowQuitDialog] = useState(false)
   const [showPrevItemCue, setShowPrevItemCue] = useState(false)
   const [showNextItemCue, setShowNextItemCue] = useState(false)
   const [currentItemCompleted, setCurrentItemCompleted] = useState(initialCurrentItemCompleted)
+  const [completedItemIds, setCompletedItemIds] = useState(
+    () => new Set(completedItemIdsForLesson),
+  )
   const [mobileSwipeOffset, setMobileSwipeOffset] = useState(0)
   const [isMobileSwipeSettling, setIsMobileSwipeSettling] = useState(false)
   const prevArrowHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -120,10 +132,25 @@ function LessonItemShellInner({
       : lessonBaseHref
 
   const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
+  const itemNavigation = useOptionalLearningPathItemNavigation()
+  const chrome = useLearningPathItemChrome()
+  const slideDirection = itemNavigation?.slideDirection ?? "forward"
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
+  const navigateToPrevItem = useNavigateToPrevLearningPathItem(prevItemHref)
   const prevItemTitle = itemIndex > 1 ? items[itemIndex - 2]?.title || "Pasul anterior" : null
   const nextItemTitle = itemIndex < items.length ? items[itemIndex]?.title || "Pasul următor" : "Înapoi la lecție"
 
-  const stepProgress = items.length > 0 ? itemIndex / items.length : 0
+  const completedItemIdsKey = completedItemIdsForLesson.join(",")
+  const lessonProgress = useMemo(() => {
+    if (items.length === 0) return 0
+    const lessonItemIds = new Set(items.map((lessonItem) => lessonItem.id))
+    let completedCount = 0
+    for (const itemId of completedItemIds) {
+      if (lessonItemIds.has(itemId)) completedCount++
+    }
+    return completedCount / items.length
+  }, [completedItemIds, items])
+
   const markCurrentItemCompleted = useLearningPathItemCompletion({
     itemId: currentItemId,
     lessonId,
@@ -132,18 +159,43 @@ function LessonItemShellInner({
 
   const continueToNextItem = useCallback(async () => {
     await markCurrentItemCompleted()
+    setCompletedItemIds((previous) => {
+      if (previous.has(currentItemId)) return previous
+      const next = new Set(previous)
+      next.add(currentItemId)
+      return next
+    })
     pushMomentum({
       nextHref: nextItemHref,
       isLastItem: itemIndex >= items.length,
       itemIndex,
       totalItems: items.length,
     })
-    router.push(nextItemHref)
-  }, [itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum, router])
+    await navigateToNextItem()
+  }, [currentItemId, itemIndex, items.length, markCurrentItemCompleted, navigateToNextItem, nextItemHref, pushMomentum])
 
   useEffect(() => {
     setCurrentItemCompleted(initialCurrentItemCompleted)
   }, [initialCurrentItemCompleted])
+
+  useEffect(() => {
+    setCompletedItemIds(new Set(completedItemIdsForLesson))
+  }, [completedItemIdsKey, lessonId])
+
+  useEffect(() => {
+    if (!currentItemCompleted) return
+    setCompletedItemIds((previous) => {
+      if (previous.has(currentItemId)) return previous
+      const next = new Set(previous)
+      next.add(currentItemId)
+      return next
+    })
+  }, [currentItemCompleted, currentItemId])
+
+  useEffect(() => {
+    setMobileSwipeOffset(0)
+    setIsMobileSwipeSettling(false)
+  }, [currentItemId])
 
   useEffect(() => {
     if (!user?.id || !currentItemId) return
@@ -190,38 +242,6 @@ function LessonItemShellInner({
     }
     fetchStreak()
   }, [user])
-
-  const updateScrollProgress = useCallback(() => {
-    const el = contentRef.current
-    if (!el || !isTextLesson) return
-
-    const rect = el.getBoundingClientRect()
-    const contentTop = rect.top + window.scrollY
-    const contentHeight = el.offsetHeight
-    const viewportHeight = window.innerHeight
-
-    if (contentHeight <= viewportHeight) {
-      setScrollProgress(1)
-      return
-    }
-
-    const scrollable = contentHeight - viewportHeight
-    const scrolled = Math.max(0, window.scrollY - contentTop)
-    const progress = Math.min(1, Math.max(0, scrolled / scrollable))
-    setScrollProgress(progress)
-  }, [isTextLesson])
-
-  useEffect(() => {
-    if (!isTextLesson) return
-
-    updateScrollProgress()
-    window.addEventListener("scroll", updateScrollProgress, { passive: true })
-    window.addEventListener("resize", updateScrollProgress)
-    return () => {
-      window.removeEventListener("scroll", updateScrollProgress)
-      window.removeEventListener("resize", updateScrollProgress)
-    }
-  }, [isTextLesson, updateScrollProgress])
 
   useEffect(() => {
     const canShowNextCue = currentItemCompleted
@@ -367,12 +387,15 @@ function LessonItemShellInner({
       const shouldGoNext = Boolean(axis === "horizontal" && isHorizontalSwipe && dx < 0 && currentItemCompleted)
 
       if (shouldGoPrev || shouldGoNext) {
-        const href = shouldGoPrev && prevItemHref ? prevItemHref : nextItemHref
         setIsMobileSwipeSettling(true)
         setMobileSwipeOffset(Math.sign(dx) * window.innerWidth)
         playClickSound()
         swipeSettleTimerRef.current = setTimeout(() => {
-          router.push(href)
+          if (shouldGoPrev) {
+            void navigateToPrevItem()
+          } else {
+            void navigateToNextItem()
+          }
         }, 140)
         return
       }
@@ -396,9 +419,9 @@ function LessonItemShellInner({
       window.removeEventListener("touchend", onTouchEnd)
       window.removeEventListener("touchcancel", onTouchEnd)
     }
-  }, [currentItemCompleted, nextItemHref, prevItemHref, router, showQuitDialog])
+  }, [currentItemCompleted, navigateToNextItem, navigateToPrevItem, nextItemHref, prevItemHref, showQuitDialog])
 
-  const progress = isTextLesson ? scrollProgress : stepProgress
+  const progress = lessonProgress
   const mobileSwipeProgress = Math.min(1, Math.abs(mobileSwipeOffset) / 120)
   const isMobileSwipeActive = mobileSwipeOffset !== 0 || isMobileSwipeSettling
 
@@ -415,8 +438,8 @@ function LessonItemShellInner({
         </button>
 
         <div className="flex min-w-0 flex-1 justify-center px-2 sm:px-4">
-          <div className="w-full max-w-[200px] sm:max-w-[280px]">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#e5e5e5]">
+          <div className="w-full max-w-[240px] sm:max-w-[340px]">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e5e5e5]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] transition-all duration-200"
                 style={{ width: `${progress * 100}%` }}
@@ -446,6 +469,12 @@ function LessonItemShellInner({
         >
           <Link
             href={prevItemHref}
+            onClick={(event) => {
+              if (!itemNavigation) return
+              event.preventDefault()
+              playClickSound()
+              void navigateToPrevItem()
+            }}
             className={cn(
               "pointer-events-auto ml-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#e8e2ee] bg-white text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] transition-[opacity,transform,visibility] duration-200 sm:ml-3 sm:h-14 sm:w-14",
               showPrevItemCue
@@ -472,7 +501,12 @@ function LessonItemShellInner({
         >
           <Link
             href={nextItemHref}
-            onClick={() => playClickSound()}
+            onClick={(event) => {
+              playClickSound()
+              if (!itemNavigation) return
+              event.preventDefault()
+              void navigateToNextItem()
+            }}
             className={cn(
               "pointer-events-auto mr-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#e8e2ee] bg-white text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] transition-[opacity,transform,visibility] duration-200 sm:mr-3 sm:h-14 sm:w-14",
               showNextItemCue
@@ -537,15 +571,8 @@ function LessonItemShellInner({
           paddingBottom: hideBottomCta
             ? "max(16px, env(safe-area-inset-bottom, 0px))"
             : "calc(6rem + env(safe-area-inset-bottom, 0px))",
-          transform: isMobileSwipeActive ? `translate3d(${mobileSwipeOffset}px, 0, 0)` : undefined,
-          transition: isMobileSwipeSettling ? "transform 160ms ease-out" : "none",
           touchAction: "pan-y",
-          willChange: isMobileSwipeActive ? "transform" : "auto",
-          boxShadow:
-            isMobileSwipeActive
-              ? "0 0 32px rgba(82,44,111,0.10)"
-              : "none",
-        } as CSSProperties}
+        }}
       >
         <div
           ref={contentRef}
@@ -553,8 +580,23 @@ function LessonItemShellInner({
             "mx-auto w-full px-5 sm:px-8 lg:px-12",
             !fullWidth && "max-w-5xl",
           )}
+          style={{
+            transform: isMobileSwipeActive ? `translate3d(${mobileSwipeOffset}px, 0, 0)` : undefined,
+            transition: isMobileSwipeSettling ? "transform 160ms ease-out" : "none",
+            willChange: isMobileSwipeActive ? "transform" : "auto",
+            boxShadow:
+              isMobileSwipeActive
+                ? "0 0 32px rgba(82,44,111,0.10)"
+                : "none",
+          } as CSSProperties}
         >
-          {children}
+          {itemNavigation ? (
+            <LearningPathItemSlideContainer itemKey={currentItemId} direction={slideDirection}>
+              {children}
+            </LearningPathItemSlideContainer>
+          ) : (
+            children
+          )}
         </div>
       </main>
 
@@ -593,6 +635,8 @@ function LessonItemShellInner({
             </Link>
           </div>
         </div>
+      ) : hideBottomCta ? (
+        chrome?.fixedBottomBar
       ) : null}
 
       <Dialog open={showQuitDialog} onOpenChange={setShowQuitDialog}>
@@ -643,7 +687,9 @@ function LessonItemShellInner({
 export function LessonItemShell(props: LessonItemShellProps) {
   return (
     <LearningPathExplainChatProvider currentItemId={props.currentItemId}>
-      <LessonItemShellInner {...props} />
+      <LearningPathItemChromeProvider>
+        <LessonItemShellInner {...props} />
+      </LearningPathItemChromeProvider>
     </LearningPathExplainChatProvider>
   )
 }

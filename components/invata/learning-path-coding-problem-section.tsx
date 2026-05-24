@@ -13,6 +13,7 @@ import type { CodingProblem, CodingProblemExample } from "@/components/coding-pr
 import { PlanckCodeSettingsProvider } from "@/components/planckcode-settings-provider"
 import { CatalogThemeProvider, useCatalogTheme } from "@/components/catalog-theme-provider"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
+import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
 import { cn } from "@/lib/utils"
@@ -123,6 +124,22 @@ export function LearningPathCodingProblemSection({
     }
   }, [markComplete, solved])
 
+  useRegisterLearningPathFixedBottomBar(
+    () =>
+      showContinueBar ? (
+        <ProblemFeedbackBar
+          state="correct"
+          hasAnswer
+          nextItemHref={nextItemHref}
+          onVerify={() => {}}
+          onRetry={() => {}}
+          onContinue={handleContinueWithoutSubmit}
+          answerSlot={null}
+        />
+      ) : null,
+    [showContinueBar, nextItemHref, solved]
+  )
+
   return (
     <PlanckCodeSettingsProvider>
       <CatalogThemeProvider catalogType="info" pageType="detail">
@@ -187,18 +204,6 @@ export function LearningPathCodingProblemSection({
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
-
-          {showContinueBar ? (
-            <ProblemFeedbackBar
-              state="correct"
-              hasAnswer
-              nextItemHref={nextItemHref}
-              onVerify={() => {}}
-              onRetry={() => {}}
-              onContinue={handleContinueWithoutSubmit}
-              answerSlot={null}
-            />
-          ) : null}
         </div>
       </CatalogThemeProvider>
     </PlanckCodeSettingsProvider>

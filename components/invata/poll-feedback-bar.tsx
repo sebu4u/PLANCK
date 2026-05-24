@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EloGainCard } from "@/components/invata/elo-gain-card"
@@ -33,7 +33,7 @@ export function PollFeedbackBar({
   onExplain,
   eloAward,
 }: PollFeedbackBarProps) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const explainChat = useLearningPathExplainChat()
   const bottomBarDesktopInset = Boolean(
     explainChat?.insightOpen && explainChat?.isDesktopViewport
@@ -51,13 +51,13 @@ export function PollFeedbackBar({
       return
     }
     await onContinue?.()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   const continueAfterEloCard = async () => {
     playDashboardStartButtonClickSound()
     await onContinue?.()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   return (

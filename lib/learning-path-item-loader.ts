@@ -1,0 +1,324 @@
+import type { Problem } from "@/data/problems"
+import type { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
+import type { Lesson as PhysicsLesson } from "@/lib/supabase-physics"
+import type { QuizQuestion } from "@/lib/types/quiz-questions"
+import { supabase } from "@/lib/supabaseClient"
+import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
+import { getLearningPathAccess, type LearningPathAccess } from "@/lib/learning-path-access"
+import { createClient } from "@/lib/supabase/server"
+import {
+  getLearningPathLessonHref,
+  getLearningPathChapterById,
+  getLearningPathChapterBySlug,
+  getLearningPathLessonById,
+  getLearningPathLessonBySlug,
+  getLearningPathLessonItems,
+  getCompletedLearningPathItemIdsForUser,
+  isUuid,
+  type LearningPathChapter,
+  type LearningPathLesson,
+  type LearningPathLessonItem,
+} from "@/lib/supabase-learning-paths"
+import { MATH_PROBLEMS_SOLVE_COLUMNS } from "@/data/math-problems"
+import { mathProblemRowToProblem } from "@/lib/math-problem-to-learning-path-problem"
+import { getLessonBySlug } from "@/lib/supabase-physics"
+import { cookies } from "next/headers"
+import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
+import {
+  GUEST_LEARNING_PATH_PROGRESS_COOKIE,
+  countGuestCompletedLearningPathItems,
+  getGuestCompletedItemIdsForLesson,
+  parseGuestLearningPathProgress,
+} from "@/lib/guest-learning-path-cookie"
+
+export interface LearningPathItemPayload {
+  chapterSlug: string
+  lessonSlug: string
+  itemIndex: number
+  chapter: LearningPathChapter
+  lesson: LearningPathLesson
+  item: LearningPathLessonItem
+  items: LearningPathLessonItem[]
+  lessonId: string
+  lessonBaseHref: string
+  nextItemHref: string
+  initialCurrentItemCompleted: boolean
+  completedItemIdsForLesson: string[]
+  isTextLesson: boolean
+  hideBottomCta: boolean
+  overflowHidden: boolean
+  fullWidth: boolean
+  sourceLesson: PhysicsLesson | null
+  sourceProblem: Problem | null
+  sourceCodingProblem: CodingProblem | null
+  sourceCodingExamples: CodingProblemExample[]
+  sourceQuizQuestion: QuizQuestion | null
+  isLastItem: boolean
+}
+
+export type LearningPathItemLoadResult =
+  | { status: "not_found" }
+  | { status: "invalid_index" }
+  | { status: "locked"; chapter: LearningPathChapter; lesson: LearningPathLesson }
+  | { status: "blocked"; lessonBaseHref: string }
+  | { status: "ok"; payload: LearningPathItemPayload }
+
+export async function resolveLessonContext(chapterSlug: string, lessonSlug: string) {
+  const chapter = isUuid(chapterSlug)
+    ? await getLearningPathChapterById(chapterSlug)
+    : await getLearningPathChapterBySlug(chapterSlug)
+
+  if (!chapter) return { chapter: null, lesson: null }
+
+  const lesson = isUuid(lessonSlug)
+    ? await getLearningPathLessonById(lessonSlug)
+    : await getLearningPathLessonBySlug(chapterSlug, lessonSlug)
+
+  if (!lesson || lesson.chapter_id !== chapter.id) {
+    return { chapter: null, lesson: null }
+  }
+
+  return { chapter, lesson }
+}
+
+function computeItemUiFlags(
+  item: LearningPathLessonItem,
+  sourceProblem: Problem | null,
+  sourceCodingProblem: CodingProblem | null
+) {
+  const isLinkedTextItem = item.item_type === "text"
+  const isCustomTextItem = item.item_type === "custom_text"
+  const isPoll = item.item_type === "poll"
+  const isProblem =
+    (item.item_type === "problem" || item.item_type === "math_problem") && !!sourceProblem
+  const isCodingProblem = item.item_type === "coding_problem" && !!sourceCodingProblem
+  const isTest = item.item_type === "test"
+  const isCardSort = item.item_type === "card_sort"
+  const isFillSlot = item.item_type === "fill_slot"
+  const isMatch = item.item_type === "match"
+  const isBareInteractiveItem =
+    isCardSort ||
+    isFillSlot ||
+    isMatch ||
+    item.item_type === "graph_build" ||
+    item.item_type === "code_trace" ||
+    item.item_type === "swipe_classify" ||
+    item.item_type === "slider_explore" ||
+    item.item_type === "memory_flip" ||
+    item.item_type === "reveal_steps"
+  const problemHasAnswer =
+    sourceProblem &&
+    (sourceProblem.answer_type === "value" || sourceProblem.answer_type === "grila")
+
+  return {
+    isTextLesson: isLinkedTextItem || isCustomTextItem,
+    hideBottomCta:
+      isPoll ||
+      isTest ||
+      (isProblem && !!problemHasAnswer) ||
+      isCodingProblem ||
+      isBareInteractiveItem,
+    overflowHidden: isProblem || isCodingProblem,
+    fullWidth: isProblem || isCodingProblem,
+  }
+}
+
+async function loadItemContent(item: LearningPathLessonItem) {
+  const isLinkedTextItem = item.item_type === "text"
+  const sourceLesson =
+    isLinkedTextItem && item.cursuri_lesson_slug ? await getLessonBySlug(item.cursuri_lesson_slug) : null
+
+  let sourceProblem: Problem | null = null
+  if (item.item_type === "problem" && item.problem_id) {
+    const { data } = await supabase.from("problems").select("*").eq("id", item.problem_id).single()
+    sourceProblem = data as Problem | null
+  } else if (item.item_type === "math_problem" && item.problem_id) {
+    const { data } = await supabase
+      .from("math_problems")
+      .select(MATH_PROBLEMS_SOLVE_COLUMNS)
+      .eq("id", item.problem_id)
+      .eq("is_active", true)
+      .maybeSingle()
+    if (data) {
+      sourceProblem = mathProblemRowToProblem(data)
+    }
+  }
+
+  let sourceCodingProblem: CodingProblem | null = null
+  let sourceCodingExamples: CodingProblemExample[] = []
+  if (item.item_type === "coding_problem" && item.problem_id) {
+    const { data: codingRow } = await supabase
+      .from("coding_problems")
+      .select("*")
+      .eq("id", item.problem_id)
+      .eq("is_active", true)
+      .maybeSingle()
+    if (codingRow) {
+      sourceCodingProblem = {
+        ...(codingRow as CodingProblem),
+        tags: Array.isArray(codingRow.tags) ? codingRow.tags : [],
+      }
+      const { data: examples } = await supabase
+        .from("coding_problem_examples")
+        .select("*")
+        .eq("problem_id", codingRow.id)
+        .order("order_index", { ascending: true })
+      sourceCodingExamples = (examples ?? []) as CodingProblemExample[]
+    }
+  }
+
+  const sourceQuizQuestion =
+    item.item_type === "grila" && item.quiz_question_id
+      ? await fetchQuizQuestionById(item.quiz_question_id)
+      : null
+
+  return { sourceLesson, sourceProblem, sourceCodingProblem, sourceCodingExamples, sourceQuizQuestion }
+}
+
+async function getProgressState(
+  access: LearningPathAccess,
+  lessonId: string,
+  items: LearningPathLessonItem[],
+  currentItemId: string
+) {
+  const supabaseForProgress = await createClient()
+  const {
+    data: { user: progressUser },
+  } = await supabaseForProgress.auth.getUser()
+
+  let guestProgressMap = parseGuestLearningPathProgress(undefined)
+  if (access.mode === "free-preview" && !progressUser) {
+    const cookieStore = await cookies()
+    guestProgressMap = parseGuestLearningPathProgress(
+      cookieStore.get(GUEST_LEARNING_PATH_PROGRESS_COOKIE)?.value
+    )
+  }
+  const guestGlobalSolved =
+    access.mode === "free-preview" && !progressUser
+      ? countGuestCompletedLearningPathItems(guestProgressMap)
+      : 0
+
+  let completedItemIdsForLesson: string[] = []
+  let initialCurrentItemCompleted = false
+  if (progressUser) {
+    completedItemIdsForLesson = await getCompletedLearningPathItemIdsForUser(
+      supabaseForProgress,
+      progressUser.id,
+      items.map((i) => i.id)
+    )
+    initialCurrentItemCompleted = completedItemIdsForLesson.includes(currentItemId)
+  } else if (access.mode === "free-preview") {
+    completedItemIdsForLesson = getGuestCompletedItemIdsForLesson(guestProgressMap, lessonId)
+    initialCurrentItemCompleted = completedItemIdsForLesson.includes(currentItemId)
+  }
+
+  const itemsRemainingForFreePreview =
+    access.mode === "free-preview"
+      ? progressUser
+        ? access.itemsRemaining
+        : Math.max(0, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT - guestGlobalSolved)
+      : 0
+
+  return {
+    completedItemIdsForLesson,
+    initialCurrentItemCompleted,
+    itemsRemainingForFreePreview,
+  }
+}
+
+function isBlockedByFreePlan(
+  access: LearningPathAccess,
+  items: LearningPathLessonItem[],
+  item: LearningPathLessonItem,
+  completedItemIdsForLesson: string[],
+  initialCurrentItemCompleted: boolean,
+  itemsRemainingForFreePreview: number
+): boolean {
+  if (access.mode !== "free-preview") return false
+
+  const completedSet = new Set(completedItemIdsForLesson)
+  const nextItemId = items.find((i) => !completedSet.has(i.id))?.id ?? items[0]?.id ?? null
+  const isCurrentItemNext = item.id === nextItemId
+  const isCurrentItemCompleted = initialCurrentItemCompleted
+
+  if (isCurrentItemCompleted) return false
+
+  const blockedBySkip = !isCurrentItemNext
+  const blockedByLimit = isCurrentItemNext && itemsRemainingForFreePreview <= 0
+  return blockedBySkip || blockedByLimit
+}
+
+export async function loadLearningPathItemPayload(
+  chapterSlug: string,
+  lessonSlug: string,
+  itemIndex: number
+): Promise<LearningPathItemLoadResult> {
+  if (!Number.isFinite(itemIndex) || itemIndex < 1) {
+    return { status: "invalid_index" }
+  }
+
+  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
+  if (!chapter || !lesson) {
+    return { status: "not_found" }
+  }
+
+  const access = await getLearningPathAccess(chapter)
+  if (access.mode === "locked") {
+    return { status: "locked", chapter, lesson }
+  }
+
+  const items = await getLearningPathLessonItems(lesson.id)
+  const item = items[itemIndex - 1]
+  if (!item) {
+    return { status: "not_found" }
+  }
+
+  const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
+  const { completedItemIdsForLesson, initialCurrentItemCompleted, itemsRemainingForFreePreview } =
+    await getProgressState(access, lesson.id, items, item.id)
+
+  if (
+    isBlockedByFreePlan(
+      access,
+      items,
+      item,
+      completedItemIdsForLesson,
+      initialCurrentItemCompleted,
+      itemsRemainingForFreePreview
+    )
+  ) {
+    return { status: "blocked", lessonBaseHref }
+  }
+
+  const { sourceLesson, sourceProblem, sourceCodingProblem, sourceCodingExamples, sourceQuizQuestion } =
+    await loadItemContent(item)
+
+  const uiFlags = computeItemUiFlags(item, sourceProblem, sourceCodingProblem)
+  const nextItemHref =
+    itemIndex < items.length ? `${lessonBaseHref}/${itemIndex + 1}` : lessonBaseHref
+
+  return {
+    status: "ok",
+    payload: {
+      chapterSlug: chapter.slug ?? chapter.id,
+      lessonSlug: lesson.slug ?? lesson.id,
+      itemIndex,
+      chapter,
+      lesson,
+      item,
+      items,
+      lessonId: lesson.id,
+      lessonBaseHref,
+      nextItemHref,
+      initialCurrentItemCompleted,
+      completedItemIdsForLesson,
+      sourceLesson,
+      sourceProblem,
+      sourceCodingProblem,
+      sourceCodingExamples,
+      sourceQuizQuestion,
+      isLastItem: itemIndex >= items.length,
+      ...uiFlags,
+    },
+  }
+}

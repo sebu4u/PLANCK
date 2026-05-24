@@ -19,12 +19,72 @@ type IndividualPlan = {
   name: string
   priceLabel?: string
   priceValue?: number
+  /** Preț „înainte de reducere”, afișat tăiat */
+  originalPriceValue?: number
   currency?: string
   period?: string
   description: string
   popular?: boolean
   /** Economii față de 12× lunar, afișate lângă preț la facturare anuală */
   yearlySavingsRon?: number
+}
+
+function discountPercent(current: number, original: number) {
+  return Math.round((1 - current / original) * 100)
+}
+
+function PaidPlanPrice({
+  plan,
+  isYearly,
+}: {
+  plan: IndividualPlan
+  isYearly: boolean
+}) {
+  if (plan.priceValue == null) return null
+
+  const original = plan.originalPriceValue
+  const percentOff = original != null ? discountPercent(plan.priceValue, original) : null
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {original != null && percentOff != null && percentOff > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-gray-400 line-through tabular-nums sm:text-base">
+            {original.toLocaleString()} {plan.currency}
+            {plan.period}
+          </span>
+          <span className="inline-flex items-center rounded-full bg-red-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(239,68,68,0.45)] sm:text-[11px]">
+            −{percentOff}%
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex min-w-0 items-end gap-1.5">
+          <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
+            <AnimatedPrice value={plan.priceValue} /> {plan.currency}
+            {plan.id === "plus" ? ` ${plan.period}` : null}
+          </span>
+          {plan.id !== "plus" && (
+            <span className="pb-0.5 text-xs font-medium text-gray-500 sm:pb-1 sm:text-sm">
+              {plan.period}
+            </span>
+          )}
+        </div>
+        {plan.yearlySavingsRon != null && (
+          <span
+            className={cn(
+              "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
+              isYearly ? "text-red-600" : "invisible"
+            )}
+            aria-hidden={!isYearly}
+          >
+            −{plan.yearlySavingsRon} RON
+          </span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function AnimatedPrice({ value }: { value: number }) {
@@ -215,6 +275,7 @@ function PricingPageContent() {
         id: "plus",
         name: "Plus+",
         priceValue: isYearly ? 290 : 29,
+        originalPriceValue: isYearly ? 588 : 49,
         currency: "RON",
         period: isYearly ? "/an" : "/lună",
         description: "Doar 0.93 lei/zi",
@@ -225,6 +286,7 @@ function PricingPageContent() {
         id: "premium",
         name: "Premium",
         priceValue: isYearly ? 590 : 59,
+        originalPriceValue: isYearly ? 1188 : 99,
         currency: "RON",
         period: isYearly ? "/an" : "/lună",
         description: "Pentru elevul care vrea să ajungă primul",
@@ -410,7 +472,7 @@ function PricingPageContent() {
                     className={cn(
                       "relative flex h-full w-full flex-col rounded-[25px] bg-white p-3 text-left transition duration-200 sm:rounded-[26.5px] sm:p-5",
                       isSelected ? "shadow-[0_18px_40px_rgba(15,23,42,0.12)]" : "shadow-[0_10px_30px_rgba(15,23,42,0.06)]",
-                      "min-h-[128px] sm:min-h-[168px]"
+                      "min-h-[148px] sm:min-h-[188px]"
                     )}
                   >
                     <div className="flex flex-1 flex-col">
@@ -425,76 +487,27 @@ function PricingPageContent() {
                         )}
                       </div>
 
-                      {plan.id === "plus" ? (
+                      {plan.id === "free" ? (
                         <>
-                          <div className="flex items-end justify-between gap-2">
-                            <div className="flex min-w-0 items-end gap-1.5">
-                              <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
-                                {plan.priceValue != null ? (
-                                  <>
-                                    <AnimatedPrice value={plan.priceValue} /> {plan.currency}{" "}
-                                    {plan.period}
-                                  </>
-                                ) : (
-                                  plan.priceLabel
-                                )}
-                              </span>
-                            </div>
-                            {plan.yearlySavingsRon != null && (
-                              <span
-                                className={cn(
-                                  "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
-                                  isYearly ? "text-red-600" : "invisible"
-                                )}
-                                aria-hidden={!isYearly}
-                              >
-                                -{plan.yearlySavingsRon}
-                              </span>
-                            )}
+                          <div className="flex items-end gap-1.5">
+                            <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
+                              {plan.priceLabel}
+                            </span>
                           </div>
-
-                          <p className="mt-2 max-w-[18rem] text-xs font-normal leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
-                            {plan.priceValue != null
-                              ? isYearly
-                                ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
-                                : plan.description
-                              : null}
+                          <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                            {plan.description}
                           </p>
                         </>
                       ) : (
                         <>
-                          <div className="flex items-end justify-between gap-2">
-                            <div className="flex min-w-0 items-end gap-1.5">
-                              <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
-                                {plan.priceValue ? (
-                                  <>
-                                    <AnimatedPrice value={plan.priceValue} /> {plan.currency}
-                                  </>
-                                ) : (
-                                  plan.priceLabel
-                                )}
-                              </span>
-                              {plan.priceLabel !== "Gratuit" && (
-                                <span className="pb-0.5 text-xs font-medium text-gray-500 sm:pb-1 sm:text-sm">
-                                  {plan.period}
-                                </span>
-                              )}
-                            </div>
-                            {plan.yearlySavingsRon != null && (
-                              <span
-                                className={cn(
-                                  "shrink-0 pb-0.5 text-xs font-semibold tabular-nums sm:pb-1 sm:text-base",
-                                  isYearly ? "text-red-600" : "invisible"
-                                )}
-                                aria-hidden={!isYearly}
-                              >
-                                -{plan.yearlySavingsRon}
-                              </span>
-                            )}
-                          </div>
+                          <PaidPlanPrice plan={plan} isYearly={isYearly} />
 
-                          <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
-                            {plan.description}
+                          <p className="mt-2 max-w-[18rem] text-xs font-normal leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                            {plan.id === "plus" && plan.priceValue != null
+                              ? isYearly
+                                ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
+                                : plan.description
+                              : plan.description}
                           </p>
                         </>
                       )}

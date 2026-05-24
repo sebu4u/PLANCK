@@ -13,6 +13,7 @@ import {
   formatPollLearningPathContext,
   LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
+import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -128,6 +129,36 @@ export function PollSection({
     isLastItem,
   })
 
+  useRegisterLearningPathFixedBottomBar(
+    () => (
+      <PollFeedbackBar
+        state={barState}
+        hasSelection={selectedId !== null}
+        nextItemHref={nextItemHref}
+        onVerify={onVerify}
+        onRetry={onRetry}
+        onContinue={onContinue}
+        onExplain={() => {
+          pushHint("manual")
+          explainChat?.openExplainChat({
+            problemStatement: formatPollLearningPathContext({
+              question,
+              options: options.map((o) => ({ id: o.id, label: o.label })),
+              selectedId,
+              correctAnswerId,
+              displayTextAfterVerify: displayText,
+              wasCorrect: isCorrect,
+            }),
+            problemContextPreamble: "",
+            initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+          })
+        }}
+        eloAward={eloAward}
+      />
+    ),
+    [barState, selectedId, nextItemHref, eloAward, displayText, isCorrect, verified]
+  )
+
   return (
     <PollStateContext.Provider
       value={{
@@ -153,31 +184,6 @@ export function PollSection({
           {children}
         </div>
       </div>
-
-      <PollFeedbackBar
-        state={barState}
-        hasSelection={selectedId !== null}
-        nextItemHref={nextItemHref}
-        onVerify={onVerify}
-        onRetry={onRetry}
-        onContinue={onContinue}
-        onExplain={() => {
-          pushHint("manual")
-          explainChat?.openExplainChat({
-            problemStatement: formatPollLearningPathContext({
-              question,
-              options: options.map((o) => ({ id: o.id, label: o.label })),
-              selectedId,
-              correctAnswerId,
-              displayTextAfterVerify: displayText,
-              wasCorrect: isCorrect,
-            }),
-            problemContextPreamble: "",
-            initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
-          })
-        }}
-        eloAward={eloAward}
-      />
     </PollStateContext.Provider>
   )
 }

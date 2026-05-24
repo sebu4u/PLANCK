@@ -1,6 +1,6 @@
 "use client"
 
-import { useLayoutEffect, useMemo, useState, type CSSProperties } from "react"
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { BookOpen, Check, ChevronRight, Lock } from "lucide-react"
 import {
@@ -13,6 +13,7 @@ import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-pla
 import { ITEM_TYPE_LABEL, getLessonItemDisplayIcon } from "@/components/invata/learning-path-item-body"
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
+import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
 
 interface FreeAccessState {
   itemsSolved: number
@@ -110,6 +111,15 @@ export function LearningPathLessonPage({
     return firstUncompleted?.id ?? items[0]?.id ?? null
   }, [items, completedItemIdSet])
   const isSelectedNextItem = selectedItem ? selectedItem.id === nextItemId : true
+
+  useEffect(() => {
+    if (!selectedItem) return
+    prefetchLearningPathItem(
+      chapter.slug ?? chapter.id,
+      lesson.slug ?? lesson.id,
+      selectedItemIndex + 1
+    )
+  }, [chapter.id, chapter.slug, lesson.id, lesson.slug, selectedItem, selectedItemIndex])
 
   useLayoutEffect(() => {
     if (!initialSelectedItemId || items.length < 2) return

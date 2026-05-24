@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import {
   AlertCircle,
   BatteryFull,
@@ -446,6 +447,7 @@ export function LearningPathTestSection({
   isLastItem,
 }: LearningPathTestSectionProps) {
   const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const { user } = useAuth()
   const pushProgress = useProgressTrigger()
   const pushMomentum = useMomentumTrigger()
@@ -599,8 +601,8 @@ export function LearningPathTestSection({
       itemIndex: 0,
       totalItems: 0,
     })
-    router.push(nextItemHref)
-  }, [isLastItem, nextItemHref, pushMomentum, router])
+    await navigateToNextItem()
+  }, [isLastItem, navigateToNextItem, nextItemHref, pushMomentum])
 
   const totalProblems = content.problems.length
   const answeredCount = useMemo(() => {

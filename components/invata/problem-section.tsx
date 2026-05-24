@@ -19,6 +19,7 @@ import {
   formatProblemLearningPathContext,
   LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
+import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
@@ -307,6 +308,65 @@ export function ProblemSection({
 
   const canShowVerifyBar = hasValueAnswer || hasGrilaAnswer
 
+  useRegisterLearningPathFixedBottomBar(
+    () =>
+      canShowVerifyBar ? (
+        <ProblemFeedbackBar
+          state={barState}
+          hasAnswer={hasAnswer}
+          nextItemHref={nextItemHref}
+          onVerify={onVerify}
+          onRetry={onRetry}
+          onContinue={onContinue}
+          onExplain={() => {
+            pushHint("manual")
+            const statement =
+              answerType === "value" && currentSubpoint
+                ? formatProblemLearningPathContext({
+                    problem,
+                    answerType,
+                    valueInput,
+                    valueSubpointLabel: currentSubpoint.label,
+                    valueCorrectValue: currentSubpoint.correct_value,
+                    wasCorrect: isCorrect,
+                  })
+                : answerType === "grila" && hasGrilaAnswer
+                  ? formatProblemLearningPathContext({
+                      problem,
+                      answerType,
+                      grilaOptions,
+                      grilaSelectedIndex:
+                        grilaSelected === "" ? undefined : Number(grilaSelected),
+                      grilaCorrectIndex,
+                      wasCorrect: isCorrect,
+                    })
+                  : formatProblemLearningPathContext({
+                      problem,
+                      answerType,
+                      wasCorrect: isCorrect,
+                    })
+            explainChat?.openExplainChat({
+              problemStatement: statement,
+              problemContextPreamble: "",
+              initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
+            })
+          }}
+          eloAward={eloAward}
+          answerSlot={answerSlot}
+        />
+      ) : null,
+    [
+      canShowVerifyBar,
+      barState,
+      hasAnswer,
+      nextItemHref,
+      eloAward,
+      answerSlot,
+      isCorrect,
+      verified,
+    ]
+  )
+
   // Sub lg: înălțime în viewport ca scroll-ul să includă enunț + video; fără verify scădem ~6rem (bara Continuă din shell).
   const mobileScrollHeightClass = canShowVerifyBar
     ? "max-lg:h-[calc(100dvh-3.5rem)] max-lg:min-h-0"
@@ -388,52 +448,6 @@ export function ProblemSection({
           </div>
         </div>
       </div>
-
-      {canShowVerifyBar && (
-        <ProblemFeedbackBar
-          state={barState}
-          hasAnswer={hasAnswer}
-          nextItemHref={nextItemHref}
-          onVerify={onVerify}
-          onRetry={onRetry}
-          onContinue={onContinue}
-          onExplain={() => {
-            pushHint("manual")
-            const statement =
-              answerType === "value" && currentSubpoint
-                ? formatProblemLearningPathContext({
-                    problem,
-                    answerType,
-                    valueInput,
-                    valueSubpointLabel: currentSubpoint.label,
-                    valueCorrectValue: currentSubpoint.correct_value,
-                    wasCorrect: isCorrect,
-                  })
-                : answerType === "grila" && hasGrilaAnswer
-                  ? formatProblemLearningPathContext({
-                      problem,
-                      answerType,
-                      grilaOptions,
-                      grilaSelectedIndex:
-                        grilaSelected === "" ? undefined : Number(grilaSelected),
-                      grilaCorrectIndex,
-                      wasCorrect: isCorrect,
-                    })
-                  : formatProblemLearningPathContext({
-                      problem,
-                      answerType,
-                      wasCorrect: isCorrect,
-                    })
-            explainChat?.openExplainChat({
-              problemStatement: statement,
-              problemContextPreamble: "",
-              initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
-            })
-          }}
-          eloAward={eloAward}
-          answerSlot={answerSlot}
-        />
-      )}
     </>
   )
 }

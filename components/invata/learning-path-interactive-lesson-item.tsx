@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DependencyList } from "react"
 import { evaluate } from "mathjs"
 import { Reorder } from "framer-motion"
 import { motion, useMotionValue, useTransform } from "framer-motion"
@@ -37,6 +37,7 @@ import {
   LEARNING_PATH_FILL_SLOT_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
 import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
+import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 
 function shuffleInPlace<T>(arr: T[]) {
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -64,11 +65,11 @@ function ContinueRow({
   onContinue: () => Promise<void>
   label?: string
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const handle = async (e: React.MouseEvent) => {
     e.preventDefault()
     await onContinue()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
   return (
     <div className="mt-6 flex justify-center">
@@ -112,12 +113,9 @@ function CardSortView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const explainChat = useLearningPathExplainChat()
   const { pushHint } = useStuckTrigger({ surface: "invata" })
-  const insightDesktopOpen = Boolean(
-    explainChat?.insightOpen && explainChat?.isDesktopViewport
-  )
 
   const initial = useMemo(() => {
     const ids = data.cards.map((c) => c.id)
@@ -176,7 +174,7 @@ function CardSortView({
     if (!canContinue) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   return (
@@ -228,45 +226,37 @@ function CardSortView({
         </div>
       </div>
 
-      <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-          insightDesktopOpen && "lg:right-[25vw]",
-        )}
-        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3 sm:gap-4">
+      <InteractiveBottomChrome registrationDeps={[canContinue, checkPhase]}>
+        <button
+          type="button"
+          onClick={handleWhy}
+          className="shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 sm:px-5 sm:py-3 sm:text-base"
+        >
+          De ce?
+        </button>
+        {canContinue ? (
+          <Link
+            href={nextItemHref}
+            onClick={handleContinue}
+            className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
+            style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
+          >
+            <span className="relative z-[1] inline-flex items-center gap-2">
+              Continuă
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+            </span>
+          </Link>
+        ) : (
           <button
             type="button"
-            onClick={handleWhy}
-            className="shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 sm:px-5 sm:py-3 sm:text-base"
+            onClick={handleVerify}
+            className="dashboard-start-glow inline-flex min-h-[3.25rem] shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#fb923c] to-[#ea580c] px-8 py-3.5 text-base font-semibold text-white shadow-[0_4px_0_#9a3412] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#9a3412] sm:min-h-[3.5rem] sm:px-10 sm:py-4 sm:text-lg"
+            style={{ "--start-glow-tint": CARD_SORT_VERIFY_GLOW_TINT } as CSSProperties}
           >
-            De ce?
+            <span className="relative z-[1]">Verifică ordinea</span>
           </button>
-          {canContinue ? (
-            <Link
-              href={nextItemHref}
-              onClick={handleContinue}
-              className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
-              style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
-            >
-              <span className="relative z-[1] inline-flex items-center gap-2">
-                Continuă
-                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-              </span>
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={handleVerify}
-              className="dashboard-start-glow inline-flex min-h-[3.25rem] shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#fb923c] to-[#ea580c] px-8 py-3.5 text-base font-semibold text-white shadow-[0_4px_0_#9a3412] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#9a3412] sm:min-h-[3.5rem] sm:px-10 sm:py-4 sm:text-lg"
-              style={{ "--start-glow-tint": CARD_SORT_VERIFY_GLOW_TINT } as CSSProperties}
-            >
-              <span className="relative z-[1]">Verifică ordinea</span>
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </InteractiveBottomChrome>
     </>
   )
 }
@@ -279,24 +269,35 @@ const MATCH_ASSOC_CARD_CLASS =
 const INTERACTIVE_OPTION_CARD =
   "rounded-xl border-[3px] bg-white px-3 py-2.5 text-left shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow] border-[#cfc3dc] [&_.prose]:my-0 [&_.prose]:text-left [&_p]:my-0"
 
-function InteractiveBottomChrome({ children }: { children: React.ReactNode }) {
+function InteractiveBottomChrome({
+  children,
+  registrationDeps = [],
+}: {
+  children: React.ReactNode
+  registrationDeps?: DependencyList
+}) {
   const explainChat = useLearningPathExplainChat()
   const insightDesktopOpen = Boolean(
     explainChat?.insightOpen && explainChat?.isDesktopViewport,
   )
-  return (
-    <div
-      className={cn(
-        "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-        insightDesktopOpen && "lg:right-[25vw]",
-      )}
-      style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
-    >
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3 sm:gap-4">
-        {children}
+
+  useRegisterLearningPathFixedBottomBar(
+    () => (
+      <div
+        className={cn(
+          "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
+          insightDesktopOpen && "lg:right-[25vw]",
+        )}
+        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
+      >
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3 sm:gap-4">
+          {children}
+        </div>
       </div>
-    </div>
+    ),
+    [insightDesktopOpen, ...registrationDeps]
   )
+  return null
 }
 
 function FillSlotView({
@@ -308,12 +309,9 @@ function FillSlotView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const explainChat = useLearningPathExplainChat()
   const { pushHint } = useStuckTrigger({ surface: "invata" })
-  const insightDesktopOpen = Boolean(
-    explainChat?.insightOpen && explainChat?.isDesktopViewport
-  )
 
   const slotIds = useMemo(() => data.slots.map((s) => s.id), [data.slots])
   const [assign, setAssign] = useState<Record<string, string | null>>(() =>
@@ -426,7 +424,7 @@ function FillSlotView({
     if (!canContinue) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   const chipCardBase =
@@ -519,36 +517,28 @@ function FillSlotView({
         </div>
       </div>
 
-      <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-          insightDesktopOpen && "lg:right-[25vw]",
-        )}
-        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3 sm:gap-4">
-          <button
-            type="button"
-            onClick={handleWhy}
-            className="shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 sm:px-5 sm:py-3 sm:text-base"
+      <InteractiveBottomChrome registrationDeps={[canContinue, autoResult]}>
+        <button
+          type="button"
+          onClick={handleWhy}
+          className="shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 sm:px-5 sm:py-3 sm:text-base"
+        >
+          De ce?
+        </button>
+        {canContinue ? (
+          <Link
+            href={nextItemHref}
+            onClick={handleContinue}
+            className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
+            style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
           >
-            De ce?
-          </button>
-          {canContinue ? (
-            <Link
-              href={nextItemHref}
-              onClick={handleContinue}
-              className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
-              style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
-            >
-              <span className="relative z-[1] inline-flex items-center gap-2">
-                Continuă
-                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-              </span>
-            </Link>
-          ) : null}
-        </div>
-      </div>
+            <span className="relative z-[1] inline-flex items-center gap-2">
+              Continuă
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+            </span>
+          </Link>
+        ) : null}
+      </InteractiveBottomChrome>
     </>
   )
 }
@@ -564,11 +554,8 @@ function MatchView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const explainChat = useLearningPathExplainChat()
-  const insightDesktopOpen = Boolean(
-    explainChat?.insightOpen && explainChat?.isDesktopViewport
-  )
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const leftRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -641,7 +628,7 @@ function MatchView({
     if (!allMatchCorrect) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   const canVerify = edges.length === data.left.length && !allMatchCorrect
@@ -730,53 +717,45 @@ function MatchView({
       </div>
       </div>
 
-      <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-          insightDesktopOpen && "lg:right-[25vw]",
-        )}
-        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3 sm:gap-4">
+      <InteractiveBottomChrome registrationDeps={[allMatchCorrect, canVerify, canReset, submitted, pickL]}>
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={!canReset}
+          className={cn(
+            "shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors sm:px-5 sm:py-3 sm:text-base",
+            canReset ? "hover:bg-gray-50" : "cursor-not-allowed opacity-45",
+          )}
+        >
+          Resetează
+        </button>
+        {allMatchCorrect ? (
+          <Link
+            href={nextItemHref}
+            onClick={handleContinue}
+            className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
+            style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
+          >
+            <span className="relative z-[1] inline-flex items-center gap-2">
+              Continuă
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+            </span>
+          </Link>
+        ) : (
           <button
             type="button"
-            onClick={handleReset}
-            disabled={!canReset}
+            onClick={handleVerify}
+            disabled={!canVerify}
             className={cn(
-              "shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors sm:px-5 sm:py-3 sm:text-base",
-              canReset ? "hover:bg-gray-50" : "cursor-not-allowed opacity-45",
+              "dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#fb923c] to-[#ea580c] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#9a3412] transition-[transform,box-shadow] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg",
+              !canVerify && "pointer-events-none opacity-45",
             )}
+            style={{ "--start-glow-tint": CARD_SORT_VERIFY_GLOW_TINT } as CSSProperties}
           >
-            Resetează
+            <span className="relative z-[1]">Verifică asocierile</span>
           </button>
-          {allMatchCorrect ? (
-            <Link
-              href={nextItemHref}
-              onClick={handleContinue}
-              className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
-              style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
-            >
-              <span className="relative z-[1] inline-flex items-center gap-2">
-                Continuă
-                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-              </span>
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={handleVerify}
-              disabled={!canVerify}
-              className={cn(
-                "dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#fb923c] to-[#ea580c] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#9a3412] transition-[transform,box-shadow] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg",
-                !canVerify && "pointer-events-none opacity-45",
-              )}
-              style={{ "--start-glow-tint": CARD_SORT_VERIFY_GLOW_TINT } as CSSProperties}
-            >
-              <span className="relative z-[1]">Verifică asocierile</span>
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </InteractiveBottomChrome>
     </>
   )
 }
@@ -792,7 +771,7 @@ function GraphBuildView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const [choice, setChoice] = useState<string | null>(null)
   const [points, setPoints] = useState<{ x: number; y: number }[]>([])
   const [submitted, setSubmitted] = useState(false)
@@ -801,7 +780,7 @@ function GraphBuildView({
     e.preventDefault()
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   if (data.mode === "pick_curve") {
@@ -1050,7 +1029,7 @@ function CodeTraceView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const [step, setStep] = useState(0)
   const [textVal, setTextVal] = useState("")
   const [choice, setChoice] = useState<string | null>(null)
@@ -1084,7 +1063,7 @@ function CodeTraceView({
     if (!done) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   const canVerifyStep =
@@ -1194,7 +1173,7 @@ function SwipeClassifyView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const [idx, setIdx] = useState(0)
   const [score, setScore] = useState(0)
   const [feedback, setFeedback] = useState<"left" | "right" | null>(null)
@@ -1224,7 +1203,7 @@ function SwipeClassifyView({
     if (!finished) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   const outlineBtn =
@@ -1415,7 +1394,7 @@ function SliderExploreView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const [vals, setVals] = useState<Record<string, number>>(() =>
     Object.fromEntries(data.sliders.map((s) => [s.id, s.default]))
   )
@@ -1449,7 +1428,7 @@ function SliderExploreView({
     if (!hit) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   return (
@@ -1607,7 +1586,7 @@ function MemoryFlipView({
   markComplete: () => Promise<void>
 }) {
   type Card = { key: string; face: string; pair: string }
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const deck = useMemo(() => {
     const out: Card[] = []
     data.pairs.forEach((p, i) => {
@@ -1646,7 +1625,7 @@ function MemoryFlipView({
     if (!done) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   return (
@@ -1806,7 +1785,7 @@ function RevealStepsView({
   nextItemHref: string
   markComplete: () => Promise<void>
 }) {
-  const router = useRouter()
+  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const [visible, setVisible] = useState(0)
   const [quizChoice, setQuizChoice] = useState<number | null>(null)
   const [quizErr, setQuizErr] = useState(false)
@@ -1839,7 +1818,7 @@ function RevealStepsView({
     if (!atEnd) return
     playDashboardStartButtonClickSound()
     await markComplete()
-    router.push(nextItemHref)
+    await navigateToNextItem()
   }
 
   const canTapAdvance =
