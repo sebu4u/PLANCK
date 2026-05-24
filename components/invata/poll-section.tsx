@@ -14,6 +14,7 @@ import {
   LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -177,9 +178,12 @@ export function PollSection({
         className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center"
         style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
       >
-        <p className="mb-4 w-full max-w-md text-center text-base font-semibold leading-snug text-[#2C2F33] sm:text-lg">
-          {displayText}
-        </p>
+        <div className="mb-4 w-full max-w-md text-center text-base font-semibold leading-snug text-[#2C2F33] sm:text-lg">
+          <LatexRichText
+            content={displayText}
+            className="break-words [&_.katex]:text-[#2C2F33]"
+          />
+        </div>
         <div className="w-full max-w-md rounded-2xl border border-[#e8e8e8] bg-white overflow-hidden shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
           {children}
         </div>

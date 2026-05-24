@@ -38,6 +38,7 @@ import {
 } from "@/lib/learning-path-insight-context"
 import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 
 function shuffleInPlace<T>(arr: T[]) {
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -1898,7 +1899,7 @@ function RevealStepsView({
                           : "border-[#cfc3dc] bg-white text-[#111] shadow-[0_3px_0_#9d8ab3]",
                       )}
                     >
-                      {o}
+                      <LatexRichText content={o} className="break-words [&_.katex]:text-inherit" />
                     </button>
                   ))}
                 </div>

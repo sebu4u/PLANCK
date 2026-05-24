@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { usePollState } from "@/components/invata/poll-section"
+import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 
 export interface LessonPollOption {
   id: string
@@ -50,7 +51,7 @@ export function LessonPoll({ imageSrc, imageAlt, options, correctAnswerId }: Les
                     : "border-gray-300 bg-transparent text-[#4d4d4d]"
                 )}
               >
-                {opt.label}
+                <LatexRichText content={opt.label} className="break-words [&_.katex]:text-inherit" />
               </button>
             )
           })}
