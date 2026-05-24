@@ -3,9 +3,15 @@ import {
   getAllGrades,
   getChaptersByGradeId
 } from '@/lib/supabase-physics'
+import {
+  getLearningPathChapters,
+  getLearningPathLessonsByChapterId,
+  getLearningPathLessonHref,
+} from '@/lib/supabase-learning-paths'
 import { slugify } from '@/lib/slug'
 import { supabase } from '@/lib/supabaseClient'
 import { createClient } from '@supabase/supabase-js'
+import { PLATFORM_SITE_URL } from '@/lib/platform-marketing'
 
 async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -52,9 +58,23 @@ async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<Meta
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://www.planck.academy'
+  const baseUrl = PLATFORM_SITE_URL
 
   const problemEntries = await fetchPhysicsProblemsSitemapEntries(baseUrl)
+
+  // Learning path lesson URLs
+  const learningPathLessons: Array<{ url: string; updated_at: string }> = []
+  const chapters = await getLearningPathChapters()
+  for (const chapter of chapters) {
+    const lessons = await getLearningPathLessonsByChapterId(chapter.id)
+    for (const lesson of lessons) {
+      if (!lesson.is_active) continue
+      learningPathLessons.push({
+        url: `${baseUrl}${getLearningPathLessonHref(chapter, lesson)}`,
+        updated_at: lesson.updated_at || new Date().toISOString(),
+      })
+    }
+  }
 
   // Get all lessons for dynamic sitemap with updated_at
   const grades = await getAllGrades()
@@ -106,6 +126,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/invata`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.95,
+    },
+    {
+      url: `${baseUrl}/grile`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/matematica/probleme`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/informatica/probleme`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/simulari-bac`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.85,
     },
     {
       url: `${baseUrl}/sketch`,
@@ -173,7 +223,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.5,
     },
-    // Dynamic lesson URLs
+    // Dynamic learning path lesson URLs
+    ...learningPathLessons.map((entry) => ({
+      url: entry.url,
+      lastModified: new Date(entry.updated_at),
+      changeFrequency: 'weekly' as const,
+      priority: 0.75 as const,
+    })),
+    // Dynamic course lesson URLs
     ...allLessons.map(lesson => ({
       url: `${baseUrl}/cursuri/${slugify(lesson.title)}`,
       lastModified: new Date(lesson.updated_at),

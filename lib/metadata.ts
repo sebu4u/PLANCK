@@ -1,13 +1,31 @@
 import { Metadata } from 'next'
+import {
+  PLATFORM_DESCRIPTION,
+  PLATFORM_KEYWORDS,
+  PLATFORM_SITE_URL,
+  PLATFORM_TAGLINE,
+  HOME_TITLE,
+  LEARNING_PATHS_DESCRIPTION,
+  LEARNING_PATHS_TITLE,
+  INSIGHT_DESCRIPTION,
+  PLANCKCODE_DESCRIPTION,
+  PLANCKCODE_TITLE,
+  QUIZ_COUNT,
+  VIDEO_SOLUTIONS_COUNT,
+  TEACHER_VERIFICATION,
+  TESTIMONIALS_LABEL,
+} from '@/lib/platform-marketing'
+
+const OG_IMAGE = 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'
 
 // Base metadata configuration
 export const baseMetadata: Metadata = {
   title: {
-    default: "Planck Academy",
+    default: `Planck Academy – ${PLATFORM_TAGLINE}`,
     template: "%s – Planck Academy"
   },
-  description: "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
-  keywords: "fizică, educație, liceu, cursuri video, probleme fizică, mecanică, optică, termodinamică, electricitate",
+  description: PLATFORM_DESCRIPTION,
+  keywords: PLATFORM_KEYWORDS,
   authors: [{ name: "Planck Team" }],
   creator: "Planck Academy",
   publisher: "Planck Academy",
@@ -16,20 +34,20 @@ export const baseMetadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://www.planck.academy'),
+  metadataBase: new URL(PLATFORM_SITE_URL),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'ro_RO',
-    url: 'https://www.planck.academy',
+    url: PLATFORM_SITE_URL,
     siteName: 'Planck Academy',
-    title: 'Planck Academy',
-    description: 'Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.',
+    title: `Planck Academy – ${PLATFORM_TAGLINE}`,
+    description: PLATFORM_DESCRIPTION,
     images: [
       {
-        url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+        url: OG_IMAGE,
         width: 1200,
         height: 630,
       }
@@ -37,9 +55,9 @@ export const baseMetadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Planck Academy',
-    description: 'Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.',
-    images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+    title: `Planck Academy – ${PLATFORM_TAGLINE}`,
+    description: PLATFORM_DESCRIPTION,
+    images: [OG_IMAGE],
   },
   robots: {
     index: true,
@@ -57,66 +75,65 @@ export const baseMetadata: Metadata = {
 // Page-specific metadata configurations
 export const pageMetadata: Record<string, Metadata> = {
   "planckcode-ide": {
-    title: "PlanckCode IDE – C++ Compiler Online în Browser",
-    description: "IDE online C++ cu compilator integrat: scrii, compilezi și rulezi C++ direct în browser, cu autocompletare, erori în timp real și asistent AI.",
-    keywords: "C++ compiler, C++ compiler online, compilator C++ online, IDE C++ online, C++ online compiler, editor C++ online, browser IDE, coding environment",
+    title: "PlanckCode IDE – C++ & Python Online în Browser",
+    description: "IDE online C++ și Python cu compilator integrat: scrii, compilezi și rulezi cod direct în browser, cu autocompletare, erori în timp real și asistent AI.",
+    keywords: "C++ compiler online, Python IDE online, compilator C++ online, IDE C++ online, Python in browser, editor C++ online, browser IDE, coding environment",
     alternates: {
       canonical: '/planckcode/ide',
     },
     openGraph: {
-      title: "PlanckCode IDE – C++ Compiler Online",
-      description: "IDE online C++ cu compilator C++ în browser: scrii, compilezi și rulezi instant, cu feedback și asistent AI.",
-      url: 'https://www.planck.academy/planckcode/ide',
+      title: "PlanckCode IDE – C++ & Python Online",
+      description: "IDE online C++ și Python în browser: scrii, compilezi și rulezi instant, cu feedback și asistent AI.",
+      url: `${PLATFORM_SITE_URL}/planckcode/ide`,
     },
     twitter: {
-      title: "PlanckCode IDE – C++ Compiler Online în Browser",
-      description: "IDE online C++ cu compilator integrat: scrii, compilezi și rulezi C++ direct în browser, cu autocompletare și asistent AI.",
+      title: "PlanckCode IDE – C++ & Python Online în Browser",
+      description: "IDE online C++ și Python cu compilator integrat: scrii, compilezi și rulezi cod direct în browser, cu autocompletare și asistent AI.",
     },
   },
   home: {
     title: {
-      absolute: "Cursuri de Fizică și Informatică pentru Liceu – Planck Academy"
+      absolute: `${HOME_TITLE} | Planck Academy`
     },
-    description: "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
-    keywords: "fizică liceu, cursuri fizică, probleme fizică, învățare interactivă, educație fizică, clasa 9, clasa 10",
+    description: PLATFORM_DESCRIPTION,
+    keywords: PLATFORM_KEYWORDS,
     openGraph: {
-      title: "Cursuri de Fizică și Informatică pentru Liceu – Planck Academy",
-      description: "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
+      title: `${HOME_TITLE} | Planck Academy`,
+      description: PLATFORM_DESCRIPTION,
     },
     twitter: {
-      title: "Cursuri de Fizică și Informatică pentru Liceu – Planck Academy",
-      description: "Planck este o platformă educațională de fizică și informatică pentru liceu, bazată pe AI, care îi învață pe elevi să gândească prin probleme explicate pas cu pas, cursuri interactive și un mediu complet de programare.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      title: `${HOME_TITLE} | Planck Academy`,
+      description: PLATFORM_DESCRIPTION,
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
   },
 
   courses: {
-    title: "Cursuri de Fizică",
-    description: "Descoperă cursurile complete de fizică pentru liceu. Videoclipuri HD, explicații detaliate și exerciții practice pentru clasa a 9-a și a 10-a.",
-    keywords: "cursuri fizică liceu, videoclipuri fizică, lecții fizică, exerciții fizică, clasa 9 fizică, clasa 10 fizică",
+    title: "Cursuri Video – Integrate în Traseele Planck",
+    description: "Lecții video HD integrate în traseele de învățare Planck Academy. Fizică, matematică și informatică pentru clasele 9–12, cu explicații clare pentru notă la clasă, BAC și admitere.",
+    keywords: "cursuri liceu, lecții video liceu, trasee invatare, fizică liceu, clasa 9, clasa 10, clasa 11, clasa 12",
     openGraph: {
-      title: "Cursuri de Fizică",
-      description: "Cursuri complete de fizică cu videoclipuri HD și explicații detaliate.",
+      title: "Cursuri Video – Integrate în Traseele Planck",
+      description: "Lecții video HD pentru liceu, integrate în traseele de învățare Planck Academy.",
     },
   },
 
-  // Pagina lecțiilor (cursuri -> lectii)
   "physics-lessons": {
-    title: "Lecții de Fizică Structurate pe Clase și Capitole",
-    description: "Parcurge lecțiile de fizică pentru clasa a 9-a și a 10-a, structurate pe capitole, cu explicații clare și exemple practice.",
-    keywords: "lecții fizică, lecții clasa 9, lecții clasa 10, capitole fizică, conținut educațional fizică",
+    title: "Lecții de Fizică – Trasee și Capitole Structurate",
+    description: "Lecții de fizică pentru clasele 9–12, structurate pe capitole și integrate în traseele Planck. Explicații clare, exemple practice și pregătire pentru BAC și admitere.",
+    keywords: "lecții fizică, lecții clasa 9, lecții clasa 10, capitole fizică, trasee invatare fizica, bac fizica",
     alternates: {
       canonical: '/cursuri',
     },
     openGraph: {
-      title: "Lecții de Fizică Structurate pe Clase și Capitole",
-      description: "Lecții de fizică pentru liceu, organizate pe capitole cu explicații și exemple.",
-      url: 'https://www.planck.academy/cursuri',
+      title: "Lecții de Fizică – Trasee și Capitole Structurate",
+      description: "Lecții de fizică pentru liceu, integrate în traseele Planck Academy.",
+      url: `${PLATFORM_SITE_URL}/cursuri`,
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
           alt: 'Lecții de Fizică – Planck Academy',
@@ -124,9 +141,9 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: "Lecții de Fizică",
-      description: "Lecții structurate pe capitole pentru clasa a 9-a și a 10-a.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      title: "Lecții de Fizică – Planck Academy",
+      description: "Lecții structurate pe capitole, integrate în traseele de învățare.",
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
     robots: {
@@ -136,66 +153,66 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "learning-paths": {
-    title: "Learning Paths – Învață Structurat",
-    description: "Parcurge capitolele și lecțiile în pași clari, organizate în learning paths.",
-    keywords: "learning paths, invata, capitole, lectii, invatare structurata, planck",
+    title: LEARNING_PATHS_TITLE,
+    description: LEARNING_PATHS_DESCRIPTION,
+    keywords: "trasee invatare, learning paths liceu, invata, capitole, lectii, clasa 9 10 11 12, bac, admitere, planck academy",
     alternates: {
       canonical: "/invata",
     },
     openGraph: {
-      title: "Learning Paths – Planck Academy",
-      description: "Învață organizat pe capitole și lecții, cu paths ușor de urmărit.",
-      url: "https://www.planck.academy/invata",
+      title: `${LEARNING_PATHS_TITLE} | Planck Academy`,
+      description: LEARNING_PATHS_DESCRIPTION,
+      url: `${PLATFORM_SITE_URL}/invata`,
       type: "website",
       images: [
         {
-          url: "https://i.ibb.co/DHgVg7gr/Untitled-design-4.png",
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
-          alt: "Learning Paths – Planck Academy",
+          alt: "Trasee de învățare – Planck Academy",
         },
       ],
     },
     twitter: {
-      title: "Learning Paths – Planck Academy",
-      description: "Capitole și lecții organizate în paths clare pentru învățare.",
-      images: ["https://i.ibb.co/DHgVg7gr/Untitled-design-4.png"],
+      title: LEARNING_PATHS_TITLE,
+      description: LEARNING_PATHS_DESCRIPTION,
+      images: [OG_IMAGE],
       card: "summary_large_image",
     },
   },
 
   problems: {
-    title: "Probleme de Fizică - Grilă & Rezolvări Complete | PLANCK",
-    description: "Cea mai mare colecție de probleme de fizică pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. Mecanică, Termodinamică, Electricitate și Optică.",
-    keywords: "probleme fizica, bacalaureat fizica, admitere medicina fizica, teste grila fizica, exercitii fizica rezolvate, culegere fizica online",
+    title: "Probleme Rezolvate Video & Catalog – BAC, Admitere, Clasă | PLANCK",
+    description: `Peste ${VIDEO_SOLUTIONS_COUNT} probleme cu soluții video explicate și catalog complet pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. ${TEACHER_VERIFICATION}.`,
+    keywords: "probleme fizica, probleme rezolvate video, bacalaureat fizica, admitere medicina fizica, teste grila fizica, exercitii fizica rezolvate, culegere fizica online",
     openGraph: {
-      title: "Probleme de Fizică - Pregătire Performantă",
-      description: "Exersează cu sute de probleme de fizică explicate. Pregătire pentru examene și concursuri.",
+      title: "Probleme Rezolvate Video – Pregătire BAC și Admitere",
+      description: `Peste ${VIDEO_SOLUTIONS_COUNT} soluții video explicate. Catalog complet pentru examene și clasă.`,
     },
   },
 
   about: {
-    title: "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
-    description: "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa PLANCK, misiunea noastră, cursuri interactive, Insight AI, PlanckCode IDE, Planck Sketch și modelele Raptor1.",
-    keywords: "despre planck, echipa planck, misiune planck, educație fizică, informatică liceu, Insight AI, PlanckCode, Planck Sketch, Raptor1, platformă educațională, cursuri fizică, probleme fizică, IDE C++ online",
+    title: "Despre PLANCK – Trasee, Grile, Video și Echipa Noastră",
+    description: `Planck Academy te ajută să obții nota dorită la clasă, BAC sau admitere. Trasee de învățare 9–12, ${QUIZ_COUNT} grile, ${VIDEO_SOLUTIONS_COUNT} soluții video, ${TESTIMONIALS_LABEL}. ${TEACHER_VERIFICATION}.`,
+    keywords: "despre planck, echipa planck, trasee invatare, grile liceu, Insight AI, PlanckCode, Planck Sketch, Raptor1, platformă educațională, IDE C++ Python online",
     alternates: {
       canonical: '/despre',
     },
     openGraph: {
-      title: "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
-      description: "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa, cursuri interactive, Insight AI, PlanckCode și Planck Sketch.",
-      url: 'https://www.planck.academy/despre',
+      title: "Despre PLANCK – Trasee, Grile, Video și Echipa Noastră",
+      description: `Platformă pentru nota dorită la clasă, BAC și admitere. Trasee complete, ${QUIZ_COUNT} grile, Insight AI, PlanckCode și Planck Sketch.`,
+      url: `${PLATFORM_SITE_URL}/despre`,
     },
     twitter: {
-      title: "Despre PLANCK – Echipa, Misiunea și Produsele Noastre",
-      description: "Planck Academy este platforma educațională de fizică și informatică pentru liceu. Descoperă echipa, cursuri interactive, Insight AI, PlanckCode și Planck Sketch.",
+      title: "Despre PLANCK – Trasee, Grile, Video și Echipa Noastră",
+      description: `Planck Academy – trasee de învățare, ${QUIZ_COUNT} grile, ${VIDEO_SOLUTIONS_COUNT} soluții video, ${TEACHER_VERIFICATION}.`,
     },
   },
 
   contact: {
     title: "Contact - PLANCK",
     description: "Contactează echipa PLANCK pentru întrebări, suport tehnic sau colaborări. Suntem aici să te ajutăm!",
-    keywords: "contact planck, suport planck, întrebări planck, ajutor fizică",
+    keywords: "contact planck, suport planck, întrebări planck, ajutor liceu",
     openGraph: {
       title: "Contact - PLANCK",
       description: "Contactează echipa PLANCK pentru suport și întrebări.",
@@ -204,38 +221,38 @@ export const pageMetadata: Record<string, Metadata> = {
 
   login: {
     title: "Autentificare - PLANCK",
-    description: "Autentifică-te în contul tău PLANCK pentru a accesa cursurile și problemele de fizică.",
-    keywords: "autentificare planck, login planck, cont planck, acces cursuri",
+    description: "Autentifică-te în contul tău PLANCK pentru a accesa traseele de învățare, grilele și problemele video.",
+    keywords: "autentificare planck, login planck, cont planck, acces trasee invatare",
     openGraph: {
       title: "Autentificare - PLANCK",
-      description: "Autentifică-te pentru a accesa cursurile PLANCK.",
+      description: "Autentifică-te pentru a accesa traseele și conținutul PLANCK.",
     },
   },
 
   register: {
     title: "Înregistrare - PLANCK",
-    description: "Creează-ți contul PLANCK gratuit și începe să înveți fizica prin cursuri interactive și probleme captivante.",
-    keywords: "înregistrare planck, cont nou planck, înscriere planck, gratuit",
+    description: "Creează-ți contul PLANCK gratuit și începe traseele de învățare pentru nota dorită la clasă, BAC sau admitere.",
+    keywords: "înregistrare planck, cont nou planck, înscriere planck, gratuit, trasee invatare",
     openGraph: {
       title: "Înregistrare - PLANCK",
-      description: "Creează-ți contul gratuit pentru a accesa cursurile PLANCK.",
+      description: "Creează-ți contul gratuit și accesează traseele de învățare PLANCK.",
     },
   },
 
   profile: {
     title: "Profil - PLANCK",
-    description: "Gestionează-ți profilul PLANCK, vezi progresul și personalizează-ți experiența de învățare.",
-    keywords: "profil planck, progres fizică, statistici planck, cont personal",
+    description: "Gestionează-ți profilul PLANCK, vezi progresul în trasee și personalizează-ți experiența de învățare.",
+    keywords: "profil planck, progres invatare, statistici planck, cont personal",
     openGraph: {
       title: "Profil - PLANCK",
-      description: "Gestionează-ți profilul și progresul în învățarea fizicii.",
+      description: "Gestionează-ți profilul și progresul în traseele de învățare.",
     },
   },
 
   help: {
     title: "Ajutor - PLANCK",
-    description: "Ghid complet pentru utilizarea platformei PLANCK. Află cum să navighezi prin cursuri și probleme.",
-    keywords: "ajutor planck, ghid planck, tutorial planck, suport utilizatori",
+    description: "Ghid complet pentru utilizarea platformei PLANCK. Află cum să navighezi prin trasee, grile și probleme video.",
+    keywords: "ajutor planck, ghid planck, tutorial planck, suport utilizatori, trasee invatare",
     openGraph: {
       title: "Ajutor - PLANCK",
       description: "Ghid complet pentru utilizarea platformei PLANCK.",
@@ -263,60 +280,60 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "class-9": {
-    title: "Fizică Clasa a 9-a - Cursuri și Probleme | PLANCK",
-    description: "Cursuri complete de fizică pentru clasa a 9-a. Videoclipuri interactive, probleme practice și explicații detaliate pentru toate capitolele.",
-    keywords: "fizică clasa 9, cursuri clasa 9, probleme clasa 9, mecanică, optică, termodinamică",
+    title: "Fizică Clasa a 9-a - Trasee, Cursuri și Probleme | PLANCK",
+    description: "Trasee de învățare și cursuri complete de fizică pentru clasa a 9-a. Videoclipuri, grile și probleme practice pentru nota dorită.",
+    keywords: "fizică clasa 9, trasee clasa 9, cursuri clasa 9, probleme clasa 9, mecanică, optică, termodinamică",
     openGraph: {
-      title: "Fizică Clasa a 9-a - Cursuri și Probleme",
-      description: "Cursuri complete de fizică pentru clasa a 9-a cu videoclipuri interactive.",
+      title: "Fizică Clasa a 9-a - Trasee și Cursuri",
+      description: "Trasee și cursuri complete de fizică pentru clasa a 9-a.",
     },
   },
 
   "class-10": {
-    title: "Fizică Clasa a 10-a - Cursuri și Probleme | PLANCK",
-    description: "Cursuri complete de fizică pentru clasa a 10-a. Videoclipuri interactive, probleme practice și explicații detaliate pentru toate capitolele.",
-    keywords: "fizică clasa 10, cursuri clasa 10, probleme clasa 10, electricitate, magnetism, undele",
+    title: "Fizică Clasa a 10-a - Trasee, Cursuri și Probleme | PLANCK",
+    description: "Trasee de învățare și cursuri complete de fizică pentru clasa a 10-a. Videoclipuri, grile și probleme pentru BAC și clasă.",
+    keywords: "fizică clasa 10, trasee clasa 10, cursuri clasa 10, probleme clasa 10, electricitate, magnetism, undele",
     openGraph: {
-      title: "Fizică Clasa a 10-a - Cursuri și Probleme",
-      description: "Cursuri complete de fizică pentru clasa a 10-a cu videoclipuri interactive.",
+      title: "Fizică Clasa a 10-a - Trasee și Cursuri",
+      description: "Trasee și cursuri complete de fizică pentru clasa a 10-a.",
     },
   },
 
   "coming-soon": {
-    title: "În Curând - Cursuri Noi | PLANCK",
-    description: "Cursuri noi de fizică în pregătire. Fii primul care află când vor fi disponibile cursurile pentru clasele superioare.",
-    keywords: "cursuri noi fizică, în curând, clasa 11, clasa 12, fizică avansată",
+    title: "În Curând - Trasee Noi | PLANCK",
+    description: "Trasee de învățare noi în pregătire. Fii primul care află când vor fi disponibile capitolele pentru clasele superioare.",
+    keywords: "trasee noi, în curând, clasa 11, clasa 12, invatare liceu",
     openGraph: {
-      title: "În Curând - Cursuri Noi | PLANCK",
-      description: "Cursuri noi de fizică în pregătire pentru clasele superioare.",
+      title: "În Curând - Trasee Noi | PLANCK",
+      description: "Trasee de învățare noi în pregătire pentru clasele superioare.",
     },
   },
 
   insight: {
-    title: "Planck Insight - AI Assistant pentru Fizică | PLANCK",
-    description: "Planck Insight este asistentul tău AI inteligent pentru învățarea fizicii. Obține explicații detaliate, rezolvă probleme și înțelege concepte complexe cu ajutorul inteligenței artificiale.",
-    keywords: "AI fizică, asistent AI, învățare fizică, chat AI, explicatii fizică, Planck Insight, inteligență artificială educație",
+    title: "Planck Insight - AI Assistant pentru Toate Materiile | PLANCK",
+    description: INSIGHT_DESCRIPTION,
+    keywords: "AI educatie, asistent AI, invatare liceu, chat AI, Planck Insight, inteligență artificială educație, trasee invatare, bac, admitere",
     alternates: {
       canonical: '/insight',
     },
     openGraph: {
-      title: "Planck Insight - AI Assistant pentru Fizică",
-      description: "Asistentul tău AI inteligent pentru învățarea fizicii cu explicații detaliate și rezolvări de probleme.",
-      url: 'https://www.planck.academy/insight',
+      title: "Planck Insight - AI Assistant pentru Toate Materiile",
+      description: INSIGHT_DESCRIPTION,
+      url: `${PLATFORM_SITE_URL}/insight`,
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
-          alt: 'Planck Insight - AI Assistant pentru Fizică',
+          alt: 'Planck Insight - AI Assistant',
         },
       ],
     },
     twitter: {
-      title: "Planck Insight - AI Assistant pentru Fizică",
-      description: "Asistentul tău AI inteligent pentru învățarea fizicii cu explicații detaliate.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      title: "Planck Insight - AI Assistant pentru Toate Materiile",
+      description: INSIGHT_DESCRIPTION,
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
     robots: {
@@ -327,19 +344,19 @@ export const pageMetadata: Record<string, Metadata> = {
 
   sketch: {
     title: "Whiteboard Online Gratuit pentru Elevi – Planck Sketch",
-    description: "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale, accesibil printr-un singur click.",
+    description: "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale — complementar traseelor Planck.",
     keywords: "math whiteboard, online graphing calculator, interactive geometry, physics simulation, collaborative whiteboard, sketchpad, mathematics education",
     alternates: {
       canonical: '/sketch',
     },
     openGraph: {
       title: "Whiteboard Online Gratuit pentru Elevi – Planck Sketch",
-      description: "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale, accesibil printr-un singur click.",
-      url: 'https://www.planck.academy/sketch',
+      description: "Whiteboard colaborativ online, gratuit și fără cont, pentru grafice matematice și explicații vizuale.",
+      url: `${PLATFORM_SITE_URL}/sketch`,
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
           alt: 'Planck Sketch - Whiteboard Interactiv',
@@ -348,8 +365,8 @@ export const pageMetadata: Record<string, Metadata> = {
     },
     twitter: {
       title: "Whiteboard Online Gratuit pentru Elevi – Planck Sketch",
-      description: "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale, accesibil printr-un singur click.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      description: "Whiteboard colaborativ online, gratuit și fără cont, pentru desen și grafice matematice.",
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
     robots: {
@@ -359,30 +376,30 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   planckcode: {
-    title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
-    description: "PlanckCode este un IDE online C++ cu C++ compiler în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI pentru liceu și concursuri.",
-    keywords: "C++, C++ compiler, compilator C++ online, IDE C++ online, C++ online compiler, online judge C++, competitive programming, informatica liceu",
+    title: PLANCKCODE_TITLE,
+    description: PLANCKCODE_DESCRIPTION,
+    keywords: "C++, Python, C++ compiler online, Python IDE online, compilator C++ online, IDE C++ online, online judge, competitive programming, informatica liceu, bac informatica",
     alternates: {
       canonical: '/planckcode',
     },
     openGraph: {
-      title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
-      description: "IDE online C++ cu compilator în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI.",
-      url: 'https://www.planck.academy/planckcode',
+      title: PLANCKCODE_TITLE,
+      description: PLANCKCODE_DESCRIPTION,
+      url: `${PLATFORM_SITE_URL}/planckcode`,
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
-          alt: 'Planck Code - IDE & Online Judge',
+          alt: 'Planck Code - IDE C++ & Python',
         },
       ],
     },
     twitter: {
-      title: "PlanckCode – IDE Online C++ & C++ Compiler în Browser",
-      description: "IDE online C++ cu compilator în browser și Online Judge: scrii, compilezi și rulezi rapid, cu feedback și asistență AI.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      title: PLANCKCODE_TITLE,
+      description: PLANCKCODE_DESCRIPTION,
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
     robots: {
@@ -392,20 +409,20 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   pricing: {
-    title: "Deblochează note mai mari cu PLANCK",
-    description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi individuali și instituții educaționale. Începe gratuit sau alege Plus sau Pro pentru funcții avansate.",
-    keywords: "prețuri planck, planuri planck, abonament planck, preț planck, planuri educaționale, planuri școli, planuri elevi",
+    title: "Deblochează trasee complete și note mai mari – PLANCK",
+    description: "Deblochează trasee de învățare complete, Insight AI și PlanckCode. Planuri flexibile Free, Plus și Pro pentru elevi și școli.",
+    keywords: "prețuri planck, planuri planck, abonament planck, trasee invatare, planuri educaționale, planuri școli",
     alternates: {
       canonical: '/pricing',
     },
     openGraph: {
-      title: "Deblochează note mai mari cu PLANCK",
-      description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții educaționale.",
-      url: 'https://www.planck.academy/pricing',
+      title: "Deblochează trasee complete și note mai mari – PLANCK",
+      description: "Planuri flexibile pentru trasee complete, Insight AI și PlanckCode.",
+      url: `${PLATFORM_SITE_URL}/pricing`,
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
           alt: 'PLANCK - Prețuri și Planuri',
@@ -413,9 +430,9 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: "Deblochează note mai mari cu PLANCK",
-      description: "Alege planul perfect pentru tine sau pentru școala ta. Planuri flexibile pentru elevi și instituții.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      title: "Deblochează trasee complete – PLANCK",
+      description: "Planuri flexibile pentru trasee, Insight și PlanckCode.",
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
     robots: {
@@ -425,30 +442,30 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "bac-simulations": {
-    title: "Simulări BAC Fizică - Subiecte și Variante | PLANCK",
-    description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare. Vizualizează și descarcă subiectele de bacalaureat din anii anteriori.",
-    keywords: "simulari bac fizica, subiecte bac fizica, bacalaureat fizica, variante bac, modele bac, examen bac fizica",
+    title: "Simulări BAC – Subiecte și Variante | PLANCK",
+    description: "Pregătește-te pentru BAC cu simulări oficiale, integrate în traseele Planck. Subiecte și variante din anii anteriori pentru nota dorită.",
+    keywords: "simulari bac, subiecte bac, bacalaureat, variante bac, modele bac, examen bac, trasee invatare bac",
     alternates: {
       canonical: '/simulari-bac',
     },
     openGraph: {
-      title: "Simulări BAC Fizică - Subiecte și Variante | PLANCK",
-      description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare din anii anteriori.",
-      url: 'https://www.planck.academy/simulari-bac',
+      title: "Simulări BAC – Subiecte și Variante | PLANCK",
+      description: "Simulări BAC integrate în traseele Planck Academy.",
+      url: `${PLATFORM_SITE_URL}/simulari-bac`,
       type: 'website',
       images: [
         {
-          url: 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png',
+          url: OG_IMAGE,
           width: 1200,
           height: 630,
-          alt: 'Simulări BAC Fizică – Planck Academy',
+          alt: 'Simulări BAC – Planck Academy',
         },
       ],
     },
     twitter: {
-      title: "Simulări BAC Fizică - Subiecte și Variante",
-      description: "Pregătește-te pentru BAC cu subiecte oficiale și modele de simulare.",
-      images: ['https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'],
+      title: "Simulări BAC – Subiecte și Variante",
+      description: "Pregătește-te pentru BAC cu simulări oficiale în traseele Planck.",
+      images: [OG_IMAGE],
       card: 'summary_large_image',
     },
     robots: {
@@ -458,45 +475,85 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   gratuit: {
-    title: "Ai nevoie de ajutor la fizică? – PLANCK",
+    title: "Ai nevoie de ajutor pentru nota dorită? – PLANCK",
     description:
-      "Completează formularul să vedem cum te putem ajuta. Îți ia sub 2 minute.",
-    keywords: "webinar fizica, fizica liceu, bac fizica, planck academy, gratuit, ajutor fizica",
+      "Completează formularul să vedem cum te putem ajuta la clasă, BAC sau admitere. Îți ia sub 2 minute.",
+    keywords: "webinar liceu, bac, admitere, planck academy, gratuit, ajutor invatare, trasee invatare",
     alternates: {
       canonical: "/gratuit",
     },
     openGraph: {
-      title: "Ai nevoie de ajutor la fizică? – PLANCK",
+      title: "Ai nevoie de ajutor pentru nota dorită? – PLANCK",
       description:
         "Completează formularul să vedem cum te putem ajuta. Îți ia sub 2 minute.",
-      url: "https://www.planck.academy/gratuit",
+      url: `${PLATFORM_SITE_URL}/gratuit`,
     },
     twitter: {
-      title: "Ai nevoie de ajutor la fizică? – PLANCK",
+      title: "Ai nevoie de ajutor pentru nota dorită? – PLANCK",
       description:
         "Completează formularul să vedem cum te putem ajuta. Îți ia sub 2 minute.",
     },
   },
 
   "math-problems": {
-    title: "Catalog de Probleme de Matematică",
+    title: "Probleme de Matematică – Catalog pentru Liceu | Planck Academy",
     description:
-      "Probleme de matematică pentru liceu, pe clase și nivele de dificultate (Ușor, Mediu, Avansat), cu enunțuri și resurse video opționale.",
+      "Probleme de matematică pentru liceu, pe clase și nivele de dificultate, integrate în traseele Planck. Enunțuri clare și resurse video opționale.",
     keywords:
-      "matematică liceu, probleme matematică, clasa a 9-a, clasa a 10-a, algebră, geometrie, planck academy",
+      "matematică liceu, probleme matematică, clasa a 9-a, clasa a 10-a, algebră, geometrie, trasee invatare, planck academy",
     alternates: {
       canonical: "/matematica/probleme",
     },
     openGraph: {
-      title: "Catalog de Probleme de Matematică – Planck Academy",
+      title: "Probleme de Matematică – Planck Academy",
       description:
-        "Probleme structurate pentru pregătire: enunțuri clare, etichete și filtre pe clasă și dificultate.",
-      url: "https://www.planck.academy/matematica/probleme",
+        "Catalog de probleme structurate pentru pregătire la clasă, BAC și admitere.",
+      url: `${PLATFORM_SITE_URL}/matematica/probleme`,
     },
     twitter: {
       title: "Catalog de Probleme de Matematică",
       description:
-        "Probleme de matematică pentru liceu, cu suport pentru formule și catalog filtrabil.",
+        "Probleme de matematică pentru liceu, integrate în traseele Planck.",
+    },
+  },
+
+  "coding-problems": {
+    title: "Probleme de Informatică – Catalog C++ & Python | Planck Academy",
+    description:
+      "Probleme de informatică pentru liceu, cu suport C++ și Python. Catalog filtrabil pe clasă și dificultate, integrat în traseele Planck și PlanckCode IDE.",
+    keywords:
+      "informatica liceu, probleme informatica, C++, Python, online judge, concurs informatica, trasee invatare, planck academy, bac informatica",
+    alternates: {
+      canonical: "/informatica/probleme",
+    },
+    openGraph: {
+      title: "Probleme de Informatică – Planck Academy",
+      description:
+        "Catalog de probleme C++ și Python pentru liceu, concursuri și BAC.",
+      url: `${PLATFORM_SITE_URL}/informatica/probleme`,
+    },
+    twitter: {
+      title: "Probleme de Informatică – Planck Academy",
+      description:
+        "Probleme de informatică C++ și Python, integrate în traseele Planck.",
+    },
+  },
+
+  grile: {
+    title: `Teste Grilă Liceu – ${QUIZ_COUNT} Grile Rezolvate | Planck Academy`,
+    description: `Peste ${QUIZ_COUNT} grile rezolvate pentru clasele 9–12. Teste grilă de fizică, matematică și informatică pentru pregătire BAC, admitere și notă la clasă. ${TEACHER_VERIFICATION}.`,
+    keywords: "grile fizica, teste grila, grile liceu, bac grila, clasa 9 10 11 12, quiz fizica, grile matematica",
+    alternates: {
+      canonical: "/grile",
+    },
+    openGraph: {
+      title: `Teste Grilă – ${QUIZ_COUNT} Grile Rezolvate`,
+      description: `Peste ${QUIZ_COUNT} grile pentru clasele 9–12. Pregătire BAC, admitere și clasă.`,
+      url: `${PLATFORM_SITE_URL}/grile`,
+    },
+    twitter: {
+      title: `Teste Grilă – ${QUIZ_COUNT} Grile Rezolvate`,
+      description: `Grile rezolvate pentru liceu, integrate în traseele Planck.`,
     },
   },
 
@@ -511,7 +568,7 @@ export const pageMetadata: Record<string, Metadata> = {
       title: "Înscriere confirmată – Webinar PLANCK",
       description:
         "O să te contactăm pentru mai multe detalii despre webinar!",
-      url: "https://www.planck.academy/gratuit/confirmare",
+      url: `${PLATFORM_SITE_URL}/gratuit/confirmare`,
     },
     robots: {
       index: false,

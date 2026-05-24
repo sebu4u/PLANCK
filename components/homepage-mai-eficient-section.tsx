@@ -37,7 +37,7 @@ export function HomePageMaiEficientSection() {
               <span className="block">mai distractiv</span>
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-gray-700 sm:mt-5 sm:text-lg">
-              PLANCK îți explică fizica pe înțelesul tău, prin exemple din viața de zi cu zi și exerciții scurte.
+              PLANCK îți explică materia pe înțelesul tău, prin trasee structurate, exemple din viața de zi cu zi și exerciții scurte.
             </p>
           </div>
         </div>

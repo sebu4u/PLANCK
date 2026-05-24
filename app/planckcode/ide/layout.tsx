@@ -20,7 +20,7 @@ export default function PlanckCodeIdeLayout({
             "price": "0",
             "priceCurrency": "RON"
         },
-        "description": "IDE Online C++ cu compilator integrat și asistent AI."
+        "description": "IDE Online C++ și Python cu compilator integrat și asistent AI."
     }
 
     return (

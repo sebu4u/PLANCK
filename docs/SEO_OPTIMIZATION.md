@@ -1,204 +1,108 @@
-# SEO Optimization pentru PLANCK Platform
+# SEO & LLMO Optimization — Planck Academy
+
+## Positioning (2026)
+
+**Primary message:** Platformă care te ajută să obții nota dorită la clasă, BAC sau admitere.
+
+**Flagship product:** Trasee de învățare (`/invata`) — clase 9–12, toate materiile.
+
+**Proof points:**
+- 10.000+ grile rezolvate
+- 800+ probleme rezolvate video
+- Conținut verificat de profesori din toată țara
+- 100+ testimoniale (elevi, părinți, profesori)
+
+**Single source of truth:** [`lib/platform-marketing.ts`](../lib/platform-marketing.ts)
+
+---
 
 ## Implementări SEO
 
-### 1. Metadata Configuration (`lib/metadata.ts`)
+### 1. Metadata (`lib/metadata.ts`)
 
-- **Base Metadata**: Configurație centralizată pentru toate paginile
-- **Page-Specific Metadata**: Metadata personalizat pentru fiecare pagină
-- **Open Graph Tags**: Optimizare pentru social media
-- **Twitter Cards**: Optimizare pentru Twitter
-- **Keywords**: Cuvinte cheie relevante pentru fiecare pagină
+- Base metadata importă din `platform-marketing.ts`
+- Pagini cheie: `home`, `learning-paths`, `grile`, `coding-problems`, `planckcode` (C++ & Python)
+- Open Graph + Twitter Cards pe toate paginile importante
 
-### 2. Pagini cu Metadata Implementat
+### 2. Structured Data (`lib/structured-data.ts`)
 
-#### Pagini Principale
-- ✅ **Homepage** (`/`) - Metadata pentru pagina principală
-- ✅ **Cursuri** (`/cursuri`) - Metadata pentru secțiunea de cursuri
-- ✅ **Probleme** (`/probleme`) - Metadata pentru secțiunea de probleme
-- ✅ **Despre** (`/despre`) - Metadata pentru pagina despre
-- ✅ **Contact** (`/contact`) - Metadata pentru pagina de contact
+- `EducationalOrganization` — trasee, grile, Insight, Sketch, PlanckCode
+- `WebSite` — SearchAction + ReadAction spre `/invata`
+- `ItemList` — hub trasee (`learningPathsHubStructuredData`)
+- `FAQPage` — homepage (`homepageFaqStructuredData` din `FAQ_ITEMS`)
+- `AboutPage`, `LearningResource` per produs
 
-#### Pagini de Autentificare
-- ✅ **Login** (`/login`) - Metadata pentru autentificare
-- ✅ **Register** (`/register`) - Metadata pentru înregistrare
-- ✅ **Profil** (`/profil`) - Metadata pentru profilul utilizatorului
+### 3. Sitemap (`app/sitemap.ts`)
 
-#### Pagini de Cursuri
-- ✅ **Clasa 9** (`/cursuri/clasa-9`) - Metadata specific pentru cursul de clasa 9
-- ✅ **Clasa 10** (`/cursuri/clasa-10`) - Metadata specific pentru cursul de clasa 10
+Indexează:
+- `/invata` (priority 0.95)
+- Lecții trasee dinamice din Supabase
+- `/grile`, `/matematica/probleme`, `/informatica/probleme`, `/simulari-bac`
+- Probleme, cursuri, produse
 
-#### Pagini Informative
-- ✅ **Ajutor** (`/ajutor`) - Metadata pentru centrul de ajutor
-- ✅ **Termeni** (`/termeni`) - Metadata pentru termeni și condiții
+### 4. Robots (`app/robots.ts`)
 
-### 3. Sitemap și Robots
+- Permite crawleri AI: GPTBot, ClaudeBot, CCBot
+- Sitemap: `https://www.planck.academy/sitemap.xml`
 
-#### Sitemap (`app/sitemap.ts`)
-- ✅ Sitemap XML automat generat
-- ✅ Prioritate pentru fiecare pagină
-- ✅ Frecvența de actualizare specificată
-- ✅ URL-uri pentru toate paginile importante
+### 5. LLMO (`public/llms.txt`)
 
-#### Robots (`app/robots.ts`)
-- ✅ Robots.txt automat generat
-- ✅ Reguli pentru crawleri
-- ✅ Referință la sitemap
-- ✅ Restricții pentru pagini private
+- Fișier extins (~150+ linii) cu positioning, produse, URL-uri, cifre
+- Link discovery: `<link rel="alternate" type="text/plain" href="/llms.txt" />` în `app/layout.tsx`
 
-### 4. Structured Data (JSON-LD)
+---
 
-#### Tipuri de Structured Data Implementate
-- ✅ **Organization**: Date despre organizația PLANCK
-- ✅ **WebSite**: Informații despre website
-- ✅ **Course**: Date despre cursuri (clasa 9, clasa 10)
-- ✅ **BreadcrumbList**: Navigare structurată
-- ✅ **FAQPage**: Întrebări frecvente
-- ✅ **Article**: Pentru conținut articol
+## Pagini cu metadata
 
-#### Implementare
-- ✅ Script-uri JSON-LD în layout-ul principal
-- ✅ Componente pentru structured data pe pagini specifice
-- ✅ Date structurate pentru cursuri
+| Pagină | Cheie metadata |
+|--------|----------------|
+| `/` | `home` |
+| `/invata` | `learning-paths` |
+| `/grile` | `grile` |
+| `/probleme` | `problems` |
+| `/cursuri` | `physics-lessons` |
+| `/matematica/probleme` | `math-problems` |
+| `/informatica/probleme` | `coding-problems` |
+| `/simulari-bac` | `bac-simulations` |
+| `/planckcode` | `planckcode` |
+| `/planckcode/ide` | `planckcode-ide` |
+| `/insight` | `insight` |
+| `/despre` | `about` |
+| `/pricing` | `pricing` |
 
-### 5. Optimizări Tehnice
+---
 
-#### Layout Principal (`app/layout.tsx`)
-- ✅ Metadata centralizat
-- ✅ Structured data pentru organizație și website
-- ✅ Favicon și icon-uri pentru toate dispozitivele
-- ✅ Manifest pentru PWA
+## Conținut crawlable pentru LLM-uri
 
-#### Pagini Client vs Server
-- ✅ Layout-uri separate pentru pagini client (login, register, profil, probleme)
-- ✅ Metadata gestionat prin layout-uri pentru pagini client
+- `/invata` — bloc SEO (`InvataSeoIntro`) sub lista de trasee
+- `/despre` — misiune și stats actualizate
+- Homepage FAQ — întrebări BAC/admitere/trasee/profesori
+- `llms.txt` — context complet pentru AI crawlers
 
-### 6. Cuvinte Cheie Optimizate
+---
 
-#### Cuvinte Cheie Principale
-- fizică liceu
-- cursuri fizică
-- probleme fizică
-- învățare interactivă
-- educație fizică
-- clasa 9 fizică
-- clasa 10 fizică
-- videoclipuri fizică
-- exerciții fizică
+## Checklist validare post-deploy
 
-#### Cuvinte Cheie Secundare
-- mecanică
-- optică
-- termodinamică
-- electricitate
-- magnetism
-- probleme rezolvate
-- lecții video
+- [ ] [Google Rich Results Test](https://search.google.com/test/rich-results) — Organization, FAQ, ItemList
+- [ ] [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) — OG pe `/` și `/invata`
+- [ ] Fetch `https://www.planck.academy/llms.txt`
+- [ ] Google Search Console — resubmit sitemap
+- [ ] Verificare titluri indexate după 2–4 săptămâni
 
-### 7. Meta Tags Implementate
+---
 
-Pentru fiecare pagină:
-- ✅ **Title**: Titlu optimizat și relevant
-- ✅ **Description**: Descriere atractivă și informativă
-- ✅ **Keywords**: Cuvinte cheie relevante
-- ✅ **Open Graph**: Optimizare pentru social media
-- ✅ **Twitter Cards**: Optimizare pentru Twitter
-- ✅ **Canonical URL**: URL-uri canonice
-- ✅ **Robots**: Instrucțiuni pentru crawleri
+## Keywords principale
 
-### 8. Optimizări pentru Social Media
+- nota bac, pregatire bac, admitere medicina, admitere politehnica
+- trasee invatare, clasa 9 10 11 12
+- grile fizica, probleme rezolvate video
+- continut verificat profesori
+- IDE C++ Python online
 
-#### Open Graph Tags
-- ✅ `og:title` - Titlu pentru social media
-- ✅ `og:description` - Descriere pentru social media
-- ✅ `og:image` - Imagine pentru social media
-- ✅ `og:url` - URL-ul paginii
-- ✅ `og:type` - Tipul de conținut
-- ✅ `og:locale` - Limba (ro_RO)
+---
 
-#### Twitter Cards
-- ✅ `twitter:card` - Tipul de card
-- ✅ `twitter:title` - Titlu pentru Twitter
-- ✅ `twitter:description` - Descriere pentru Twitter
-- ✅ `twitter:image` - Imagine pentru Twitter
+## Note
 
-### 9. Structura URL-urilor
-
-URL-uri SEO-friendly implementate:
-- ✅ `/cursuri` - Secțiunea de cursuri
-- ✅ `/cursuri/clasa-9` - Cursul pentru clasa 9
-- ✅ `/cursuri/clasa-10` - Cursul pentru clasa 10
-- ✅ `/probleme` - Secțiunea de probleme
-- ✅ `/despre` - Pagina despre
-- ✅ `/contact` - Pagina de contact
-- ✅ `/ajutor` - Centrul de ajutor
-
-### 10. Performanță și SEO
-
-#### Optimizări Implementate
-- ✅ Metadata generat static pentru performanță
-- ✅ Structured data optimizat
-- ✅ Sitemap automat actualizat
-- ✅ Robots.txt optimizat
-
-### 11. Monitorizare și Analytics
-
-#### Recomandări pentru Monitorizare
-- ✅ Google Search Console
-- ✅ Google Analytics
-- ✅ Monitorizare poziții în Google
-- ✅ Analiza traficului organic
-
-### 12. Următorii Pași Recomandați
-
-1. **Google Search Console**
-   - Adaugă proprietatea website-ului
-   - Trimite sitemap-ul
-   - Monitorizează erorile de indexare
-
-2. **Google Analytics**
-   - Implementează tracking code
-   - Configurează evenimente personalizate
-   - Monitorizează traficul organic
-
-3. **Optimizări Suplimentare**
-   - Adaugă mai multe cuvinte cheie long-tail
-   - Creează conținut blog pentru SEO
-   - Optimizează imaginile cu alt text
-   - Implementează schema markup pentru recenzii
-
-4. **Local SEO**
-   - Adaugă date despre locație în structured data
-   - Creează pagină Google My Business
-   - Optimizează pentru căutări locale
-
-### 13. Verificare SEO
-
-#### Tools Recomandate
-- ✅ Google PageSpeed Insights
-- ✅ Google Search Console
-- ✅ Schema.org Validator
-- ✅ Facebook Sharing Debugger
-- ✅ Twitter Card Validator
-
-#### Checklist Final
-- ✅ Toate paginile au title și description
-- ✅ Structured data implementat
-- ✅ Sitemap generat
-- ✅ Robots.txt configurat
-- ✅ Open Graph tags implementate
-- ✅ Twitter Cards configurate
-- ✅ URL-uri SEO-friendly
-- ✅ Cuvinte cheie optimizate
-
-## Concluzie
-
-Platforma PLANCK este acum optimizată complet pentru SEO cu:
-- Metadata personalizat pentru toate paginile
-- Structured data pentru motoarele de căutare
-- Sitemap și robots.txt automat generate
-- Optimizări pentru social media
-- URL-uri SEO-friendly
-- Cuvinte cheie relevante și optimizate
-
-Toate aceste implementări vor ajuta la îmbunătățirea vizibilității în motoarele de căutare și la creșterea traficului organic.
+- Nu folosi AggregateRating Google până există catalog verificabil de recenzii
+- Cifrele din marketing trebuie validate periodic în producție (`quiz_questions`, probleme video)
+- Copy-ul „toată materia” reflectă capitolele reale din DB (fizică, mate, info, bio)

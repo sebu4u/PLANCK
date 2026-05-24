@@ -33,7 +33,7 @@ export default function PlanckCodePage() {
       "price": "0",
       "priceCurrency": "RON"
     },
-    "description": "IDE online integrat pentru C++ și platformă de probleme pentru liceeni."
+    "description": "IDE online integrat C++ și Python + Online Judge pentru liceeni — parte din ecosistemul Planck Academy."
   }
 
   return (
@@ -73,7 +73,7 @@ export default function PlanckCodePage() {
             </h1>
 
             <p className="scroll-animate-fade-up animate-delay-200 font-vt323 text-lg sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-8 leading-relaxed drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]">
-              IDE online integrat + Online Judge care evaluează automat soluțiile + cursuri clare de C++ pentru liceeni. Totul într-un singur loc, proiectat pentru învățare rapidă și competiții.
+              IDE online C++ și Python + Online Judge care evaluează automat soluțiile + trasee de programare pentru liceeni. Totul într-un singur loc, proiectat pentru învățare rapidă, BAC și concursuri.
             </p>
 
             {/* CTA Buttons */}
@@ -181,7 +181,7 @@ export default function PlanckCodePage() {
             <div className="relative flex flex-col gap-6 items-center">
               {[
                 { text: "Rezolvă probleme împreună cu tine, nu în locul tău", align: "self-center lg:self-start lg:-translate-x-16" },
-                { text: "Îți explică orice concept din C++ pe limba ta", align: "self-center lg:self-end lg:translate-x-16" },
+                { text: "Îți explică orice concept din C++ sau Python pe limba ta", align: "self-center lg:self-end lg:translate-x-16" },
                 { text: "Găsește erori și îți arată exact ce trebuie schimbat", align: "self-center lg:self-center" },
                 { text: "Sugerează optimizări și complexități", align: "self-center lg:self-start lg:-translate-x-8" },
                 { text: "Îți poate genera test cases, edge cases și inputuri random", align: "self-center lg:self-end lg:translate-x-12" },

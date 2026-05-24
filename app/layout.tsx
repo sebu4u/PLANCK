@@ -81,6 +81,12 @@ export default function RootLayout({
           as="video"
           type="video/webm"
         />
+        <link
+          rel="alternate"
+          type="text/plain"
+          href="/llms.txt"
+          title="LLM context"
+        />
         <style dangerouslySetInnerHTML={{
           __html: `
             html {

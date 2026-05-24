@@ -2,11 +2,9 @@ import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { GrilePageContent } from '@/components/grile/grile-page-content';
 import { Navigation } from '@/components/navigation';
+import { generateMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-    title: 'Teste Grilă Fizică | Planck',
-    description: 'Teste grilă de fizică pentru clasele IX-XII. Întrebări cu variante de răspuns pentru pregătirea examenelor.',
-};
+export const metadata: Metadata = generateMetadata('grile');
 
 export default function GrilePage() {
     return (

@@ -44,8 +44,8 @@ export function HomePageInteractiveSchoolSection() {
               <span className="block">interactivă</span>
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-gray-700 sm:mt-5 sm:text-lg">
-              Crește-ți nota la fizică cu lecții care fac conceptele complexe ușor de înțeles. Primești feedback instant pe
-              măsură ce înveți.
+              Crește-ți nota la clasă, BAC sau admitere cu trasee interactive, feedback instant și
+              conținut verificat de profesori.
             </p>
           </div>
 

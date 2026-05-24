@@ -4,12 +4,18 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FadeInUp } from "@/components/scroll-animations"
 import { BookOpen, Sparkles, Brain, CheckCircle, Play, GraduationCap, Clock, Users, MessageCircle, Award, Zap } from "lucide-react"
+import {
+  LEARNING_PATHS_GRADES_LABEL,
+  QUIZ_COUNT,
+  VIDEO_SOLUTIONS_COUNT,
+  PLATFORM_STATS,
+} from "@/lib/platform-marketing"
 
 const features = [
     {
         icon: BookOpen,
-        title: "Cursuri complete",
-        description: "De la mecanică la fizică cuantică, toate capitolele explicate clar"
+        title: "Trasee de învățare",
+        description: "Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas"
     },
     {
         icon: Sparkles,
@@ -18,8 +24,8 @@ const features = [
     },
     {
         icon: Brain,
-        title: "Învățare adaptivă",
-        description: "Conținutul se adaptează la ritmul și stilul tău de învățare"
+        title: "Grile și probleme video",
+        description: `Peste ${QUIZ_COUNT} grile și ${VIDEO_SOLUTIONS_COUNT} soluții video explicate`
     },
     {
         icon: CheckCircle,
@@ -33,8 +39,8 @@ const stats = [
         icon: GraduationCap,
         iconWrap: "bg-purple-500/10",
         iconClass: "text-purple-400",
-        title: "50+ Lecții explicate",
-        description: "Toate capitolele de fizică pentru liceu, explicate clar și pe înțelesul tău.",
+        title: `Trasee ${LEARNING_PATHS_GRADES_LABEL}`,
+        description: "Toată materia structurată pentru notă la clasă, BAC sau admitere.",
     },
     {
         icon: Clock,
@@ -47,8 +53,8 @@ const stats = [
         icon: Users,
         iconWrap: "bg-green-500/10",
         iconClass: "text-green-400",
-        title: "1000+ Elevi activi",
-        description: "O comunitate de elevi care învață fizica mai ușor cu PLANCK.",
+        title: `${PLATFORM_STATS.activeUsers} Elevi activi`,
+        description: "O comunitate de elevi care își ating obiectivele cu traseele Planck.",
     },
     {
         icon: MessageCircle,

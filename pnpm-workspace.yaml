@@ -1,5 +1,6 @@
 allowBuilds:
   core-js: true
   esbuild: true
+  msgpackr-extract: set this to true or false
   sharp: true
   workerd: true

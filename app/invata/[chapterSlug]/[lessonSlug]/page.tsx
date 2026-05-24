@@ -46,11 +46,22 @@ export async function generateMetadata({
     return generatePageMetadata("learning-paths")
   }
 
+  const description =
+    lesson.description ||
+    chapter.description ||
+    `Lecție din traseul Planck Academy: ${chapter.title}. Pregătire pentru notă la clasă, BAC sau admitere.`
+
   return {
     title: `${lesson.title} | ${chapter.title} | PLANCK`,
-    description: lesson.description || chapter.description || `Lecție din capitolul ${chapter.title} pe PLANCK.`,
+    description,
     alternates: {
       canonical: `/invata/${chapterSlug}/${lessonSlug}`,
+    },
+    openGraph: {
+      title: `${lesson.title} – Traseu Planck Academy`,
+      description,
+      url: `https://www.planck.academy/invata/${chapterSlug}/${lessonSlug}`,
+      type: "website",
     },
   }
 }

@@ -3,6 +3,14 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Rocket, ArrowLeft, Users, CheckCircle, Play, Clock, Sparkles, Code, Cpu, PenTool, BrainCircuit, User } from "lucide-react"
+import {
+  PLATFORM_DESCRIPTION,
+  LEARNING_PATHS_DESCRIPTION,
+  QUIZ_COUNT,
+  VIDEO_SOLUTIONS_COUNT,
+  TEACHER_VERIFICATION,
+  TESTIMONIALS_LABEL,
+} from "@/lib/platform-marketing"
 import { platformStats, teamMembers } from "@/lib/despre-constants"
 import { useRef, useState, useEffect } from "react"
 import { DespreHeroSection } from "@/components/despre/despre-hero-section"
@@ -313,18 +321,18 @@ function MissionSection() {
   const features = [
     {
       icon: <Sparkles className="w-6 h-6" />,
-      title: "Cursuri de Fizică",
-      description: "Lecții video HD, de la mecanică la fizică cuantică. Pregătire completă pentru Bacalaureat, admitere la medicină și politehnică, și olimpiade de fizică.",
+      title: "Trasee de învățare",
+      description: LEARNING_PATHS_DESCRIPTION,
     },
     {
       icon: <Code className="w-6 h-6" />,
       title: "Informatică & PlanckCode",
-      description: "PlanckCode este un IDE online C++ cu compilator integrat, Online Judge și asistent AI. Scrii, compilezi și testezi cod direct în browser, pregătindu-te pentru concursuri de informatică.",
+      description: "PlanckCode este un IDE online C++ și Python cu compilator integrat, Online Judge și asistent AI. Scrii, compilezi și testezi cod direct în browser.",
     },
     {
       icon: <BrainCircuit className="w-6 h-6" />,
       title: "Insight AI & Raptor1",
-      description: "Insight este asistentul AI al platformei, alimentat de modelele Raptor1. Explică concepte, ghidează rezolvarea problemelor pas cu pas și oferă tutorat personalizat la fizică și informatică.",
+      description: "Insight este asistentul AI al platformei, alimentat de modelele Raptor1. Explică concepte, ghidează rezolvarea problemelor pas cu pas și oferă tutorat personalizat la toate materiile din trasee.",
     },
     {
       icon: <PenTool className="w-6 h-6" />,
@@ -346,9 +354,7 @@ function MissionSection() {
           </h2>
           <div className="w-16 h-1 bg-gradient-to-r from-purple-500 to-violet-400 rounded-full mx-auto mb-8" />
           <p className="text-lg sm:text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
-            Planck Academy este o platformă educațională de fizică și informatică pentru liceu, creată de elevi olimpici.
-            Misiunea noastră este să transformăm modul în care elevii învață științele exacte — făcând educația de calitate
-            accesibilă, interactivă și bazată pe inteligență artificială.
+            {PLATFORM_DESCRIPTION}
           </p>
         </div>
 
@@ -357,24 +363,24 @@ function MissionSection() {
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/[0.03] to-transparent pointer-events-none" />
           <div className="relative z-10 space-y-6 text-white/70 text-base sm:text-lg leading-relaxed">
             <p>
-              <strong className="text-white">PLANCK</strong> a fost creată cu convingerea că fizica și informatica nu trebuie să fie materii temute, ci
-              <span className="text-purple-400 font-medium"> aventuri intelectuale</span> care deschid uși către înțelegerea universului și a tehnologiei.
-              Oferim cursuri video structurate pe capitole, probleme explicate pas cu pas, simulări BAC și grile interactive.
+              <strong className="text-white">PLANCK</strong> te ajută să obții nota pe care o vrei — la clasă, BAC sau admitere — prin{" "}
+              <span className="text-purple-400 font-medium">trasee de învățare</span> complete pentru clasele 9–12.
+              Oferim peste {QUIZ_COUNT} grile rezolvate, peste {VIDEO_SOLUTIONS_COUNT} probleme explicate video, simulări BAC și conținut interactiv.
             </p>
             <p>
-              Platforma integrează instrumente avansate de inteligență artificială: <strong className="text-white">Insight</strong>, asistentul nostru AI alimentat de
-              modelele <strong className="text-white">Raptor1</strong> (fast, standard și heavy), oferă tutorat personalizat — explicând concepte, ghidând rezolvarea
-              problemelor și provocând elevii să gândească mai profund.
+              {TEACHER_VERIFICATION}. {TESTIMONIALS_LABEL} confirmă impactul platformei asupra elevilor, părinților și profesorilor.
             </p>
             <p>
-              Cu <strong className="text-white">PlanckCode</strong>, elevii au acces la un IDE online C++ complet, cu compilator în browser, feedback instant și
-              Online Judge pentru concursuri de informatică. <strong className="text-white">Planck Sketch</strong> completează ecosistemul cu un whiteboard colaborativ
-              online — ideal pentru desen, grafice matematice și explicații vizuale, accesibil gratuit, fără cont.
+              Platforma integrează <strong className="text-white">Insight</strong>, asistentul AI alimentat de modelele{" "}
+              <strong className="text-white">Raptor1</strong>, care oferă tutorat personalizat — ghidând rezolvarea problemelor și provocând elevii să gândească mai profund.
+            </p>
+            <p>
+              Cu <strong className="text-white">PlanckCode</strong>, elevii au acces la un IDE online C++ și Python, cu compilator în browser, feedback instant și
+              Online Judge. <strong className="text-white">Planck Sketch</strong> completează ecosistemul cu un whiteboard colaborativ online — gratuit, fără cont.
             </p>
             <p>
               Echipa PLANCK este formată din <span className="text-purple-400 font-medium">elevi olimpici și pasionați de educație</span> care înțeleg provocările
-              cu care se confruntă liceenii. Credem în educație bazată pe înțelegere profundă, nu pe memorare, și construim
-              instrumentele care fac acest lucru posibil.
+              cu care se confruntă liceenii. Credem în educație bazată pe înțelegere profundă, nu pe memorare.
             </p>
           </div>
         </div>

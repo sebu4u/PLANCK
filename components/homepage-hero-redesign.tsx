@@ -6,6 +6,12 @@ import { type CSSProperties } from "react"
 import { ArrowRight, Star } from "lucide-react"
 import { LiveStats } from "@/components/live-stats"
 import { HomePageNavbar } from "@/components/homepage-navbar"
+import {
+  HOME_HERO_HEADLINE,
+  HOME_HERO_SUBTITLE,
+  TEACHER_VERIFICATION,
+  TESTIMONIALS_COUNT,
+} from "@/lib/platform-marketing"
 import { HeroFeatureBar } from "@/components/hero-feature-bar"
 
 export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile?: boolean }) {
@@ -29,30 +35,30 @@ export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile
                                 <LiveStats variant="light" />
 
                                 <h1 className="scroll-animate-fade-up mb-4 text-3xl font-bold leading-tight text-gray-900 sm:mb-6 sm:text-4xl lg:text-4xl xl:text-5xl">
-                                    Explicații clare pentru note mai mari
+                                    {HOME_HERO_HEADLINE}
                                 </h1>
                                 <p className="scroll-animate-fade-up animate-delay-200 mb-0 text-base leading-relaxed text-gray-600 sm:text-lg">
-                                    Lecții structurate, exerciții interactive și AI care te ajută exact când te blochezi.
+                                    {HOME_HERO_SUBTITLE}
                                 </p>
                             </div>
 
                             <div className="scroll-animate-fade-up animate-delay-400 order-3 mx-auto flex w-full max-w-2xl flex-col items-stretch justify-center gap-4 lg:order-2 lg:mx-0 lg:max-w-2xl lg:flex-row lg:flex-wrap lg:items-center lg:justify-start">
                                 <Link
-                                    href="/register"
+                                    href="/invata"
                                     className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-9 text-base font-semibold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98] lg:w-auto"
                                     style={{ "--start-glow-tint": "rgba(224, 215, 255, 0.88)" } as CSSProperties}
                                 >
                                     <span className="relative z-10 inline-flex items-center gap-2 text-white">
-                                        Începe gratuit
+                                        Vezi traseele
                                         <ArrowRight className="h-4 w-4 shrink-0 text-white" aria-hidden />
                                     </span>
                                 </Link>
 
                                 <Link
-                                    href="/probleme"
+                                    href="/register"
                                     className="box-border inline-flex h-[62px] w-full shrink-0 items-center justify-center rounded-full border border-gray-300 border-b-[5px] border-b-[#b8bcc4] bg-white px-9 text-base font-semibold leading-snug text-gray-900 transition-[background-color,border-color] hover:bg-gray-50 hover:border-gray-400 hover:border-b-[#a8adb6] lg:w-auto"
                                 >
-                                    Explorează problemele
+                                    Începe gratuit
                                 </Link>
                             </div>
                         </div>
@@ -87,7 +93,7 @@ export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile
                         ))}
                     </div>
                     <p className="mt-1.5 text-center text-sm font-semibold text-gray-500 sm:text-base">
-                        „Folosit de elevi din 200+ școli”
+                        {TEACHER_VERIFICATION} · {TESTIMONIALS_COUNT} testimoniale
                     </p>
                 </div>
             </div>

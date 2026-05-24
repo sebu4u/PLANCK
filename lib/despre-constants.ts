@@ -1,10 +1,12 @@
+import { PLATFORM_STATS } from "@/lib/platform-marketing"
+
 // Despre page constants — easy to update with real data or API later
 
 export const platformStats = [
-  { label: "Utilizatori activi", value: "1.000+", icon: "users" },
-  { label: "Probleme rezolvate", value: "10.000+", icon: "check" },
-  { label: "Lecții video", value: "200+", icon: "play" },
-  { label: "Ore de conținut", value: "500+", icon: "clock" },
+  { label: "Utilizatori activi", value: PLATFORM_STATS.activeUsers, icon: "users" },
+  { label: "Grile rezolvate", value: PLATFORM_STATS.quizCount, icon: "check" },
+  { label: "Soluții video", value: `${PLATFORM_STATS.videoSolutions}`, icon: "play" },
+  { label: "Testimoniale", value: PLATFORM_STATS.testimonials, icon: "clock" },
 ] as const
 
 export const teamMembers = [

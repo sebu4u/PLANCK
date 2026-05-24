@@ -4,6 +4,10 @@ import { useState, useEffect, useRef, type CSSProperties } from "react"
 import Link from "next/link"
 import { LayoutGrid, Video, UserPlus, ArrowRight } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
+import {
+  QUIZ_COUNT_LABEL,
+  VIDEO_SOLUTIONS_LABEL,
+} from "@/lib/platform-marketing"
 
 interface ChatMessage {
     role: "user" | "assistant"
@@ -280,13 +284,13 @@ Calculăm: t = 30 s`,
                             <div className="p-4 rounded-2xl bg-blue-50">
                                 <LayoutGrid className="w-8 h-8 text-blue-600" />
                             </div>
-                            <span className="text-gray-700 font-semibold">1000+ Probleme rezolvate</span>
+                            <span className="text-gray-700 font-semibold">{QUIZ_COUNT_LABEL}</span>
                         </div>
                         <div className="flex flex-col items-center gap-3">
                             <div className="p-4 rounded-2xl bg-blue-50">
                                 <Video className="w-8 h-8 text-blue-600" />
                             </div>
-                            <span className="text-gray-700 font-semibold">500+ solutii video</span>
+                            <span className="text-gray-700 font-semibold">{VIDEO_SOLUTIONS_LABEL}</span>
                         </div>
                         <div className="flex flex-col items-center gap-3">
                             <div className="p-4 rounded-2xl bg-blue-50">
@@ -297,16 +301,16 @@ Calculăm: t = 30 s`,
                     </div>
 
                     <p className="text-gray-600 text-lg mb-6 font-medium">
-                        Vezi aici catalogul cu 1000+ probleme rezolvate de fizica si informatica
+                        Parcurge traseele complete pentru nota dorită la clasă, BAC sau admitere
                     </p>
                     <div className="flex w-full max-w-2xl justify-center px-4">
                         <Link
-                            href="/probleme"
+                            href="/invata"
                             className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-9 text-base font-semibold text-white shadow-[0_4px_0_#5B47D6] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#5B47D6] active:translate-y-1 active:shadow-[0_1px_0_#5B47D6] lg:w-auto"
                             style={{ "--start-glow-tint": "rgba(224, 215, 255, 0.88)" } as CSSProperties}
                         >
                             <span className="relative z-10 inline-flex items-center gap-2 text-white">
-                                Sunt gata
+                                Vezi traseele
                                 <ArrowRight className="h-4 w-4 shrink-0 text-white" aria-hidden />
                             </span>
                         </Link>

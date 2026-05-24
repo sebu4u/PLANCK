@@ -5,6 +5,7 @@ import { Star, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { FadeInUp } from "@/components/scroll-animations"
 import Link from "next/link"
+import { TESTIMONIALS_LABEL } from "@/lib/platform-marketing"
 
 const reviews = [
     {
@@ -106,7 +107,7 @@ export function ReviewsSection() {
                 {/* Header */}
                 <FadeInUp className="text-center max-w-3xl mx-auto mb-20">
                     <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6 tracking-tight">
-                        Ce spun elevii care chiar au progresat cu PLANCK
+                        {TESTIMONIALS_LABEL} recomandă PLANCK
                     </h2>
                     <p className="text-lg md:text-xl text-gray-500 leading-relaxed font-normal">
                         PLANCK nu promite „trucuri rapide”.<br className="hidden md:block" />

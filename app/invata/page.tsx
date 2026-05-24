@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { generateMetadata } from "@/lib/metadata"
+import { learningPathsHubStructuredData } from "@/lib/structured-data"
+import { StructuredData } from "@/components/structured-data"
 import {
   getCompletedLearningPathLessonIdsForUser,
   getLearningPathChapters,
@@ -11,6 +13,7 @@ import {
 } from "@/lib/supabase-learning-paths"
 import { createClient } from "@/lib/supabase/server"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
+import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import type { Problem } from "@/data/problems"
 import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-plan"
@@ -73,14 +76,19 @@ export default async function InvataPage() {
 
   return (
     <>
+      <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
       <Navigation />
 
       <main className="min-h-screen bg-[#ffffff] pb-10 pt-28">
         <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
           <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">Learning Paths</h1>
-              <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">Step-by-step paths to mastery</p>
+              <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">
+                Trasee de învățare
+              </h1>
+              <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">
+                Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
+              </p>
             </div>
             <InvataAdminLearningPathsLink />
           </header>
@@ -92,6 +100,8 @@ export default async function InvataPage() {
             lockedChapterIds={lockedChapterIds}
             completedLessonIds={completedLessonIds}
           />
+
+          <InvataSeoIntro />
         </div>
       </main>
     </>

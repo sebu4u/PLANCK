@@ -4,34 +4,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Plus, X } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
-
-const faqItems = [
-    {
-        id: "1",
-        question: "Cum știu că progresez cu adevărat?",
-        answer: "Urmărim fiecare problemă rezolvată și îți oferim statistici clare despre progres. Vei vedea evoluția în timp real, punctele tale forte și zonele care necesită îmbunătățire."
-    },
-    {
-        id: "2",
-        question: "Este PLANCK potrivit pentru mine dacă nu sunt olimpic?",
-        answer: "Absolut. PLANCK este construit pentru oricine vrea să înțeleagă fizica la un nivel profund, nu doar pentru olimpici. Explicațiile sunt clare și progresive, astfel încât să poți avansa în ritmul tău."
-    },
-    {
-        id: "3",
-        question: "Pot folosi platforma de pe telefon sau tabletă?",
-        answer: "Da, PLANCK este optimizat pentru toate dispozitivele. Poți învăța oriunde te afli, fie că ești acasă sau în deplasare."
-    },
-    {
-        id: "4",
-        question: "Ce se întâmplă dacă nu înțeleg o explicație?",
-        answer: "AI-ul nostru, Insight, este disponibil să te ghideze pas cu pas prin orice problemă. Pune întrebări și vei primi explicații personalizate până când totul devine clar."
-    },
-    {
-        id: "5",
-        question: "Pot cere o rambursare dacă nu sunt mulțumit?",
-        answer: "Da, oferim garanție de rambursare în primele 14 zile. Dacă PLANCK nu este ceea ce căutai, îți returnăm banii fără întrebări."
-    },
-]
+import { FAQ_ITEMS } from "@/lib/platform-marketing"
 
 export function FAQSection() {
     const [openItemId, setOpenItemId] = useState<string | null>(null)
@@ -49,13 +22,13 @@ export function FAQSection() {
                         Întrebări frecvente
                     </h2>
                     <p className="text-lg md:text-xl text-gray-500 leading-relaxed font-normal">
-                        Răspunsuri rapide la cele mai comune întrebări despre PLANCK.
+                        Răspunsuri rapide despre trasee, BAC, admitere și PLANCK.
                     </p>
                 </FadeInUp>
 
                 {/* FAQ Items */}
                 <FadeInUp delay={0.1} className="divide-y divide-gray-100">
-                    {faqItems.map((item) => (
+                    {FAQ_ITEMS.map((item) => (
                         <div key={item.id} className="py-6">
                             <button
                                 onClick={() => toggleItem(item.id)}
