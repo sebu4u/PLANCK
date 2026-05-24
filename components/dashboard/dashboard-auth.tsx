@@ -25,7 +25,7 @@ import type {
   DashboardUpdate,
   Project,
 } from "@/lib/dashboard-data"
-import { FreePlanUpgradeModal } from "@/components/dashboard/free-plan-upgrade-modal"
+import { FreePlanSchoolYearPromoModal } from "@/components/dashboard/free-plan-school-year-promo-modal"
 import {
   getCompletedLearningPathItemIdsForUser,
   getCompletedLearningPathLessonIdsForUser,
@@ -773,7 +773,7 @@ export function DashboardAuth() {
           role="presentation"
         >
           <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[520px]">
-            <FreePlanUpgradeModal
+            <FreePlanSchoolYearPromoModal
               imageSrc="/dashboard-card.png"
               onClose={() => setShowTrialModal(false)}
             />

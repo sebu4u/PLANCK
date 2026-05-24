@@ -16,9 +16,9 @@ import { Loader2, ArrowLeft, Plus, Trash2, ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 
-type SubjectKey = "fizica" | "informatica" | "matematica" | "biologie"
+type SubjectKey = "fizica" | "informatica" | "matematica" | "biologie" | "ai"
 type ApiSubject = "physics" | "informatics" | "math"
-type DevLearningPathSubject = "physics" | "informatics" | "math" | "biology"
+type DevLearningPathSubject = "physics" | "informatics" | "math" | "biology" | "all"
 
 function toApiSubject(key: SubjectKey): ApiSubject {
   if (key === "fizica") return "physics"
@@ -31,6 +31,7 @@ function toDevLearningPathSubject(key: SubjectKey): DevLearningPathSubject | und
   if (key === "informatica") return "informatics"
   if (key === "matematica") return "math"
   if (key === "biologie") return "biology"
+  if (key === "ai") return "all"
   return undefined
 }
 
@@ -121,7 +122,7 @@ async function getAuthJsonHeaders(): Promise<Record<string, string> | null> {
 export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   const apiSubject = toApiSubject(subjectKey)
   const devLearningPathSubject = toDevLearningPathSubject(subjectKey)
-  const learningPathsOnly = subjectKey === "biologie"
+  const learningPathsOnly = subjectKey === "biologie" || subjectKey === "ai"
   const title =
     subjectKey === "fizica"
       ? "Fizică — catalog & learning path"
@@ -129,7 +130,9 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
         ? "Informatică — catalog & learning path"
         : subjectKey === "biologie"
           ? "Biologie — learning path"
-          : "Matematică — catalog"
+          : subjectKey === "ai"
+            ? "AI — learning paths"
+            : "Matematică — catalog"
 
   const physicsChapters = useMemo(() => allPhysicsCatalogCategories().sort((a, b) => a.localeCompare(b, "ro")), [])
 
@@ -377,6 +380,12 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               Adaugă probleme în catalogul de matematică. Răspunsurile (valoare numerică între text
               înainte/după, ca la fizică) sunt folosite în learning path pentru verificare;{" "}
               <strong>nu apar</strong> în catalogul public.
+            </>
+          ) : subjectKey === "ai" ? (
+            <>
+              Vizualizează și editează toate learning path-urile (/invata), indiferent de materie. Editorul este același
+              ca la admin (preview, itemi interactive, salvare, reordonare), dar <strong>fără ștergere sau dezactivare</strong>{" "}
+              itemi.
             </>
           ) : learningPathsOnly ? (
             <>
@@ -1061,7 +1070,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                 <LearningPathsManager
                   mode="dev"
                   devSubject={devLearningPathSubject}
-                  devViewSubject={subjectKey === "matematica" ? "all" : devLearningPathSubject}
+                  devViewSubject={subjectKey === "matematica" || subjectKey === "ai" ? "all" : devLearningPathSubject}
                   onDevCelebrate={triggerDevCelebration}
                 />
               </div>
