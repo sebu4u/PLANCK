@@ -8,6 +8,7 @@ import { getLearningPathAccess, type LearningPathAccess } from "@/lib/learning-p
 import { createClient } from "@/lib/supabase/server"
 import {
   getLearningPathLessonHref,
+  getLearningPathRouteSegments,
   getLearningPathChapterById,
   getLearningPathChapterBySlug,
   getLearningPathLessonById,
@@ -274,6 +275,7 @@ export async function loadLearningPathItemPayload(
   }
 
   const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
+  const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
   const { completedItemIdsForLesson, initialCurrentItemCompleted, itemsRemainingForFreePreview } =
     await getProgressState(access, lesson.id, items, item.id)
 
@@ -300,8 +302,8 @@ export async function loadLearningPathItemPayload(
   return {
     status: "ok",
     payload: {
-      chapterSlug: chapter.slug ?? chapter.id,
-      lessonSlug: lesson.slug ?? lesson.id,
+      chapterSlug: chapterSegment,
+      lessonSlug: lessonSegment,
       itemIndex,
       chapter,
       lesson,

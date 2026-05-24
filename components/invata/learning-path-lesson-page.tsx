@@ -5,6 +5,7 @@ import Link from "next/link"
 import { BookOpen, Check, ChevronRight, Lock } from "lucide-react"
 import {
   getLearningPathLessonHref,
+  getLearningPathRouteSegments,
   type LearningPathChapter,
   type LearningPathLesson,
   type LearningPathLessonItem,
@@ -114,12 +115,9 @@ export function LearningPathLessonPage({
 
   useEffect(() => {
     if (!selectedItem) return
-    prefetchLearningPathItem(
-      chapter.slug ?? chapter.id,
-      lesson.slug ?? lesson.id,
-      selectedItemIndex + 1
-    )
-  }, [chapter.id, chapter.slug, lesson.id, lesson.slug, selectedItem, selectedItemIndex])
+    const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
+    prefetchLearningPathItem(chapterSegment, lessonSegment, selectedItemIndex + 1)
+  }, [chapter, lesson, selectedItem, selectedItemIndex])
 
   useLayoutEffect(() => {
     if (!initialSelectedItemId || items.length < 2) return

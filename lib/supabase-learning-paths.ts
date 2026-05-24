@@ -68,10 +68,18 @@ export interface LearningPathLessonItem {
   content_json?: Record<string, unknown> | null
 }
 
-export function getLearningPathLessonHref(chapter: LearningPathChapter, lesson: LearningPathLesson): string {
+export function getLearningPathRouteSegments(
+  chapter: LearningPathChapter,
+  lesson: LearningPathLesson
+): { chapterSegment: string; lessonSegment: string } {
   return chapter.slug && lesson.slug
-    ? `/invata/${chapter.slug}/${lesson.slug}`
-    : `/invata/${chapter.id}/${lesson.id}`
+    ? { chapterSegment: chapter.slug, lessonSegment: lesson.slug }
+    : { chapterSegment: chapter.id, lessonSegment: lesson.id }
+}
+
+export function getLearningPathLessonHref(chapter: LearningPathChapter, lesson: LearningPathLesson): string {
+  const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
+  return `/invata/${chapterSegment}/${lessonSegment}`
 }
 
 export function getLearningPathItemHref(
@@ -169,7 +177,9 @@ export async function getLearningPathLessonBySlug(
   chapterSlug: string,
   lessonSlug: string
 ): Promise<LearningPathLesson | null> {
-  const chapter = await getLearningPathChapterBySlug(chapterSlug)
+  const chapter = isUuid(chapterSlug)
+    ? await getLearningPathChapterById(chapterSlug)
+    : await getLearningPathChapterBySlug(chapterSlug)
   const normalizedLessonSlug = lessonSlug.trim()
 
   if (!chapter || !normalizedLessonSlug) {

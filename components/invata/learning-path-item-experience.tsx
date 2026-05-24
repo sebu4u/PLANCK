@@ -19,8 +19,8 @@ interface LearningPathItemExperienceProps {
   initialPayload: LearningPathItemPayload
 }
 
-function buildItemUrl(chapterSlug: string, lessonSlug: string, itemIndex: number): string {
-  return `/invata/${chapterSlug}/${lessonSlug}/${itemIndex}`
+function buildItemUrl(lessonBaseHref: string, itemIndex: number): string {
+  return `${lessonBaseHref}/${itemIndex}`
 }
 
 function parseItemIndexFromPathname(pathname: string): number | null {
@@ -51,7 +51,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   }, [])
 
   const syncUrl = useCallback((next: LearningPathItemPayload, mode: "replace" | "push" = "replace") => {
-    const url = buildItemUrl(next.chapterSlug, next.lessonSlug, next.itemIndex)
+    const url = buildItemUrl(next.lessonBaseHref, next.itemIndex)
     if (mode === "push") {
       window.history.pushState({ learningPathItemIndex: next.itemIndex }, "", url)
     } else {
@@ -105,7 +105,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         if (result.status === "blocked") {
           setFreePlanPaywall({ lessonBaseHref: result.lessonBaseHref })
           if (!isPopstateRef.current) {
-            const url = buildItemUrl(payload.chapterSlug, payload.lessonSlug, targetIndex)
+            const url = buildItemUrl(payload.lessonBaseHref, targetIndex)
             if (options?.urlMode === "push") {
               window.history.pushState({ learningPathItemIndex: targetIndex }, "", url)
             } else {
@@ -114,7 +114,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
           }
           return
         }
-        router.push(buildItemUrl(payload.chapterSlug, payload.lessonSlug, targetIndex))
+        router.push(buildItemUrl(payload.lessonBaseHref, targetIndex))
       } finally {
         setIsNavigating(false)
         isPopstateRef.current = false
