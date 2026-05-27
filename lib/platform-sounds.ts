@@ -9,6 +9,12 @@ const NOTIFICATION_SUPPRESS_MS_AFTER_ERROR = 1200
 
 let suppressNotificationSoundUntil = 0
 
+function isDashboardRoute(): boolean {
+  if (typeof window === "undefined") return false
+  const pathname = window.location.pathname
+  return pathname === "/dashboard" || pathname.startsWith("/dashboard/")
+}
+
 function playWav(src: string, volume = 0.5): void {
   if (typeof window === "undefined") return
   try {
@@ -62,5 +68,6 @@ export function playSuccessSound(): void {
 /** Toast, engagement card, and other platform notifications. */
 export function playNotificationSound(): void {
   if (Date.now() < suppressNotificationSoundUntil) return
+  if (isDashboardRoute()) return
   playWav(SOUND_PATHS.notification, 0.45)
 }

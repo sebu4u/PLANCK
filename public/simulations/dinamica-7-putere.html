@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Putere și randament</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --text: #292929; --line: #e8e8ec; --accent: #8043f0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    body { display: grid; place-items: stretch; }
+    .sim { width: 100%; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 2px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 2px; }
+    .row { display: flex; align-items: center; gap: 6px; flex: 1 1 90px; }
+    .row label { font: 600 10px ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+    .row input[type=range] { flex: 1; accent-color: var(--accent); }
+    .val { font: 700 10px ui-sans-serif, system-ui, sans-serif; color: var(--accent); min-width: 32px; }
+    .stage { min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px;
+      background: linear-gradient(180deg, #fff 0%, #fbfbfb 100%); }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <main class="sim">
+    <div class="controls">
+      <div class="row"><label for="f">F (N)</label><input id="f" type="range" min="50" max="500" step="10" value="200"><span class="val" id="fVal">200</span></div>
+      <div class="row"><label for="t">t (s)</label><input id="t" type="range" min="1" max="15" step="0.5" value="4"><span class="val" id="tVal">4</span></div>
+      <div class="row"><label for="m">m (kg)</label><input id="m" type="range" min="1" max="80" step="1" value="25"><span class="val" id="mVal">25</span></div>
+    </div>
+    <section class="stage"><canvas id="canvas"></canvas></section>
+  </main>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const G = 9.81;
+    const H = 3;
+    const ROPE_FACTOR = 1.25;
+
+    let cssW = 0, cssH = 0, dpr = 1, paused = false;
+    let F = 200, liftTime = 4, mass = 25;
+    let height = 0, phase = "up", pauseT = 0;
+
+    function postState() {
+      window.parent.postMessage({
+        type: "learning-path-simulation-state",
+        name: "Putere și randament",
+        text: "η = L_util / L_total × 100%.",
+        paused
+      }, "*");
+    }
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(cssW * dpr); canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function calc() {
+      const t = Math.max(0.5, liftTime);
+      const d = H * ROPE_FACTOR * 2;
+      const Lutil = mass * G * H;
+      const Ltotal = F * d;
+      const P = Ltotal / t;
+      const eta = Ltotal > 0 ? Math.min(100, (Lutil / Ltotal) * 100) : 0;
+      return { Lutil, Ltotal, P, eta, d, t };
+    }
+
+    function update(dt) {
+      if (paused) return;
+      const t = Math.max(0.5, liftTime);
+      const speed = H / t;
+      if (phase === "up") {
+        height += speed * dt;
+        if (height >= H) { height = H; phase = "pause"; pauseT = 0.6; }
+      } else if (phase === "pause") {
+        pauseT -= dt;
+        if (pauseT <= 0) phase = "down";
+      } else if (phase === "down") {
+        height -= speed * dt;
+        if (height <= 0) { height = 0; phase = "up"; }
+      }
+    }
+
+    function drawGauge(cx, cy, r, eta) {
+      const start = Math.PI * 0.75;
+      const sweep = Math.PI * 1.5;
+      ctx.strokeStyle = "#e8e8ec";
+      ctx.lineWidth = cssW < 360 ? 8 : 10;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, start + sweep);
+      ctx.stroke();
+      const color = eta < 50 ? "#e74c3c" : eta < 80 ? "#f1c40f" : "#2ecc71";
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, start + sweep * Math.min(1, eta / 100));
+      ctx.stroke();
+      ctx.fillStyle = "#292929";
+      ctx.font = "700 " + (cssW < 360 ? 12 : 14) + "px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(eta.toFixed(0) + "%", cx, cy + 4);
+      ctx.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText("Randament", cx, cy + 18);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(0, 0, cssW, cssH);
+      const { Lutil, Ltotal, P, eta, d } = calc();
+
+      const ground = cssH * 0.8;
+      const pxPerM = (ground - cssH * 0.18) / H;
+      const pulleyX = cssW * 0.58, pulleyY = cssH * 0.2;
+      const crateW = 44, crateH = 32;
+      const crateX = cssW * 0.32;
+      const crateY = ground - crateH - height * pxPerM;
+      const pullX = pulleyX + 70, pullY = pulleyY + 50 + (H - height) * pxPerM * ROPE_FACTOR;
+
+      ctx.strokeStyle = "#292929";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, ground);
+      ctx.lineTo(cssW, ground);
+      ctx.stroke();
+
+      ctx.fillStyle = "#e8e8ec";
+      ctx.fillRect(pulleyX - 4, pulleyY - 30, 8, 30);
+
+      ctx.strokeStyle = "#8043f0";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(crateX + crateW / 2, crateY);
+      ctx.lineTo(crateX + crateW / 2, pulleyY);
+      ctx.lineTo(pulleyX, pulleyY);
+      ctx.lineTo(pullX, pullY);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#292929";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pulleyX, pulleyY, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pulleyX - 16, pulleyY);
+      ctx.lineTo(pulleyX + 16, pulleyY);
+      ctx.stroke();
+
+      ctx.fillStyle = "#8043f0";
+      ctx.fillRect(crateX, crateY, crateW, crateH);
+      ctx.strokeStyle = "#292929";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(crateX, crateY, crateW, crateH);
+
+      ctx.fillStyle = "#292929";
+      ctx.beginPath();
+      ctx.arc(pullX, pullY, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      const gx = cssW * 0.78, gy = cssH * 0.34, gr = cssW < 360 ? 30 : 38;
+      drawGauge(gx, gy, gr, eta);
+
+      const pw = cssW < 380 ? cssW - 24 : 200;
+      ctx.fillStyle = "rgba(255,255,255,0.93)";
+      ctx.strokeStyle = "#e8e8ec";
+      ctx.beginPath();
+      ctx.roundRect(10, 10, pw, 88, 8);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#292929";
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("L_util = m·g·h = " + Lutil.toFixed(0) + " J", 18, 28);
+      ctx.fillText("L_total = F·d = " + Ltotal.toFixed(0) + " J", 18, 44);
+      ctx.fillText("d = " + d.toFixed(1) + " m (2h·1.25)", 18, 58);
+      ctx.fillText("P = L_total/t = " + P.toFixed(0) + " W", 18, 72);
+      ctx.fillStyle = "#8043f0";
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText("η = " + eta.toFixed(1) + " %", 18, 88);
+    }
+
+    document.getElementById("f").addEventListener("input", (e) => {
+      F = Number(e.target.value);
+      document.getElementById("fVal").textContent = F;
+    });
+    document.getElementById("t").addEventListener("input", (e) => {
+      liftTime = Math.max(0.5, Number(e.target.value));
+      document.getElementById("tVal").textContent = liftTime;
+    });
+    document.getElementById("m").addEventListener("input", (e) => {
+      mass = Math.max(1, Number(e.target.value));
+      document.getElementById("mVal").textContent = mass;
+    });
+
+    let last = performance.now();
+    function loop(now) {
+      update(Math.min(0.032, (now - last) / 1000));
+      last = now;
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("message", (e) => {
+      const d = e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "learning-path-simulation-set-paused" || d.type === "trajectory-simulation-set-paused") paused = Boolean(d.paused);
+    });
+
+    new ResizeObserver(resize).observe(canvas);
+    resize(); postState();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

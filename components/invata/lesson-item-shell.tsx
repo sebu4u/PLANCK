@@ -42,6 +42,12 @@ import {
 } from "@/components/invata/learning-path-item-navigation-context"
 import { LearningPathItemChromeProvider, useLearningPathItemChrome } from "@/components/invata/learning-path-item-chrome-context"
 import { LearningPathItemSlideContainer } from "@/components/invata/learning-path-item-slide-container"
+import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
+import { useLearningPathFlashcardFlow } from "@/components/invata/learning-path-flashcard-flow-context"
+import {
+  LearningPathFlashcardOfferScreen,
+  LearningPathFlashcardSessionScreen,
+} from "@/components/invata/learning-path-flashcard-item-screens"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -69,6 +75,8 @@ interface LessonItemShellProps {
   fullWidth?: boolean
   /** When set, bottom „Continuă” controls grila verify + navigation (learning-path grila items). */
   grilaQuestion?: QuizQuestion | null
+  chapterId?: string | null
+  itemTitle?: string | null
   children: React.ReactNode
 }
 
@@ -87,6 +95,8 @@ function LessonItemShellInner({
   overflowHidden = false,
   fullWidth = false,
   grilaQuestion = null,
+  chapterId = null,
+  itemTitle = null,
   children,
 }: LessonItemShellProps) {
   const explainChat = useLearningPathExplainChat()
@@ -116,7 +126,11 @@ function LessonItemShellInner({
   const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
   const itemNavigation = useOptionalLearningPathItemNavigation()
   const chrome = useLearningPathItemChrome()
-  const slideDirection = itemNavigation?.slideDirection ?? "forward"
+  const flashcardFlow = useLearningPathFlashcardFlow()
+  const navSlideDirection = itemNavigation?.slideDirection ?? "forward"
+  const slideDirection = flashcardFlow.isActive ? flashcardFlow.slideDirection : navSlideDirection
+  const slideKey = flashcardFlow.isActive ? flashcardFlow.slideKey : currentItemId
+  const effectiveHideBottomCta = hideBottomCta || flashcardFlow.isActive
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const navigateToPrevItem = useNavigateToPrevLearningPathItem(prevItemHref)
 
@@ -153,6 +167,22 @@ function LessonItemShellInner({
     })
     await navigateToNextItem()
   }, [currentItemId, itemIndex, items.length, markCurrentItemCompleted, navigateToNextItem, nextItemHref, pushMomentum])
+
+  const markCompleteForContinue = useCallback(async () => {
+    await markCurrentItemCompleted()
+    setCompletedItemIds((previous) => {
+      if (previous.has(currentItemId)) return previous
+      const next = new Set(previous)
+      next.add(currentItemId)
+      return next
+    })
+    pushMomentum({
+      nextHref: nextItemHref,
+      isLastItem: itemIndex >= items.length,
+      itemIndex,
+      totalItems: items.length,
+    })
+  }, [currentItemId, itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum])
 
   useEffect(() => {
     setCurrentItemCompleted(initialCurrentItemCompleted)
@@ -313,7 +343,7 @@ function LessonItemShellInner({
         </div>
       </nav>
 
-      {prevItemHref ? (
+      {prevItemHref && !flashcardFlow.isActive ? (
         <div
           className={cn(
             "pointer-events-none fixed left-0 top-14 z-[250] hidden w-[min(100vw,7rem)] items-center justify-start md:flex",
@@ -327,7 +357,7 @@ function LessonItemShellInner({
           <Link
             href={prevItemHref}
             onClick={(event) => {
-              if (!itemNavigation) return
+              if (!itemNavigation || flashcardFlow.isActive) return
               event.preventDefault()
               playClickSound()
               void navigateToPrevItem()
@@ -346,7 +376,7 @@ function LessonItemShellInner({
         </div>
       ) : null}
 
-      {currentItemCompleted ? (
+      {currentItemCompleted && !flashcardFlow.isActive ? (
         <div
           className={cn(
             "pointer-events-none fixed right-0 top-14 z-[250] hidden w-[min(100vw,7rem)] items-center justify-end md:flex",
@@ -385,7 +415,7 @@ function LessonItemShellInner({
           insightDesktopOpen && "lg:mr-[25vw]",
         )}
         style={{
-          paddingBottom: hideBottomCta
+          paddingBottom: effectiveHideBottomCta
             ? "max(16px, env(safe-area-inset-bottom, 0px))"
             : "calc(6rem + env(safe-area-inset-bottom, 0px))",
         }}
@@ -397,8 +427,10 @@ function LessonItemShellInner({
           )}
         >
           {itemNavigation ? (
-            <LearningPathItemSlideContainer itemKey={currentItemId} direction={slideDirection}>
-              {children}
+            <LearningPathItemSlideContainer itemKey={slideKey} direction={slideDirection}>
+              {flashcardFlow.phase === "offer" ? <LearningPathFlashcardOfferScreen /> : null}
+              {flashcardFlow.phase === "session" ? <LearningPathFlashcardSessionScreen /> : null}
+              {flashcardFlow.phase === "idle" ? children : null}
             </LearningPathItemSlideContainer>
           ) : (
             children
@@ -406,16 +438,20 @@ function LessonItemShellInner({
         </div>
       </main>
 
-      {!hideBottomCta && grilaQuestion ? (
+      {!effectiveHideBottomCta && grilaQuestion ? (
         <GrilaLessonBottomCta
           grilaQuestion={grilaQuestion}
           nextItemHref={nextItemHref}
-          onContinue={continueToNextItem}
+          onContinue={markCompleteForContinue}
           currentItemId={currentItemId}
           lessonId={lessonId}
           isLastItem={itemIndex >= items.length}
+          chapterSlug={chapterSlug}
+          lessonSlug={lessonSlug}
+          chapterId={chapterId}
+          itemTitle={itemTitle}
         />
-      ) : !hideBottomCta ? (
+      ) : !effectiveHideBottomCta ? (
         <div
           className={cn(
             "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
@@ -441,7 +477,7 @@ function LessonItemShellInner({
             </Link>
           </div>
         </div>
-      ) : hideBottomCta ? (
+      ) : effectiveHideBottomCta && !flashcardFlow.isActive ? (
         chrome?.fixedBottomBar
       ) : null}
 
@@ -507,6 +543,10 @@ function GrilaLessonBottomCta({
   currentItemId,
   lessonId,
   isLastItem,
+  chapterSlug,
+  lessonSlug,
+  chapterId,
+  itemTitle,
 }: {
   grilaQuestion: QuizQuestion
   nextItemHref: string
@@ -514,10 +554,15 @@ function GrilaLessonBottomCta({
   currentItemId: string
   lessonId: string
   isLastItem: boolean
+  chapterSlug: string
+  lessonSlug: string
+  chapterId?: string | null
+  itemTitle?: string | null
 }) {
   const explainChat = useLearningPathExplainChat()
   const ctx = useGrilaLesson()
-  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
+  const { pushHint, registerFailure, resetFailures, consumeStruggledBeforeSuccess } =
+    useStuckTrigger({ surface: "invata" })
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
     itemId: currentItemId,
@@ -529,6 +574,35 @@ function GrilaLessonBottomCta({
   const { selectedAnswer, isVerified, isCorrect, verify, reset } = ctx
   const hasAnswer = selectedAnswer !== null
   const barState = !isVerified ? "verify" : isCorrect ? "correct" : "incorrect"
+
+  const flashcardBridge = useMemo<LearningPathFlashcardBridge>(
+    () => ({
+      meta: {
+        itemId: currentItemId,
+        lessonId,
+        chapterId,
+        chapterSlug,
+        lessonSlug,
+        itemType: "grila",
+        itemTitle,
+      },
+      getContext: () =>
+        formatGrilaLearningPathContext(grilaQuestion, selectedAnswer, isCorrect),
+      consumeStruggledBeforeSuccess,
+    }),
+    [
+      chapterId,
+      chapterSlug,
+      consumeStruggledBeforeSuccess,
+      currentItemId,
+      grilaQuestion,
+      isCorrect,
+      itemTitle,
+      lessonId,
+      lessonSlug,
+      selectedAnswer,
+    ]
+  )
 
   return (
     <ProblemFeedbackBar
@@ -564,6 +638,7 @@ function GrilaLessonBottomCta({
         })
       }}
       eloAward={eloAward}
+      flashcardBridge={flashcardBridge}
       answerSlot={
         <span className="text-sm font-medium text-[#6f657b]">
           Răspunsul se selectează în chenarele de mai sus.

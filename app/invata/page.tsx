@@ -1,4 +1,6 @@
 import type { Metadata } from "next"
+import Link from "next/link"
+import { Layers } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
@@ -90,7 +92,18 @@ export default async function InvataPage() {
                 Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
               </p>
             </div>
-            <InvataAdminLearningPathsLink />
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              {user ? (
+                <Link
+                  href="/invata/flashcard-uri"
+                  className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                >
+                  <Layers className="h-4 w-4" />
+                  Flashcard-urile mele
+                </Link>
+              ) : null}
+              <InvataAdminLearningPathsLink />
+            </div>
           </header>
 
           <LearningPathsList

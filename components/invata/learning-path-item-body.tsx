@@ -136,6 +136,9 @@ interface LearningPathItemBodyProps {
   nextItemHref?: string
   lessonId?: string
   isLastItem?: boolean
+  chapterSlug?: string
+  lessonSlug?: string
+  chapterId?: string | null
 }
 
 function parseCustomTextContent(content: Record<string, unknown> | null | undefined): { body: string } | null {
@@ -230,6 +233,9 @@ export function LearningPathItemBody({
   nextItemHref,
   lessonId,
   isLastItem = false,
+  chapterSlug,
+  lessonSlug,
+  chapterId,
 }: LearningPathItemBodyProps) {
   if (item.item_type === "text") {
     if (!sourceLesson) {
@@ -317,6 +323,10 @@ export function LearningPathItemBody({
         lessonId={lessonId}
         currentItemId={item.id}
         isLastItem={isLastItem}
+        chapterSlug={chapterSlug ?? ""}
+        lessonSlug={lessonSlug ?? ""}
+        chapterId={chapterId}
+        itemTitle={item.title}
       >
         <LessonPollClientWrapper
           imageSrc={pollData.imageSrc}
@@ -374,6 +384,11 @@ export function LearningPathItemBody({
         lessonId={lessonId}
         nextItemHref={nextItemHref}
         isLastItem={isLastItem}
+        chapterSlug={chapterSlug ?? ""}
+        lessonSlug={lessonSlug ?? ""}
+        chapterId={chapterId}
+        itemTitle={item.title}
+        itemType={item.item_type}
       />
     )
   }

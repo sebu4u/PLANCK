@@ -10,6 +10,7 @@ import {
 import { ProblemSection } from "@/components/invata/problem-section"
 import { LearningPathCodingProblemSection } from "@/components/invata/learning-path-coding-problem-section"
 import { LearningPathItemNavigationProvider } from "@/components/invata/learning-path-item-navigation-context"
+import { LearningPathFlashcardFlowProvider } from "@/components/invata/learning-path-flashcard-flow-context"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
 
 interface LearningPathItemViewProps {
@@ -49,7 +50,14 @@ export function LearningPathItemView({
     sourceQuizQuestion,
     isLastItem,
     lesson,
+    chapter,
   } = payload
+
+  const routeMeta = {
+    chapterSlug,
+    lessonSlug,
+    chapterId: chapter.id,
+  }
 
   const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
 
@@ -88,8 +96,12 @@ export function LearningPathItemView({
   }
 
   return (
-    <LearningPathItemNavigationProvider value={navigationValue}>
-      <LessonItemShell
+    <LearningPathFlashcardFlowProvider
+      currentItemId={item.id}
+      goToNextItem={goToNextItem}
+    >
+      <LearningPathItemNavigationProvider value={navigationValue}>
+        <LessonItemShell
         chapterSlug={chapterSlug}
         lessonSlug={lessonSlug}
         itemIndex={itemIndex}
@@ -104,6 +116,8 @@ export function LearningPathItemView({
         overflowHidden={overflowHidden}
         fullWidth={fullWidth}
         grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
+        chapterId={chapter.id}
+        itemTitle={item.title}
       >
         {isTest ? (
           <div className="py-4 sm:py-6">
@@ -115,6 +129,7 @@ export function LearningPathItemView({
               nextItemHref={nextItemHref}
               lessonId={lessonId}
               isLastItem={isLastItem}
+              {...routeMeta}
             />
           </div>
         ) : isPoll ? (
@@ -126,6 +141,7 @@ export function LearningPathItemView({
             nextItemHref={nextItemHref}
             lessonId={lessonId}
             isLastItem={isLastItem}
+            {...routeMeta}
           />
         ) : isProblem && sourceProblem ? (
           <ProblemSection
@@ -135,6 +151,9 @@ export function LearningPathItemView({
             lessonId={lessonId}
             currentItemId={item.id}
             isLastItem={isLastItem}
+            itemType={item.item_type}
+            itemTitle={item.title}
+            {...routeMeta}
           />
         ) : isCodingProblem && sourceCodingProblem ? (
           <LearningPathCodingProblemSection
@@ -157,6 +176,7 @@ export function LearningPathItemView({
               nextItemHref={nextItemHref}
               lessonId={lessonId}
               isLastItem={isLastItem}
+              {...routeMeta}
             />
           </div>
         ) : item.item_type === "grila" ? (
@@ -170,6 +190,7 @@ export function LearningPathItemView({
                 nextItemHref={nextItemHref}
                 lessonId={lessonId}
                 isLastItem={isLastItem}
+                {...routeMeta}
               />
             </div>
           </div>
@@ -183,6 +204,7 @@ export function LearningPathItemView({
               nextItemHref={nextItemHref}
               lessonId={lessonId}
               isLastItem={isLastItem}
+              {...routeMeta}
             />
           </section>
         ) : isBareInteractiveItem ? (
@@ -195,6 +217,7 @@ export function LearningPathItemView({
               nextItemHref={nextItemHref}
               lessonId={lessonId}
               isLastItem={isLastItem}
+              {...routeMeta}
             />
           </section>
         ) : (
@@ -228,11 +251,13 @@ export function LearningPathItemView({
                 nextItemHref={nextItemHref}
                 lessonId={lessonId}
                 isLastItem={isLastItem}
+                {...routeMeta}
               />
             </div>
           </section>
         )}
       </LessonItemShell>
-    </LearningPathItemNavigationProvider>
+      </LearningPathItemNavigationProvider>
+    </LearningPathFlashcardFlowProvider>
   )
 }

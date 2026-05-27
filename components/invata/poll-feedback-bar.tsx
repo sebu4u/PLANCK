@@ -2,12 +2,13 @@
 
 import { useState, type MouseEvent } from "react"
 import Link from "next/link"
-import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EloGainCard } from "@/components/invata/elo-gain-card"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
+import { useLearningPathContinueFlow } from "@/hooks/use-learning-path-continue-flow"
+import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
 
 type PollBarState = "verify" | "correct" | "incorrect"
@@ -21,6 +22,7 @@ interface PollFeedbackBarProps {
   onContinue?: () => Promise<void> | void
   onExplain?: () => void
   eloAward?: LearningPathEloAward | null
+  flashcardBridge?: LearningPathFlashcardBridge | null
 }
 
 export function PollFeedbackBar({
@@ -32,8 +34,13 @@ export function PollFeedbackBar({
   onContinue,
   onExplain,
   eloAward,
+  flashcardBridge,
 }: PollFeedbackBarProps) {
-  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
+  const { proceedAfterCorrect } = useLearningPathContinueFlow({
+    nextItemHref,
+    onContinue,
+    flashcardBridge,
+  })
   const explainChat = useLearningPathExplainChat()
   const bottomBarDesktopInset = Boolean(
     explainChat?.insightOpen && explainChat?.isDesktopViewport
@@ -50,14 +57,12 @@ export function PollFeedbackBar({
       setShowEloCard(true)
       return
     }
-    await onContinue?.()
-    await navigateToNextItem()
+    await proceedAfterCorrect()
   }
 
   const continueAfterEloCard = async () => {
     playDashboardStartButtonClickSound()
-    await onContinue?.()
-    await navigateToNextItem()
+    await proceedAfterCorrect()
   }
 
   return (

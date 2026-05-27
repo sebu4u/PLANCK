@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { NavbarTestBatteries } from "@/components/navbar-test-batteries"
+import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
 
@@ -460,7 +462,6 @@ export function Navigation() {
   const navbarElevationClass = isProblemDetailPage
     ? 'shadow-none'
     : `shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? 'burger:shadow-none' : ''}`
-  const showGoPremiumCta = subscriptionPlan !== "plus" && subscriptionPlan !== "premium"
 
   return (
     <>
@@ -511,10 +512,14 @@ export function Navigation() {
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium ${navSecondaryText}`}>
-                    <Trophy className="h-3.5 w-3.5" />
-                    {user ? (userElo ?? 500) : "—"}
-                  </span>
+                  {user ? (
+                    <NavbarEloDisplay userElo={userElo} useLightNav={useLightNav} />
+                  ) : (
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${navSecondaryText}`}>
+                      <Trophy className="h-3.5 w-3.5" />
+                      —
+                    </span>
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -623,11 +628,22 @@ export function Navigation() {
                   <span className={`text-xs font-medium leading-tight ${subscriptionPlan === 'premium' ? 'text-orange-400' : subscriptionPlan === 'plus' ? (useLightNav ? 'text-emerald-600' : 'text-green-400') : 'text-gray-400'}`}>
                     {subscriptionPlan === 'premium' ? 'premium' : subscriptionPlan === 'plus' ? 'plus+' : 'free'}
                   </span>
-                  <span className={`flex items-center gap-1 ${navSecondaryText}`}>
-                    <Trophy className="w-3.5 h-3.5" />
-                    <span className="text-xs">{user ? (userElo ?? 500) : '—'}</span>
-                  </span>
+                  {user ? (
+                    <NavbarEloDisplay
+                      userElo={userElo}
+                      useLightNav={useLightNav}
+                      className={navSecondaryText}
+                      iconClassName="w-3.5 h-3.5"
+                    />
+                  ) : (
+                    <span className={`flex items-center gap-1 ${navSecondaryText}`}>
+                      <Trophy className="w-3.5 h-3.5" />
+                      <span className="text-xs">—</span>
+                    </span>
+                  )}
                 </div>
+
+                {user ? <NavbarTestBatteries useLightNav={useLightNav} /> : null}
 
                 <button
                   onClick={() => setIsSearchDialogOpen(true)}
@@ -637,14 +653,6 @@ export function Navigation() {
                   <span className="flex-1 text-left">Search...</span>
                   <kbd className={`px-1.5 py-0.5 text-xs ${useLightNav ? 'bg-gray-200 border-gray-300' : 'bg-white/10 border-white/10'} border rounded`}>/</kbd>
                 </button>
-
-                {showGoPremiumCta && (
-                  <Link href="/pricing" className="group inline-flex rounded-full bg-gradient-to-r from-[#9a7bff] via-[#d77bff] to-[#ffb56b] p-[1px]">
-                    <span className="inline-flex h-9 items-center rounded-full bg-white px-5 text-sm font-semibold text-[#2f236f] transition-colors group-hover:bg-[#f8f5ff]">
-                      Go Premium
-                    </span>
-                  </Link>
-                )}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

@@ -27,8 +27,8 @@ interface ChapterLike {
  * Determina nivelul de acces al userului curent pentru un capitol learning-path.
  *
  * - `full`: admini, planuri platite (plus/premium), useri cu `plus_months_remaining > 0`.
- * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru capitolul de cinematică
- *   (slug `cinematica` sau alias); pot parcurge secvențial până la limita de itemi.
+ * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru capitolele din
+ *   `FREE_PREVIEW_LEARNING_PATH_CHAPTER_SLUGS`; pot parcurge secvențial până la limita globală de itemi.
  * - `locked`: orice alt scenariu (afiseaza preview-ul placeholder).
  */
 export async function getLearningPathAccess(chapter?: ChapterLike | null): Promise<LearningPathAccess> {

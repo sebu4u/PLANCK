@@ -25,7 +25,6 @@ import type {
   DashboardUpdate,
   Project,
 } from "@/lib/dashboard-data"
-import { FreePlanSchoolYearPromoModal } from "@/components/dashboard/free-plan-school-year-promo-modal"
 import {
   getLearningPathChapters,
   getLearningPathLessonsByChapterId,
@@ -61,8 +60,6 @@ export function DashboardAuth() {
   const isInitialLoadRef = useRef(true)
   const isFetchingRef = useRef(false)
   const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const trialModalCheckedRef = useRef(false)
-  const [showTrialModal, setShowTrialModal] = useState(false)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
   const [fakeSolveProblems, setFakeSolveProblems] = useState<FakeSolveProblem[]>([])
@@ -107,7 +104,7 @@ export function DashboardAuth() {
     mobileVisible: fakeSolveMobileVisible,
     dismissMobileNotification: dismissFakeSolveMobileNotification,
   } = useDashboardFakeSolveSocialProof({
-    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack && !showTrialModal,
+    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack,
     problemPool: fakeSolveProblemPool,
   })
 
@@ -504,41 +501,6 @@ export function DashboardAuth() {
     }
   }
 
-  useEffect(() => {
-    if (authLoading || loading || !dashboardData || !user || !isFree) return
-    if (showWelcomeBack) return
-    if (trialModalCheckedRef.current) return
-    trialModalCheckedRef.current = true
-
-    try {
-      const countKey = `dashboard_entry_count_${user.id}`
-      const sessionKey = `dashboard_trial_session_${user.id}`
-      const lastShownKey = `dashboard_trial_last_shown_${user.id}`
-
-      let sessionId = sessionStorage.getItem(sessionKey)
-      if (!sessionId) {
-        const fallbackId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-        sessionId = typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : fallbackId
-        sessionStorage.setItem(sessionKey, sessionId)
-      }
-
-      const currentCount = Number(localStorage.getItem(countKey) || "0")
-      const nextCount = Number.isFinite(currentCount) ? currentCount + 1 : 1
-      localStorage.setItem(countKey, String(nextCount))
-
-      const lastShownSession = localStorage.getItem(lastShownKey)
-      if (nextCount % 5 === 0 && lastShownSession !== sessionId) {
-        localStorage.setItem(lastShownKey, sessionId)
-        setShowTrialModal(true)
-      }
-    } catch {
-      // Ignore storage errors silently
-    }
-  }, [authLoading, loading, dashboardData, user?.id, isFree, showWelcomeBack])
-
-
   // Memoize userData to prevent recreation on every render
   // Must be called before any conditional returns to follow Rules of Hooks
   const userData = useMemo(() => {
@@ -761,21 +723,6 @@ export function DashboardAuth() {
           </div>
         </div>
       </div>
-
-      {showTrialModal && (
-        <div
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300"
-          onClick={() => setShowTrialModal(false)}
-          role="presentation"
-        >
-          <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[520px]">
-            <FreePlanSchoolYearPromoModal
-              imageSrc="/dashboard-card.png"
-              onClose={() => setShowTrialModal(false)}
-            />
-          </div>
-        </div>
-      )}
 
       {showWelcomeBack && (
         <WelcomeBackOverlay

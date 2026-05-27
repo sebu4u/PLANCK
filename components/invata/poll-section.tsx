@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useState } from "react"
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react"
 import { PollFeedbackBar } from "@/components/invata/poll-feedback-bar"
 import type { LessonPollOption } from "@/components/invata/lesson-poll"
 import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
@@ -16,6 +16,7 @@ import {
 } from "@/lib/learning-path-insight-context"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
+import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
 
@@ -71,6 +72,10 @@ interface PollSectionProps {
   lessonId: string
   currentItemId: string
   isLastItem: boolean
+  chapterSlug: string
+  lessonSlug: string
+  chapterId?: string | null
+  itemTitle?: string | null
   children: React.ReactNode
 }
 
@@ -82,6 +87,10 @@ export function PollSection({
   lessonId,
   currentItemId,
   isLastItem,
+  chapterSlug,
+  lessonSlug,
+  chapterId,
+  itemTitle,
   children,
 }: PollSectionProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -90,7 +99,8 @@ export function PollSection({
   const [displayText, setDisplayText] = useState(question)
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const explainChat = useLearningPathExplainChat()
-  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "poll" })
+  const { pushHint, registerFailure, resetFailures, consumeStruggledBeforeSuccess } =
+    useStuckTrigger({ surface: "poll" })
   const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
     itemId: currentItemId,
     lessonId,
@@ -132,6 +142,45 @@ export function PollSection({
     isLastItem,
   })
 
+  const flashcardBridge = useMemo<LearningPathFlashcardBridge>(
+    () => ({
+      meta: {
+        itemId: currentItemId,
+        lessonId,
+        chapterId,
+        chapterSlug,
+        lessonSlug,
+        itemType: "poll",
+        itemTitle,
+      },
+      getContext: () =>
+        formatPollLearningPathContext({
+          question,
+          options: options.map((o) => ({ id: o.id, label: o.label })),
+          selectedId,
+          correctAnswerId,
+          displayTextAfterVerify: displayText,
+          wasCorrect: isCorrect,
+        }),
+      consumeStruggledBeforeSuccess,
+    }),
+    [
+      chapterId,
+      chapterSlug,
+      consumeStruggledBeforeSuccess,
+      correctAnswerId,
+      currentItemId,
+      displayText,
+      isCorrect,
+      itemTitle,
+      lessonId,
+      lessonSlug,
+      options,
+      question,
+      selectedId,
+    ]
+  )
+
   useRegisterLearningPathFixedBottomBar(
     () => (
       <PollFeedbackBar
@@ -157,9 +206,10 @@ export function PollSection({
           })
         }}
         eloAward={eloAward}
+        flashcardBridge={flashcardBridge}
       />
     ),
-    [barState, selectedId, nextItemHref, eloAward, displayText, isCorrect, verified]
+    [barState, selectedId, nextItemHref, eloAward, displayText, isCorrect, verified, flashcardBridge]
   )
 
   return (

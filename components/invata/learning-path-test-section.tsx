@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation"
 import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import {
   AlertCircle,
-  BatteryFull,
-  BatteryLow,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -28,6 +26,8 @@ import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { useProgressTrigger } from "@/hooks/engagement/use-progress-trigger"
 import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
+import { useLpTestBatteryState, type LpTestBatteryState, LP_TEST_MAX_BATTERIES } from "@/hooks/use-lp-test-battery-state"
+import { LpTestBatteryStrip } from "@/components/invata/lp-test-battery-strip"
 import { resolveTestIcon } from "@/components/invata/test-icons"
 import {
   getTestPassThreshold,
@@ -35,13 +35,7 @@ import {
   type TestPublicProblem,
 } from "@/lib/learning-path-test"
 
-const MAX_BATTERIES = 3
-
-interface BatteryState {
-  count: number
-  nextRefillAt: string | null
-  refillQueue: string[]
-}
+type BatteryState = LpTestBatteryState
 
 interface SubmitResultEntry {
   problemId: string
@@ -102,35 +96,6 @@ function describeTime(totalSeconds: number): string {
   return `${minutes} ${minutes === 1 ? "minut" : "minute"} și ${seconds} secunde`
 }
 
-interface BatteryStripProps {
-  count: number
-  max?: number
-}
-
-function BatteryStrip({ count, max = MAX_BATTERIES }: BatteryStripProps) {
-  return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3">
-      {Array.from({ length: max }).map((_, index) => {
-        const filled = index < count
-        return (
-          <div
-            key={index}
-            className={
-              "flex h-10 w-8 flex-col items-center justify-center rounded-md border-2 transition-colors sm:h-12 sm:w-9 " +
-              (filled
-                ? "border-emerald-400 bg-emerald-50 text-emerald-600"
-                : "border-[#d1d5db] bg-[#f3f4f6] text-[#9ca3af]")
-            }
-            aria-label={filled ? "Baterie disponibilă" : "Baterie consumată"}
-          >
-            {filled ? <BatteryFull className="h-4 w-4 sm:h-5 sm:w-5" /> : <BatteryLow className="h-4 w-4 sm:h-5 sm:w-5" />}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 function DifficultyDots({ value, max = 5 }: { value: number; max?: number }) {
   return (
     <span className="inline-flex items-center gap-1">
@@ -145,49 +110,6 @@ function DifficultyDots({ value, max = 5 }: { value: number; max?: number }) {
       ))}
     </span>
   )
-}
-
-function useBatteryState() {
-  const { user } = useAuth()
-  const [state, setState] = useState<BatteryState | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    if (!user?.id) {
-      setState(null)
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    const { data, error: rpcError } = await supabase.rpc("get_lp_test_battery_state")
-    if (rpcError) {
-      setError("Nu am putut încărca bateriile.")
-      setLoading(false)
-      return
-    }
-    const row = Array.isArray(data) ? data[0] : data
-    if (!row) {
-      setState({ count: MAX_BATTERIES, nextRefillAt: null, refillQueue: [] })
-    } else {
-      const refillQueue = Array.isArray(row.refill_queue)
-        ? (row.refill_queue as string[])
-        : []
-      setState({
-        count: typeof row.count === "number" ? row.count : Number(row.count ?? 0),
-        nextRefillAt: typeof row.next_refill_at === "string" ? row.next_refill_at : null,
-        refillQueue,
-      })
-    }
-    setLoading(false)
-  }, [user?.id])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  return { state, setState, loading, error, refresh }
 }
 
 interface IntroPopupProps {
@@ -216,7 +138,7 @@ function IntroPopup({
   const [, forceTick] = useState(0)
   useEffect(() => {
     if (!open) return
-    if (!battery?.nextRefillAt || (battery?.count ?? 0) >= MAX_BATTERIES) return
+    if (!battery?.nextRefillAt || (battery?.count ?? 0) >= LP_TEST_MAX_BATTERIES) return
     const interval = window.setInterval(() => forceTick((tick) => tick + 1), 1000)
     return () => window.clearInterval(interval)
   }, [battery?.nextRefillAt, battery?.count, open])
@@ -282,7 +204,7 @@ function IntroPopup({
                   Verific bateriile...
                 </div>
               ) : (
-                <BatteryStrip count={battery?.count ?? 0} />
+                <LpTestBatteryStrip count={battery?.count ?? 0} />
               )}
             </div>
             <p className="mx-auto mt-2 max-w-xs text-center text-[11px] leading-snug text-[#6f657b] sm:mt-3 sm:text-xs">
@@ -463,7 +385,7 @@ export function LearningPathTestSection({
   const [result, setResult] = useState<SubmitResult | null>(null)
 
   const { state: battery, setState: setBattery, loading: batteryLoading, refresh: refreshBattery } =
-    useBatteryState()
+    useLpTestBatteryState()
 
   const [secondsLeft, setSecondsLeft] = useState<number>(content.timeLimitSeconds)
   const [autoSubmitArmed, setAutoSubmitArmed] = useState(false)

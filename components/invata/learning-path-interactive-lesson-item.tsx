@@ -50,6 +50,7 @@ import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { InlineMath } from "react-katex"
 import katex from "katex"
 import { hasMixedLatexDelimiters } from "@/lib/parse-mixed-latex"
+import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 function shuffleInPlace<T>(arr: T[]) {
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -526,6 +527,11 @@ function FillSlotView({
   itemId,
   lessonId,
   isLastItem,
+  chapterSlug,
+  lessonSlug,
+  chapterId,
+  itemTitle,
+  itemType,
 }: {
   data: FillSlotContent
   nextItemHref: string
@@ -533,9 +539,15 @@ function FillSlotView({
   itemId: string
   lessonId: string
   isLastItem: boolean
+  chapterSlug: string
+  lessonSlug: string
+  chapterId?: string | null
+  itemTitle?: string | null
+  itemType: string
 }) {
   const explainChat = useLearningPathExplainChat()
-  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
+  const { pushHint, registerFailure, resetFailures, consumeStruggledBeforeSuccess } =
+    useStuckTrigger({ surface: "invata" })
   const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
     itemId,
     lessonId,
@@ -642,6 +654,46 @@ function FillSlotView({
     })
   }
 
+  const flashcardBridge = useMemo<LearningPathFlashcardBridge>(
+    () => ({
+      meta: {
+        itemId,
+        lessonId,
+        chapterId,
+        chapterSlug,
+        lessonSlug,
+        itemType,
+        itemTitle,
+      },
+      getContext: () =>
+        formatFillSlotLearningPathContext({
+          instructions: data.instructions,
+          latexTemplate: data.latexTemplate,
+          slots: data.slots,
+          assign,
+          chips: data.chips,
+          autoResult: verifyResult,
+        }),
+      consumeStruggledBeforeSuccess,
+    }),
+    [
+      assign,
+      chapterId,
+      chapterSlug,
+      consumeStruggledBeforeSuccess,
+      data.chips,
+      data.instructions,
+      data.latexTemplate,
+      data.slots,
+      itemId,
+      itemTitle,
+      itemType,
+      lessonId,
+      lessonSlug,
+      verifyResult,
+    ]
+  )
+
   useRegisterLearningPathFixedBottomBar(
     () => (
       <ProblemFeedbackBar
@@ -656,6 +708,7 @@ function FillSlotView({
         onExplain={handleWhy}
         eloAward={eloAward}
         retryLabel="Încearcă din nou"
+        flashcardBridge={flashcardBridge}
         answerSlot={
           <span className="text-sm font-medium text-[#6f657b]">
             Completează toate sloturile din formulă, apoi apasă Verifică.
@@ -663,7 +716,7 @@ function FillSlotView({
         }
       />
     ),
-    [barState, allFilled, nextItemHref, eloAward, assign, verifyPhase],
+    [barState, allFilled, nextItemHref, eloAward, assign, verifyPhase, flashcardBridge],
   )
 
   const chipCardBase =
@@ -2463,12 +2516,22 @@ export function LearningPathInteractiveLessonItem({
   lessonId,
   nextItemHref,
   isLastItem,
+  chapterSlug,
+  lessonSlug,
+  chapterId,
+  itemTitle,
+  itemType,
 }: {
   parsed: ParsedInteractiveContent
   itemId: string
   lessonId: string
   nextItemHref: string
   isLastItem: boolean
+  chapterSlug: string
+  lessonSlug: string
+  chapterId?: string | null
+  itemTitle?: string | null
+  itemType: string
 }) {
   const markComplete = useLearningPathItemCompletion({ itemId, lessonId, isLastItem })
   const onDone = useCallback(() => {}, [])
@@ -2500,6 +2563,11 @@ export function LearningPathInteractiveLessonItem({
           itemId={itemId}
           lessonId={lessonId}
           isLastItem={isLastItem}
+          chapterSlug={chapterSlug}
+          lessonSlug={lessonSlug}
+          chapterId={chapterId}
+          itemTitle={itemTitle}
+          itemType={itemType}
         />
       ) : null}
       {parsed.itemType === "match" ? (

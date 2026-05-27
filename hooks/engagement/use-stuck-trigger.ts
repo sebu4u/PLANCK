@@ -27,6 +27,7 @@ export function useStuckTrigger({
 }: StuckTriggerOptions = {}) {
   const engagement = useEngagement()
   const failureCountRef = useRef(0)
+  const struggledBeforeSuccessRef = useRef(false)
 
   const pushHint = useCallback(
     (reason: "manual" | "failure" | "idle" = "manual") => {
@@ -61,7 +62,17 @@ export function useStuckTrigger({
   }, [pushHint, surface, threshold])
 
   const resetFailures = useCallback(() => {
+    const triggerAt = threshold ?? (surface === "ide" ? 3 : 2)
+    if (failureCountRef.current >= triggerAt) {
+      struggledBeforeSuccessRef.current = true
+    }
     failureCountRef.current = 0
+  }, [surface, threshold])
+
+  const consumeStruggledBeforeSuccess = useCallback(() => {
+    const struggled = struggledBeforeSuccessRef.current
+    struggledBeforeSuccessRef.current = false
+    return struggled
   }, [])
 
   useEffect(() => {
@@ -70,6 +81,6 @@ export function useStuckTrigger({
     return () => window.clearTimeout(timer)
   }, [activityKey, enabled, idleMs, pushHint])
 
-  return { pushHint, registerFailure, resetFailures }
+  return { pushHint, registerFailure, resetFailures, consumeStruggledBeforeSuccess }
 }
 

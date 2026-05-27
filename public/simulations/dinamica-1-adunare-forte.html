@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adunarea forțelor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --text: #292929; --line: #e8e8ec; --accent: #8043f0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    body { display: grid; place-items: stretch; }
+    .sim { width: 100%; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 2px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px; }
+    .btn { min-height: 32px; padding: 0 12px; border: 1px solid #e0dce8; border-radius: 999px; background: #fff;
+      font: 700 10px ui-sans-serif, system-ui, sans-serif; cursor: pointer; touch-action: manipulation; }
+    .btn.active { border-color: var(--text); background: var(--text); color: #fff; }
+    .stage { min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px;
+      background: linear-gradient(180deg, #fff 0%, #fbfbfb 100%); }
+    canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  </style>
+</head>
+<body>
+  <main class="sim">
+    <div class="controls">
+      <button class="btn active" type="button" id="gridBtn">Grilă</button>
+      <button class="btn" type="button" id="clearBtn">Șterge tot</button>
+    </div>
+    <section class="stage"><canvas id="canvas"></canvas></section>
+  </main>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const gridBtn = document.getElementById("gridBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    const COLORS = ["#8043f0", "#e74c3c", "#3498db", "#f39c12", "#2ecc71"];
+    const PX_PER_N = 2.2;
+
+    let cssW = 0, cssH = 0, dpr = 1, paused = false;
+    let cx = 0, cy = 0, showGrid = true;
+    let forces = [];
+    let dragging = false, dragId = null, pointerId = null;
+    let nextId = 1;
+
+    function postState() {
+      window.parent.postMessage({
+        type: "learning-path-simulation-state",
+        name: "Adunarea forțelor",
+        text: forces.length ? forces.length + " forțe pe corp." : "trage de pe canvas pentru o forță.",
+        paused
+      }, "*");
+    }
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(cssW * dpr); canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cx = cssW * 0.5; cy = cssH * 0.52;
+    }
+
+    function ptr(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    function resultant() {
+      let rx = 0, ry = 0;
+      for (const f of forces) {
+        rx += f.mag * Math.cos(f.ang);
+        ry += f.mag * Math.sin(f.ang);
+      }
+      const mag = Math.hypot(rx, ry);
+      const ang = Math.atan2(ry, rx);
+      return { rx, ry, mag, ang };
+    }
+
+    function drawGrid() {
+      if (!showGrid) return;
+      ctx.strokeStyle = "rgba(41,41,41,0.08)";
+      ctx.lineWidth = 1;
+      const step = 20;
+      for (let x = 0; x < cssW; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cssH); ctx.stroke();
+      }
+      for (let y = 0; y < cssH; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cssW, y); ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(128,67,240,0.2)";
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(cssW, cy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, cssH); ctx.stroke();
+    }
+
+    function drawArrow(x0, y0, x1, y1, color, width) {
+      const dx = x1 - x0, dy = y1 - y0;
+      const len = Math.hypot(dx, dy) || 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      const ux = dx / len, uy = dy / len;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 - ux * 10 - uy * 5, y1 - uy * 10 + ux * 5);
+      ctx.lineTo(x1 - ux * 10 + uy * 5, y1 - uy * 10 - ux * 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(0, 0, cssW, cssH);
+      drawGrid();
+
+      const res = resultant();
+      if (res.mag > 0.05) {
+        const ex = cx + res.rx * PX_PER_N;
+        const ey = cy + res.ry * PX_PER_N;
+        drawArrow(cx, cy, ex, ey, "#292929", 4);
+      }
+
+      forces.forEach((f, i) => {
+        const ex = cx + Math.cos(f.ang) * f.mag * PX_PER_N;
+        const ey = cy + Math.sin(f.ang) * f.mag * PX_PER_N;
+        drawArrow(cx, cy, ex, ey, f.color, 2.5);
+        const lx = ex + Math.cos(f.ang) * 14;
+        const ly = ey + Math.sin(f.ang) * 14;
+        ctx.fillStyle = f.color;
+        ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("F" + (i + 1) + "=" + f.mag.toFixed(1) + "N", lx, ly);
+        ctx.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillText(Math.round(f.ang * 180 / Math.PI) + "°", lx, ly + 12);
+
+        const tx = cx - 50 + (i % 3) * 52;
+        const ty = 18 + Math.floor(i / 3) * 14;
+        ctx.fillStyle = "rgba(41,41,41,0.45)";
+        ctx.textAlign = "left";
+        ctx.fillText("🗑 F" + (i + 1), tx, ty);
+        f.trash = { x: tx, y: ty - 10, w: 44, h: 16 };
+      });
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+      ctx.fillStyle = "#292929";
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      if (forces.length && res.mag < 0.5) {
+        ctx.fillStyle = "#8043f0";
+        ctx.font = "700 12px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Echilibru", cx, cy - 28);
+      }
+
+      ctx.fillStyle = "rgba(41,41,41,0.45)";
+      ctx.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("Trage de centru (max 5)", 10, cssH - 10);
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (paused) return;
+      const p = ptr(e);
+      for (let i = forces.length - 1; i >= 0; i--) {
+        const t = forces[i].trash;
+        if (t && p.x >= t.x && p.x <= t.x + t.w && p.y >= t.y && p.y <= t.y + t.h) {
+          forces.splice(i, 1);
+          postState();
+          return;
+        }
+      }
+      if (forces.length >= 5) return;
+      dragging = true; pointerId = e.pointerId;
+      dragId = nextId++;
+      const ang = Math.atan2(p.y - cy, p.x - cx);
+      const mag = Math.max(1, Math.min(50, Math.hypot(p.x - cx, p.y - cy) / PX_PER_N));
+      forces.push({ id: dragId, ang, mag, color: COLORS[forces.length % COLORS.length] });
+      canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!dragging || e.pointerId !== pointerId) return;
+      const p = ptr(e);
+      const f = forces.find((x) => x.id === dragId);
+      if (!f) return;
+      f.ang = Math.atan2(p.y - cy, p.x - cx);
+      f.mag = Math.max(1, Math.min(50, Math.hypot(p.x - cx, p.y - cy) / PX_PER_N));
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      if (e.pointerId !== pointerId) return;
+      dragging = false; dragId = null;
+      canvas.releasePointerCapture(e.pointerId);
+      postState();
+    });
+
+    gridBtn.addEventListener("click", () => {
+      showGrid = !showGrid;
+      gridBtn.classList.toggle("active", showGrid);
+    });
+    clearBtn.addEventListener("click", () => { forces = []; postState(); });
+
+    window.addEventListener("message", (e) => {
+      const d = e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "learning-path-simulation-set-paused" || d.type === "trajectory-simulation-set-paused") paused = Boolean(d.paused);
+    });
+
+    new ResizeObserver(resize).observe(canvas);
+    resize(); postState();
+    (function loop() { draw(); requestAnimationFrame(loop); })();
+  </script>
+</body>
+</html>

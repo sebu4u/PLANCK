@@ -28,8 +28,8 @@
     <div class="controls">
       <div class="row">
         <label for="f">f</label>
-        <input id="f" type="range" min="-200" max="200" step="5" value="120">
-        <span class="val" id="fVal">120</span>
+        <input id="f" type="range" min="-200" max="200" step="5" value="50">
+        <span class="val" id="fVal">50</span>
       </div>
       <div class="row">
         <label for="h">h₀</label>
@@ -46,7 +46,7 @@
     const hEl = document.getElementById("h");
 
     let cssW = 0, cssH = 0, dpr = 1, paused = false;
-    let focal = 120, objH = 50, d0 = 180;
+    let focal = 50, objH = 50, d0 = 180;
     let dragging = false, pointerId = null;
 
     function postState() {
@@ -142,15 +142,9 @@
       ctx.setLineDash([]);
 
       ctx.strokeStyle = "#8043f0";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(L, cy - 70);
-      ctx.lineTo(L, cy + 70);
-      ctx.stroke();
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.ellipse(L, cy, 6, 70, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(128,67,240,0.25)";
-      ctx.lineWidth = 1.5;
       ctx.stroke();
 
       if (Math.abs(f) > 5) {
@@ -206,27 +200,9 @@
 
       drawArrow(ox, cy, tipY, "#292929", 1);
 
-      ctx.fillStyle = "rgba(255,255,255,0.93)";
-      ctx.strokeStyle = "#e8e8ec";
-      ctx.beginPath();
-      ctx.roundRect(10, 10, cssW < 360 ? cssW - 20 : 210, 88, 8);
-      ctx.fill(); ctx.stroke();
-
-      const invF = Math.abs(f) > 1 ? (1 / f).toFixed(4) : "∞";
-      const invD0 = (1 / d0).toFixed(4);
-      const invDi = isFinite(img.di) ? (1 / img.di).toFixed(4) : "0";
-      const lines = [
-        "d₀ = " + d0 + " px   dᵢ = " + (isFinite(img.di) ? img.di.toFixed(0) : "∞") + " px",
-        "m = " + (isFinite(img.m) ? img.m.toFixed(2) : "—"),
-        (img.real ? "Reală" : "Virtuală") + " · " + (img.upright ? "Dreaptă" : "Răsturnată"),
-        "1/f = 1/d₀ + 1/dᵢ → " + invF + " ≈ " + invD0 + " + " + invDi
-      ];
-      ctx.fillStyle = "#292929";
+      ctx.fillStyle = "rgba(41,41,41,0.45)";
       ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
       ctx.textAlign = "left";
-      lines.forEach((ln, i) => ctx.fillText(ln, 18, 26 + i * 14));
-
-      ctx.fillStyle = "rgba(41,41,41,0.45)";
       ctx.fillText("Trage obiectul pe axă", 10, cssH - 10);
     }
 

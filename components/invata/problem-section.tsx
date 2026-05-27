@@ -21,6 +21,7 @@ import {
   LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
@@ -117,6 +118,11 @@ interface ProblemSectionProps {
   lessonId: string
   currentItemId: string
   isLastItem: boolean
+  chapterSlug: string
+  lessonSlug: string
+  chapterId?: string | null
+  itemType?: string
+  itemTitle?: string | null
 }
 
 export function ProblemSection({
@@ -126,6 +132,11 @@ export function ProblemSection({
   lessonId,
   currentItemId,
   isLastItem,
+  chapterSlug,
+  lessonSlug,
+  chapterId,
+  itemType = "problem",
+  itemTitle,
 }: ProblemSectionProps) {
   const tags = useMemo(() => normalizeTags(problem.tags), [problem.tags])
   const valueSubpoints = useMemo(() => normalizeValueSubpoints(problem), [problem])
@@ -140,7 +151,8 @@ export function ProblemSection({
   const [valueSubpointIndex, setValueSubpointIndex] = useState(0)
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const explainChat = useLearningPathExplainChat()
-  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
+  const { pushHint, registerFailure, resetFailures, consumeStruggledBeforeSuccess } =
+    useStuckTrigger({ surface: "invata" })
 
   const hasVideo =
     typeof problem.youtube_url === "string" && problem.youtube_url.trim() !== ""
@@ -309,6 +321,71 @@ export function ProblemSection({
     grilaOptions,
   ])
 
+  const buildProblemContext = useCallback(() => {
+    if (answerType === "value" && currentSubpoint) {
+      return formatProblemLearningPathContext({
+        problem,
+        answerType,
+        valueInput,
+        valueSubpointLabel: currentSubpoint.label,
+        valueCorrectValue: currentSubpoint.correct_value,
+        wasCorrect: isCorrect,
+      })
+    }
+    if (answerType === "grila" && hasGrilaAnswer) {
+      return formatProblemLearningPathContext({
+        problem,
+        answerType,
+        grilaOptions,
+        grilaSelectedIndex: grilaSelected === "" ? undefined : Number(grilaSelected),
+        grilaCorrectIndex,
+        wasCorrect: isCorrect,
+      })
+    }
+    return formatProblemLearningPathContext({
+      problem,
+      answerType,
+      wasCorrect: isCorrect,
+    })
+  }, [
+    answerType,
+    currentSubpoint,
+    grilaCorrectIndex,
+    grilaOptions,
+    grilaSelected,
+    hasGrilaAnswer,
+    isCorrect,
+    problem,
+    valueInput,
+  ])
+
+  const flashcardBridge = useMemo<LearningPathFlashcardBridge>(
+    () => ({
+      meta: {
+        itemId: currentItemId,
+        lessonId,
+        chapterId,
+        chapterSlug,
+        lessonSlug,
+        itemType,
+        itemTitle,
+      },
+      getContext: buildProblemContext,
+      consumeStruggledBeforeSuccess,
+    }),
+    [
+      buildProblemContext,
+      chapterId,
+      chapterSlug,
+      consumeStruggledBeforeSuccess,
+      currentItemId,
+      itemTitle,
+      itemType,
+      lessonId,
+      lessonSlug,
+    ]
+  )
+
   const canShowVerifyBar = hasValueAnswer || hasGrilaAnswer
 
   useRegisterLearningPathFixedBottomBar(
@@ -323,39 +400,15 @@ export function ProblemSection({
           onContinue={onContinue}
           onExplain={() => {
             pushHint("manual")
-            const statement =
-              answerType === "value" && currentSubpoint
-                ? formatProblemLearningPathContext({
-                    problem,
-                    answerType,
-                    valueInput,
-                    valueSubpointLabel: currentSubpoint.label,
-                    valueCorrectValue: currentSubpoint.correct_value,
-                    wasCorrect: isCorrect,
-                  })
-                : answerType === "grila" && hasGrilaAnswer
-                  ? formatProblemLearningPathContext({
-                      problem,
-                      answerType,
-                      grilaOptions,
-                      grilaSelectedIndex:
-                        grilaSelected === "" ? undefined : Number(grilaSelected),
-                      grilaCorrectIndex,
-                      wasCorrect: isCorrect,
-                    })
-                  : formatProblemLearningPathContext({
-                      problem,
-                      answerType,
-                      wasCorrect: isCorrect,
-                    })
             explainChat?.openExplainChat({
-              problemStatement: statement,
+              problemStatement: buildProblemContext(),
               problemContextPreamble: "",
               initialUserMessage: LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
             })
           }}
           eloAward={eloAward}
           answerSlot={answerSlot}
+          flashcardBridge={flashcardBridge}
         />
       ) : null,
     [
@@ -367,6 +420,7 @@ export function ProblemSection({
       answerSlot,
       isCorrect,
       verified,
+      flashcardBridge,
     ]
   )
 

@@ -2,14 +2,15 @@
 
 import { useState, type MouseEvent } from "react"
 import Link from "next/link"
-import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EloGainCard } from "@/components/invata/elo-gain-card"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
-
 import { playButtonClickSound } from "@/lib/platform-sounds"
+
+import { useLearningPathContinueFlow } from "@/hooks/use-learning-path-continue-flow"
+import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 function playClickSound() {
   playButtonClickSound()
@@ -29,6 +30,7 @@ interface ProblemFeedbackBarProps {
   answerSlot: React.ReactNode
   /** Etichetă buton după răspuns greșit (implicit: „Continuă”). */
   retryLabel?: string
+  flashcardBridge?: LearningPathFlashcardBridge | null
 }
 
 export function ProblemFeedbackBar({
@@ -42,8 +44,13 @@ export function ProblemFeedbackBar({
   eloAward,
   answerSlot,
   retryLabel = "Continuă",
+  flashcardBridge,
 }: ProblemFeedbackBarProps) {
-  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
+  const { proceedAfterCorrect } = useLearningPathContinueFlow({
+    nextItemHref,
+    onContinue,
+    flashcardBridge,
+  })
   const explainChat = useLearningPathExplainChat()
   const bottomBarDesktopInset = Boolean(
     explainChat?.insightOpen && explainChat?.isDesktopViewport
@@ -60,14 +67,12 @@ export function ProblemFeedbackBar({
       setShowEloCard(true)
       return
     }
-    await onContinue?.()
-    await navigateToNextItem()
+    await proceedAfterCorrect()
   }
 
   const continueAfterEloCard = async () => {
     playClickSound()
-    await onContinue?.()
-    await navigateToNextItem()
+    await proceedAfterCorrect()
   }
 
   return (
