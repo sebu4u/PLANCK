@@ -4,6 +4,9 @@ import { cn } from "@/lib/utils"
 import { usePollState } from "@/components/invata/poll-section"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 
+const POLL_OPTION_CARD_BASE =
+  "w-full rounded-xl border-[3px] bg-white px-3 py-2.5 text-center transition-[border-color,box-shadow]"
+
 export interface LessonPollOption {
   id: string
   label: string
@@ -14,48 +17,52 @@ interface LessonPollProps {
   imageSrc: string
   imageAlt: string
   options: LessonPollOption[]
-  correctAnswerId: string
 }
 
-export function LessonPoll({ imageSrc, imageAlt, options, correctAnswerId }: LessonPollProps) {
+export function LessonPoll({ imageSrc, imageAlt, options }: LessonPollProps) {
   const pollState = usePollState()
   if (!pollState) return null
 
-  const { selectedId, setSelectedId, verified } = pollState
+  const { selectedId, setSelectedId, verified, correctAnswerId } = pollState
 
   const showImage = imageSrc.trim().length > 0
 
   return (
-    <div className="flex flex-col">
+    <div className="space-y-6">
       {showImage ? (
-        <div className="aspect-video w-full overflow-hidden bg-white">
+        <div className="aspect-video w-full overflow-hidden rounded-2xl border border-[#e8e8e8] bg-white">
           <img src={imageSrc} alt={imageAlt} className="h-full w-full object-cover" />
         </div>
       ) : null}
-      <div className="flex w-full justify-start p-4 sm:p-5">
-        <div className="inline-flex max-w-full min-w-0 flex-col items-stretch gap-2">
-          {options.map((opt) => {
-            const isSelected = selectedId === opt.id
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => !verified && setSelectedId(opt.id)}
-                disabled={verified}
-                className={cn(
-                  "flex min-h-[2.75rem] items-center justify-start rounded-full border-2 px-4 py-2.5 text-left text-sm font-semibold leading-snug transition-colors",
-                  verified && "cursor-default",
-                  !verified && "hover:opacity-90",
-                  isSelected
-                    ? "border-[#8b5cf6] text-[#7c3aed]"
-                    : "border-gray-300 bg-transparent text-[#4d4d4d]"
-                )}
-              >
-                <LatexRichText content={opt.label} className="break-words [&_.katex]:text-inherit" />
-              </button>
-            )
-          })}
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {options.map((opt) => {
+          const isSelected = selectedId === opt.id
+          const isCorrectOpt = opt.id === correctAnswerId
+          const isChosenWrong = verified && isSelected && !isCorrectOpt
+          const showFeedback = verified
+
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => !verified && setSelectedId(opt.id)}
+              disabled={verified}
+              className={cn(
+                POLL_OPTION_CARD_BASE,
+                !showFeedback && !isSelected && "border-[#cfc3dc] shadow-[0_4px_0_#9d8ab3]",
+                !showFeedback && isSelected && "border-violet-500 shadow-[0_4px_0_#5b21b6]",
+                showFeedback && isCorrectOpt && "border-emerald-500 shadow-[0_4px_0_#047857]",
+                isChosenWrong && "border-red-500 shadow-[0_4px_0_#b91c1c]",
+                verified && "cursor-default"
+              )}
+            >
+              <LatexRichText
+                content={opt.label}
+                className="break-words text-[#222] [&_.katex]:text-[#222] [&_p]:mx-auto [&_p]:my-0"
+              />
+            </button>
+          )
+        })}
       </div>
     </div>
   )

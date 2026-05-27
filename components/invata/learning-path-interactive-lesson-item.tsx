@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { createPortal } from "react-dom"
 import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DependencyList } from "react"
 import { evaluate } from "mathjs"
@@ -27,16 +28,23 @@ import type {
   SwipeClassifyContent,
   TableFillContent,
 } from "@/lib/learning-path-interactive-items"
-import { ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import {
   formatCardSortLearningPathContext,
   formatFillSlotLearningPathContext,
+  formatRevealStepsQuizLearningPathContext,
   LEARNING_PATH_CARD_SORT_EXPLAIN_INITIAL_PROMPT,
   LEARNING_PATH_FILL_SLOT_EXPLAIN_INITIAL_PROMPT,
+  LEARNING_PATH_REVEAL_STEPS_QUIZ_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
 import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
+import { playErrorSound, playSuccessSound } from "@/lib/platform-sounds"
+import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
+import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
+import type { LearningPathEloAward } from "@/lib/learning-path-elo"
+import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { InlineMath } from "react-katex"
@@ -181,6 +189,8 @@ function buildFillSlotLatex(
 }
 
 const FILL_SLOT_CHIP_DRAG_MIME = "application/x-planck-fill-chip"
+const FILL_SLOT_CHIP_SELECTED =
+  "border-violet-500 shadow-[0_4px_0_#5b21b6] ring-2 ring-violet-300 ring-offset-1"
 
 function FillSlotFormula({
   latex,
@@ -440,7 +450,40 @@ function CardSortView({
 }
 
 const MATCH_ASSOC_CARD_CLASS =
-  "relative z-10 w-full rounded-xl border-[3px] bg-white px-3 py-2.5 text-center shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow] border-[#cfc3dc] [&_.prose]:my-0 [&_.prose]:text-center [&_.prose]:text-sm [&_p]:mx-auto [&_p]:my-0"
+  "relative z-10 w-full rounded-xl border-[3px] bg-white px-3 py-2.5 text-center shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow,background-color] border-[#cfc3dc] [&_.prose]:my-0 [&_.prose]:text-center [&_.prose]:text-sm [&_p]:mx-auto [&_p]:my-0"
+
+const MATCH_PAIR_MOBILE_COLORS = [
+  { border: "border-violet-400", bg: "bg-violet-50", shadow: "shadow-[0_4px_0_#a78bfa]", divider: "border-violet-200", label: "text-violet-700" },
+  { border: "border-sky-400", bg: "bg-sky-50", shadow: "shadow-[0_4px_0_#38bdf8]", divider: "border-sky-200", label: "text-sky-700" },
+  { border: "border-amber-400", bg: "bg-amber-50", shadow: "shadow-[0_4px_0_#fbbf24]", divider: "border-amber-200", label: "text-amber-800" },
+  { border: "border-rose-400", bg: "bg-rose-50", shadow: "shadow-[0_4px_0_#fb7185]", divider: "border-rose-200", label: "text-rose-700" },
+  { border: "border-teal-400", bg: "bg-teal-50", shadow: "shadow-[0_4px_0_#2dd4bf]", divider: "border-teal-200", label: "text-teal-700" },
+  { border: "border-fuchsia-400", bg: "bg-fuchsia-50", shadow: "shadow-[0_4px_0_#e879f9]", divider: "border-fuchsia-200", label: "text-fuchsia-700" },
+  { border: "border-lime-400", bg: "bg-lime-50", shadow: "shadow-[0_4px_0_#a3e635]", divider: "border-lime-200", label: "text-lime-800" },
+  { border: "border-orange-400", bg: "bg-orange-50", shadow: "shadow-[0_4px_0_#fb923c]", divider: "border-orange-200", label: "text-orange-800" },
+] as const
+
+function mobileMatchPairClasses(
+  colorIndex: number | null,
+  opts: { submitted: boolean; ok: boolean | null; selected: boolean },
+) {
+  if (opts.selected && !opts.submitted) {
+    return "border-violet-500 bg-violet-50 shadow-[0_4px_0_#5b21b6]"
+  }
+  if (opts.submitted && opts.ok !== null) {
+    return opts.ok
+      ? "border-emerald-500 bg-emerald-50 shadow-[0_4px_0_#047857]"
+      : "border-red-500 bg-red-50 shadow-[0_4px_0_#b91c1c]"
+  }
+  if (colorIndex === null) return ""
+  const palette = MATCH_PAIR_MOBILE_COLORS[colorIndex % MATCH_PAIR_MOBILE_COLORS.length]!
+  return cn(palette.border, palette.bg, palette.shadow)
+}
+
+function mobileMatchPairPalette(colorIndex: number | null) {
+  if (colorIndex === null) return null
+  return MATCH_PAIR_MOBILE_COLORS[colorIndex % MATCH_PAIR_MOBILE_COLORS.length]!
+}
 
 const INTERACTIVE_OPTION_CARD =
   "rounded-xl border-[3px] bg-white px-3 py-2.5 text-left shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow] border-[#cfc3dc] [&_.prose]:my-0 [&_.prose]:text-left [&_p]:my-0"
@@ -480,45 +523,60 @@ function FillSlotView({
   data,
   nextItemHref,
   markComplete,
+  itemId,
+  lessonId,
+  isLastItem,
 }: {
   data: FillSlotContent
   nextItemHref: string
   markComplete: () => Promise<void>
+  itemId: string
+  lessonId: string
+  isLastItem: boolean
 }) {
-  const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const explainChat = useLearningPathExplainChat()
-  const { pushHint } = useStuckTrigger({ surface: "invata" })
+  const { pushHint, registerFailure, resetFailures } = useStuckTrigger({ surface: "invata" })
+  const awardCorrectAnswerElo = useLearningPathCorrectAnswerElo({
+    itemId,
+    lessonId,
+    isLastItem,
+  })
 
   const slotIds = useMemo(() => data.slots.map((s) => s.id), [data.slots])
   const [assign, setAssign] = useState<Record<string, string | null>>(() =>
     Object.fromEntries(slotIds.map((id) => [id, null]))
   )
   const [active, setActive] = useState<string | null>(slotIds[0] ?? null)
-  const [autoResult, setAutoResult] = useState<"ok" | "bad" | null>(null)
+  const [selectedChip, setSelectedChip] = useState<string | null>(null)
+  const [verifyPhase, setVerifyPhase] = useState<"none" | "correct" | "incorrect">("none")
+  const [screenFlash, setScreenFlash] = useState<"correct" | "incorrect" | null>(null)
+  const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null)
 
   const chipSet = useMemo(() => new Set(data.chips), [data.chips])
-
-  useEffect(() => {
-    if (!slotIds.every((id) => assign[id])) {
-      setAutoResult(null)
-      return
-    }
-    const allOk = data.slots.every((s) => (assign[s.id] || "").trim() === s.answer.trim())
-    setAutoResult(allOk ? "ok" : "bad")
-  }, [assign, data.slots, slotIds])
+  const lockedCorrect = verifyPhase === "correct"
+  const verifyResult: "ok" | "bad" | null =
+    verifyPhase === "correct" ? "ok" : verifyPhase === "incorrect" ? "bad" : null
 
   const renderedLatex = useMemo(
-    () => buildFillSlotLatex(data.latexTemplate, assign, active, autoResult, data.slots),
-    [data.latexTemplate, assign, active, autoResult, data.slots],
+    () => buildFillSlotLatex(data.latexTemplate, assign, active, verifyResult, data.slots),
+    [data.latexTemplate, assign, active, verifyResult, data.slots],
   )
 
   const used = new Set(Object.values(assign).filter(Boolean) as string[])
   const allFilled = slotIds.length > 0 && slotIds.every((id) => assign[id])
+  const barState = verifyPhase === "none" ? "verify" : verifyPhase === "correct" ? "correct" : "incorrect"
+
+  const selectSlot = (slotId: string) => {
+    setActive(slotId)
+    setSelectedChip(assign[slotId] ?? null)
+  }
 
   const placeChipInSlot = (chip: string, slotId: string) => {
     const trimmed = chip.trim()
-    if (!trimmed || !chipSet.has(trimmed) || autoResult === "ok") return
+    if (!trimmed || !chipSet.has(trimmed) || lockedCorrect) return
+    if (verifyPhase === "incorrect") setVerifyPhase("none")
+    setSelectedChip(trimmed)
     setAssign((prev) => {
       const next: Record<string, string | null> = { ...prev }
       for (const id of slotIds) {
@@ -531,6 +589,7 @@ function FillSlotView({
   }
 
   const handleChipDragStart = (e: React.DragEvent, chip: string) => {
+    setSelectedChip(chip.trim())
     e.dataTransfer.setData(FILL_SLOT_CHIP_DRAG_MIME, chip)
     e.dataTransfer.setData("text/plain", chip)
     e.dataTransfer.effectAllowed = "move"
@@ -538,6 +597,33 @@ function FillSlotView({
 
   const handleChipDragEnd = () => {
     setDragOverSlot(null)
+  }
+
+  const handleVerify = async () => {
+    if (!allFilled || lockedCorrect) return
+    const allOk = data.slots.every((s) => (assign[s.id] || "").trim() === s.answer.trim())
+    if (allOk) {
+      playSuccessSound()
+      fireLearningPathCorrectConfetti()
+      const award = await awardCorrectAnswerElo()
+      setEloAward(award?.awarded ? award : null)
+      resetFailures()
+      setVerifyPhase("correct")
+      setScreenFlash("correct")
+      window.setTimeout(() => setScreenFlash(null), 220)
+    } else {
+      playErrorSound()
+      registerFailure()
+      setVerifyPhase("incorrect")
+      setScreenFlash("incorrect")
+      window.setTimeout(() => setScreenFlash(null), 220)
+    }
+  }
+
+  const handleRetry = () => {
+    setVerifyPhase("none")
+    setEloAward(null)
+    setSelectedChip(active ? assign[active] ?? null : null)
   }
 
   const handleWhy = () => {
@@ -549,37 +635,57 @@ function FillSlotView({
         slots: data.slots,
         assign,
         chips: data.chips,
-        autoResult: allFilled ? autoResult : null,
+        autoResult: verifyResult,
       }),
       problemContextPreamble: "",
       initialUserMessage: LEARNING_PATH_FILL_SLOT_EXPLAIN_INITIAL_PROMPT,
     })
   }
 
-  const canContinue = autoResult === "ok"
-
-  const handleContinue = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    if (!canContinue) return
-    playDashboardStartButtonClickSound()
-    await markComplete()
-    await navigateToNextItem()
-  }
+  useRegisterLearningPathFixedBottomBar(
+    () => (
+      <ProblemFeedbackBar
+        state={barState}
+        hasAnswer={allFilled}
+        nextItemHref={nextItemHref}
+        onVerify={() => {
+          void handleVerify()
+        }}
+        onRetry={handleRetry}
+        onContinue={markComplete}
+        onExplain={handleWhy}
+        eloAward={eloAward}
+        retryLabel="Încearcă din nou"
+        answerSlot={
+          <span className="text-sm font-medium text-[#6f657b]">
+            Completează toate sloturile din formulă, apoi apasă Verifică.
+          </span>
+        }
+      />
+    ),
+    [barState, allFilled, nextItemHref, eloAward, assign, verifyPhase],
+  )
 
   const chipCardBase =
     "rounded-lg border-[2.5px] bg-white px-2 py-1.5 text-center transition-[border-color,box-shadow,opacity] shadow-[0_3px_0_#9d8ab3] border-[#cfc3dc] sm:rounded-xl sm:border-[3px] sm:px-2.5 sm:py-2 sm:shadow-[0_3px_0_#9d8ab3]"
 
   return (
     <>
-      <div className="flex min-h-[calc(100dvh-3.5rem-8rem)] w-full flex-col items-center justify-center px-2 pb-2 sm:min-h-[calc(100dvh-3.5rem-7.5rem)]">
+      <SwipeClassifyScreenFlash feedback={screenFlash} />
+      <div
+        className={cn(
+          "flex min-h-[calc(100dvh-3.5rem-8rem)] w-full flex-col items-center justify-center px-2 pb-2 sm:min-h-[calc(100dvh-3.5rem-7.5rem)]",
+          verifyPhase === "incorrect" && "animate-grile-wrong-shake",
+        )}
+      >
         <div className="flex w-full max-w-full flex-col items-center">
           <div className="mb-8 w-full sm:mb-10">
             <FillSlotFormula
               latex={renderedLatex}
               slotIds={slotIds}
-              autoResult={autoResult}
+              autoResult={verifyResult}
               dragOverSlot={dragOverSlot}
-              onSelectSlot={setActive}
+              onSelectSlot={selectSlot}
               onDropChip={placeChipInSlot}
               setDragOverSlot={setDragOverSlot}
             />
@@ -592,20 +698,23 @@ function FillSlotView({
               <button
                 type="button"
                 key={chip}
-                draggable={autoResult !== "ok"}
+                draggable={!lockedCorrect}
                 onDragStart={(e) => handleChipDragStart(e, chip)}
                 onDragEnd={handleChipDragEnd}
-                disabled={autoResult === "ok"}
+                disabled={lockedCorrect}
                 onClick={() => {
-                  if (autoResult === "ok" || !active) return
+                  if (lockedCorrect) return
+                  setSelectedChip(chip)
+                  if (!active) return
                   placeChipInSlot(chip, active)
                 }}
                 className={cn(
                   chipCardBase,
                   "w-full touch-manipulation select-none hover:border-[#a898bc] md:w-auto md:min-w-[3.75rem] md:max-w-[6rem] md:shrink-0",
-                  autoResult !== "ok" && "cursor-grab active:cursor-grabbing",
-                  autoResult === "ok" && "cursor-not-allowed opacity-60",
-                  taken && "opacity-90",
+                  !lockedCorrect && "cursor-grab active:cursor-grabbing",
+                  lockedCorrect && "cursor-not-allowed opacity-60",
+                  taken && !selectedChip && "opacity-90",
+                  selectedChip === chip && FILL_SLOT_CHIP_SELECTED,
                 )}
               >
                 <FillSlotLatex
@@ -616,37 +725,8 @@ function FillSlotView({
             )
           })}
         </div>
-
-        {autoResult === "bad" ? (
-          <p className="mt-6 max-w-md px-2 text-center text-sm font-medium text-red-600 sm:text-base">
-            Unele valori nu sunt corecte. Trage un chip într-un slot sau selectează un slot și apasă pe un chip.
-          </p>
-        ) : null}
         </div>
       </div>
-
-      <InteractiveBottomChrome registrationDeps={[canContinue, autoResult]}>
-        <button
-          type="button"
-          onClick={handleWhy}
-          className="shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 sm:px-5 sm:py-3 sm:text-base"
-        >
-          De ce?
-        </button>
-        {canContinue ? (
-          <Link
-            href={nextItemHref}
-            onClick={handleContinue}
-            className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
-            style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
-          >
-            <span className="relative z-[1] inline-flex items-center gap-2">
-              Continuă
-              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-            </span>
-          </Link>
-        ) : null}
-      </InteractiveBottomChrome>
     </>
   )
 }
@@ -666,12 +746,49 @@ function MatchView({
   const explainChat = useLearningPathExplainChat()
 
   const wrapRef = useRef<HTMLDivElement>(null)
+  const mobileRightSectionRef = useRef<HTMLDivElement>(null)
   const leftRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const rightRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const [pickL, setPickL] = useState<string | null>(null)
   const [edges, setEdges] = useState<{ leftId: string; rightId: string }[]>([])
   const [submitted, setSubmitted] = useState(false)
   const [lines, setLines] = useState<{ x1: number; y1: number; x2: number; y2: number; ok: boolean }[]>([])
+
+  const shuffledLeft = useMemo(() => {
+    const copy = [...data.left]
+    shuffleInPlace(copy)
+    return copy
+  }, [data.left])
+
+  const shuffledRight = useMemo(() => {
+    const copy = [...data.right]
+    shuffleInPlace(copy)
+    return copy
+  }, [data.right])
+
+  const rightById = useMemo(() => new Map(data.right.map((row) => [row.id, row])), [data.right])
+  const leftById = useMemo(() => new Map(data.left.map((row) => [row.id, row])), [data.left])
+
+  const pairColorByLeftId = useMemo(() => {
+    const map = new Map<string, number>()
+    let next = 0
+    for (const edge of edges) {
+      if (!map.has(edge.leftId)) {
+        map.set(edge.leftId, next)
+        next += 1
+      }
+    }
+    return map
+  }, [edges])
+
+  const getMobilePairColorIndex = (leftId?: string, rightId?: string) => {
+    if (leftId && pairColorByLeftId.has(leftId)) return pairColorByLeftId.get(leftId)!
+    if (rightId) {
+      const edge = edges.find((e) => e.rightId === rightId)
+      if (edge) return pairColorByLeftId.get(edge.leftId) ?? null
+    }
+    return null
+  }
 
   const correctSet = useMemo(
     () => new Set(data.pairs.map((p) => `${p.leftId}:${p.rightId}`)),
@@ -707,6 +824,10 @@ function MatchView({
     if (allMatchCorrect) return
     setSubmitted(false)
     setPickL(id)
+    requestAnimationFrame(() => {
+      if (window.matchMedia("(min-width: 768px)").matches) return
+      mobileRightSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    })
   }
 
   const onPickRight = (id: string) => {
@@ -763,14 +884,145 @@ function MatchView({
     )
   }
 
+  const mobileHint = pickL
+    ? "Acum alege corespondentul din a doua listă."
+    : edges.length === data.left.length
+      ? submitted
+        ? allMatchCorrect
+          ? "Toate asocierile sunt corecte!"
+          : "Unele asocieri sunt greșite — corectează și verifică din nou."
+        : "Apasă Verifică asocierile când ești gata."
+      : "Apasă un card din prima listă, apoi pe corespondentul din a doua."
+
   return (
     <>
       <div className="flex min-h-[calc(100dvh-3.5rem-9rem)] w-full flex-col items-center px-2 pb-2 pt-1 sm:min-h-[calc(100dvh-3.5rem-8rem)] sm:pt-2">
-        <p className="mb-5 max-w-lg text-center text-base font-medium leading-snug text-[#22192d] sm:mb-6 sm:max-w-xl sm:text-lg">
-          Asociază cardurile din stânga cu cardurile din dreapta.
+        <p className="mb-3 max-w-lg text-center text-base font-medium leading-snug text-[#22192d] sm:mb-6 sm:max-w-xl sm:text-lg md:mb-6">
+          <span className="md:hidden">{mobileHint}</span>
+          <span className="hidden md:inline">Asociază cardurile din stânga cu cardurile din dreapta.</span>
+        </p>
+        <p className="mb-4 text-sm font-semibold tabular-nums text-[#6f657b] md:hidden">
+          {edges.length}/{data.left.length} asocieri
         </p>
         <div className="flex w-full flex-1 flex-col justify-center">
-          <div ref={wrapRef} className="relative mx-auto w-full max-w-3xl">
+          <div className="relative mx-auto w-full max-w-3xl md:hidden">
+            <div className="mx-auto flex w-full max-w-md flex-col gap-5">
+              <section aria-label="Prima listă">
+                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-[#6f657b]">Prima listă</p>
+                <div className="flex flex-col gap-2.5">
+                  {shuffledLeft.map((row) => {
+                    const edge = edges.find((e) => e.leftId === row.id)
+                    const matchedRight = edge ? rightById.get(edge.rightId) : null
+                    const okEdge = edge ? correctSet.has(`${edge.leftId}:${edge.rightId}`) : null
+                    const colorIndex = getMobilePairColorIndex(row.id)
+                    const pairPalette = mobileMatchPairPalette(colorIndex)
+                    return (
+                      <button
+                        type="button"
+                        key={row.id}
+                        onClick={() => onPickLeft(row.id)}
+                        disabled={allMatchCorrect}
+                        className={cn(
+                          MATCH_ASSOC_CARD_CLASS,
+                          mobileMatchPairClasses(colorIndex, {
+                            submitted,
+                            ok: edge ? (submitted ? okEdge : null) : null,
+                            selected: pickL === row.id,
+                          }),
+                          !submitted && "active:scale-[0.99]",
+                        )}
+                      >
+                        <RichMini text={row.text} />
+                        {matchedRight ? (
+                          <div className={cn("mt-2 border-t pt-2 text-left", pairPalette?.divider ?? "border-[#ece6f3]")}>
+                            <p
+                              className={cn(
+                                "mb-1 text-[10px] font-semibold uppercase tracking-wide",
+                                pairPalette?.label ?? "text-[#9a8fb0]",
+                              )}
+                            >
+                              Asociat cu
+                            </p>
+                            <RichMini
+                              text={matchedRight.text}
+                              className="text-left [&_.prose]:text-left [&_.prose]:text-xs [&_p]:text-left"
+                            />
+                          </div>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {pickL ? (
+                <div className="flex items-center justify-center gap-2 rounded-full bg-violet-50 px-3 py-2 text-violet-700">
+                  <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="text-sm font-medium">Alege corespondentul</span>
+                </div>
+              ) : null}
+
+              <section
+                ref={mobileRightSectionRef}
+                aria-label="A doua listă"
+                className={cn(
+                  "rounded-2xl transition-[box-shadow,background-color]",
+                  pickL && "bg-violet-50/60 p-3 ring-2 ring-violet-200 ring-offset-2 ring-offset-[#fafafa]",
+                )}
+              >
+                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-[#6f657b]">A doua listă</p>
+                <div className="flex flex-col gap-2.5">
+                  {shuffledRight.map((row) => {
+                    const edge = edges.find((e) => e.rightId === row.id)
+                    const matchedLeft = edge ? leftById.get(edge.leftId) : null
+                    const okEdge = edge ? correctSet.has(`${edge.leftId}:${edge.rightId}`) : null
+                    const canPick = Boolean(pickL) && !allMatchCorrect
+                    const colorIndex = getMobilePairColorIndex(undefined, row.id)
+                    const pairPalette = mobileMatchPairPalette(colorIndex)
+                    return (
+                      <button
+                        type="button"
+                        key={row.id}
+                        onClick={() => onPickRight(row.id)}
+                        disabled={allMatchCorrect || !pickL}
+                        className={cn(
+                          MATCH_ASSOC_CARD_CLASS,
+                          mobileMatchPairClasses(colorIndex, {
+                            submitted,
+                            ok: edge ? (submitted ? okEdge : null) : null,
+                            selected: false,
+                          }),
+                          canPick && colorIndex === null && "border-violet-300 bg-violet-50/80 shadow-[0_4px_0_#c4b5fd] active:scale-[0.99]",
+                          canPick && colorIndex !== null && "active:scale-[0.99]",
+                          !pickL && colorIndex === null && "opacity-50",
+                        )}
+                      >
+                        <RichMini text={row.text} />
+                        {matchedLeft ? (
+                          <div className={cn("mt-2 border-t pt-2 text-left", pairPalette?.divider ?? "border-[#ece6f3]")}>
+                            <p
+                              className={cn(
+                                "mb-1 text-[10px] font-semibold uppercase tracking-wide",
+                                pairPalette?.label ?? "text-[#9a8fb0]",
+                              )}
+                            >
+                              Asociat cu
+                            </p>
+                            <RichMini
+                              text={matchedLeft.text}
+                              className="text-left [&_.prose]:text-left [&_.prose]:text-xs [&_p]:text-left"
+                            />
+                          </div>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div ref={wrapRef} className="relative mx-auto hidden w-full max-w-3xl md:block">
           <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
             {lines.map((ln, i) => (
               <line
@@ -784,9 +1036,9 @@ function MatchView({
               />
             ))}
           </svg>
-          <div className="relative grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start md:justify-items-center md:gap-x-12 md:gap-y-6">
-            <div className="flex w-full max-w-[220px] flex-col gap-3 sm:max-w-[248px] md:justify-self-end">
-              {data.left.map((row) => (
+          <div className="relative grid grid-cols-2 items-start justify-items-center gap-x-12 gap-y-6">
+            <div className="flex w-full max-w-[248px] flex-col gap-3 justify-self-end">
+              {shuffledLeft.map((row) => (
                 <button
                   type="button"
                   key={row.id}
@@ -801,8 +1053,8 @@ function MatchView({
                 </button>
               ))}
             </div>
-            <div className="flex w-full max-w-[220px] flex-col gap-3 sm:max-w-[248px] md:justify-self-start">
-              {data.right.map((row) => (
+            <div className="flex w-full max-w-[248px] flex-col gap-3 justify-self-start">
+              {shuffledRight.map((row) => (
                 <button
                   type="button"
                   key={row.id}
@@ -1270,6 +1522,33 @@ function CodeTraceView({
   )
 }
 
+function SwipeClassifyScreenFlash({
+  feedback,
+}: {
+  feedback: "correct" | "incorrect" | null
+}) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none fixed inset-0 z-[310] transition-opacity duration-150",
+        feedback === "correct" && "bg-emerald-400/25 opacity-100",
+        feedback === "incorrect" && "bg-red-400/25 opacity-100",
+        !feedback && "opacity-0",
+      )}
+    />,
+    document.body,
+  )
+}
+
 function SwipeClassifyView({
   data,
   onDone,
@@ -1282,19 +1561,26 @@ function SwipeClassifyView({
   markComplete: () => Promise<void>
 }) {
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
+  const confettiFiredRef = useRef(false)
   const [idx, setIdx] = useState(0)
   const [score, setScore] = useState(0)
-  const [feedback, setFeedback] = useState<"left" | "right" | null>(null)
+  const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null)
   const x = useMotionValue(0)
   const rotate = useTransform(x, [-120, 120], [-8, 8])
   const card = data.cards[idx]
   const finished = idx >= data.cards.length
+  const passed = finished && score === data.cards.length
 
   const resolve = (side: "left" | "right") => {
-    if (!card) return
+    if (!card || feedback) return
     const ok = card.side === side
-    if (ok) setScore((s) => s + 1)
-    setFeedback(side)
+    if (ok) {
+      setScore((s) => s + 1)
+      playSuccessSound()
+    } else {
+      playErrorSound()
+    }
+    setFeedback(ok ? "correct" : "incorrect")
     window.setTimeout(() => {
       setFeedback(null)
       setIdx((i) => i + 1)
@@ -1306,91 +1592,135 @@ function SwipeClassifyView({
     if (finished) onDone()
   }, [finished, onDone])
 
+  useEffect(() => {
+    if (!passed) {
+      confettiFiredRef.current = false
+      return
+    }
+    if (confettiFiredRef.current) return
+    confettiFiredRef.current = true
+    fireLearningPathCorrectConfetti()
+  }, [passed])
+
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
-    if (!finished) return
+    if (!passed) return
     playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
+  }
+
+  const handleRetry = () => {
+    setIdx(0)
+    setScore(0)
+    setFeedback(null)
+    x.set(0)
   }
 
   const outlineBtn =
     "shrink-0 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 sm:px-5 sm:py-3 sm:text-base"
 
   return (
-    <>
-      <div className="mx-auto w-full max-w-md px-2 text-[#2a2433]">
-        {data.prompt ? (
-          <RichMini
-            text={data.prompt}
-            className="mb-6 text-center text-[#2a2433] [&_.prose]:text-center [&_p]:mx-auto [&_p]:max-w-none"
-          />
-        ) : null}
-        <div className="mb-3 flex justify-between text-xs font-semibold uppercase tracking-wide text-[#6f657b] sm:text-sm">
-          <span>{data.leftLabel}</span>
-          <span>{data.rightLabel}</span>
-        </div>
-        {!finished && card ? (
-          <motion.div
-            style={{ x, rotate }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.x > 70) resolve("right")
-              else if (info.offset.x < -70) resolve("left")
-              else x.set(0)
-            }}
-            className="relative mx-auto w-full max-w-md touch-pan-y"
-          >
-            <div
-              className={cn(
-                "min-h-[140px] rounded-xl border-[3px] bg-white p-6 text-center shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow] border-[#cfc3dc]",
-                feedback === "left" && card.side === "left" && "border-emerald-500 shadow-[0_4px_0_#047857]",
-                feedback === "left" && card.side !== "left" && "border-red-500 shadow-[0_4px_0_#b91c1c]",
-                feedback === "right" && card.side === "right" && "border-emerald-500 shadow-[0_4px_0_#047857]",
-                feedback === "right" && card.side !== "right" && "border-red-500 shadow-[0_4px_0_#b91c1c]",
-              )}
-            >
-              <RichMini text={card.text} className="[&_.prose]:text-center [&_p]:mx-auto [&_p]:max-w-none" />
-              <p className="mt-4 text-center text-[11px] text-[#8b7fa3] sm:text-xs">
-                Trage stânga/dreapta sau folosește butoanele de mai jos.
+    <div className={cn("relative", finished && "pb-28 sm:pb-24")}>
+      <SwipeClassifyScreenFlash feedback={feedback} />
+      <div
+        className={cn(
+          "flex w-full flex-col items-center justify-center px-2 pb-2 text-[#2a2433]",
+          finished
+            ? "min-h-[calc(100dvh-3.5rem-9rem)] sm:min-h-[calc(100dvh-3.5rem-8rem)]"
+            : "min-h-[calc(100dvh-3.5rem-4rem)] sm:min-h-[calc(100dvh-3.5rem-3.5rem)]",
+        )}
+      >
+        <div className="flex w-full max-w-md flex-col items-center">
+          {data.prompt ? (
+            <RichMini
+              text={data.prompt}
+              className="mb-5 text-center text-[#2a2433] [&_.prose]:text-center [&_p]:mx-auto [&_p]:max-w-none sm:mb-6"
+            />
+          ) : null}
+          {!finished ? (
+            <>
+              <p className="mb-4 max-w-sm text-center text-sm font-medium leading-snug text-[#6f657b] md:hidden sm:max-w-md sm:text-base">
+                Glisează cardul spre stânga sau dreapta pentru a-l clasifica.
+              </p>
+              <p className="mb-4 hidden max-w-sm text-center text-sm font-medium leading-snug text-[#6f657b] md:block sm:max-w-md sm:text-base">
+                Apasă pe unul dintre butoanele de jos pentru a clasifica cardul.
+              </p>
+            </>
+          ) : null}
+          <div className="mb-3 flex w-full justify-between text-xs font-semibold uppercase tracking-wide text-[#6f657b] sm:text-sm">
+            <span>{data.leftLabel}</span>
+            <span>{data.rightLabel}</span>
+          </div>
+          {!finished && card ? (
+            <>
+              <motion.div
+                style={{ x, rotate }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                onDragEnd={(_, info) => {
+                  if (info.offset.x > 70) resolve("right")
+                  else if (info.offset.x < -70) resolve("left")
+                  else x.set(0)
+                }}
+                className="relative w-full touch-pan-y"
+              >
+                <div
+                  className={cn(
+                    "min-h-[140px] rounded-xl border-[3px] bg-white p-6 text-center shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow] border-[#cfc3dc]",
+                    feedback === "correct" && "border-emerald-500 shadow-[0_4px_0_#047857]",
+                    feedback === "incorrect" && "border-red-500 shadow-[0_4px_0_#b91c1c]",
+                  )}
+                >
+                  <RichMini text={card.text} className="[&_.prose]:text-center [&_p]:mx-auto [&_p]:max-w-none" />
+                </div>
+              </motion.div>
+              <div className="mt-6 hidden w-full flex-wrap items-center justify-center gap-3 md:flex sm:gap-4">
+                <button type="button" className={outlineBtn} onClick={() => resolve("left")}>
+                  ← {data.leftLabel}
+                </button>
+                <button type="button" className={outlineBtn} onClick={() => resolve("right")}>
+                  {data.rightLabel} →
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="w-full rounded-xl border-[3px] border-[#cfc3dc] bg-white px-4 py-8 text-center shadow-[0_4px_0_#9d8ab3] sm:py-10">
+              <p className="text-lg font-bold text-[#111] sm:text-xl">
+                Scor: {score} / {data.cards.length}
               </p>
             </div>
-          </motion.div>
-        ) : (
-          <div className="rounded-xl border-[3px] border-[#cfc3dc] bg-white px-4 py-8 text-center shadow-[0_4px_0_#9d8ab3] sm:py-10">
-            <p className="text-lg font-bold text-[#111] sm:text-xl">
-              Scor: {score} / {data.cards.length}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      <InteractiveBottomChrome registrationDeps={[finished, score, idx, feedback]}>
-        {finished ? (
-          <Link
-            href={nextItemHref}
-            onClick={handleContinue}
-            className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
-            style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
-          >
-            <span className="relative z-[1] inline-flex items-center gap-2">
-              Continuă
-              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-            </span>
-          </Link>
-        ) : (
-          <>
-            <button type="button" className={outlineBtn} disabled={finished} onClick={() => resolve("left")}>
-              ← {data.leftLabel}
+      {finished ? (
+        <InteractiveBottomChrome registrationDeps={[passed, score]}>
+          {passed ? (
+            <Link
+              href={nextItemHref}
+              onClick={handleContinue}
+              className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-7 py-3 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#5b21b6] sm:min-h-[3.25rem] sm:px-9 sm:py-3.5 sm:text-lg"
+              style={{ "--start-glow-tint": LESSON_CONTINUE_GLOW_TINT } as CSSProperties}
+            >
+              <span className="relative z-[1] inline-flex items-center gap-2">
+                Continuă
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="dashboard-start-glow inline-flex min-h-[3rem] shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#fb923c] to-[#ea580c] px-8 py-3 text-base font-semibold text-white shadow-[0_4px_0_#9a3412] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_2px_0_#9a3412] sm:min-h-[3.25rem] sm:px-10 sm:py-3.5 sm:text-lg"
+              style={{ "--start-glow-tint": CARD_SORT_VERIFY_GLOW_TINT } as CSSProperties}
+            >
+              <span className="relative z-[1]">Încearcă din nou</span>
             </button>
-            <button type="button" className={outlineBtn} disabled={finished} onClick={() => resolve("right")}>
-              {data.rightLabel} →
-            </button>
-          </>
-        )}
-      </InteractiveBottomChrome>
-    </>
+          )}
+        </InteractiveBottomChrome>
+      ) : null}
+    </div>
   )
 }
 
@@ -1894,26 +2224,45 @@ function RevealStepsView({
   markComplete: () => Promise<void>
 }) {
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
+  const explainChat = useLearningPathExplainChat()
+  const { pushHint } = useStuckTrigger({ surface: "invata" })
   const [visible, setVisible] = useState(0)
   const [quizChoice, setQuizChoice] = useState<number | null>(null)
   const [quizErr, setQuizErr] = useState(false)
+  const [quizChecked, setQuizChecked] = useState(false)
   const steps = data.steps
   const atEnd = visible >= steps.length
   const block: RevealStepBlock | undefined = atEnd ? undefined : steps[visible]
   const total = steps.length
 
+  useEffect(() => {
+    setQuizChoice(null)
+    setQuizErr(false)
+    setQuizChecked(false)
+  }, [visible])
+
   const advance = () => {
-    if (atEnd) return
-    const cur = steps[visible]
-    if (cur.kind === "quiz") {
-      if (quizChoice === null) return
-      if (quizChoice !== cur.correctIndex) {
-        setQuizErr(true)
-        return
-      }
-      setQuizErr(false)
-      setQuizChoice(null)
+    if (atEnd || !block) return
+
+    if (block.kind === "markdown") {
+      playDashboardStartButtonClickSound()
+      setVisible((v) => v + 1)
+      return
     }
+
+    if (quizChoice === null) return
+
+    setQuizChecked(true)
+    if (quizChoice !== block.correctIndex) {
+      setQuizErr(true)
+      playErrorSound()
+      return
+    }
+
+    setQuizErr(false)
+    playSuccessSound()
+    setQuizChoice(null)
+    setQuizChecked(false)
     setVisible((v) => v + 1)
   }
 
@@ -1931,6 +2280,32 @@ function RevealStepsView({
 
   const canTapAdvance =
     !!block && (block.kind === "markdown" || (block.kind === "quiz" && quizChoice !== null))
+
+  const handleWhy = () => {
+    if (block?.kind !== "quiz") return
+    pushHint("manual")
+    const wasLastVerifyCorrect =
+      quizChecked && quizChoice === block.correctIndex
+        ? !quizErr
+        : quizChecked && quizErr
+          ? false
+          : null
+    explainChat?.openExplainChat({
+      problemStatement: formatRevealStepsQuizLearningPathContext({
+        instructions: data.instructions,
+        stepIndex: visible + 1,
+        totalSteps: total,
+        priorSteps: steps.slice(0, visible),
+        quizContent: block.content,
+        options: block.options,
+        correctIndex: block.correctIndex,
+        selectedIndex: quizChoice,
+        wasLastVerifyCorrect,
+      }),
+      problemContextPreamble: "",
+      initialUserMessage: LEARNING_PATH_REVEAL_STEPS_QUIZ_EXPLAIN_INITIAL_PROMPT,
+    })
+  }
 
   const stepCardPast =
     "rounded-xl border-[3px] border-[#cfc3dc] bg-white px-4 py-4 shadow-[0_4px_0_#9d8ab3] sm:px-5 sm:py-5"
@@ -1991,28 +2366,49 @@ function RevealStepsView({
                   <RichMini text={block.content} className="text-[#2a2433] [&_.prose]:text-[#2a2433]" />
                 ) : null}
                 <div className="flex flex-wrap gap-2">
-                  {block.options.map((o, i) => (
-                    <button
-                      type="button"
-                      key={i}
-                      onClick={() => {
-                        setQuizChoice(i)
-                        setQuizErr(false)
-                      }}
-                      className={cn(
-                        "rounded-full border-[2.5px] px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:py-2.5",
-                        quizChoice === i
-                          ? "border-violet-500 bg-violet-50 text-[#111]"
-                          : "border-[#cfc3dc] bg-white text-[#111] shadow-[0_3px_0_#9d8ab3]",
-                      )}
-                    >
-                      <LatexRichText content={o} className="break-words [&_.katex]:text-inherit" />
-                    </button>
-                  ))}
+                  {block.options.map((o, i) => {
+                    const isSelected = quizChoice === i
+                    const isCorrectOption = i === block.correctIndex
+                    const showFeedback = quizChecked && quizErr
+                    return (
+                      <button
+                        type="button"
+                        key={i}
+                        onClick={() => {
+                          setQuizChoice(i)
+                          setQuizErr(false)
+                          setQuizChecked(false)
+                        }}
+                        className={cn(
+                          "rounded-full border-[2.5px] px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:py-2.5",
+                          showFeedback && isCorrectOption
+                            ? "border-emerald-500 bg-emerald-50 text-[#111]"
+                            : showFeedback && isSelected
+                              ? "border-red-500 bg-red-50 text-[#111]"
+                              : isSelected
+                                ? "border-violet-500 bg-violet-50 text-[#111]"
+                                : "border-[#cfc3dc] bg-white text-[#111] shadow-[0_3px_0_#9d8ab3]",
+                        )}
+                      >
+                        <LatexRichText content={o} className="break-words [&_.katex]:text-inherit" />
+                      </button>
+                    )
+                  })}
                 </div>
                 {quizErr ? (
-                  <p className="text-center text-sm font-medium text-red-600 sm:text-base">Răspuns incorect.</p>
+                  <p className="text-center text-sm font-medium text-red-600 sm:text-base">
+                    Răspuns incorect. Alege varianta corectă pentru a continua.
+                  </p>
                 ) : null}
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleWhy}
+                    className="rounded-full border border-gray-300 bg-white px-3.5 py-2 text-sm font-semibold text-[#111111] transition-colors hover:bg-gray-50 sm:px-4 sm:py-2.5"
+                  >
+                    De ce?
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -2026,7 +2422,7 @@ function RevealStepsView({
       </div>
 
       <InteractiveBottomChrome
-        registrationDeps={[atEnd, canTapAdvance, block?.kind, quizChoice, quizErr, visible]}
+        registrationDeps={[atEnd, canTapAdvance, block?.kind, quizChoice, quizErr, quizChecked, visible]}
       >
         {atEnd ? (
           <Link
@@ -2086,7 +2482,6 @@ export function LearningPathInteractiveLessonItem({
           parsed.itemType === "match" ||
           parsed.itemType === "graph_build" ||
           parsed.itemType === "code_trace" ||
-          parsed.itemType === "swipe_classify" ||
           parsed.itemType === "slider_explore" ||
           parsed.itemType === "memory_flip" ||
           parsed.itemType === "reveal_steps"
@@ -2098,7 +2493,14 @@ export function LearningPathInteractiveLessonItem({
         <CardSortView data={parsed.data} onDone={onDone} nextItemHref={nextItemHref} markComplete={markComplete} />
       ) : null}
       {parsed.itemType === "fill_slot" ? (
-        <FillSlotView data={parsed.data} nextItemHref={nextItemHref} markComplete={markComplete} />
+        <FillSlotView
+          data={parsed.data}
+          nextItemHref={nextItemHref}
+          markComplete={markComplete}
+          itemId={itemId}
+          lessonId={lessonId}
+          isLastItem={isLastItem}
+        />
       ) : null}
       {parsed.itemType === "match" ? (
         <MatchView data={parsed.data} onDone={onDone} nextItemHref={nextItemHref} markComplete={markComplete} />

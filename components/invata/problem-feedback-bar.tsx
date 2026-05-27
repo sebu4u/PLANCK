@@ -27,6 +27,8 @@ interface ProblemFeedbackBarProps {
   onExplain?: () => void
   eloAward?: LearningPathEloAward | null
   answerSlot: React.ReactNode
+  /** Etichetă buton după răspuns greșit (implicit: „Continuă”). */
+  retryLabel?: string
 }
 
 export function ProblemFeedbackBar({
@@ -39,6 +41,7 @@ export function ProblemFeedbackBar({
   onExplain,
   eloAward,
   answerSlot,
+  retryLabel = "Continuă",
 }: ProblemFeedbackBarProps) {
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const explainChat = useLearningPathExplainChat()
@@ -146,7 +149,7 @@ export function ProblemFeedbackBar({
                   onClick={onRetry}
                   className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-400 bg-white px-4 py-2 text-sm font-semibold text-[#4d4d4d] transition-colors hover:bg-gray-50 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-base"
                 >
-                  Continuă
+                  {retryLabel}
                 </button>
               )}
             </div>

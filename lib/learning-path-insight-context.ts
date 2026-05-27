@@ -201,3 +201,62 @@ export function formatFillSlotLearningPathContext(params: {
   )
   return parts.join("\n")
 }
+
+/** First user message when learner taps „De ce?” on reveal-steps quiz cards. */
+export const LEARNING_PATH_REVEAL_STEPS_QUIZ_EXPLAIN_INITIAL_PROMPT =
+  "Explică de ce răspunsul corect la acest pas quiz este cel indicat și cum reiese din pașii anteriori ai demonstrației. Dacă am ales altceva, explică de ce varianta mea nu este corectă (fără a mă lăsa doar cu răspunsul final, ci ghidând înțelegerea)."
+
+export function formatRevealStepsQuizLearningPathContext(params: {
+  instructions?: string
+  stepIndex: number
+  totalSteps: number
+  priorSteps: { kind: "markdown" | "quiz"; content?: string; options?: string[]; correctIndex?: number }[]
+  quizContent?: string
+  options: string[]
+  correctIndex: number
+  selectedIndex: number | null
+  /** null = never verified on this attempt, or selection changed after verify */
+  wasLastVerifyCorrect: boolean | null
+}): string {
+  const priorLines = params.priorSteps.map((s, i) => {
+    if (s.kind === "markdown") {
+      return `Pas ${i + 1} (text): ${(s.content ?? "").trim() || "(gol)"}`
+    }
+    const opts = (s.options ?? []).map((o, j) => `${j}) ${o}`).join("; ")
+    return `Pas ${i + 1} (quiz): ${(s.content ?? "").trim() || "(fără enunț)"} | opțiuni: ${opts || "(niciuna)"} | răspuns corect: indice ${s.correctIndex ?? "?"}.`
+  })
+
+  const optionLines = params.options.map((o, i) => `${i}) ${o}`).join("\n")
+  const verifyLine =
+    params.wasLastVerifyCorrect === null
+      ? "Utilizatorul nu a verificat încă răspunsul pe această încercare (sau a schimbat selecția după verificare)."
+      : params.wasLastVerifyCorrect
+        ? "Ultima verificare: răspuns corect."
+        : "Ultima verificare: răspuns incorect."
+
+  const parts: string[] = [
+    "Tip exercițiu: demonstrație pas cu pas — pas quiz (learning path).",
+    "",
+    `Pas curent: ${params.stepIndex} din ${params.totalSteps}.`,
+  ]
+  if (params.instructions?.trim()) {
+    parts.push("", "Instrucțiuni generale:", params.instructions.trim())
+  }
+  if (priorLines.length) {
+    parts.push("", "Pași parcurși anterior:", priorLines.join("\n"))
+  }
+  parts.push(
+    "",
+    "Întrebare quiz (pas curent):",
+    params.quizContent?.trim() || "(fără enunț suplimentar)",
+    "",
+    "Opțiuni:",
+    optionLines || "(fără)",
+    "",
+    `Indice răspuns corect: ${params.correctIndex}.`,
+    `Indice ales de utilizator: ${params.selectedIndex ?? "(niciunul)"}.`,
+    "",
+    verifyLine,
+  )
+  return parts.join("\n")
+}

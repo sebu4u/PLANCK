@@ -314,44 +314,6 @@ function LessonItemShellInner({
       </nav>
 
       {prevItemHref ? (
-        <div className="pointer-events-none fixed left-0 top-14 z-[250] flex md:hidden">
-          <Link
-            href={prevItemHref}
-            onClick={(event) => {
-              if (!itemNavigation) return
-              event.preventDefault()
-              playClickSound()
-              void navigateToPrevItem()
-            }}
-            className="pointer-events-auto ml-2 mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e8e2ee] bg-white/95 text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] backdrop-blur-sm"
-            aria-label="Pasul anterior"
-            scroll
-          >
-            <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
-          </Link>
-        </div>
-      ) : null}
-
-      {currentItemCompleted ? (
-        <div className="pointer-events-none fixed right-0 top-14 z-[250] flex md:hidden">
-          <Link
-            href={nextItemHref}
-            onClick={(event) => {
-              playClickSound()
-              if (!itemNavigation) return
-              event.preventDefault()
-              void navigateToNextItem()
-            }}
-            className="pointer-events-auto mr-2 mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e8e2ee] bg-white/95 text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] backdrop-blur-sm"
-            aria-label={itemIndex < items.length ? "Pasul următor" : "Înapoi la lecție"}
-            scroll
-          >
-            <ChevronRight className="h-5 w-5" strokeWidth={2.25} />
-          </Link>
-        </div>
-      ) : null}
-
-      {prevItemHref ? (
         <div
           className={cn(
             "pointer-events-none fixed left-0 top-14 z-[250] hidden w-[min(100vw,7rem)] items-center justify-start md:flex",

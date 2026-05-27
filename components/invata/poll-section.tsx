@@ -176,17 +176,14 @@ export function PollSection({
         onVerify,
       }}
     >
-      <div
-        className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center"
-        style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div className="mb-4 w-full max-w-md text-center text-base font-semibold leading-snug text-[#2C2F33] sm:text-lg">
-          <LatexRichText
-            content={displayText}
-            className="break-words [&_.katex]:text-[#2C2F33]"
-          />
-        </div>
-        <div className="w-full max-w-md rounded-2xl border border-[#e8e8e8] bg-white overflow-hidden shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
+      <div className="flex min-h-[calc(100dvh-3.5rem-8rem)] w-full flex-col items-center justify-center px-1 sm:min-h-[calc(100dvh-3.5rem-7.5rem)]">
+        <div className="w-full max-w-3xl space-y-6">
+          <div className="text-center text-lg font-bold leading-snug text-[#111111] md:text-xl md:leading-snug">
+            <LatexRichText
+              content={displayText}
+              className="break-words [&_.katex]:text-[#111111] [&_p]:mx-auto"
+            />
+          </div>
           {children}
         </div>
       </div>

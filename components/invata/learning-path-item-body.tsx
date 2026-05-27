@@ -321,7 +321,6 @@ export function LearningPathItemBody({
         <LessonPollClientWrapper
           imageSrc={pollData.imageSrc}
           imageAlt={pollData.imageAlt}
-          correctAnswerId={pollData.correctAnswerId}
           options={pollData.options}
         />
       </PollSection>

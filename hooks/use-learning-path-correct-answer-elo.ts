@@ -35,7 +35,11 @@ export function useLearningPathCorrectAnswerElo({
     })
 
     if (error) {
-      console.error("learning path ELO award:", error)
+      console.error(
+        "learning path ELO award:",
+        error.message || error.code || error,
+        { itemId, lessonId, isLastItem },
+      )
       return null
     }
 
