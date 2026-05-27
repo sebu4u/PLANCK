@@ -68,13 +68,63 @@ export interface LearningPathLessonItem {
   content_json?: Record<string, unknown> | null
 }
 
+function normalizeLearningPathSlug(slug: string | null | undefined): string | null {
+  const trimmed = slug?.trim()
+  return trimmed ? trimmed : null
+}
+
 export function getLearningPathRouteSegments(
   chapter: LearningPathChapter,
   lesson: LearningPathLesson
 ): { chapterSegment: string; lessonSegment: string } {
-  return chapter.slug && lesson.slug
-    ? { chapterSegment: chapter.slug, lessonSegment: lesson.slug }
-    : { chapterSegment: chapter.id, lessonSegment: lesson.id }
+  const chapterSlug = normalizeLearningPathSlug(chapter.slug)
+  const lessonSlug = normalizeLearningPathSlug(lesson.slug)
+  return {
+    chapterSegment: chapterSlug ?? chapter.id,
+    lessonSegment: lessonSlug ?? lesson.id,
+  }
+}
+
+/** Calea canonică `/invata/...` cu slug-uri din DB (fallback la id doar când lipsește slug-ul). */
+export function getCanonicalLearningPathLessonPath(
+  chapter: LearningPathChapter,
+  lesson: LearningPathLesson,
+  itemIndex?: number
+): string {
+  const href = getLearningPathLessonHref(chapter, lesson)
+  if (itemIndex == null || !Number.isFinite(itemIndex) || itemIndex < 1) {
+    return href
+  }
+  return `${href}/${itemIndex}`
+}
+
+export function learningPathUrlNeedsCanonicalRedirect(
+  chapterSlug: string,
+  lessonSlug: string,
+  chapter: LearningPathChapter,
+  lesson: LearningPathLesson,
+  itemIndex?: string
+): string | null {
+  const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
+  const parsedItemIndex =
+    itemIndex == null ? null : Number.parseInt(itemIndex, 10)
+  const normalizedItemIndex =
+    parsedItemIndex != null && Number.isFinite(parsedItemIndex) && parsedItemIndex >= 1
+      ? parsedItemIndex
+      : null
+
+  const canonicalPath = getCanonicalLearningPathLessonPath(
+    chapter,
+    lesson,
+    normalizedItemIndex ?? undefined
+  )
+
+  const currentPath =
+    normalizedItemIndex != null
+      ? `/invata/${chapterSlug}/${lessonSlug}/${normalizedItemIndex}`
+      : `/invata/${chapterSlug}/${lessonSlug}`
+
+  return currentPath === canonicalPath ? null : canonicalPath
 }
 
 export function getLearningPathLessonHref(chapter: LearningPathChapter, lesson: LearningPathLesson): string {
@@ -453,6 +503,43 @@ export async function getCompletedLearningPathItemIdsForUser(
   }
 
   return (data ?? []).map((row) => row.item_id as string)
+}
+
+/** Capitolul din ultimul item de learning path completat de user (după completed_at). */
+export async function getLastWorkedLearningPathChapterIdForUser(
+  client: SupabaseClient,
+  userId: string
+): Promise<string | null> {
+  const { data: progressRow, error: progressError } = await client
+    .from("user_learning_path_item_progress")
+    .select("item_id")
+    .eq("user_id", userId)
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (progressError) {
+    console.error("Error fetching last worked learning path item:", progressError)
+    return null
+  }
+
+  const itemId = progressRow?.item_id
+  if (!itemId) return null
+
+  const { data: itemRow, error: itemError } = await client
+    .from("learning_path_lesson_items")
+    .select("learning_path_lessons(chapter_id)")
+    .eq("id", itemId)
+    .maybeSingle()
+
+  if (itemError) {
+    console.error("Error resolving chapter for last worked learning path item:", itemError)
+    return null
+  }
+
+  const lesson = itemRow?.learning_path_lessons as { chapter_id?: string } | { chapter_id?: string }[] | null
+  const chapterId = Array.isArray(lesson) ? lesson[0]?.chapter_id : lesson?.chapter_id
+  return chapterId ?? null
 }
 
 /** Primul item (după order_index) din prima lecție cu itemi, din primul capitol activ (după order_index). */

@@ -11,6 +11,7 @@ import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
+import { generateUniqueChapterSlug, generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 type DevSubject = "physics" | "informatics" | "math" | "biology" | "all"
@@ -500,9 +501,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const requestedSlug = toNullableString(body.slug)
+      const slug =
+        requestedSlug ||
+        (await generateUniqueChapterSlug(supabase, title))
+
       const payload = {
         title,
-        slug: toNullableString(body.slug),
+        slug,
         description: toNullableString(body.description),
         icon_url: toNullableString(body.icon_url),
         problem_category,
@@ -561,9 +567,14 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      const requestedLessonSlug = toNullableString(body.slug)
+      const lessonSlug =
+        requestedLessonSlug ||
+        (await generateUniqueLessonSlug(supabase, chapterId, title))
+
       const payload = {
         chapter_id: chapterId,
-        slug: toNullableString(body.slug),
+        slug: lessonSlug,
         title,
         description: toNullableString(body.description),
         image_url: toNullableString(body.image_url),

@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react"
-import Link from "next/link"
-import { BookOpen, Check, ChevronRight, Lock } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { BookOpen, Check, ChevronRight, Loader2, Lock } from "lucide-react"
 import {
   getLearningPathLessonHref,
   getLearningPathRouteSegments,
@@ -94,8 +94,10 @@ export function LearningPathLessonPage({
   completedItemIds = [],
   freeAccess = null,
 }: LearningPathLessonPageProps) {
+  const router = useRouter()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialSelectedItemId ?? items[0]?.id ?? null)
   const [paywallOpen, setPaywallOpen] = useState(false)
+  const [isOpeningItem, setIsOpeningItem] = useState(false)
   const completedItemIdSet = useMemo(() => new Set(completedItemIds), [completedItemIds])
 
   const selectedItem = useMemo(
@@ -112,6 +114,14 @@ export function LearningPathLessonPage({
     return firstUncompleted?.id ?? items[0]?.id ?? null
   }, [items, completedItemIdSet])
   const isSelectedNextItem = selectedItem ? selectedItem.id === nextItemId : true
+
+  const handleOpenItem = () => {
+    if (!selectedItemHref || isOpeningItem) return
+
+    setIsOpeningItem(true)
+    router.prefetch(selectedItemHref)
+    router.push(selectedItemHref)
+  }
 
   useEffect(() => {
     if (!selectedItem) return
@@ -405,16 +415,23 @@ export function LearningPathLessonPage({
                         }
 
                         return (
-                          <Link
-                            href={selectedItemHref || lessonBaseHref}
-                            className={commonClassName}
+                          <button
+                            type="button"
+                            onClick={handleOpenItem}
+                            disabled={isOpeningItem}
+                            aria-busy={isOpeningItem}
+                            className={`${commonClassName} disabled:cursor-not-allowed disabled:opacity-70`}
                             style={commonStyle}
                           >
                             <span className="relative z-[1] inline-flex items-center gap-2">
                               {buttonLabel}
-                              <ChevronRight className="h-3.5 w-3.5" />
+                              {isOpeningItem ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              )}
                             </span>
-                          </Link>
+                          </button>
                         )
                       })()}
                     </div>

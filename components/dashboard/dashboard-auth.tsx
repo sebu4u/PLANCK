@@ -29,6 +29,7 @@ import { FreePlanSchoolYearPromoModal } from "@/components/dashboard/free-plan-s
 import {
   getLearningPathChapters,
   getLearningPathLessonsByChapterId,
+  getLastWorkedLearningPathChapterIdForUser,
   getLearningPathResumeHrefForChapter,
   getLearningPathResumeHrefForUser,
   getProblemsByClass,
@@ -1445,9 +1446,42 @@ function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): L
   return picked.slice(0, 3)
 }
 
+function orderDashboardLearningPathChapters(
+  selectedChapters: LearningPathChapter[],
+  allChapters: LearningPathChapter[],
+  lastWorkedChapterId: string | null
+): LearningPathChapter[] {
+  if (!lastWorkedChapterId || selectedChapters.length === 0) {
+    return selectedChapters
+  }
+
+  const lastWorkedChapter =
+    selectedChapters.find((chapter) => chapter.id === lastWorkedChapterId) ??
+    allChapters.find((chapter) => chapter.id === lastWorkedChapterId)
+
+  if (!lastWorkedChapter) {
+    return selectedChapters
+  }
+
+  const isInSelected = selectedChapters.some((chapter) => chapter.id === lastWorkedChapterId)
+  if (isInSelected) {
+    const others = selectedChapters.filter((chapter) => chapter.id !== lastWorkedChapterId)
+    return [lastWorkedChapter, ...others]
+  }
+
+  return [lastWorkedChapter, ...selectedChapters.slice(0, 2)]
+}
+
 async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLearningPathsData> {
-  const chapters = await getLearningPathChapters()
-  const selectedChapters = selectDashboardLearningPathChapters(chapters)
+  const [chapters, lastWorkedChapterId] = await Promise.all([
+    getLearningPathChapters(),
+    getLastWorkedLearningPathChapterIdForUser(supabase, userId),
+  ])
+  const selectedChapters = orderDashboardLearningPathChapters(
+    selectDashboardLearningPathChapters(chapters),
+    chapters,
+    lastWorkedChapterId
+  )
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
   const startHrefByChapterId: Record<string, string> = {}
 

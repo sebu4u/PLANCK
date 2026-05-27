@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learning-path-lesson-progress"
 import { LearningPathLessonPage } from "@/components/invata/learning-path-lesson-page"
@@ -13,9 +13,11 @@ import {
   getLearningPathChapterBySlug,
   getLearningPathLessonById,
   getLearningPathLessonBySlug,
+  getCanonicalLearningPathLessonPath,
   getLearningPathLessonItems,
   getNextIncompleteLearningPathItem,
   isUuid,
+  learningPathUrlNeedsCanonicalRedirect,
 } from "@/lib/supabase-learning-paths"
 import { sanitizeTestContentJson } from "@/lib/learning-path-test"
 import { cookies } from "next/headers"
@@ -46,6 +48,7 @@ export async function generateMetadata({
     return generatePageMetadata("learning-paths")
   }
 
+  const canonicalPath = getCanonicalLearningPathLessonPath(chapter, lesson)
   const description =
     lesson.description ||
     chapter.description ||
@@ -55,12 +58,12 @@ export async function generateMetadata({
     title: `${lesson.title} | ${chapter.title} | PLANCK`,
     description,
     alternates: {
-      canonical: `/invata/${chapterSlug}/${lessonSlug}`,
+      canonical: canonicalPath,
     },
     openGraph: {
       title: `${lesson.title} – Traseu Planck Academy`,
       description,
-      url: `https://www.planck.academy/invata/${chapterSlug}/${lessonSlug}`,
+      url: `https://www.planck.academy${canonicalPath}`,
       type: "website",
     },
   }
@@ -90,6 +93,11 @@ export default async function InvataLessonDetailPage({
 
   if (!lesson || lesson.chapter_id !== chapter.id) {
     notFound()
+  }
+
+  const canonicalRedirect = learningPathUrlNeedsCanonicalRedirect(chapterSlug, lessonSlug, chapter, lesson)
+  if (canonicalRedirect) {
+    redirect(canonicalRedirect)
   }
 
   const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id) : []

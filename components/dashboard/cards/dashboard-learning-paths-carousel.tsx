@@ -4,7 +4,11 @@ import { type CSSProperties, useCallback, useEffect, useRef, useState } from "re
 import Link from "next/link"
 import { ArrowRight, BookOpen, Play, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { LearningPathChapter, LearningPathLesson } from "@/lib/supabase-learning-paths"
+import {
+  getLearningPathLessonHref,
+  type LearningPathChapter,
+  type LearningPathLesson,
+} from "@/lib/supabase-learning-paths"
 
 interface DashboardLearningPathsCarouselProps {
   chapters: LearningPathChapter[]
@@ -127,12 +131,9 @@ export function DashboardLearningPathsCarousel({
         {chapters.map((chapter) => {
           const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
           const firstLesson = chapterLessons[0]
-          const fallbackChapterHref =
-            chapter.slug && firstLesson?.slug
-              ? `/invata/${chapter.slug}/${firstLesson.slug}`
-              : firstLesson
-                ? `/invata/${chapter.id}/${firstLesson.id}`
-                : "/invata"
+          const fallbackChapterHref = firstLesson
+            ? getLearningPathLessonHref(chapter, firstLesson)
+            : "/invata"
           const chapterHref = startHrefByChapter[chapter.id] ?? fallbackChapterHref
           const colors = getChapterTheme(chapter.title)
 
@@ -226,12 +227,9 @@ export function DashboardLearningPathsCarousel({
         {chapters.map((chapter, index) => {
           const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
           const firstLesson = chapterLessons[0]
-          const fallbackChapterHref =
-            chapter.slug && firstLesson?.slug
-              ? `/invata/${chapter.slug}/${firstLesson.slug}`
-              : firstLesson
-                ? `/invata/${chapter.id}/${firstLesson.id}`
-                : "/invata"
+          const fallbackChapterHref = firstLesson
+            ? getLearningPathLessonHref(chapter, firstLesson)
+            : "/invata"
           const chapterHref = startHrefByChapter[chapter.id] ?? fallbackChapterHref
 
           const offset = ((index - activeIndex + count) % count)

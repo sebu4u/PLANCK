@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
@@ -7,11 +7,13 @@ import { LearningPathItemExperience } from "@/components/invata/learning-path-it
 import { ITEM_TYPE_LABEL } from "@/components/invata/learning-path-item-body"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import {
+  getCanonicalLearningPathLessonPath,
   getLearningPathLessonItems,
+  learningPathUrlNeedsCanonicalRedirect,
 } from "@/lib/supabase-learning-paths"
 import {
-  resolveLessonContext,
   loadLearningPathItemPayload,
+  resolveLessonContext,
 } from "@/lib/learning-path-item-loader"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
@@ -42,11 +44,13 @@ export async function generateMetadata({
     return generatePageMetadata("learning-paths")
   }
 
+  const canonicalPath = getCanonicalLearningPathLessonPath(chapter, lesson, parsedIndex)
+
   return {
     title: `${item.title || ITEM_TYPE_LABEL[item.item_type]} | ${lesson.title} | PLANCK`,
     description: lesson.description || `Item din lecția ${lesson.title}.`,
     alternates: {
-      canonical: `/invata/${chapterSlug}/${lessonSlug}/${itemIndex}`,
+      canonical: canonicalPath,
     },
   }
 }
@@ -58,6 +62,20 @@ export default async function InvataLessonItemPage({
 }) {
   const { chapterSlug, lessonSlug, itemIndex } = await params
   const parsedIndex = Number.parseInt(itemIndex, 10)
+
+  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
+  if (chapter && lesson) {
+    const canonicalRedirect = learningPathUrlNeedsCanonicalRedirect(
+      chapterSlug,
+      lessonSlug,
+      chapter,
+      lesson,
+      itemIndex
+    )
+    if (canonicalRedirect) {
+      redirect(canonicalRedirect)
+    }
+  }
 
   const result = await loadLearningPathItemPayload(chapterSlug, lessonSlug, parsedIndex)
 

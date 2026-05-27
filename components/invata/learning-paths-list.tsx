@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent, type TouchEvent } from "react"
 import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
-import type { LearningPathChapter, LearningPathLesson } from "@/lib/supabase-learning-paths"
+import {
+  getLearningPathLessonHref,
+  type LearningPathChapter,
+  type LearningPathLesson,
+} from "@/lib/supabase-learning-paths"
 import type { Problem } from "@/data/problems"
 import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
@@ -445,10 +449,7 @@ export function LearningPathsList({
               {chapterLessons.length ? (
                 <ElasticLessonsScroller>
                     {chapterLessons.map((lesson, lessonIndex) => {
-                      const lessonHref =
-                        chapter.slug && lesson.slug
-                          ? `/invata/${chapter.slug}/${lesson.slug}`
-                          : `/invata/${chapter.id}/${lesson.id}`
+                      const lessonHref = getLearningPathLessonHref(chapter, lesson)
                       const cardContent = (
                         <div className="relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]">
                         <div className="flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]">

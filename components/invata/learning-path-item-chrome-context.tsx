@@ -14,20 +14,32 @@ import {
 
 interface LearningPathItemChromeContextValue {
   fixedBottomBar: ReactNode | null
-  setFixedBottomBar: (node: ReactNode | null) => void
+  registerFixedBottomBar: (registrationId: number, node: ReactNode | null) => void
+  clearFixedBottomBar: (registrationId: number) => void
 }
 
 const LearningPathItemChromeContext = createContext<LearningPathItemChromeContextValue | null>(null)
 
+let nextRegistrationId = 0
+
 export function LearningPathItemChromeProvider({ children }: { children: ReactNode }) {
   const [fixedBottomBar, setFixedBottomBarState] = useState<ReactNode | null>(null)
-  const setFixedBottomBar = useCallback((node: ReactNode | null) => {
+  const activeRegistrationIdRef = useRef(0)
+
+  const registerFixedBottomBar = useCallback((registrationId: number, node: ReactNode | null) => {
+    activeRegistrationIdRef.current = registrationId
     setFixedBottomBarState(node)
   }, [])
 
+  const clearFixedBottomBar = useCallback((registrationId: number) => {
+    if (activeRegistrationIdRef.current === registrationId) {
+      setFixedBottomBarState(null)
+    }
+  }, [])
+
   const value = useMemo(
-    () => ({ fixedBottomBar, setFixedBottomBar }),
-    [fixedBottomBar, setFixedBottomBar]
+    () => ({ fixedBottomBar, registerFixedBottomBar, clearFixedBottomBar }),
+    [fixedBottomBar, registerFixedBottomBar, clearFixedBottomBar]
   )
 
   return (
@@ -45,15 +57,21 @@ export function useRegisterLearningPathFixedBottomBar(
   renderBar: () => ReactNode | null,
   deps: DependencyList
 ) {
-  const setFixedBottomBar = useLearningPathItemChrome()?.setFixedBottomBar
+  const registerFixedBottomBar = useLearningPathItemChrome()?.registerFixedBottomBar
+  const clearFixedBottomBar = useLearningPathItemChrome()?.clearFixedBottomBar
+  const registrationIdRef = useRef<number | null>(null)
+  if (registrationIdRef.current === null) {
+    registrationIdRef.current = ++nextRegistrationId
+  }
   const renderBarRef = useRef(renderBar)
   renderBarRef.current = renderBar
 
   useLayoutEffect(() => {
-    if (!setFixedBottomBar) return
-    setFixedBottomBar(renderBarRef.current())
-    return () => setFixedBottomBar(null)
+    if (!registerFixedBottomBar || !clearFixedBottomBar) return
+    const registrationId = registrationIdRef.current!
+    registerFixedBottomBar(registrationId, renderBarRef.current())
+    return () => clearFixedBottomBar(registrationId)
     // renderBar is read from ref; deps list drives when content meaningfully changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setFixedBottomBar, ...deps])
+  }, [registerFixedBottomBar, clearFixedBottomBar, ...deps])
 }

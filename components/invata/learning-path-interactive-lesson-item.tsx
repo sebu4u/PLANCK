@@ -39,6 +39,9 @@ import {
 import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
+import { InlineMath } from "react-katex"
+import katex from "katex"
+import { hasMixedLatexDelimiters } from "@/lib/parse-mixed-latex"
 
 function shuffleInPlace<T>(arr: T[]) {
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -97,6 +100,180 @@ function RichMini({ text, className }: { text: string; className?: string }) {
     <div className={cn("prose prose-sm max-w-none text-[#222]", className)}>
       <LessonRichContent content={text} theme="light" />
     </div>
+  )
+}
+
+function normalizeLatexSegment(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ""
+  if (trimmed.startsWith("$") && trimmed.endsWith("$") && trimmed.length > 2 && !trimmed.slice(1, -1).includes("$")) {
+    return trimmed.slice(1, -1).trim()
+  }
+  if (trimmed.startsWith("\\(") && trimmed.endsWith("\\)")) {
+    return trimmed.slice(2, -2).trim()
+  }
+  return trimmed
+}
+
+function FillSlotLatex({ content, className }: { content: string; className?: string }) {
+  const trimmed = content.trim()
+  if (!trimmed) return null
+
+  if (hasMixedLatexDelimiters(trimmed)) {
+    return (
+      <LatexRichText
+        content={trimmed}
+        className={cn("text-inherit [&_.katex]:text-inherit", className)}
+      />
+    )
+  }
+
+  return (
+    <span className={cn("inline-block text-inherit [&_.katex]:text-inherit", className)}>
+      <InlineMath math={normalizeLatexSegment(trimmed)} />
+    </span>
+  )
+}
+
+function chipToLatex(chip: string): string {
+  const value = normalizeLatexSegment(chip)
+  if (!value) return "\\text{?}"
+  if (/\\[a-zA-Z]+|[\^_{}=]/.test(value)) return value
+  return `\\text{${value.replace(/([#%&_{}])/g, "\\$1")}}`
+}
+
+function buildFillSlotPlaceholder(
+  slotId: string,
+  value: string | null,
+  isActive: boolean,
+  autoResult: "ok" | "bad" | null,
+  slotCorrect: boolean,
+): string {
+  const inner = value ? chipToLatex(value) : "\\text{?}"
+  let body = `\\boxed{${inner}}`
+
+  if (autoResult === "ok") {
+    body = `\\color{#059669}{${body}}`
+  } else if (autoResult === "bad" && value) {
+    body = slotCorrect ? `\\color{#059669}{${body}}` : `\\color{#dc2626}{${body}}`
+  } else if (isActive) {
+    body = `\\color{#7c3aed}{${body}}`
+  }
+
+  return `\\htmlId{fill-slot-${slotId}}{${body}}`
+}
+
+function buildFillSlotLatex(
+  template: string,
+  assign: Record<string, string | null>,
+  active: string | null,
+  autoResult: "ok" | "bad" | null,
+  slots: FillSlotContent["slots"],
+): string {
+  const base = normalizeLatexSegment(template)
+  const answerById = new Map(slots.map((s) => [s.id, s.answer.trim()]))
+
+  return base.replace(/\{\{(\w+)\}\}/g, (_, slotId: string) => {
+    const value = assign[slotId] ?? null
+    const slotCorrect = value ? value.trim() === (answerById.get(slotId) ?? "") : false
+    return buildFillSlotPlaceholder(slotId, value, active === slotId, autoResult, slotCorrect)
+  })
+}
+
+const FILL_SLOT_CHIP_DRAG_MIME = "application/x-planck-fill-chip"
+
+function FillSlotFormula({
+  latex,
+  slotIds,
+  autoResult,
+  dragOverSlot,
+  onSelectSlot,
+  onDropChip,
+  setDragOverSlot,
+}: {
+  latex: string
+  slotIds: string[]
+  autoResult: "ok" | "bad" | null
+  dragOverSlot: string | null
+  onSelectSlot: (slotId: string) => void
+  onDropChip: (chip: string, slotId: string) => void
+  setDragOverSlot: (slotId: string | null) => void
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(latex, {
+        trust: true,
+        strict: "ignore",
+        throwOnError: false,
+        displayMode: true,
+      })
+    } catch {
+      return ""
+    }
+  }, [latex])
+
+  useEffect(() => {
+    const root = containerRef.current
+    if (!root) return
+
+    const cleanups: Array<() => void> = []
+
+    for (const slotId of slotIds) {
+      const el = root.querySelector(`#fill-slot-${slotId}`) as HTMLElement | null
+      if (!el) continue
+
+      el.setAttribute("role", "button")
+      el.setAttribute("tabindex", autoResult === "ok" ? "-1" : "0")
+      el.classList.add("fill-slot-target", "rounded-sm", "transition-shadow")
+      el.style.cursor = autoResult === "ok" ? "default" : "pointer"
+      el.classList.toggle("ring-2", dragOverSlot === slotId && autoResult !== "ok")
+      el.classList.toggle("ring-violet-400", dragOverSlot === slotId && autoResult !== "ok")
+      el.classList.toggle("ring-offset-2", dragOverSlot === slotId && autoResult !== "ok")
+
+      const onClick = () => onSelectSlot(slotId)
+      const onDragOver = (e: DragEvent) => {
+        if (autoResult === "ok") return
+        e.preventDefault()
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
+        setDragOverSlot(slotId)
+      }
+      const onDragLeave = () => setDragOverSlot(null)
+      const onDrop = (e: DragEvent) => {
+        e.preventDefault()
+        setDragOverSlot(null)
+        if (autoResult === "ok") return
+        const raw =
+          e.dataTransfer?.getData(FILL_SLOT_CHIP_DRAG_MIME) || e.dataTransfer?.getData("text/plain")
+        if (raw) onDropChip(raw, slotId)
+      }
+
+      el.addEventListener("click", onClick)
+      el.addEventListener("dragover", onDragOver)
+      el.addEventListener("dragleave", onDragLeave)
+      el.addEventListener("drop", onDrop)
+
+      cleanups.push(() => {
+        el.removeEventListener("click", onClick)
+        el.removeEventListener("dragover", onDragOver)
+        el.removeEventListener("dragleave", onDragLeave)
+        el.removeEventListener("drop", onDrop)
+      })
+    }
+
+    return () => cleanups.forEach((fn) => fn())
+  }, [html, slotIds, autoResult, dragOverSlot, onSelectSlot, onDropChip, setDragOverSlot])
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "w-full max-w-4xl overflow-x-auto px-2 text-center text-[#1a1423]",
+        "[&_.katex-display]:my-0 [&_.katex]:text-[1.35rem] sm:[&_.katex]:text-[1.65rem] md:[&_.katex]:text-[1.95rem]",
+      )}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   )
 }
 
@@ -262,8 +439,6 @@ function CardSortView({
   )
 }
 
-const FILL_SLOT_CHIP_DRAG_MIME = "application/x-planck-fill-chip"
-
 const MATCH_ASSOC_CARD_CLASS =
   "relative z-10 w-full rounded-xl border-[3px] bg-white px-3 py-2.5 text-center shadow-[0_4px_0_#9d8ab3] transition-[border-color,box-shadow] border-[#cfc3dc] [&_.prose]:my-0 [&_.prose]:text-center [&_.prose]:text-sm [&_p]:mx-auto [&_p]:my-0"
 
@@ -333,29 +508,13 @@ function FillSlotView({
     setAutoResult(allOk ? "ok" : "bad")
   }, [assign, data.slots, slotIds])
 
-  const parts = useMemo(() => {
-    const template = data.latexTemplate
-    const out: { type: "text" | "slot"; value: string }[] = []
-    const re = /\{\{(\w+)\}\}/g
-    let last = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(template)) !== null) {
-      if (m.index > last) out.push({ type: "text", value: template.slice(last, m.index) })
-      out.push({ type: "slot", value: m[1] })
-      last = m.index + m[0].length
-    }
-    if (last < template.length) out.push({ type: "text", value: template.slice(last) })
-    return out
-  }, [data.latexTemplate])
+  const renderedLatex = useMemo(
+    () => buildFillSlotLatex(data.latexTemplate, assign, active, autoResult, data.slots),
+    [data.latexTemplate, assign, active, autoResult, data.slots],
+  )
 
   const used = new Set(Object.values(assign).filter(Boolean) as string[])
   const allFilled = slotIds.length > 0 && slotIds.every((id) => assign[id])
-
-  const slotOk = (slotId: string) => {
-    const s = data.slots.find((x) => x.id === slotId)
-    if (!s) return false
-    return (assign[slotId] || "").trim() === s.answer.trim()
-  }
 
   const placeChipInSlot = (chip: string, slotId: string) => {
     const trimmed = chip.trim()
@@ -379,27 +538,6 @@ function FillSlotView({
 
   const handleChipDragEnd = () => {
     setDragOverSlot(null)
-  }
-
-  const handleSlotDragOver = (e: React.DragEvent, slotId: string) => {
-    if (autoResult === "ok") return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    setDragOverSlot(slotId)
-  }
-
-  const handleSlotDragLeave = (e: React.DragEvent) => {
-    const next = e.relatedTarget as Node | null
-    if (next && (e.currentTarget as HTMLElement).contains(next)) return
-    setDragOverSlot(null)
-  }
-
-  const handleSlotDrop = (e: React.DragEvent, slotId: string) => {
-    e.preventDefault()
-    setDragOverSlot(null)
-    if (autoResult === "ok") return
-    const raw = e.dataTransfer.getData(FILL_SLOT_CHIP_DRAG_MIME) || e.dataTransfer.getData("text/plain")
-    placeChipInSlot(raw, slotId)
   }
 
   const handleWhy = () => {
@@ -435,48 +573,17 @@ function FillSlotView({
     <>
       <div className="flex min-h-[calc(100dvh-3.5rem-8rem)] w-full flex-col items-center justify-center px-2 pb-2 sm:min-h-[calc(100dvh-3.5rem-7.5rem)]">
         <div className="flex w-full max-w-full flex-col items-center">
-          <div className="mb-8 flex w-full max-w-4xl flex-wrap items-center justify-center gap-x-3 gap-y-4 px-2 text-center sm:mb-10 sm:gap-x-4">
-          {parts.map((p, i) =>
-            p.type === "text" ? (
-              <RichMini
-                key={`t-${i}`}
-                text={p.value}
-                className="inline max-w-none text-[#1a1423] [&_.prose]:my-0 [&_.prose]:inline [&_.prose]:max-w-none [&_.prose]:text-[1.35rem] [&_.prose]:leading-snug sm:[&_.prose]:text-[1.65rem] md:[&_.prose]:text-[1.95rem] [&_p]:my-0 [&_p]:inline"
-              />
-            ) : (
-              <button
-                type="button"
-                key={`s-${p.value}-${i}`}
-                onClick={() => setActive(p.value)}
-                disabled={autoResult === "ok"}
-                onDragOver={(e) => handleSlotDragOver(e, p.value)}
-                onDragLeave={handleSlotDragLeave}
-                onDrop={(e) => handleSlotDrop(e, p.value)}
-                className={cn(
-                  "inline-flex min-h-[3rem] min-w-[3.25rem] shrink-0 items-center justify-center rounded-xl border-[3px] bg-white px-3 py-2 transition-[border-color,box-shadow] sm:min-h-[3.25rem] sm:min-w-[3.5rem]",
-                  "border-[#cfc3dc] shadow-[0_4px_0_#9d8ab3]",
-                  dragOverSlot === p.value && autoResult !== "ok" && "ring-2 ring-violet-400 ring-offset-2 ring-offset-white",
-                  active === p.value &&
-                    autoResult !== "ok" &&
-                    !(allFilled && autoResult === "bad") &&
-                    "border-violet-500 shadow-[0_4px_0_#5b21b6]",
-                  allFilled && autoResult === "ok" && "border-emerald-500 shadow-[0_4px_0_#047857]",
-                  allFilled &&
-                    autoResult === "bad" &&
-                    (slotOk(p.value)
-                      ? "border-emerald-500 shadow-[0_4px_0_#047857]"
-                      : "border-red-500 shadow-[0_4px_0_#b91c1c]"),
-                )}
-              >
-                {assign[p.value] ? (
-                  <span className="text-base font-semibold text-[#111] sm:text-lg">{assign[p.value]}</span>
-                ) : (
-                  <span className="text-sm font-medium text-[#9a8fb0] sm:text-base">?</span>
-                )}
-              </button>
-            )
-          )}
-        </div>
+          <div className="mb-8 w-full sm:mb-10">
+            <FillSlotFormula
+              latex={renderedLatex}
+              slotIds={slotIds}
+              autoResult={autoResult}
+              dragOverSlot={dragOverSlot}
+              onSelectSlot={setActive}
+              onDropChip={placeChipInSlot}
+              setDragOverSlot={setDragOverSlot}
+            />
+          </div>
 
         <div className="mx-auto flex w-full max-w-[168px] flex-col gap-2 md:max-w-3xl md:flex-row md:flex-wrap md:justify-center md:gap-x-2.5 md:gap-y-2">
           {data.chips.map((chip) => {
@@ -501,9 +608,9 @@ function FillSlotView({
                   taken && "opacity-90",
                 )}
               >
-                <RichMini
-                  text={chip}
-                  className="text-[#222] [&_.prose]:my-0 [&_.prose]:text-center [&_.prose]:text-xs md:[&_.prose]:text-[0.8125rem] [&_p]:mx-auto [&_p]:my-0"
+                <FillSlotLatex
+                  content={chip}
+                  className="text-[#222] [&_.katex]:text-xs md:[&_.katex]:text-[0.8125rem]"
                 />
               </button>
             )
@@ -838,7 +945,7 @@ function GraphBuildView({
           ) : null}
         </div>
 
-        <InteractiveBottomChrome>
+        <InteractiveBottomChrome registrationDeps={[ok, submitted, choice]}>
           {ok && submitted ? (
             <Link
               href={nextItemHref}
@@ -964,7 +1071,7 @@ function GraphBuildView({
         ) : null}
       </div>
 
-      <InteractiveBottomChrome>
+      <InteractiveBottomChrome registrationDeps={[plotOk, submitted, points.length, canResetPlot]}>
         {plotOk ? (
           <Link
             href={nextItemHref}
@@ -1131,7 +1238,7 @@ function CodeTraceView({
         )}
       </div>
 
-      <InteractiveBottomChrome>
+      <InteractiveBottomChrome registrationDeps={[done, canVerifyStep, wrong, step]}>
         {done ? (
           <Link
             href={nextItemHref}
@@ -1259,7 +1366,7 @@ function SwipeClassifyView({
         )}
       </div>
 
-      <InteractiveBottomChrome>
+      <InteractiveBottomChrome registrationDeps={[finished, score, idx, feedback]}>
         {finished ? (
           <Link
             href={nextItemHref}
@@ -1474,7 +1581,7 @@ function SliderExploreView({
         ) : null}
       </div>
 
-      <InteractiveBottomChrome>
+      <InteractiveBottomChrome registrationDeps={[hit]}>
         {hit ? (
           <Link
             href={nextItemHref}
@@ -1676,7 +1783,7 @@ function MemoryFlipView({
         </div>
       </div>
 
-      <InteractiveBottomChrome>
+      <InteractiveBottomChrome registrationDeps={[done, matched.size, open.length]}>
         {done ? (
           <Link
             href={nextItemHref}
@@ -1918,7 +2025,9 @@ function RevealStepsView({
         ) : null}
       </div>
 
-      <InteractiveBottomChrome>
+      <InteractiveBottomChrome
+        registrationDeps={[atEnd, canTapAdvance, block?.kind, quizChoice, quizErr, visible]}
+      >
         {atEnd ? (
           <Link
             href={nextItemHref}

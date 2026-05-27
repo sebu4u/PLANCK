@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Refracția prin prismă</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --text: #292929; --line: #e8e8ec; --accent: #8043f0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    body { display: grid; place-items: stretch; }
+    .sim { width: 100%; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 2px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 2px; }
+    .row { display: flex; align-items: center; gap: 6px; flex: 1 1 110px; }
+    .row label { font: 600 10px ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+    .row input[type=range] { flex: 1; min-width: 50px; accent-color: var(--accent); }
+    .val { font: 700 10px ui-sans-serif, system-ui, sans-serif; color: var(--accent); min-width: 32px; }
+    .tab { min-height: 32px; padding: 0 12px; border: 1px solid #e0dce8; border-radius: 999px; background: #fff;
+      font: 700 10px ui-sans-serif, system-ui, sans-serif; cursor: pointer; touch-action: manipulation; }
+    .tab.active { border-color: var(--text); background: var(--text); color: #fff; }
+    .stage { min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px;
+      background: linear-gradient(180deg, #fff 0%, #fbfbfb 100%); }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <main class="sim">
+    <div class="controls">
+      <div class="row">
+        <label for="apex">Apex A</label>
+        <input id="apex" type="range" min="30" max="70" step="1" value="60">
+        <span class="val" id="apexVal">60°</span>
+      </div>
+      <div class="row">
+        <label for="inc">Incidență</label>
+        <input id="inc" type="range" min="0" max="70" step="1" value="40">
+        <span class="val" id="incVal">40°</span>
+      </div>
+      <div class="row">
+        <label for="n">n</label>
+        <input id="n" type="range" min="1.4" max="1.9" step="0.01" value="1.55">
+        <span class="val" id="nVal">1.55</span>
+      </div>
+      <button class="tab active" type="button" data-mode="mono">Monocrom</button>
+      <button class="tab" type="button" data-mode="white">Alb</button>
+    </div>
+    <section class="stage"><canvas id="canvas"></canvas></section>
+  </main>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const apexEl = document.getElementById("apex");
+    const incEl = document.getElementById("inc");
+    const nEl = document.getElementById("n");
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+
+    let cssW = 0, cssH = 0, dpr = 1, paused = false;
+    let apexDeg = 60, incDeg = 40, baseN = 1.55, mode = "mono";
+
+    const COLORS = [
+      { name: "Roșu", color: "#e74c3c", dn: -0.04 },
+      { name: "Portocaliu", color: "#e67e22", dn: -0.02 },
+      { name: "Galben", color: "#f1c40f", dn: 0 },
+      { name: "Verde", color: "#2ecc71", dn: 0.015 },
+      { name: "Violet", color: "#9b59b6", dn: 0.035 }
+    ];
+
+    function postState() {
+      window.parent.postMessage({
+        type: "learning-path-simulation-state",
+        name: "Refracția prin prismă",
+        text: mode === "mono" ? "rază monocromă prin prismă." : "dispersia luminii albe.",
+        paused
+      }, "*");
+    }
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(cssW * dpr); canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function prismVerts() {
+      const cx = cssW * 0.5, cy = cssH * 0.52;
+      const side = Math.min(cssW, cssH) * 0.28;
+      const A = apexDeg * Math.PI / 180;
+      const baseHalf = side * Math.sin(A / 2);
+      const height = side * Math.cos(A / 2);
+      return {
+        top: { x: cx, y: cy - height * 0.5 },
+        bl: { x: cx - baseHalf, y: cy + height * 0.5 },
+        br: { x: cx + baseHalf, y: cy + height * 0.5 },
+        A
+      };
+    }
+
+    function lineIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+      const d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+      if (Math.abs(d) < 1e-9) return null;
+      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d;
+      const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / d;
+      if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+      return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1), t, u };
+    }
+
+    function segHit(px, py, dx, dy, x1, y1, x2, y2) {
+      const den = dx * (y2 - y1) - dy * (x2 - x1);
+      if (Math.abs(den) < 1e-9) return null;
+      const t = ((x1 - px) * (y2 - y1) - (y1 - py) * (x2 - x1)) / den;
+      const u = ((x1 - px) * dy - (y1 - py) * dx) / den;
+      if (t > 0.001 && u >= 0 && u <= 1) {
+        const nx = -(y2 - y1), ny = (x2 - x1);
+        const len = Math.hypot(nx, ny) || 1;
+        return { x: px + t * dx, y: py + t * dy, t, nx: nx / len, ny: ny / len };
+      }
+      return null;
+    }
+
+    function refract2d(dx, dy, nx, ny, n1, n2) {
+      const dot = dx * nx + dy * ny;
+      const eta = n1 / n2;
+      const k = 1 - eta * eta * (1 - dot * dot);
+      if (k < 0) return null;
+      const sq = Math.sqrt(k);
+      return { x: eta * dx - (eta * dot + sq) * nx, y: eta * dy - (eta * dot + sq) * ny };
+    }
+
+    function faceNormal(x1, y1, x2, y2, inward) {
+      let nx = -(y2 - y1), ny = (x2 - x1);
+      const len = Math.hypot(nx, ny) || 1;
+      nx /= len; ny /= len;
+      if (!inward) { nx = -nx; ny = -ny; }
+      return { nx, ny };
+    }
+
+    function angleBetween(dx, dy, nx, ny) {
+      const c = Math.abs(dx * nx + dy * ny);
+      return Math.acos(Math.min(1, c));
+    }
+
+    function traceRay(nGlass, color) {
+      const p = prismVerts();
+      const iRad = incDeg * Math.PI / 180;
+      const startX = p.bl.x - 100;
+      const startY = p.bl.y - 60 - incDeg * 0.8;
+      const dir1 = { x: Math.cos(iRad), y: Math.sin(iRad) };
+      const d1len = Math.hypot(dir1.x, dir1.y) || 1;
+      dir1.x /= d1len; dir1.y /= d1len;
+
+      const nEntry = faceNormal(p.bl.x, p.bl.y, p.top.x, p.top.y, true);
+      const hit1 = segHit(startX, startY, dir1.x, dir1.y, p.bl.x, p.bl.y, p.top.x, p.top.y);
+      if (!hit1) return null;
+
+      const d2 = refract2d(dir1.x, dir1.y, nEntry.nx, nEntry.ny, 1, nGlass);
+      if (!d2) return null;
+
+      const hit2 = segHit(hit1.x, hit1.y, d2.x, d2.y, p.bl.x, p.bl.y, p.br.x, p.br.y);
+      if (!hit2) return null;
+
+      const nExit = faceNormal(p.bl.x, p.bl.y, p.br.x, p.br.y, true);
+      const d3 = refract2d(d2.x, d2.y, nExit.nx, nExit.ny, nGlass, 1);
+      if (!d3) return null;
+
+      const exitPt = { x: hit2.x + d3.x * 280, y: hit2.y + d3.y * 280 };
+      const i1 = angleBetween(dir1.x, dir1.y, nEntry.nx, nEntry.ny);
+      const i2 = angleBetween(d2.x, d2.y, nExit.nx, nExit.ny);
+      const delta = Math.abs((i1 + i2 - p.A) * 180 / Math.PI);
+
+      return {
+        segments: [
+          { x1: startX, y1: startY, x2: hit1.x, y2: hit1.y },
+          { x1: hit1.x, y1: hit1.y, x2: hit2.x, y2: hit2.y },
+          { x1: hit2.x, y1: hit2.y, x2: exitPt.x, y2: exitPt.y }
+        ],
+        delta,
+        color
+      };
+    }
+
+    function clipSeg(x1, y1, x2, y2) {
+      return { x1: Math.max(0, Math.min(cssW, x1)), y1: Math.max(0, Math.min(cssH, y1)),
+        x2: Math.max(0, Math.min(cssW, x2)), y2: Math.max(0, Math.min(cssH, y2)) };
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(0, 0, cssW, cssH);
+
+      const p = prismVerts();
+      ctx.fillStyle = "rgba(128,67,240,0.12)";
+      ctx.strokeStyle = "#8043f0";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p.top.x, p.top.y);
+      ctx.lineTo(p.bl.x, p.bl.y);
+      ctx.lineTo(p.br.x, p.br.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#292929";
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("A", p.top.x, p.top.y - 8);
+
+      const rays = mode === "mono"
+        ? [traceRay(baseN, "#f1c40f")]
+        : COLORS.map((c) => traceRay(baseN + c.dn, c.color));
+
+      let delta = 0;
+      for (const ray of rays) {
+        if (!ray) continue;
+        delta = ray.delta;
+        ctx.strokeStyle = ray.color;
+        ctx.lineWidth = mode === "white" ? 2 : 2.5;
+        for (const s of ray.segments) {
+          const c = clipSeg(s.x1, s.y1, s.x2, s.y2);
+          ctx.beginPath();
+          ctx.moveTo(c.x1, c.y1);
+          ctx.lineTo(c.x2, c.y2);
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.strokeStyle = "#e8e8ec";
+      ctx.beginPath();
+      ctx.roundRect(10, 10, 150, 44, 8);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#292929";
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("δ = " + delta.toFixed(1) + "°", 18, 28);
+      ctx.fillText("A = " + apexDeg + "°  i = " + incDeg + "°", 18, 42);
+    }
+
+    apexEl.addEventListener("input", () => { apexDeg = Number(apexEl.value); document.getElementById("apexVal").textContent = apexDeg + "°"; postState(); });
+    incEl.addEventListener("input", () => { incDeg = Number(incEl.value); document.getElementById("incVal").textContent = incDeg + "°"; postState(); });
+    nEl.addEventListener("input", () => { baseN = Number(nEl.value); document.getElementById("nVal").textContent = baseN.toFixed(2); postState(); });
+    tabs.forEach((t) => t.addEventListener("click", () => {
+      mode = t.dataset.mode;
+      tabs.forEach((x) => x.classList.toggle("active", x === t));
+      postState();
+    }));
+
+    window.addEventListener("message", (e) => {
+      const d = e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "learning-path-simulation-set-paused" || d.type === "trajectory-simulation-set-paused") paused = Boolean(d.paused);
+    });
+
+    new ResizeObserver(resize).observe(canvas);
+    resize(); postState();
+    (function loop() { draw(); requestAnimationFrame(loop); })();
+  </script>
+</body>
+</html>
