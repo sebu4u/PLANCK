@@ -11,12 +11,8 @@
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       -webkit-font-smoothing: antialiased; }
     body { display: grid; place-items: stretch; }
-    .sim { width: 100%; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 2px; }
-    .controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px; }
-    .tab { min-height: 32px; padding: 0 14px; border: 1px solid #e0dce8; border-radius: 999px; background: #fff;
-      color: var(--text); font: 700 10px ui-sans-serif, system-ui, sans-serif; cursor: pointer; touch-action: manipulation; }
-    .tab.active { border-color: var(--text); background: var(--text); color: #fff; }
-    .stage { min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px;
+    .sim { width: 100%; height: 100%; padding: 2px; }
+    .stage { width: 100%; height: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: 18px;
       background: linear-gradient(180deg, #fff 0%, #fbfbfb 100%); }
     canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
     canvas.dragging { cursor: grabbing; }
@@ -24,31 +20,23 @@
 </head>
 <body>
   <main class="sim">
-    <div class="controls">
-      <button class="tab active" type="button" data-mirror="flat">Oglindă plană</button>
-      <button class="tab" type="button" data-mirror="concave">Concavă</button>
-      <button class="tab" type="button" data-mirror="convex">Convexă</button>
-    </div>
-    <section class="stage"><canvas id="canvas"></canvas></section>
+    <section class="stage" aria-label="Simulare reflexie — oglindă plană">
+      <canvas id="canvas"></canvas>
+    </section>
   </main>
   <script>
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    const tabs = Array.from(document.querySelectorAll(".tab"));
 
     let cssW = 0, cssH = 0, dpr = 1, paused = false;
-    let mirrorType = "flat";
-    let sourceAngle = -Math.PI / 4;
+    let sourceAngle = -Math.PI / 2;
     let dragging = false, pointerId = null;
 
-    const MIRROR_Y_RATIO = 0.78;
-
     function postState() {
-      const names = { flat: "Oglindă plană", concave: "Oglindă concavă", convex: "Oglindă convexă" };
       window.parent.postMessage({
         type: "learning-path-simulation-state",
         name: "Reflexia luminii",
-        text: names[mirrorType] + " — unghiul i = unghiul r.",
+        text: "oglindă plană — unghiul i = unghiul r.",
         paused
       }, "*");
     }
@@ -61,110 +49,80 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    function mirrorY() { return cssH * MIRROR_Y_RATIO; }
-    function mirrorCenterX() { return cssW * 0.5; }
-
-    function reflect(d, n) {
-      const dot = d.x * n.x + d.y * n.y;
-      return { x: d.x - 2 * dot * n.x, y: d.y - 2 * dot * n.y };
+    function layout() {
+      const mirrorY = cssH * 0.78;
+      const pivot = { x: cssW * 0.5, y: cssH * 0.28 };
+      const arcR = Math.min(cssW, cssH) * 0.24;
+      return { mirrorY, pivot, arcR, mirrorLeft: cssW * 0.08, mirrorRight: cssW * 0.92 };
     }
 
-    function flatHit(px, py, dx, dy) {
-      const my = mirrorY();
-      if (Math.abs(dy) < 1e-9) return null;
-      const t = (my - py) / dy;
-      if (t <= 0) return null;
-      const hx = px + dx * t, hy = my;
-      if (hx < cssW * 0.08 || hx > cssW * 0.92) return null;
-      return { x: hx, y: hy, t, nx: 0, ny: -1 };
-    }
-
-    function curvedHit(px, py, dx, dy, sign) {
-      const cx = mirrorCenterX(), cy = mirrorY() + sign * 120;
-      const R = 140;
-      const ox = px - cx, oy = py - cy;
-      const a = dx * dx + dy * dy;
-      const b = 2 * (ox * dx + oy * dy);
-      const c = ox * ox + oy * oy - R * R;
-      const disc = b * b - 4 * a * c;
-      if (disc < 0) return null;
-      let t1 = (-b - Math.sqrt(disc)) / (2 * a);
-      let t2 = (-b + Math.sqrt(disc)) / (2 * a);
-      let t = t1 > 0.001 ? t1 : t2;
-      if (t <= 0.001) return null;
-      const hx = px + dx * t, hy = py + dy * t;
-      if (hx < cssW * 0.06 || hx > cssW * 0.94) return null;
-      const nx = (hx - cx) / R;
-      const ny = (hy - cy) / R;
-      const inward = sign > 0 ? -1 : 1;
-      return { x: hx, y: hy, t, nx: nx * inward, ny: ny * inward };
-    }
-
-    function traceRay() {
-      const cx = cssW * 0.5, cy = cssH * 0.32;
-      const radius = Math.min(cssW, cssH) * 0.28;
-      const sx = cx + Math.cos(sourceAngle) * radius;
-      const sy = cy + Math.sin(sourceAngle) * radius;
-      const dx = cx - sx, dy = cy - sy;
-      const len = Math.hypot(dx, dy) || 1;
-      const dir = { x: dx / len, y: dy / len };
-
-      let hit;
-      if (mirrorType === "flat") hit = flatHit(sx, sy, dir.x, dir.y);
-      else if (mirrorType === "concave") hit = curvedHit(sx, sy, dir.x, dir.y, 1);
-      else hit = curvedHit(sx, sy, dir.x, dir.y, -1);
-
-      if (!hit) return { sx, sy, cx, cy, valid: false, iDeg: 0, rDeg: 0, hit: null };
-
-      const nLen = Math.hypot(hit.nx, hit.ny) || 1;
-      const n = { x: hit.nx / nLen, y: hit.ny / nLen };
-      const rd = reflect(dir, n);
-      const cosI = Math.abs(dir.x * n.x + dir.y * n.y);
-      const iDeg = Math.round(Math.acos(Math.min(1, cosI)) * 180 / Math.PI);
-      const rDeg = iDeg;
-
-      const ext = 400;
+    function sourcePos(L) {
       return {
-        sx, sy, hx: hit.x, hy: hit.y,
-        rx: hit.x + rd.x * ext, ry: hit.y + rd.y * ext,
-        nx: n.x, ny: n.y, iDeg, rDeg, valid: true, hit
+        x: L.pivot.x + Math.cos(sourceAngle) * L.arcR,
+        y: L.pivot.y + Math.sin(sourceAngle) * L.arcR
       };
     }
 
-    function drawArc(cx, cy, r, a0, a1, color) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, a0, a1);
-      ctx.stroke();
+    function traceRay(L) {
+      const src = sourcePos(L);
+      const dx = L.pivot.x - src.x;
+      const dy = L.pivot.y - src.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const dir = { x: dx / len, y: dy / len };
+
+      if (dir.y <= 0.001) return null;
+
+      const t = (L.mirrorY - src.y) / dir.y;
+      if (t <= 0) return null;
+
+      const hx = src.x + dir.x * t;
+      const hy = L.mirrorY;
+
+      if (hx < L.mirrorLeft || hx > L.mirrorRight) return null;
+
+      const nx = 0, ny = -1;
+      const dot = dir.x * nx + dir.y * ny;
+      const refl = { x: dir.x - 2 * dot * nx, y: dir.y - 2 * dot * ny };
+
+      const cosI = Math.abs(dot);
+      const iDeg = Math.round(Math.acos(Math.min(1, cosI)) * 180 / Math.PI);
+
+      const ext = Math.max(cssW, cssH);
+      const end = clipRay(hx, hy, refl.x, refl.y, ext);
+
+      return { src, hx, hy, end, dir, refl, nx, ny, iDeg, rDeg: iDeg };
     }
 
-    function drawAngleLabel(x, y, text, color) {
+    function clipRay(x0, y0, dx, dy, maxLen) {
+      let t = maxLen;
+      if (dx > 0) t = Math.min(t, (cssW - 8 - x0) / dx);
+      if (dx < 0) t = Math.min(t, (x0 - 8) / -dx);
+      if (dy > 0) t = Math.min(t, (cssH - 8 - y0) / dy);
+      if (dy < 0) t = Math.min(t, (y0 - 8) / -dy);
+      return { x: x0 + dx * t, y: y0 + dy * t };
+    }
+
+    function drawAngleArc(cx, cy, fromAng, toAng, radius, color) {
+      let diff = toAng - fromAng;
+      while (diff <= -Math.PI) diff += 2 * Math.PI;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      const ccw = diff < 0;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, fromAng, fromAng + diff, ccw);
+      ctx.stroke();
+      return fromAng + diff / 2;
+    }
+
+    function drawAngleLabel(cx, cy, bisectAng, radius, text, color) {
+      const lx = cx + Math.cos(bisectAng) * (radius + 14);
+      const ly = cy + Math.sin(bisectAng) * (radius + 14);
       ctx.fillStyle = color;
       ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(text, x, y);
-    }
-
-    function drawMirror() {
-      const my = mirrorY(), mcx = mirrorCenterX();
-      ctx.lineWidth = 3;
-      if (mirrorType === "flat") {
-        ctx.strokeStyle = "#8043f0";
-        ctx.beginPath();
-        ctx.moveTo(cssW * 0.08, my);
-        ctx.lineTo(cssW * 0.92, my);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(128,67,240,0.08)";
-        ctx.fillRect(cssW * 0.08, my, cssW * 0.84, cssH - my);
-      } else {
-        const sign = mirrorType === "concave" ? 1 : -1;
-        const cy = my + sign * 120;
-        ctx.strokeStyle = "#8043f0";
-        ctx.beginPath();
-        ctx.arc(mcx, cy, 140, sign > 0 ? Math.PI * 0.08 : Math.PI * 1.08, sign > 0 ? Math.PI * 0.92 : Math.PI * 1.92);
-        ctx.stroke();
-      }
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, lx, ly);
     }
 
     function draw() {
@@ -172,50 +130,60 @@
       ctx.fillStyle = "#fafafa";
       ctx.fillRect(0, 0, cssW, cssH);
 
-      drawMirror();
-      const ray = traceRay();
+      const L = layout();
+      const ray = traceRay(L);
+      const src = sourcePos(L);
 
-      const cx = cssW * 0.5, cy = cssH * 0.32;
-      const radius = Math.min(cssW, cssH) * 0.28;
+      ctx.strokeStyle = "#8043f0";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(L.mirrorLeft, L.mirrorY);
+      ctx.lineTo(L.mirrorRight, L.mirrorY);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(128,67,240,0.07)";
+      ctx.fillRect(L.mirrorLeft, L.mirrorY, L.mirrorRight - L.mirrorLeft, cssH - L.mirrorY);
 
       ctx.setLineDash([5, 4]);
       ctx.strokeStyle = "rgba(41,41,41,0.2)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius, Math.PI * 0.05, Math.PI * 0.95);
+      ctx.arc(L.pivot.x, L.pivot.y, L.arcR, Math.PI, 0);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      if (ray.valid) {
+      if (ray) {
         ctx.setLineDash([4, 4]);
         ctx.strokeStyle = "rgba(41,41,41,0.45)";
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(ray.hx, ray.hy);
-        ctx.lineTo(ray.hx + ray.nx * 40, ray.hy + ray.ny * 40);
+        ctx.lineTo(ray.hx, ray.hy - 36);
         ctx.stroke();
         ctx.setLineDash([]);
 
         ctx.strokeStyle = "#8043f0";
         ctx.lineWidth = 2.5;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.moveTo(ray.sx, ray.sy);
+        ctx.moveTo(ray.src.x, ray.src.y);
         ctx.lineTo(ray.hx, ray.hy);
-        ctx.lineTo(ray.rx, ray.ry);
+        ctx.lineTo(ray.end.x, ray.end.y);
         ctx.stroke();
 
-        const nAng = Math.atan2(-ray.ny, -ray.nx);
-        drawArc(ray.hx, ray.hy, 28, nAng - ray.iDeg * Math.PI / 180, nAng, "#292929");
-        const rDir = Math.atan2(ray.ry - ray.hy, ray.rx - ray.hx);
-        drawArc(ray.hx, ray.hy, 36, nAng, rDir, "#8043f0");
+        const normalAng = -Math.PI / 2;
+        const incomingAng = Math.atan2(-ray.dir.y, -ray.dir.x);
+        const reflectedAng = Math.atan2(ray.refl.y, ray.refl.x);
 
-        drawAngleLabel(ray.hx - 36, ray.hy - 14, "i = " + ray.iDeg + "°", "#292929");
-        drawAngleLabel(ray.hx + 36, ray.hy - 14, "r = " + ray.rDeg + "°", "#8043f0");
+        const iBisect = drawAngleArc(ray.hx, ray.hy, incomingAng, normalAng, 24, "#292929");
+        const rBisect = drawAngleArc(ray.hx, ray.hy, normalAng, reflectedAng, 34, "#8043f0");
+
+        drawAngleLabel(ray.hx, ray.hy, iBisect, 24, "i = " + ray.iDeg + "°", "#292929");
+        drawAngleLabel(ray.hx, ray.hy, rBisect, 34, "r = " + ray.rDeg + "°", "#8043f0");
       }
 
       ctx.fillStyle = dragging ? "#8043f0" : "#292929";
       ctx.beginPath();
-      ctx.arc(ray.sx, ray.sy, 8, 0, Math.PI * 2);
+      ctx.arc(src.x, src.y, 9, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2;
@@ -236,48 +204,47 @@
     }
 
     function angleFromPoint(x, y) {
-      const cx = cssW * 0.5, cy = cssH * 0.32;
-      let a = Math.atan2(y - cy, x - cx);
-      a = Math.max(Math.PI * 0.05, Math.min(Math.PI * 0.95, a));
-      return a;
+      const L = layout();
+      let a = Math.atan2(y - L.pivot.y, x - L.pivot.x);
+      return Math.max(-Math.PI + 0.06, Math.min(-0.06, a));
     }
 
     canvas.addEventListener("pointerdown", (e) => {
       if (paused) return;
-      dragging = true; pointerId = e.pointerId;
+      dragging = true;
+      pointerId = e.pointerId;
       canvas.classList.add("dragging");
       canvas.setPointerCapture(e.pointerId);
       const p = ptr(e);
       sourceAngle = angleFromPoint(p.x, p.y);
     });
+
     canvas.addEventListener("pointermove", (e) => {
       if (!dragging || e.pointerId !== pointerId) return;
       const p = ptr(e);
       sourceAngle = angleFromPoint(p.x, p.y);
     });
+
     canvas.addEventListener("pointerup", (e) => {
       if (e.pointerId !== pointerId) return;
-      dragging = false; pointerId = null;
+      dragging = false;
+      pointerId = null;
       canvas.classList.remove("dragging");
       canvas.releasePointerCapture(e.pointerId);
     });
-
-    tabs.forEach((t) => t.addEventListener("click", () => {
-      mirrorType = t.dataset.mirror;
-      tabs.forEach((x) => x.classList.toggle("active", x === t));
-      postState();
-    }));
 
     window.addEventListener("message", (e) => {
       const d = e.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "learning-path-simulation-set-paused" || d.type === "trajectory-simulation-set-paused") {
-        paused = Boolean(d.paused); postState();
+        paused = Boolean(d.paused);
+        postState();
       }
     });
 
     new ResizeObserver(resize).observe(canvas);
-    resize(); postState();
+    resize();
+    postState();
     (function loop() { draw(); requestAnimationFrame(loop); })();
   </script>
 </body>

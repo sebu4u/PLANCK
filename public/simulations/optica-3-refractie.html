@@ -79,23 +79,15 @@
       return Math.asin(sinR);
     }
 
-    function criticalAngle() {
-      if (n1 <= n2) return null;
-      const s = n2 / n1;
-      if (s >= 1) return null;
-      return rad2deg(Math.asin(s));
-    }
-
     function trace() {
       const hx = hitX(), hy = interfaceY();
       const iRad = deg2rad(incidenceDeg);
-      const incoming = { x: -Math.sin(iRad), y: -Math.cos(iRad) };
-      const len = 500;
-      const sx = hx - incoming.x * len * 0.55;
-      const sy = hy - incoming.y * len * 0.55;
+      const len = Math.min(cssW, cssH) * 0.42;
 
-      const rRefl = deg2rad(incidenceDeg);
-      const reflDir = { x: Math.sin(rRefl), y: -Math.cos(rRefl) };
+      // Direcție de sus în jos, din mediul 1 spre interfață
+      const incDir = { x: Math.sin(iRad), y: Math.cos(iRad) };
+      const sx = hx - incDir.x * len;
+      const sy = hy - incDir.y * len;
 
       const rRefr = snellRefract(n1, n2, iRad);
       const tir = rRefr === null;
@@ -105,7 +97,7 @@
         refrDir = { x: Math.sin(rRefr), y: Math.cos(rRefr) };
       }
 
-      return { sx, sy, hx, hy, incoming, reflDir, refrDir, iDeg: incidenceDeg, rDeg, tir };
+      return { sx, sy, hx, hy, incDir, refrDir, iDeg: incidenceDeg, rDeg, tir };
     }
 
     function clipRay(x0, y0, dx, dy, maxLen) {
@@ -129,41 +121,27 @@
       ctx.globalAlpha = 1;
     }
 
-    function drawArc(cx, cy, r, a0, a1, color) {
+    function drawAngleArc(cx, cy, fromAng, toAng, radius, color) {
+      let diff = toAng - fromAng;
+      while (diff <= -Math.PI) diff += 2 * Math.PI;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      const ccw = diff < 0;
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, a0, a1, a0 > a1);
+      ctx.arc(cx, cy, radius, fromAng, fromAng + diff, ccw);
       ctx.stroke();
+      return fromAng + diff / 2;
     }
 
-    function drawPanel(ray) {
-      const x = 10, y = 14;
-      const lines = [
-        "n₁ = " + n1.toFixed(2) + "   n₂ = " + n2.toFixed(2),
-        "i = " + ray.iDeg.toFixed(1) + "°",
-        ray.tir ? "Reflexie totală!" : "r = " + ray.rDeg.toFixed(1) + "°",
-        "r' = " + ray.iDeg.toFixed(1) + "° (reflexie)"
-      ];
-      const crit = criticalAngle();
-      if (crit !== null) lines.push("θc = " + crit.toFixed(1) + "°");
-
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.strokeStyle = "#e8e8ec";
-      ctx.lineWidth = 1;
-      const h = lines.length * 14 + 12;
-      ctx.beginPath();
-      ctx.roundRect(x, y, cssW < 360 ? cssW - 20 : 200, h, 8);
-      ctx.fill(); ctx.stroke();
-
-      ctx.fillStyle = "#292929";
-      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
-      ctx.textAlign = "left";
-      lines.forEach((ln, i) => {
-        ctx.fillStyle = ln.includes("totală") ? "#8043f0" : "#292929";
-        ctx.font = ln.includes("totală") ? "700 10px ui-sans-serif, system-ui, sans-serif" : "600 10px ui-sans-serif, system-ui, sans-serif";
-        ctx.fillText(ln, x + 8, y + 16 + i * 14);
-      });
+    function drawAngleLabel(cx, cy, bisectAng, radius, text, color) {
+      const lx = cx + Math.cos(bisectAng) * (radius + 14);
+      const ly = cy + Math.sin(bisectAng) * (radius + 14);
+      ctx.fillStyle = color;
+      ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, lx, ly);
     }
 
     function draw() {
@@ -192,24 +170,35 @@
 
       ctx.setLineDash([4, 4]);
       ctx.strokeStyle = "rgba(41,41,41,0.4)";
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(ray.hx, ray.hy - 50);
-      ctx.lineTo(ray.hx, ray.hy + 50);
+      ctx.moveTo(ray.hx, ray.hy);
+      ctx.lineTo(ray.hx, ray.hy - 40);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      drawRay(ray.sx, ray.sy, ray.incoming.x, ray.incoming.y, "#8043f0", 2.5, 1);
-      drawRay(ray.hx, ray.hy, ray.reflDir.x, ray.reflDir.y, "#292929", ray.tir ? 2.5 : 1.5, ray.tir ? 1 : 0.35);
+      ctx.strokeStyle = "#8043f0";
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(ray.sx, ray.sy);
+      ctx.lineTo(ray.hx, ray.hy);
+      ctx.stroke();
 
       if (!ray.tir && ray.refrDir) {
         drawRay(ray.hx, ray.hy, ray.refrDir.x, ray.refrDir.y, "#8043f0", 2.5, 1);
       }
 
-      const normalAng = -Math.PI / 2;
-      drawArc(ray.hx, ray.hy, 30, normalAng, normalAng + deg2rad(ray.iDeg), "#292929");
+      const normalUp = -Math.PI / 2;
+      const incomingAng = Math.atan2(-ray.incDir.y, -ray.incDir.x);
+      const iBisect = drawAngleArc(ray.hx, ray.hy, incomingAng, normalUp, 24, "#292929");
+      drawAngleLabel(ray.hx, ray.hy, iBisect, 24, "i = " + ray.iDeg.toFixed(0) + "°", "#292929");
+
       if (!ray.tir) {
-        drawArc(ray.hx, ray.hy, 42, normalAng, normalAng - deg2rad(ray.rDeg), "#8043f0");
+        const normalDown = Math.PI / 2;
+        const refrAng = Math.atan2(ray.refrDir.y, ray.refrDir.x);
+        const rBisect = drawAngleArc(ray.hx, ray.hy, normalDown, refrAng, 34, "#8043f0");
+        drawAngleLabel(ray.hx, ray.hy, rBisect, 34, "r = " + ray.rDeg.toFixed(0) + "°", "#8043f0");
       }
 
       ctx.fillStyle = "#8043f0";
@@ -217,17 +206,10 @@
       ctx.arc(ray.sx, ray.sy, 8, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#292929";
-      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("i", ray.hx - 22, ray.hy - 36);
-      if (!ray.tir) ctx.fillStyle = "#8043f0", ctx.fillText("r", ray.hx + 22, ray.hy + 48);
-
-      drawPanel(ray);
       ctx.fillStyle = "rgba(41,41,41,0.45)";
       ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText("Trage sursa stânga-sus", 10, cssH - 10);
+      ctx.fillText("Trage sursa de sus (mediul 1)", 10, cssH - 10);
     }
 
     function ptr(e) {
@@ -235,19 +217,26 @@
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
 
+    function setIncidenceFromPoint(x, y) {
+      const hx = hitX(), hy = interfaceY();
+      const dx = hx - x;
+      const dy = hy - y;
+      if (dy <= 8) return;
+      incidenceDeg = Math.max(0.5, Math.min(89.9, rad2deg(Math.atan2(dx, dy))));
+    }
+
     canvas.addEventListener("pointerdown", (e) => {
       if (paused) return;
       dragging = true; pointerId = e.pointerId;
       canvas.classList.add("dragging");
       canvas.setPointerCapture(e.pointerId);
+      const p = ptr(e);
+      if (p.y < interfaceY() - 8) setIncidenceFromPoint(p.x, p.y);
     });
     canvas.addEventListener("pointermove", (e) => {
       if (!dragging || e.pointerId !== pointerId) return;
       const p = ptr(e);
-      const hx = hitX(), hy = interfaceY();
-      const dx = hx - p.x, dy = hy - p.y;
-      let ang = rad2deg(Math.atan2(dx, -dy));
-      incidenceDeg = Math.max(0, Math.min(89.9, ang));
+      if (p.y < interfaceY() - 8) setIncidenceFromPoint(p.x, p.y);
     });
     canvas.addEventListener("pointerup", (e) => {
       if (e.pointerId !== pointerId) return;
