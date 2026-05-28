@@ -21,6 +21,11 @@ import { formatGrileCatalogInsightContext } from '@/lib/grile-insight-context';
 import type { GradeLevel, QuizQuestion, UserAnswer } from '@/lib/types/quiz-questions';
 import { Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  MOBILE_BOTTOM_NAV_FAB_ABOVE_QUIZ_CLASS,
+  MOBILE_BOTTOM_NAV_PADDING_CLASS,
+  MOBILE_BOTTOM_NAV_QUIZ_PADDING_CLASS,
+} from '@/lib/mobile-app-nav';
 import { fireLearningPathCorrectConfetti } from '@/lib/learning-path-confetti';
 import { playGrileErrorSound, playGrileSuccessSound } from '@/lib/grile-quiz-audio';
 
@@ -213,7 +218,7 @@ function QuizContent() {
     }
 
     return (
-        <div className="w-full max-w-4xl mx-auto px-4 lg:px-6 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]">
+        <div className={cn("w-full max-w-4xl mx-auto px-4 lg:px-6", MOBILE_BOTTOM_NAV_QUIZ_PADDING_CLASS, "burger:pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]")}>
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-8">
                 <QuestionCard question={currentQuestion} />
 
@@ -294,7 +299,8 @@ function GrileInsightFab({
             }}
             className={cn(
                 'fixed z-[400] flex items-center gap-2 rounded-full border border-violet-500/40 bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-900/15 transition hover:from-violet-500 hover:to-purple-500',
-                'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-lg:right-[max(1.5rem,env(safe-area-inset-right,0px))]',
+                MOBILE_BOTTOM_NAV_FAB_ABOVE_QUIZ_CLASS,
+                'max-lg:right-[max(1.5rem,env(safe-area-inset-right,0px))] lg:bottom-6',
                 grileDesktopChat ? 'lg:right-[calc(1.5rem+25vw)]' : 'lg:right-6',
             )}
         >
@@ -330,7 +336,8 @@ function GrilePageShell() {
         <GrileShellFeedbackContext.Provider value={shellFeedbackValue}>
             <div
                 className={cn(
-                    'relative min-h-screen lg:h-screen lg:overflow-hidden bg-[#ffffff] pt-20 lg:pt-24 pb-8 lg:pb-4 flex flex-col',
+                    'relative min-h-screen lg:h-screen lg:overflow-hidden bg-[#ffffff] pt-16 lg:pt-24 lg:pb-4 flex flex-col',
+                    MOBILE_BOTTOM_NAV_PADDING_CLASS,
                     insightDesktopOpen && 'lg:mr-[25vw]',
                     wrongFlash && 'animate-grile-wrong-shake',
                 )}

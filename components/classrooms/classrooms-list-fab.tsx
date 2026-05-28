@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 
 export function ClassroomsListFab() {
   const [open, setOpen] = useState(false)
@@ -22,7 +23,7 @@ export function ClassroomsListFab() {
   }, [open])
 
   return (
-    <div ref={rootRef} className="pointer-events-none fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-2">
+    <div ref={rootRef} className={cn("pointer-events-none fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-2", MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS)}>
       {open ? (
         <div
           className={cn(

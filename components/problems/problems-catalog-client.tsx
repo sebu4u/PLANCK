@@ -19,6 +19,7 @@ import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { ALLOW_ALL_PHYSICS_PROBLEMS } from "@/lib/access-config"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { ProblemCardSkeleton } from "@/components/problems/problem-card-skeleton"
@@ -914,7 +915,7 @@ export default function ProblemsCatalogClient({
               onScroll={handleProblemsScroll}
             >
               {topSlot}
-              <div className="pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px] pt-6 pb-12 space-y-6">
+              <div className={cn("pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px] pt-6 pb-12 space-y-6", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           {!catalogReady ? (
             <section className="flex min-h-[56vh] items-center justify-center py-4">
               <div className="w-full max-w-4xl">

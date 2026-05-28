@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Resortul orizontal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --text: #292929; --line: #e8e8ec; --accent: #8043f0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; }
+    .sim { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+    .controls { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 2px; }
+    .row { display: flex; align-items: center; gap: 6px; flex: 1 1 120px; min-width: 0; }
+    .row label { font: 600 10px ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+    .row input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 24px; }
+    .val { font: 700 10px ui-sans-serif, system-ui, sans-serif; color: var(--accent); min-width: 28px; text-align: right; }
+    .stage { flex: 1 1 auto; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px;
+      background: linear-gradient(180deg, #fff 0%, #fbfbfb 100%); }
+    canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    @media (max-width: 520px) {
+      .row { min-height: 32px; flex: 1 1 100%; }
+      .row input[type=range] { height: 28px; }
+      .stage { border-radius: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="sim">
+    <div class="controls">
+      <div class="row"><label for="k">k</label><input id="k" type="range" min="20" max="300" step="5" value="90"><span class="val" id="kVal">90</span></div>
+    </div>
+    <section class="stage"><canvas id="canvas"></canvas></section>
+  </main>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const MASS = 1;
+    const BALL_R = 22;
+    const DAMPING = 5.5;
+    const WALL_W = 14;
+    const RESTITUTION = 0.42;
+
+    let cssW = 0, cssH = 0, dpr = 1, paused = false;
+    let k = 90;
+    let cy = 0, wallX = 0, restX = 0, L0 = 0;
+    let ballX = 0, v = 0;
+    let dragging = false, pointerId = null;
+
+    function layout() {
+      cy = cssH * 0.52;
+      wallX = cssW * 0.08;
+      L0 = Math.min(cssW * 0.38, 160);
+      restX = wallX + WALL_W + L0 + BALL_R;
+    }
+
+    function minBallX() { return wallX + WALL_W + L0 * 0.35 + BALL_R; }
+    function maxBallX() { return wallX + WALL_W + L0 * 1.75 + BALL_R; }
+
+    function displacement() { return ballX - restX; }
+
+    function postState() {
+      window.parent.postMessage({
+        type: "learning-path-simulation-state",
+        name: "Resort orizontal",
+        text: dragging ? "Trage bila — comprimă sau alungește resortul." : "Eliberează — resortul revine cu bounce.",
+        paused
+      }, "*");
+    }
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(cssW * dpr); canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const rel = restX > 0 ? (ballX - restX) / L0 : 0;
+      layout();
+      ballX = restX + rel * L0;
+      ballX = Math.max(minBallX(), Math.min(maxBallX(), ballX));
+    }
+
+    function ptr(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    function hitBall(p) {
+      return Math.hypot(p.x - ballX, p.y - cy) <= BALL_R + 12;
+    }
+
+    function update(dt) {
+      if (paused || dragging) return;
+      const disp = displacement();
+      const a = (-k * disp - DAMPING * v) / MASS;
+      v += a * dt;
+      ballX += v * dt;
+
+      if (ballX < minBallX()) {
+        ballX = minBallX();
+        v = Math.abs(v) * RESTITUTION;
+      } else if (ballX > maxBallX()) {
+        ballX = maxBallX();
+        v = -Math.abs(v) * RESTITUTION;
+      }
+
+      if (Math.abs(disp) < 0.3 && Math.abs(v) < 0.45) {
+        v = 0;
+        ballX = restX;
+      }
+    }
+
+    function drawWall() {
+      const top = cy - cssH * 0.28;
+      const bot = cy + cssH * 0.28;
+      ctx.fillStyle = "#292929";
+      ctx.fillRect(wallX, top, WALL_W, bot - top);
+      ctx.fillStyle = "rgba(41,41,41,0.08)";
+      for (let y = top + 10; y < bot; y += 18) {
+        ctx.fillRect(wallX - 8, y, 8, 2);
+      }
+    }
+
+    function drawSpring() {
+      const x1 = wallX + WALL_W;
+      const x2 = ballX - BALL_R;
+      const len = Math.max(8, x2 - x1);
+      const coils = Math.max(8, Math.round(len / 14));
+      const stretch = Math.abs(displacement()) / L0;
+      const bounceAmp = Math.min(1, Math.abs(v) / 80);
+      const amp = (cssW < 360 ? 8 : 10) * (1 + bounceAmp * 0.35);
+      const step = len / coils;
+      ctx.strokeStyle = stretch > 0.03 || Math.abs(v) > 2 ? "#8043f0" : "#292929";
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, cy);
+      for (let i = 0; i < coils; i++) {
+        const dir = i % 2 === 0 ? 1 : -1;
+        ctx.lineTo(x1 + step * (i + 0.5), cy + amp * dir);
+        ctx.lineTo(x1 + step * (i + 1), cy);
+      }
+      ctx.stroke();
+    }
+
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(ballX, cy, BALL_R, 0, Math.PI * 2);
+      ctx.fillStyle = dragging || Math.abs(displacement()) > 2 || Math.abs(v) > 3 ? "#8043f0" : "#292929";
+      ctx.fill();
+      ctx.strokeStyle = "#292929";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function drawFloor() {
+      ctx.strokeStyle = "rgba(41,41,41,0.12)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(0, cy + BALL_R + 4);
+      ctx.lineTo(cssW, cy + BALL_R + 4);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(0, 0, cssW, cssH);
+      drawFloor();
+      drawWall();
+      drawSpring();
+      drawBall();
+
+      if (!dragging && Math.abs(displacement()) < 1 && Math.abs(v) < 1) {
+        ctx.fillStyle = "rgba(41,41,41,0.45)";
+        ctx.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Trage bila — eliberează și urmărește bounce-ul spre forma normală", cssW * 0.5, cssH - 10);
+      }
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (paused) return;
+      const p = ptr(e);
+      if (!hitBall(p)) return;
+      dragging = true;
+      v = 0;
+      pointerId = e.pointerId;
+      canvas.classList.add("dragging");
+      canvas.setPointerCapture(e.pointerId);
+      postState();
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!dragging || e.pointerId !== pointerId) return;
+      const p = ptr(e);
+      ballX = Math.max(minBallX(), Math.min(maxBallX(), p.x));
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      if (e.pointerId !== pointerId) return;
+      dragging = false;
+      pointerId = null;
+      canvas.classList.remove("dragging");
+      canvas.releasePointerCapture(e.pointerId);
+      postState();
+    });
+
+    canvas.addEventListener("pointercancel", (e) => {
+      if (e.pointerId !== pointerId) return;
+      dragging = false;
+      pointerId = null;
+      canvas.classList.remove("dragging");
+    });
+
+    document.getElementById("k").addEventListener("input", (e) => {
+      k = Number(e.target.value);
+      document.getElementById("kVal").textContent = k;
+    });
+
+    let last = performance.now();
+    function loop(now) {
+      update(Math.min(0.032, (now - last) / 1000));
+      last = now;
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("message", (e) => {
+      const d = e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "learning-path-simulation-set-paused" || d.type === "trajectory-simulation-set-paused") paused = Boolean(d.paused);
+    });
+
+    new ResizeObserver(resize).observe(canvas.parentElement);
+    resize();
+    ballX = restX;
+    postState();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

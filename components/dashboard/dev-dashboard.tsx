@@ -9,7 +9,6 @@ import { Navigation } from "@/components/navigation"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
 import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-wrapper"
-import { DashboardMobileBottomNav } from "@/components/dashboard/dashboard-mobile-bottom-nav"
 import type {
   Achievement,
   ContinueLearningItem,
@@ -119,7 +118,7 @@ export function DevDashboard() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#ffffff] transition-all duration-300 lg:ml-[250px]">
           <div className="m-[3px] mt-0 flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f8f9fa] lg:mt-0 lg:rounded-xl">
-            <div className="dashboard-scrollbar flex-1 overflow-y-auto bg-[#f8f9fa] pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
+            <div className="dashboard-scrollbar flex-1 overflow-y-auto bg-[#f8f9fa]">
               <main className="animate-fade-in-up p-4 md:p-8 lg:p-10">
                 <div className="mx-auto max-w-[1000px]">
                   <div className="mb-4 pt-3 md:hidden">
@@ -206,7 +205,6 @@ export function DevDashboard() {
         </div>
       </div>
 
-      <DashboardMobileBottomNav userGrade={profile?.grade} />
     </DashboardSidebarProvider>
   )
 }

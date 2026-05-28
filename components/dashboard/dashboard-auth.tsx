@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import { Navigation } from "@/components/navigation"
+import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-wrapper"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
@@ -40,7 +41,6 @@ import {
   DashboardStreakCard,
   type DashboardStreakDay,
 } from "@/components/dashboard/cards/dashboard-streak-card"
-import { DashboardMobileBottomNav } from "@/components/dashboard/dashboard-mobile-bottom-nav"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
@@ -547,8 +547,8 @@ export function DashboardAuth() {
           {/* Floating Card Container */}
           <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
-            {/* Scrollable Content Area — extra bottom padding on mobile for fixed quick nav */}
-            <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa] pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
+            {/* Scrollable Content Area */}
+            <div className={`flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa] ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}>
               {!isPaid ? (
                 <div className="bg-[#f7f9fa]">
                   {postOnboardingDiscount.active ? (
@@ -601,20 +601,6 @@ export function DashboardAuth() {
               ) : null}
               <main className="p-4 md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="max-w-[1000px] mx-auto">
-                  {/* Mobile welcome */}
-                  <div className="mb-4 pt-3 md:hidden">
-                    <p className="text-2xl font-extrabold text-gray-900">
-                      Bună, {userData.username || 'Student'} 👋
-                    </p>
-                    <p className="mt-0.5 text-sm text-gray-500">
-                      {(() => {
-                        const d = new Date()
-                        const weekdays = ['Duminică', 'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă']
-                        const months = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'nov', 'dec']
-                        return `${weekdays[d.getDay()]} • ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
-                      })()}
-                    </p>
-                  </div>
                   {/* Desktop welcome */}
                   <div className="mb-8 hidden md:block">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -624,7 +610,7 @@ export function DashboardAuth() {
                   </div>
 
                   <div className={`grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6 ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
-                    <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
+                    <div className="order-1 xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
                         currentStreak={dashboardData.stats.current_streak}
                         problemsToday={dashboardData.stats.problems_solved_today}
@@ -733,7 +719,6 @@ export function DashboardAuth() {
         />
       )}
 
-      <DashboardMobileBottomNav userGrade={profile?.grade} />
       <DashboardFakeSolveSocialOverlay
         notification={fakeSolveMobileNotification}
         visible={fakeSolveMobileVisible}

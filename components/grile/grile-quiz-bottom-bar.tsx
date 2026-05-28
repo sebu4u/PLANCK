@@ -3,6 +3,7 @@
 import React from "react"
 import { ArrowLeft, ArrowRight, CheckCircle, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import type { UserAnswer } from "@/lib/types/quiz-questions"
 import { playGrileClickSound } from "@/lib/grile-quiz-audio"
 
@@ -121,7 +122,8 @@ export function GrileQuizBottomBar({
   return (
     <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-[300] border-t px-4 py-2.5 sm:px-6 sm:py-4",
+        "fixed bottom-0 left-0 right-0 z-[310] border-t px-4 py-2.5 sm:px-6 sm:py-4",
+        MOBILE_BOTTOM_NAV_OFFSET_CLASS,
         insightDesktopOpen && "lg:right-[25vw]",
         barTone,
       )}

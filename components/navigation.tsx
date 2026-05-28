@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { NavbarTestBatteries } from "@/components/navbar-test-batteries"
 import { NavbarEloDisplay } from "@/components/navbar-elo-display"
+import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { getMobileTopBarContent, isMobileAppShellRoute } from "@/lib/mobile-app-nav"
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
 
@@ -462,11 +464,28 @@ export function Navigation() {
   const navbarElevationClass = isProblemDetailPage
     ? 'shadow-none'
     : `shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? 'burger:shadow-none' : ''}`
+  const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
+  const mobileDisplayName = profile?.nickname || profile?.name || "Student"
+  const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
+
+  useEffect(() => {
+    if (showMobileAppShell) {
+      document.body.classList.add("mobile-app-shell")
+    } else {
+      document.body.classList.remove("mobile-app-shell")
+    }
+    return () => document.body.classList.remove("mobile-app-shell")
+  }, [showMobileAppShell])
+  const mobileShellNavSurfaceClass = showMobileAppShell
+    ? useLightNav
+      ? `${navTheme.background} ${navTheme.border}`
+      : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
+    : `${navTheme.background} ${navTheme.border}`
 
   return (
     <>
       <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} ${navbarElevationClass}`}>
-        <nav className={`w-full ${isHomepage && isScrolled ? 'backdrop-blur-md' : !isHomepage ? 'backdrop-blur-md' : ''} transition-all duration-300 ${navTheme.background} ${navTheme.border}`}>
+        <nav className={`w-full ${isHomepage && isScrolled ? 'backdrop-blur-md' : !isHomepage ? 'backdrop-blur-md' : ''} transition-all duration-300 ${mobileShellNavSurfaceClass}`}>
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="relative h-16 flex items-center justify-between gap-4">
               <div className={`burger:hidden flex w-full items-center justify-between ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
@@ -491,77 +510,94 @@ export function Navigation() {
                       <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                     </Link>
                   </div>
+                ) : showMobileAppShell ? (
+                  <>
+                    <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
+                      <p className="truncate text-sm font-bold text-gray-900">
+                        {mobileTopBarContent.primary}
+                      </p>
+                      {mobileTopBarContent.secondary ? (
+                        <p className="truncate text-xs text-gray-500">{mobileTopBarContent.secondary}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <NavbarEloDisplay userElo={userElo} useLightNav />
+                      <NavbarTestBatteries useLightNav />
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                      <Home className="h-5 w-5" />
-                    </Link>
-                    <Link href="/invata" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                      <BookOpen className="h-5 w-5" />
-                    </Link>
-                    <Link href="/probleme" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                      <Calculator className="h-5 w-5" />
-                    </Link>
-                    <Link
-                      href="/classrooms"
-                      aria-label="Clasa mea"
-                      className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
-                    >
-                      <Users className="h-5 w-5" />
-                    </Link>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  {user ? (
-                    <NavbarEloDisplay userElo={userElo} useLightNav={useLightNav} />
-                  ) : (
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${navSecondaryText}`}>
-                      <Trophy className="h-3.5 w-3.5" />
-                      —
-                    </span>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        aria-label="Open navigation menu"
-                        className={`inline-flex h-9 w-9 items-center justify-center ${useLightNav ? 'text-gray-700' : 'text-gray-200'} ${navHoverText} transition-colors`}
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                        <Home className="h-5 w-5" />
+                      </Link>
+                      <Link href="/invata" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                        <BookOpen className="h-5 w-5" />
+                      </Link>
+                      <Link href="/probleme" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                        <Calculator className="h-5 w-5" />
+                      </Link>
+                      <Link
+                        href="/classrooms"
+                        aria-label="Clasa mea"
+                        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                       >
-                        <Menu className="h-5 w-5" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
-                      <DropdownMenuItem asChild>
-                        <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Profil</a>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
-                          Abonament
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
+                        <Users className="h-5 w-5" />
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2">
                       {user ? (
-                        <DropdownMenuItem asChild>
-                          <button
-                            onClick={async () => {
-                              await logout()
-                              toast({ title: "Te-ai delogat cu succes!" })
-                              router.push("/")
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20"
-                          >
-                            Log out
-                          </button>
-                        </DropdownMenuItem>
+                        <NavbarEloDisplay userElo={userElo} useLightNav={useLightNav} />
                       ) : (
-                        <DropdownMenuItem asChild>
-                          <a href="/register" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
-                            Creeaza cont acum
-                          </a>
-                        </DropdownMenuItem>
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${navSecondaryText}`}>
+                          <Trophy className="h-3.5 w-3.5" />
+                          —
+                        </span>
                       )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            aria-label="Open navigation menu"
+                            className={`inline-flex h-9 w-9 items-center justify-center ${useLightNav ? 'text-gray-700' : 'text-gray-200'} ${navHoverText} transition-colors`}
+                          >
+                            <Menu className="h-5 w-5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
+                          <DropdownMenuItem asChild>
+                            <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Profil</a>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                              Abonament
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
+                          {user ? (
+                            <DropdownMenuItem asChild>
+                              <button
+                                onClick={async () => {
+                                  await logout()
+                                  toast({ title: "Te-ai delogat cu succes!" })
+                                  router.push("/")
+                                }}
+                                className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20"
+                              >
+                                Log out
+                              </button>
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem asChild>
+                              <a href="/register" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                                Creeaza cont acum
+                              </a>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="hidden burger:flex items-center h-full gap-6 flex-1 min-w-0">
@@ -858,6 +894,7 @@ export function Navigation() {
 
         </nav>
       </div>
+      {showMobileAppShell ? <MobileBottomNav /> : null}
     </>
   )
 }

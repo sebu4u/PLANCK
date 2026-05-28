@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
-import { Pencil, Settings, Lock, Shield, Trophy, Gift, GraduationCap, Copy, Check } from "lucide-react";
+import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav";
+import { Pencil, Settings, Lock, Shield, Trophy, Gift, GraduationCap, Copy, Check, CreditCard, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserBadges } from "@/components/user-badges";
 import { ChangePasswordModal } from "@/components/change-password-modal";
@@ -21,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getNextRankThreshold } from "@/lib/dashboard-data";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 // Skeleton components for profile page
@@ -43,7 +45,7 @@ const StatsSkeleton = () => (
 );
 
 const ProfilPage = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
@@ -263,7 +265,7 @@ const ProfilPage = () => {
     return (
       <div className="min-h-screen bg-[#0D0D0F]">
         <Navigation />
-        <main className="pt-24 px-4 md:px-6 lg:px-8 pb-12">
+        <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
@@ -295,7 +297,7 @@ const ProfilPage = () => {
     <>
       <div className="min-h-screen bg-[#0D0D0F]">
         <Navigation />
-        <main className="pt-24 px-4 md:px-6 lg:px-8 pb-12">
+        <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
@@ -493,6 +495,26 @@ const ProfilPage = () => {
                           >
                             <Shield className="w-4 h-4 mr-2" />
                             Setări confidențialitate
+                          </Button>
+                          <Button
+                            onClick={() => router.push("/pricing")}
+                            className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                            variant="outline"
+                          >
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Abonament
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              await logout()
+                              toast({ title: "Te-ai delogat cu succes!" })
+                              router.push("/")
+                            }}
+                            className="w-full border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                            variant="outline"
+                          >
+                            <LogOut className="w-4 h-4 mr-2" />
+                            Log out
                           </Button>
                         </div>
                       </div>

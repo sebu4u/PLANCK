@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Layers } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
@@ -81,7 +82,7 @@ export default async function InvataPage() {
       <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
       <Navigation />
 
-      <main className="min-h-screen bg-[#ffffff] pb-10 pt-28">
+      <main className={`min-h-screen bg-[#ffffff] pt-16 burger:pt-28 burger:pb-10 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}>
         <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
           <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>

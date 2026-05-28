@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { ChevronUp, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import type { Problem } from "@/data/problems"
 import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
 import type { ProblemWrongAnswerPenalty } from "@/components/problems/problem-wrong-answer-elo-card"
@@ -249,6 +250,7 @@ export function ProblemAnswerBottomSheet({
       onTouchEnd={onDrawerTouchEnd}
       className={cn(
         "fixed inset-x-0 bottom-0 z-[90] flex flex-col transition-all duration-300 ease-out",
+        MOBILE_BOTTOM_NAV_OFFSET_CLASS,
         !isDragging && !expanded && "transition-transform duration-300 ease-out",
         !expanded && isBouncing && !isDragging && "-translate-y-1"
       )}

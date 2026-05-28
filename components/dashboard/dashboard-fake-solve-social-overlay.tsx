@@ -20,7 +20,7 @@ export function DashboardFakeSolveSocialOverlay({
   return (
     <div
       className={cn(
-        "pointer-events-none fixed inset-x-3 bottom-[calc(4.85rem+env(safe-area-inset-bottom,0px))] z-[290] flex justify-start lg:hidden",
+        "pointer-events-none fixed inset-x-3 mobile-bottom-nav-fab-offset z-[290] flex justify-start lg:bottom-3 lg:hidden",
         "transition-all duration-300 ease-out",
         visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
       )}

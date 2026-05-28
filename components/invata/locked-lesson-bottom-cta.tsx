@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 
 const SCROLL_DELTA = 8
 
@@ -42,6 +43,7 @@ export function LockedLessonBottomCta() {
     <div
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center px-2 pb-6 pt-2 sm:px-4 lg:left-[calc(360px+2rem)] lg:right-8 lg:justify-center xl:left-[calc(400px+2rem)]",
+        MOBILE_BOTTOM_NAV_OFFSET_CLASS,
         "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform",
         /* translate-y-full pe intregul bloc (glow + card in flux) ca sa iasa complet in jos */
         visible ? "translate-y-0" : "translate-y-full"

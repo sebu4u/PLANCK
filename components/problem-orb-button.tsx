@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import Orb from "@/components/orb"
+import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from "@/lib/mobile-app-nav"
+import { cn } from "@/lib/utils"
 
 const bubbleTexts = [
   "Psst, te-ai blocat..?",
@@ -65,7 +67,10 @@ export default function ProblemOrbButton({ onOpenSidebar }: ProblemOrbButtonProp
 
   return (
     <div 
-      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 lg:hidden"
+      className={cn(
+        "fixed bottom-4 right-4 z-50 sm:right-6 lg:hidden",
+        MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS,
+      )}
       style={{
         opacity: orbVisible ? 1 : 0,
         transition: "opacity 0.5s ease-in-out",

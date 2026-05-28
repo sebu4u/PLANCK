@@ -15,6 +15,8 @@ import { ITEM_TYPE_LABEL, getLessonItemDisplayIcon } from "@/components/invata/l
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
+import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS, MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 
 interface FreeAccessState {
   itemsSolved: number
@@ -147,7 +149,7 @@ export function LearningPathLessonPage({
   }, [initialSelectedItemId, items])
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 pb-10 pt-28 sm:px-8 lg:px-12">
+    <div className={cn("mx-auto w-full max-w-7xl px-5 pt-16 sm:px-8 lg:px-12 lg:pt-28 lg:pb-10", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-10")}>
       <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
         <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
           <div className="flex w-full justify-center bg-transparent lg:justify-start">
@@ -361,7 +363,7 @@ export function LearningPathLessonPage({
                 <>
                   {/* Spacer păstrează layout-ul; cardul real e fixed mai jos */}
                   <div className="mt-6 h-[140px] w-full shrink-0 lg:w-1/2 lg:min-w-[200px] lg:max-w-sm" aria-hidden="true" />
-                  <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:left-[calc(360px+2rem)] lg:right-8 lg:justify-center xl:left-[calc(400px+2rem)]">
+                  <div className={cn("fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:left-[calc(360px+2rem)] lg:right-8 lg:justify-center xl:left-[calc(400px+2rem)]", MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS)}>
                     <div
                       key={selectedItem.id}
                       className="animate-learning-path-card-pop w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)] lg:w-[min(100%,320px)]"

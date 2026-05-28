@@ -19,6 +19,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_DRAFT_PADDING_CLASS, MOBILE_BOTTOM_NAV_DRAFT_PREVIEW_PADDING_CLASS, MOBILE_BOTTOM_NAV_OFFSET_CLASS, MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import type { ClassroomSummary } from "@/lib/classrooms/types"
 
 interface ClassroomsShellProps {
@@ -362,13 +363,15 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
 
       <div className="flex-1 min-w-0 flex flex-col bg-[#ffffff]">
         <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col">
-          <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[#f8f9fa] dashboard-scrollbar">
+          <div className={cn("min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[#f8f9fa] dashboard-scrollbar", MOBILE_BOTTOM_NAV_PADDING_CLASS)}>
             <main
               className={cn(
                 "p-4 md:p-8 lg:p-10",
                 isDraftPicking && "lg:p-0 lg:pb-0",
-                isDraftPicking && !isOnClassroomProblemPreview && "pb-32",
-                isDraftPicking && isOnClassroomProblemPreview && "pb-40 lg:pb-0",
+                isDraftPicking && !isOnClassroomProblemPreview && MOBILE_BOTTOM_NAV_DRAFT_PADDING_CLASS,
+                isDraftPicking && !isOnClassroomProblemPreview && "burger:pb-32",
+                isDraftPicking && isOnClassroomProblemPreview && MOBILE_BOTTOM_NAV_DRAFT_PREVIEW_PADDING_CLASS,
+                isDraftPicking && isOnClassroomProblemPreview && "burger:pb-40 lg:pb-0",
               )}
             >
               <div className={cn("mx-auto w-full max-w-5xl", isDraftPicking && "max-w-none")}>{children}</div>
@@ -378,7 +381,7 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
       </div>
 
       {isDraftPicking && pathClassId ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[120] border-t border-[#dbe5f0] bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm lg:hidden">
+        <div className={cn("pointer-events-none fixed inset-x-0 z-[120] border-t border-[#dbe5f0] bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm lg:hidden", MOBILE_BOTTOM_NAV_OFFSET_CLASS)}>
           <div className="pointer-events-auto mx-auto max-w-5xl">
             {isOnClassroomProblemPreview && previewProblemIdFromPath ? (
               <div className="flex flex-col gap-2">

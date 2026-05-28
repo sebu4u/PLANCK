@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 
 interface ClassroomAssignmentFabProps {
   classroomId: string
@@ -70,6 +71,7 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
         onClick={() => setOpen(true)}
         className={cn(
           "pointer-events-auto fixed bottom-6 right-6 z-[200] flex h-14 w-14 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-lg",
+          MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS,
           "transition-transform hover:scale-105 hover:bg-[#1557b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a73e8]"
         )}
       >

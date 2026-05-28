@@ -25,6 +25,7 @@ import ProblemOrbButton from "@/components/problem-orb-button"
 const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
 const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
 import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
 import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
@@ -417,7 +418,7 @@ export default function ProblemDetailClient({
           className={cn(
             "px-4 sm:px-6 lg:px-12 pb-16",
             isClassroomEmbed ? "pt-4" : "pt-4 lg:pt-8",
-            isMobile && "pb-28",
+            !isClassroomEmbed && MOBILE_BOTTOM_NAV_PADDING_CLASS,
           )}
         >
           <div className="mx-auto max-w-[1600px] space-y-10">
