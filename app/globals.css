@@ -315,6 +315,45 @@
   will-change: transform, opacity;
 }
 
+@keyframes learning-path-scroll-button-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes learning-path-scroll-button-pop-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+}
+
+.animate-learning-path-scroll-button-pop-in {
+  animation: learning-path-scroll-button-pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+.animate-learning-path-scroll-button-pop-out {
+  animation: learning-path-scroll-button-pop-out 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
 /* Pulse Animation for Streak */
 @keyframes pulse-glow {
 

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useRouter } from "next/navigation"
-import { BookOpen, Check, ChevronRight, Loader2, Lock } from "lucide-react"
+import { BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, Loader2, Lock } from "lucide-react"
 import {
   getLearningPathLessonHref,
   getLearningPathRouteSegments,
@@ -13,10 +13,26 @@ import {
 import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
 import { ITEM_TYPE_LABEL, getLessonItemDisplayIcon } from "@/components/invata/learning-path-item-body"
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
+import { LearningPathTrail } from "@/components/invata/learning-path-trail"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
 import { cn } from "@/lib/utils"
-import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS, MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
+
+function scrollLearningPathItemIntoView(itemId: string, behavior: ScrollBehavior = "smooth") {
+  document.getElementById(`learning-path-item-node-${itemId}`)?.scrollIntoView({ block: "center", behavior })
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "")
+  const r = Number.parseInt(normalized.slice(0, 2), 16)
+  const g = Number.parseInt(normalized.slice(2, 4), 16)
+  const b = Number.parseInt(normalized.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function getLevelContinueGlow(from: string, to: string): string {
+  return `radial-gradient(ellipse 85% 75% at 50% 100%, ${hexToRgba(to, 0.72)} 0%, ${hexToRgba(from, 0.42)} 34%, ${hexToRgba(from, 0.22)} 52%, ${hexToRgba(from, 0.1)} 68%, transparent 88%)`
+}
 
 interface FreeAccessState {
   itemsSolved: number
@@ -33,7 +49,9 @@ interface LearningPathLessonPageProps {
 }
 
 const NODE_ROW_OFFSETS = ["ml-[6%]", "ml-[26%]", "ml-[12%]", "ml-[32%]", "ml-[18%]"]
-const ITEMS_PER_LEVEL = 4
+const ITEMS_PER_LEVEL = 6
+const CONTINUE_CARD_EXIT_MS = 300
+const PROGRESS_SCROLL_BUTTON_ANIM_MS = 280
 
 const LEVEL_CARD_THEMES = [
   {
@@ -100,7 +118,13 @@ export function LearningPathLessonPage({
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialSelectedItemId ?? items[0]?.id ?? null)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [isOpeningItem, setIsOpeningItem] = useState(false)
+  const [isSelectedItemInViewport, setIsSelectedItemInViewport] = useState(false)
+  const [progressScrollDirection, setProgressScrollDirection] = useState<"up" | "down" | null>(null)
+  const [progressButtonMounted, setProgressButtonMounted] = useState(false)
+  const [progressButtonExiting, setProgressButtonExiting] = useState(false)
+  const progressButtonMountedRef = useRef(false)
   const completedItemIdSet = useMemo(() => new Set(completedItemIds), [completedItemIds])
+  const showContinueCard = isSelectedItemInViewport
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
@@ -125,6 +149,111 @@ export function LearningPathLessonPage({
     router.push(selectedItemHref)
   }
 
+  const handleSelectItem = (itemId: string) => {
+    setSelectedItemId(itemId)
+    requestAnimationFrame(() => scrollLearningPathItemIntoView(itemId))
+  }
+
+  const updateProgressScrollDirection = useCallback(() => {
+    if (!nextItemId) {
+      setProgressScrollDirection(null)
+      return
+    }
+
+    const node = document.getElementById(`learning-path-item-node-${nextItemId}`)
+    if (!node) {
+      setProgressScrollDirection(null)
+      return
+    }
+
+    const rect = node.getBoundingClientRect()
+    const nodeCenterY = rect.top + rect.height / 2
+    const viewportCenterY = window.innerHeight / 2
+    const centerThreshold = 72
+
+    if (Math.abs(nodeCenterY - viewportCenterY) < centerThreshold) {
+      setProgressScrollDirection(null)
+      return
+    }
+
+    setProgressScrollDirection(nodeCenterY < viewportCenterY ? "up" : "down")
+  }, [nextItemId])
+
+  const handleScrollToProgress = () => {
+    if (!nextItemId) return
+    setSelectedItemId(nextItemId)
+    scrollLearningPathItemIntoView(nextItemId)
+  }
+
+  useEffect(() => {
+    if (!selectedItemId) {
+      setIsSelectedItemInViewport(false)
+      return
+    }
+
+    const node = document.getElementById(`learning-path-item-node-${selectedItemId}`)
+    if (!node) {
+      setIsSelectedItemInViewport(false)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSelectedItemInViewport(entry.isIntersecting)
+      },
+      { threshold: 0.15 },
+    )
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [selectedItemId])
+
+  useEffect(() => {
+    updateProgressScrollDirection()
+    window.addEventListener("scroll", updateProgressScrollDirection, { passive: true })
+    window.addEventListener("resize", updateProgressScrollDirection)
+    return () => {
+      window.removeEventListener("scroll", updateProgressScrollDirection)
+      window.removeEventListener("resize", updateProgressScrollDirection)
+    }
+  }, [updateProgressScrollDirection, items.length, completedItemIds.join(",")])
+
+  useEffect(() => {
+    let delayTimer: ReturnType<typeof setTimeout> | undefined
+    let exitTimer: ReturnType<typeof setTimeout> | undefined
+
+    const hideProgressButton = () => {
+      if (!progressButtonMountedRef.current) return
+
+      setProgressButtonExiting(true)
+      exitTimer = window.setTimeout(() => {
+        progressButtonMountedRef.current = false
+        setProgressButtonMounted(false)
+        setProgressButtonExiting(false)
+      }, PROGRESS_SCROLL_BUTTON_ANIM_MS)
+    }
+
+    if (showContinueCard || !progressScrollDirection) {
+      hideProgressButton()
+      return () => {
+        if (exitTimer) window.clearTimeout(exitTimer)
+      }
+    }
+
+    delayTimer = window.setTimeout(() => {
+      if (!showContinueCard && progressScrollDirection) {
+        progressButtonMountedRef.current = true
+        setProgressButtonExiting(false)
+        setProgressButtonMounted(true)
+      }
+    }, CONTINUE_CARD_EXIT_MS)
+
+    return () => {
+      if (delayTimer) window.clearTimeout(delayTimer)
+      if (exitTimer) window.clearTimeout(exitTimer)
+    }
+  }, [showContinueCard, progressScrollDirection])
+
   useEffect(() => {
     if (!selectedItem) return
     const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
@@ -137,11 +266,7 @@ export function LearningPathLessonPage({
     const resumeIndex = items.findIndex((item) => item.id === initialSelectedItemId)
     if (resumeIndex <= 0) return
 
-    const runScroll = () => {
-      document
-        .getElementById(`learning-path-item-node-${initialSelectedItemId}`)
-        ?.scrollIntoView({ block: "center", behavior: "instant" })
-    }
+    const runScroll = () => scrollLearningPathItemIntoView(initialSelectedItemId, "instant")
 
     runScroll()
     const raf = window.requestAnimationFrame(runScroll)
@@ -149,7 +274,7 @@ export function LearningPathLessonPage({
   }, [initialSelectedItemId, items])
 
   return (
-    <div className={cn("mx-auto w-full max-w-7xl px-5 pt-16 sm:px-8 lg:px-12 lg:pt-28 lg:pb-10", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-10")}>
+    <div className="mx-auto w-full max-w-7xl px-5 pt-16 pb-6 sm:px-8 lg:px-12 lg:pt-28 lg:pb-10">
       <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
         <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
           <div className="flex w-full justify-center bg-transparent lg:justify-start">
@@ -181,6 +306,10 @@ export function LearningPathLessonPage({
         <section className="relative flex min-w-0 flex-col items-center">
           {items.length ? (
             <>
+              <LearningPathTrail
+                className="w-full"
+                layoutKey={`${items.length}-${completedItemIds.join(",")}-${selectedItemId ?? ""}`}
+              >
               {Array.from({ length: levelCount }, (_, levelIndex) => {
                 const start = levelIndex * ITEMS_PER_LEVEL
                 const levelItems = items.slice(start, start + ITEMS_PER_LEVEL)
@@ -188,6 +317,8 @@ export function LearningPathLessonPage({
                 const theme = LEVEL_CARD_THEMES[levelIndex % LEVEL_CARD_THEMES.length]
                 const levelStartLabel = start + 1
                 const levelEndLabel = start + levelItems.length
+                const hasCompletedItemInLevel = levelItems.some((item) => completedItemIdSet.has(item.id))
+                const isLevelColored = levelNumber === 1 || hasCompletedItemInLevel
 
                 return (
                   <div key={levelNumber} className="w-full">
@@ -196,6 +327,8 @@ export function LearningPathLessonPage({
                       blurredTitle={`Itemii ${levelStartLabel}-${levelEndLabel}`}
                       outlineColor={theme.outline}
                       labelColorClass={theme.label}
+                      isLocked={false}
+                      isColored={isLevelColored}
                     />
 
                     <div className="relative flex w-full flex-col items-center">
@@ -213,19 +346,11 @@ export function LearningPathLessonPage({
                           <div
                             key={item.id}
                             id={`learning-path-item-node-${item.id}`}
-                            className={`relative mb-10 w-fit max-w-full ${offsetClass} ${isTest ? "mx-auto" : ""}`}
+                            className={`relative mb-20 w-fit max-w-full sm:mb-10 ${offsetClass} ${isTest ? "mx-auto" : ""}`}
                           >
-                            {index < items.length - 1 ? (
-                              <div
-                                className={`pointer-events-none absolute h-24 w-[3px] rounded-full bg-gradient-to-b from-[#ddd3ea] via-[#ece8f5] to-transparent ${
-                                  isTest ? "left-1/2 top-[72px] -translate-x-1/2" : "left-10 top-20"
-                                }`}
-                              />
-                            ) : null}
-
                             <button
                               type="button"
-                              onClick={() => setSelectedItemId(item.id)}
+                              onClick={() => handleSelectItem(item.id)}
                               className={`group flex max-w-full items-center gap-4 text-left ${
                                 isTest
                                   ? "rounded-[26px] border p-3 pr-4 shadow-[0_14px_34px_rgba(82,44,111,0.08)] transition-[transform,box-shadow,border-color] hover:-translate-y-0.5"
@@ -248,11 +373,25 @@ export function LearningPathLessonPage({
                               {isTest ? (
                                 <>
                                   <span
+                                    data-learning-path-anchor="circle"
+                                    data-trail-completed={isCompleted ? "true" : "false"}
+                                    data-trail-stroke-from={theme.from}
+                                    data-trail-stroke-to={theme.to}
                                     className={`relative flex h-16 w-16 shrink-0 rotate-3 items-center justify-center rounded-[22px] border-2 transition-transform group-hover:rotate-0 ${
                                       isSelected
                                         ? "border-white/40 bg-white/18 text-white"
-                                        : "border-[#ded2eb] bg-[#f4efff] text-[#7c3aed]"
+                                        : isCompleted
+                                          ? "border-transparent text-white"
+                                          : "border-[#ded2eb] bg-[#f4efff] text-[#7c3aed]"
                                     }`}
+                                    style={
+                                      isCompleted && !isSelected
+                                        ? ({
+                                            backgroundImage: `linear-gradient(135deg, ${theme.from} 0%, ${theme.to} 100%)`,
+                                            boxShadow: `0 8px 18px ${theme.shadow}`,
+                                          } as CSSProperties)
+                                        : undefined
+                                    }
                                   >
                                     <ItemIcon className="h-8 w-8" />
                                     <span
@@ -294,7 +433,13 @@ export function LearningPathLessonPage({
                                 </>
                               ) : (
                                 <>
-                                  <span className="relative flex h-20 w-20 shrink-0 items-center justify-center">
+                                  <span
+                                    data-learning-path-anchor="circle"
+                                    data-trail-completed={isCompleted ? "true" : "false"}
+                                    data-trail-stroke-from={theme.from}
+                                    data-trail-stroke-to={theme.to}
+                                    className="relative flex h-20 w-20 shrink-0 items-center justify-center"
+                                  >
                                     {isSelected ? (
                                       <>
                                         <span
@@ -317,13 +462,31 @@ export function LearningPathLessonPage({
                                           }}
                                         />
                                       </>
+                                    ) : isCompleted ? (
+                                      <>
+                                        <span
+                                          className="absolute inset-0 rounded-full border-[5px]"
+                                          style={{ borderColor: theme.ring }}
+                                        />
+                                        <span
+                                          className="absolute inset-[12px] rounded-full"
+                                          style={{
+                                            backgroundImage: `linear-gradient(to right, ${theme.from}, ${theme.to})`,
+                                            boxShadow: `0 8px 18px ${theme.shadow}`,
+                                          }}
+                                        />
+                                      </>
                                     ) : (
                                       <>
                                         <span className="absolute inset-[1px] rounded-full bg-[#d9d9de]" />
                                         <span className="absolute inset-[9px] rounded-full border border-white/70 bg-[#f4f4f7]" />
                                       </>
                                     )}
-                                    <span className={`relative z-[1] flex items-center justify-center ${isSelected ? "text-white" : "text-[#9a9aa2]"}`}>
+                                    <span
+                                      className={`relative z-[1] flex items-center justify-center ${
+                                        isSelected || isCompleted ? "text-white" : "text-[#9a9aa2]"
+                                      }`}
+                                    >
                                       <ItemIcon className="h-8 w-8" />
                                     </span>
                                   </span>
@@ -359,15 +522,69 @@ export function LearningPathLessonPage({
                 )
               })}
 
-              {selectedItem ? (
+              </LearningPathTrail>
+
+              {items.length > 0 ? (
                 <>
-                  {/* Spacer păstrează layout-ul; cardul real e fixed mai jos */}
-                  <div className="mt-6 h-[140px] w-full shrink-0 lg:w-1/2 lg:min-w-[200px] lg:max-w-sm" aria-hidden="true" />
-                  <div className={cn("fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:left-[calc(360px+2rem)] lg:right-8 lg:justify-center xl:left-[calc(400px+2rem)]", MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS)}>
+                  <div
+                    className={cn(
+                      "mt-6 w-full shrink-0 transition-[height,margin] duration-300 lg:w-1/2 lg:min-w-[200px] lg:max-w-sm",
+                      showContinueCard && selectedItem ? "h-[140px]" : "h-0 mt-0",
+                    )}
+                    aria-hidden="true"
+                  />
+                  <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-2 lg:bottom-6 lg:left-[calc(360px+2rem)] lg:right-8 xl:left-[calc(400px+2rem)]">
                     <div
-                      key={selectedItem.id}
-                      className="animate-learning-path-card-pop w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)] lg:w-[min(100%,320px)]"
+                      className={cn(
+                        "relative w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,28rem)] lg:w-[min(100%,320px)]",
+                        progressButtonMounted && "min-h-9",
+                      )}
                     >
+                      {progressButtonMounted ? (
+                        <button
+                          type="button"
+                          onClick={handleScrollToProgress}
+                          className={cn(
+                            "absolute bottom-0 left-0 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#e9e0f0] bg-white text-[#4b5563] shadow-[0_8px_20px_rgba(82,44,111,0.12)] hover:-translate-y-0.5 hover:text-[#111111] hover:shadow-[0_10px_24px_rgba(82,44,111,0.16)]",
+                            progressButtonExiting
+                              ? "animate-learning-path-scroll-button-pop-out"
+                              : "animate-learning-path-scroll-button-pop-in",
+                          )}
+                          aria-label="Mergi la progresul tău"
+                        >
+                          {progressScrollDirection === "up" ? (
+                            <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" strokeWidth={2.5} />
+                          )}
+                        </button>
+                      ) : null}
+
+                      {selectedItem ? (
+                        <div
+                          className={cn(
+                            "transition-[transform,opacity] duration-300",
+                            showContinueCard
+                              ? "relative translate-y-0 opacity-100"
+                              : "pointer-events-none absolute inset-x-0 bottom-0 translate-y-8 opacity-0",
+                          )}
+                        >
+                          <div
+                            aria-hidden
+                            className="pointer-events-none flex w-full shrink-0 justify-center overflow-x-visible overflow-y-visible"
+                          >
+                            <div
+                              key={selectedTheme.outline}
+                              className="h-[min(340px,56vh)] w-[min(94vw,44rem)] shrink-0 translate-y-[10%] blur-[28px] sm:w-[min(88vw,52rem)]"
+                              style={{ backgroundImage: getLevelContinueGlow(selectedTheme.from, selectedTheme.to) }}
+                            />
+                          </div>
+
+                          <div className="relative z-10 -mt-[min(200px,35vh)] w-full">
+                            <div
+                              key={selectedItem.id}
+                              className="animate-learning-path-card-pop w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)]"
+                            >
                       {freeAccess ? (
                         <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7c3aed]">
                           {Math.min(freeAccess.itemsSolved, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT)} / {FREE_PLAN_LEARNING_PATH_ITEM_LIMIT} itemi gratuiți
@@ -436,6 +653,10 @@ export function LearningPathLessonPage({
                           </button>
                         )
                       })()}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </>

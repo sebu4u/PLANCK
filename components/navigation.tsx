@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type CSSProperties } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, Code, Github, Chrome, Trophy, Users } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { NavbarTestBatteries } from "@/components/navbar-test-batteries"
 import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
-import { getMobileTopBarContent, isMobileAppShellRoute } from "@/lib/mobile-app-nav"
+import { getMobileTopBarContent, isMobileAppShellRoute, isMobileLessonItemsShellRoute } from "@/lib/mobile-app-nav"
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
 
@@ -461,10 +461,15 @@ export function Navigation() {
   /** Single-problem page uses a fixed white outline under the bar; shadow is applied there so it sits below that outline */
   const isProblemDetailPage =
     Boolean(pathname && /^\/probleme\/[^/]+$/.test(pathname) && !pathname.startsWith('/probleme/pagina'))
-  const navbarElevationClass = isProblemDetailPage
-    ? 'shadow-none'
-    : `shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? 'burger:shadow-none' : ''}`
+  const showMobileLessonShell = Boolean(user && isMobileLessonItemsShellRoute(pathname, true))
+  const navbarElevationClass =
+    isProblemDetailPage
+      ? "shadow-none"
+      : showMobileLessonShell
+        ? "shadow-none burger:shadow-md"
+        : `shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
+  const showMobileBottomNav = showMobileAppShell
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
 
@@ -476,16 +481,21 @@ export function Navigation() {
     }
     return () => document.body.classList.remove("mobile-app-shell")
   }, [showMobileAppShell])
-  const mobileShellNavSurfaceClass = showMobileAppShell
-    ? useLightNav
-      ? `${navTheme.background} ${navTheme.border}`
-      : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
-    : `${navTheme.background} ${navTheme.border}`
+  const mobileShellNavSurfaceClass = showMobileLessonShell
+    ? "bg-[#ffffff] border-transparent"
+    : showMobileAppShell
+      ? useLightNav
+        ? `${navTheme.background} ${navTheme.border}`
+        : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
+      : `${navTheme.background} ${navTheme.border}`
+  const navBackdropClass = showMobileLessonShell
+    ? ""
+    : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
 
   return (
     <>
       <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} ${navbarElevationClass}`}>
-        <nav className={`w-full ${isHomepage && isScrolled ? 'backdrop-blur-md' : !isHomepage ? 'backdrop-blur-md' : ''} transition-all duration-300 ${mobileShellNavSurfaceClass}`}>
+        <nav className={`w-full ${navBackdropClass} transition-all duration-300 ${mobileShellNavSurfaceClass}`}>
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="relative h-16 flex items-center justify-between gap-4">
               <div className={`burger:hidden flex w-full items-center justify-between ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
@@ -510,6 +520,19 @@ export function Navigation() {
                       <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                     </Link>
                   </div>
+                ) : showMobileLessonShell ? (
+                  <>
+                    <Link
+                      href="/invata"
+                      aria-label="Înapoi la Invata"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                    >
+                      <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
+                    </Link>
+                    <div className="flex shrink-0 items-center">
+                      <NavbarTestBatteries useLightNav />
+                    </div>
+                  </>
                 ) : showMobileAppShell ? (
                   <>
                     <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
@@ -894,7 +917,7 @@ export function Navigation() {
 
         </nav>
       </div>
-      {showMobileAppShell ? <MobileBottomNav /> : null}
+      {showMobileBottomNav ? <MobileBottomNav /> : null}
     </>
   )
 }

@@ -2,6 +2,7 @@ import { BookOpen } from "lucide-react"
 import { getItemIcon } from "@/components/invata/learning-path-item-body"
 import { LockedLessonBottomCta } from "@/components/invata/locked-lesson-bottom-cta"
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
+import { LearningPathTrail } from "@/components/invata/learning-path-trail"
 import type { LearningPathChapter, LearningPathLesson, LearningPathLessonType } from "@/lib/supabase-learning-paths"
 
 interface LearningPathLessonLockedPreviewProps {
@@ -32,7 +33,7 @@ const LEVEL_BLURRED_TITLES = [
   "Consolidare si evaluare finala",
 ]
 
-const ITEMS_PER_LEVEL = 4
+const ITEMS_PER_LEVEL = 6
 
 /** Tipuri de item rotite pentru iconițe blurate în preview (ca pe path-ul real). */
 const ICON_TYPE_CYCLE: LearningPathLessonType[] = [
@@ -65,7 +66,7 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
   const levelCount = Math.ceil(PLACEHOLDER_LABELS.length / ITEMS_PER_LEVEL)
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 pb-10 pt-28 sm:px-8 lg:px-12">
+    <div className="mx-auto w-full max-w-7xl px-5 pb-10 pt-16 sm:px-8 lg:px-12 lg:pt-28">
       <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
         <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
           <div className="flex w-full justify-center bg-transparent lg:justify-start">
@@ -94,6 +95,7 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
         </aside>
 
         <section className="relative min-w-0">
+          <LearningPathTrail className="w-full" layoutKey={PLACEHOLDER_LABELS.length}>
           {Array.from({ length: levelCount }, (_, levelIndex) => {
             const start = levelIndex * ITEMS_PER_LEVEL
             const levelItems = PLACEHOLDER_LABELS.slice(start, start + ITEMS_PER_LEVEL)
@@ -109,24 +111,23 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
                   blurredTitle={blurredTitle}
                   outlineColor={theme.outline}
                   labelColorClass={theme.label}
+                  isColored={levelNumber === 1}
                 />
 
                 <div className="flex flex-col items-center">
                   {levelItems.map((label, localIndex) => {
                     const globalIndex = start + localIndex
                     const offsetClass = NODE_ROW_OFFSETS[globalIndex % NODE_ROW_OFFSETS.length]
-                    const isLastGlobal = globalIndex === PLACEHOLDER_LABELS.length - 1
                     const iconType = ICON_TYPE_CYCLE[globalIndex % ICON_TYPE_CYCLE.length]
                     const ItemIcon = getItemIcon(iconType)
 
                     return (
-                      <div key={`${label}-${globalIndex + 1}`} className={`relative mb-10 w-fit max-w-full ${offsetClass}`}>
-                        {!isLastGlobal ? (
-                          <div className="pointer-events-none absolute left-10 top-20 h-24 w-[3px] rounded-full bg-gradient-to-b from-[#ddd3ea] via-[#ece8f5] to-transparent" />
-                        ) : null}
-
+                      <div key={`${label}-${globalIndex + 1}`} className={`relative mb-20 w-fit max-w-full sm:mb-10 ${offsetClass}`}>
                         <div className="flex max-w-full items-center gap-4">
-                          <span className="relative flex h-20 w-20 shrink-0 items-center justify-center">
+                          <span
+                            data-learning-path-anchor="circle"
+                            className="relative flex h-20 w-20 shrink-0 items-center justify-center"
+                          >
                             <span className="absolute inset-[1px] rounded-full bg-[#d9d9de]" />
                             <span className="absolute inset-[9px] rounded-full border border-white/70 bg-[#f4f4f7]" />
                             <ItemIcon
@@ -150,6 +151,8 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
               </div>
             )
           })}
+
+          </LearningPathTrail>
 
           <div className="mt-6 h-[140px] w-full shrink-0" aria-hidden="true" />
           <LockedLessonBottomCta />

@@ -13,10 +13,24 @@ export const MOBILE_BOTTOM_NAV_DRAFT_PADDING_CLASS = "mobile-bottom-nav-draft-pa
 export const MOBILE_BOTTOM_NAV_DRAFT_PREVIEW_PADDING_CLASS = "mobile-bottom-nav-draft-preview-pad"
 
 const LEARNING_PATH_ITEM_ROUTE = /^\/invata\/[^/]+\/[^/]+\/\d+\/?$/
+const LEARNING_PATH_LESSON_ROUTE = /^\/invata\/[^/]+\/[^/]+\/?$/
 
 export function isLearningPathItemRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return LEARNING_PATH_ITEM_ROUTE.test(pathname)
+}
+
+/** Lecție cu listă de itemi (/invata/capitol/lectie), fără index de item. */
+export function isLearningPathLessonRoute(pathname: string | null | undefined): boolean {
+  if (!pathname || isLearningPathItemRoute(pathname)) return false
+  return LEARNING_PATH_LESSON_ROUTE.test(pathname)
+}
+
+export function isMobileLessonItemsShellRoute(
+  pathname: string | null | undefined,
+  isAuthenticated: boolean,
+): boolean {
+  return isAuthenticated && isLearningPathLessonRoute(pathname)
 }
 
 export function isMobileAppShellRoute(
@@ -24,7 +38,7 @@ export function isMobileAppShellRoute(
   isAuthenticated: boolean,
 ): boolean {
   if (!isAuthenticated || !pathname) return false
-  if (isLearningPathItemRoute(pathname)) return false
+  if (isLearningPathItemRoute(pathname) || isLearningPathLessonRoute(pathname)) return false
 
   return (
     pathname === "/dashboard" ||
