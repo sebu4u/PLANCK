@@ -19,7 +19,14 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { NavbarTestBatteries } from "@/components/navbar-test-batteries"
 import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
-import { getMobileTopBarContent, isMobileAppShellRoute, isMobileLessonItemsShellRoute } from "@/lib/mobile-app-nav"
+import { InvataMobilePathNav } from "@/components/invata/invata-mobile-path-nav"
+import { useInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
+import {
+  getMobileTopBarContent,
+  isInvataHubRoute,
+  isMobileAppShellRoute,
+  isMobileLessonItemsShellRoute,
+} from "@/lib/mobile-app-nav"
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
 
@@ -472,6 +479,9 @@ export function Navigation() {
   const showMobileBottomNav = showMobileAppShell
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
+  const invataHubChapters = useInvataHubChapters()
+  const showInvataHubMobileNav =
+    isMobile && isInvataHubRoute(pathname) && Boolean(invataHubChapters?.length)
 
   useEffect(() => {
     if (showMobileAppShell) {
@@ -483,6 +493,10 @@ export function Navigation() {
   }, [showMobileAppShell])
   const mobileShellNavSurfaceClass = showMobileLessonShell
     ? "bg-[#ffffff] border-transparent"
+    : showInvataHubMobileNav
+      ? useLightNav
+        ? `${navTheme.background} border-transparent`
+        : "bg-[#ffffff] border-transparent burger:bg-[#0d1117]"
     : showMobileAppShell
       ? useLightNav
         ? `${navTheme.background} ${navTheme.border}`
@@ -497,9 +511,23 @@ export function Navigation() {
       <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} ${navbarElevationClass}`}>
         <nav className={`w-full ${navBackdropClass} transition-all duration-300 ${mobileShellNavSurfaceClass}`}>
           <div className="w-full px-4 sm:px-6 lg:px-8">
-            <div className="relative h-16 flex items-center justify-between gap-4">
-              <div className={`burger:hidden flex w-full items-center justify-between ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
-                {isGuestProblemeOrCursuri ? (
+            <div
+              className={`relative flex justify-between gap-4 ${
+                showInvataHubMobileNav
+                  ? "h-[5.875rem] items-stretch py-0"
+                  : "h-16 items-center"
+              }`}
+            >
+              <div
+                className={`burger:hidden flex w-full ${
+                  showInvataHubMobileNav
+                    ? "h-full items-stretch"
+                    : `items-center justify-between ${isTransparent ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : ""}`
+                }`}
+              >
+                {showInvataHubMobileNav && invataHubChapters ? (
+                  <InvataMobilePathNav chapters={invataHubChapters} embeddedInNavbar />
+                ) : isGuestProblemeOrCursuri ? (
                   <div className="flex min-w-0 flex-1 items-center gap-2 pr-1">
                     <Link
                       href="/"

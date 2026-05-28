@@ -148,6 +148,101 @@ export function getNextIncompleteLearningPathItem(
   return items.find((item) => !completed.has(item.id)) ?? null
 }
 
+/** Matches level grouping on the lesson page (`learning-path-lesson-page.tsx`). */
+export const LEARNING_PATH_ITEMS_PER_LEVEL = 6
+
+export interface LearningPathChapterDashboardSnapshot {
+  currentLevel: number
+  previewLessons: LearningPathLesson[]
+  hasStarted: boolean
+  resumeHref: string
+}
+
+export async function getLearningPathChapterDashboardSnapshot(
+  client: SupabaseClient,
+  userId: string,
+  chapter: LearningPathChapter,
+  lessons: LearningPathLesson[]
+): Promise<LearningPathChapterDashboardSnapshot> {
+  const firstLesson = lessons[0]
+  if (!firstLesson) {
+    return {
+      currentLevel: 1,
+      previewLessons: [],
+      hasStarted: false,
+      resumeHref: "/invata",
+    }
+  }
+
+  const lessonIds = lessons.map((lesson) => lesson.id)
+  const completedLessonIds = new Set(
+    await getCompletedLearningPathLessonIdsForUser(client, userId, lessonIds)
+  )
+
+  let hasStarted = completedLessonIds.size > 0
+  let currentLevel = 1
+  let currentLessonIndex = 0
+  let resumeHref = getLearningPathLessonHref(chapter, firstLesson)
+  let foundIncomplete = false
+
+  for (let lessonIndex = 0; lessonIndex < lessons.length; lessonIndex++) {
+    const lesson = lessons[lessonIndex]
+    const items = await getLearningPathLessonItems(lesson.id)
+    const lessonHref = getLearningPathLessonHref(chapter, lesson)
+
+    if (!items.length) {
+      if (!completedLessonIds.has(lesson.id)) {
+        foundIncomplete = true
+        currentLessonIndex = lessonIndex
+        resumeHref = lessonHref
+        break
+      }
+      continue
+    }
+
+    const completedItemIds = await getCompletedLearningPathItemIdsForUser(
+      client,
+      userId,
+      items.map((item) => item.id)
+    )
+
+    if (completedItemIds.length > 0) {
+      hasStarted = true
+    }
+
+    const nextItem = getNextIncompleteLearningPathItem(items, completedItemIds)
+    if (nextItem) {
+      foundIncomplete = true
+      currentLessonIndex = lessonIndex
+      const nextItemIndex = items.findIndex((item) => item.id === nextItem.id)
+      currentLevel =
+        Math.floor(Math.max(nextItemIndex, 0) / LEARNING_PATH_ITEMS_PER_LEVEL) + 1
+      resumeHref = getLearningPathItemHref(chapter, lesson, Math.max(nextItemIndex, 0))
+      break
+    }
+  }
+
+  if (!foundIncomplete && hasStarted) {
+    const lastLesson = lessons[lessons.length - 1] ?? firstLesson
+    const lastItems = await getLearningPathLessonItems(lastLesson.id)
+    currentLessonIndex = Math.max(lessons.length - 2, 0)
+    currentLevel =
+      lastItems.length > 0
+        ? Math.ceil(lastItems.length / LEARNING_PATH_ITEMS_PER_LEVEL)
+        : 1
+    resumeHref = getLearningPathLessonHref(chapter, lastLesson)
+  }
+
+  const previewLessons = lessons.slice(currentLessonIndex, currentLessonIndex + 2)
+
+  return {
+    currentLevel,
+    previewLessons,
+    hasStarted,
+    resumeHref,
+  }
+}
+
 export async function getLearningPathChapters(): Promise<LearningPathChapter[]> {
   const { data, error } = await supabase
     .from("learning_path_chapters")
@@ -288,6 +383,56 @@ export async function getLearningPathLessonItems(lessonId: string): Promise<Lear
   }
 
   return data || []
+}
+
+export type LearningPathLessonItemAggregates = {
+  counts: Record<string, number>
+  itemIdsByLessonId: Record<string, string[]>
+}
+
+const LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE = 80
+
+/** Active item counts and IDs per lesson (batched queries for hub progress). */
+export async function getLearningPathLessonItemAggregates(
+  lessonIds: string[]
+): Promise<LearningPathLessonItemAggregates> {
+  if (!lessonIds.length) {
+    return { counts: {}, itemIdsByLessonId: {} }
+  }
+
+  const counts: Record<string, number> = {}
+  const itemIdsByLessonId: Record<string, string[]> = {}
+
+  for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
+    const chunk = lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE)
+    const { data, error } = await supabase
+      .from("learning_path_lesson_items")
+      .select("id, lesson_id")
+      .in("lesson_id", chunk)
+      .eq("is_active", true)
+
+    if (error) {
+      console.error("Error fetching learning path lesson item aggregates:", error)
+      continue
+    }
+
+    for (const row of data ?? []) {
+      const lessonId = row.lesson_id as string
+      const itemId = row.id as string
+      counts[lessonId] = (counts[lessonId] ?? 0) + 1
+      if (!itemIdsByLessonId[lessonId]) itemIdsByLessonId[lessonId] = []
+      itemIdsByLessonId[lessonId].push(itemId)
+    }
+  }
+
+  return { counts, itemIdsByLessonId }
+}
+
+export async function getLearningPathItemCountsByLessonIds(
+  lessonIds: string[]
+): Promise<Record<string, number>> {
+  const { counts } = await getLearningPathLessonItemAggregates(lessonIds)
+  return counts
 }
 
 export async function getRandomProblemsByCategory(category: string, limit = 3): Promise<Problem[]> {
@@ -484,6 +629,23 @@ export async function getCompletedLearningPathLessonIdsForUser(
   return (data ?? []).map((row) => row.lesson_id as string)
 }
 
+/** PostgREST rejects very large `.in()` lists (URL / filter limits). */
+const LEARNING_PATH_ITEM_PROGRESS_IN_CHUNK_SIZE = 80
+
+function logLearningPathItemProgressError(error: {
+  message?: string
+  code?: string
+  details?: string
+  hint?: string
+}) {
+  console.error(
+    "Error fetching learning path item progress:",
+    error.message || error.code || error,
+    error.details ?? "",
+    error.hint ?? ""
+  )
+}
+
 export async function getCompletedLearningPathItemIdsForUser(
   client: SupabaseClient,
   userId: string,
@@ -491,18 +653,49 @@ export async function getCompletedLearningPathItemIdsForUser(
 ): Promise<string[]> {
   if (!itemIds.length) return []
 
-  const { data, error } = await client
-    .from("user_learning_path_item_progress")
-    .select("item_id")
-    .eq("user_id", userId)
-    .in("item_id", itemIds)
+  const scopedIds = new Set(itemIds)
+  const completed = new Set<string>()
 
-  if (error) {
-    console.error("Error fetching learning path item progress:", error)
-    return []
+  const collectMatching = (rows: { item_id: string }[] | null) => {
+    for (const row of rows ?? []) {
+      const id = row.item_id as string
+      if (scopedIds.has(id)) completed.add(id)
+    }
   }
 
-  return (data ?? []).map((row) => row.item_id as string)
+  // Hub loads every item id at once; fetch by user and filter in memory.
+  if (itemIds.length > LEARNING_PATH_ITEM_PROGRESS_IN_CHUNK_SIZE) {
+    const { data, error } = await client
+      .from("user_learning_path_item_progress")
+      .select("item_id")
+      .eq("user_id", userId)
+
+    if (error) {
+      logLearningPathItemProgressError(error)
+      return []
+    }
+
+    collectMatching(data)
+    return Array.from(completed)
+  }
+
+  for (let i = 0; i < itemIds.length; i += LEARNING_PATH_ITEM_PROGRESS_IN_CHUNK_SIZE) {
+    const chunk = itemIds.slice(i, i + LEARNING_PATH_ITEM_PROGRESS_IN_CHUNK_SIZE)
+    const { data, error } = await client
+      .from("user_learning_path_item_progress")
+      .select("item_id")
+      .eq("user_id", userId)
+      .in("item_id", chunk)
+
+    if (error) {
+      logLearningPathItemProgressError(error)
+      return Array.from(completed)
+    }
+
+    collectMatching(data)
+  }
+
+  return Array.from(completed)
 }
 
 /** Capitolul din ultimul item de learning path completat de user (după completed_at). */

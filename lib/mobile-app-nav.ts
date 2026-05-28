@@ -33,6 +33,11 @@ export function isMobileLessonItemsShellRoute(
   return isAuthenticated && isLearningPathLessonRoute(pathname)
 }
 
+/** Hub learning paths list (`/invata` exact, not lesson/item routes). */
+export function isInvataHubRoute(pathname: string | null | undefined): boolean {
+  return pathname === "/invata"
+}
+
 export function isMobileAppShellRoute(
   pathname: string | null | undefined,
   isAuthenticated: boolean,

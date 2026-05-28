@@ -10,56 +10,51 @@ function LessonCardSkeleton() {
   )
 }
 
-function ChapterProblemsSkeleton() {
+function MobileLessonRowSkeleton() {
   return (
-    <div className="-mx-5 mt-5 sm:mx-0">
-      <div className="rounded-none border-y border-[#ececec] bg-white py-5 sm:rounded-2xl sm:border sm:p-5">
-        <div className="hidden gap-3 sm:grid sm:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div
-              key={index}
-              className="rounded-xl border border-[#ededed] bg-[#fafafa] p-4"
-            >
-              <Skeleton className="h-3 w-16 rounded bg-[#ececec]" />
-              <Skeleton className="mt-2 h-4 w-full rounded bg-[#e6e6e6]" />
-              <Skeleton className="mt-1 h-4 w-4/5 rounded bg-[#ececec]" />
-              <Skeleton className="mt-3 h-3 w-20 rounded bg-[#ececec]" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end px-5 sm:px-0">
-          <Skeleton className="h-9 w-40 rounded-full bg-[#e6e6e6]" />
-        </div>
+    <div className="flex items-center gap-3 rounded-xl border-[3px] border-[#ececec] bg-white px-3.5 py-3.5 shadow-[0_4px_0_#e6e6e6]">
+      <Skeleton className="h-14 w-14 shrink-0 rounded-lg bg-[#ececec]" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-4 w-3/4 rounded bg-[#e6e6e6]" />
+        <Skeleton className="h-2 w-full rounded-full bg-[#ececec]" />
       </div>
     </div>
   )
 }
 
-function ChapterSectionSkeleton({
-  withTopBorder = false,
-  showProblems = false,
-}: {
-  withTopBorder?: boolean
-  showProblems?: boolean
-}) {
+function ChapterSectionSkeleton({ withTopBorder = false }: { withTopBorder?: boolean }) {
   return (
-    <section className={withTopBorder ? "border-t border-[#ececec] pt-10" : ""}>
-      <div className="mb-5 flex items-start justify-between gap-5 sm:items-center">
-        <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
-          <Skeleton className="h-24 w-24 shrink-0 rounded-xl bg-[#ececec] sm:h-28 sm:w-28" />
+    <section className={withTopBorder ? "border-t border-[#ececec] pt-10 sm:pt-10" : ""}>
+      <div className="mb-5 sm:hidden">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-7 w-48 rounded bg-[#e6e6e6] sm:w-64" />
-            <Skeleton className="h-4 w-full max-w-md rounded bg-[#ececec]" />
-            <div className="mt-3 flex w-full max-w-md gap-1">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <Skeleton key={index} className="h-2 min-w-0 flex-1 rounded-full bg-[#ececec]" />
-              ))}
-            </div>
+            <Skeleton className="h-7 w-48 rounded bg-[#e6e6e6]" />
+            <Skeleton className="h-4 w-full max-w-xs rounded bg-[#ececec]" />
+          </div>
+          <Skeleton className="h-20 w-20 shrink-0 rounded-xl bg-[#ececec]" />
+        </div>
+      </div>
+
+      <div className="mb-5 hidden sm:flex sm:items-start sm:gap-5">
+        <Skeleton className="h-24 w-24 shrink-0 rounded-xl bg-[#ececec] sm:h-28 sm:w-28" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-7 w-48 rounded bg-[#e6e6e6] sm:w-64" />
+          <Skeleton className="h-4 w-full max-w-md rounded bg-[#ececec]" />
+          <div className="mt-3 flex w-full max-w-md gap-1">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="h-2 min-w-0 flex-1 rounded-full bg-[#ececec]" />
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
+      <div className="space-y-5 sm:hidden">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <MobileLessonRowSkeleton key={index} />
+        ))}
+      </div>
+
+      <div className="-mx-5 hidden rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:block sm:rounded-2xl sm:p-6">
         <div className="-mx-5 overflow-hidden px-5 sm:mx-0 sm:px-0">
           <div className="flex min-w-max gap-4 sm:gap-5">
             {Array.from({ length: 5 }).map((_, index) => (
@@ -69,7 +64,6 @@ function ChapterSectionSkeleton({
         </div>
       </div>
 
-      {showProblems ? <ChapterProblemsSkeleton /> : null}
     </section>
   )
 }
@@ -91,7 +85,7 @@ function InvataSeoIntroSkeleton() {
 export function InvataPageSkeleton() {
   return (
     <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
-      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="mb-8 hidden flex-col gap-4 sm:flex sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <Skeleton className="h-9 w-56 rounded-lg bg-[#e6e6e6] sm:h-10 sm:w-72" />
           <Skeleton className="h-4 w-full max-w-md rounded bg-[#ececec] sm:h-5" />
@@ -99,10 +93,12 @@ export function InvataPageSkeleton() {
         <Skeleton className="h-10 w-44 rounded-full bg-[#ececec]" />
       </header>
 
-      <div className="space-y-10 pb-14">
-        <ChapterSectionSkeleton showProblems />
-        <ChapterSectionSkeleton withTopBorder />
-        <ChapterSectionSkeleton withTopBorder />
+      <div className="pb-14">
+        <div className="space-y-12 sm:space-y-10">
+          <ChapterSectionSkeleton />
+          <ChapterSectionSkeleton withTopBorder />
+          <ChapterSectionSkeleton withTopBorder />
+        </div>
       </div>
 
       <InvataSeoIntroSkeleton />

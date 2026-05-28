@@ -14,12 +14,16 @@ interface DashboardLearningPathsCarouselProps {
   chapters: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
   startHrefByChapter?: Record<string, string>
+  levelByChapter?: Record<string, number>
+  hasStartedByChapter?: Record<string, boolean>
 }
 
 export function DashboardLearningPathsCarousel({
   chapters,
   lessonsByChapter,
   startHrefByChapter = {},
+  levelByChapter = {},
+  hasStartedByChapter = {},
 }: DashboardLearningPathsCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [dragOffset, setDragOffset] = useState(0)
@@ -129,12 +133,14 @@ export function DashboardLearningPathsCarousel({
     <div className="flex flex-col items-center gap-2">
       <div className="-mx-4 flex w-[calc(100%+2rem)] snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 md:hidden scrollbar-hide">
         {chapters.map((chapter) => {
-          const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
+          const chapterLessons = lessonsByChapter[chapter.id] || []
           const firstLesson = chapterLessons[0]
           const fallbackChapterHref = firstLesson
             ? getLearningPathLessonHref(chapter, firstLesson)
             : "/invata"
           const chapterHref = startHrefByChapter[chapter.id] ?? fallbackChapterHref
+          const currentLevel = levelByChapter[chapter.id] ?? 1
+          const hasStarted = hasStartedByChapter[chapter.id] ?? false
           const colors = getChapterTheme(chapter.title)
 
           return (
@@ -147,7 +153,7 @@ export function DashboardLearningPathsCarousel({
             >
               <h3 className="text-center text-2xl font-bold leading-tight text-[#111111]">{chapter.title}</h3>
               <p className={cn("mt-1 text-center text-sm font-semibold uppercase tracking-[0.16em]", colors.text)}>
-                LEVEL 1
+                LEVEL {currentLevel}
               </p>
 
               <div className="mt-4 flex justify-center">
@@ -206,7 +212,7 @@ export function DashboardLearningPathsCarousel({
                 style={{ "--start-glow-tint": colors.buttonGlowTint } as CSSProperties}
               >
                 <span className="relative z-[1] inline-flex items-center justify-center gap-2">
-                  Start
+                  {hasStarted ? "Continuă" : "Start"}
                   <ArrowRight className="h-4 w-4" />
                 </span>
               </Link>
@@ -225,12 +231,14 @@ export function DashboardLearningPathsCarousel({
         onPointerCancel={onPointerUp}
       >
         {chapters.map((chapter, index) => {
-          const chapterLessons = (lessonsByChapter[chapter.id] || []).slice(0, 2)
+          const chapterLessons = lessonsByChapter[chapter.id] || []
           const firstLesson = chapterLessons[0]
           const fallbackChapterHref = firstLesson
             ? getLearningPathLessonHref(chapter, firstLesson)
             : "/invata"
           const chapterHref = startHrefByChapter[chapter.id] ?? fallbackChapterHref
+          const currentLevel = levelByChapter[chapter.id] ?? 1
+          const hasStarted = hasStartedByChapter[chapter.id] ?? false
 
           const offset = ((index - activeIndex + count) % count)
           const normalizedOffset = offset > Math.floor(count / 2) ? offset - count : offset
@@ -273,7 +281,7 @@ export function DashboardLearningPathsCarousel({
                 {chapter.title}
               </h3>
               <p className={cn("mt-1 text-center text-sm font-semibold uppercase tracking-[0.16em]", colors.text)}>
-                LEVEL 1
+                LEVEL {currentLevel}
               </p>
 
               <div className="mt-4 flex justify-center">
@@ -333,7 +341,7 @@ export function DashboardLearningPathsCarousel({
                 onClick={(e) => e.stopPropagation()}
               >
                 <span className="relative z-[1] inline-flex items-center justify-center gap-2">
-                  Start
+                  {hasStarted ? "Continuă" : "Start"}
                   <ArrowRight className="h-4 w-4" />
                 </span>
               </Link>

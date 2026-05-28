@@ -14,7 +14,6 @@ import { InlineMath } from 'react-katex';
 import React from 'react';
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
@@ -33,7 +32,6 @@ import {
   ProblemWrongAnswerEloCard,
   type ProblemWrongAnswerPenalty,
 } from "@/components/problems/problem-wrong-answer-elo-card"
-import { ProblemAnswerBottomSheet } from "@/components/problems/problem-answer-bottom-sheet"
 import { RecommendedProblemCard } from "@/components/problems/recommended-problem-card"
 import {
   ensurePhysicsCatalogProblemsCached,
@@ -174,7 +172,6 @@ export default function ProblemDetailClient({
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
   const { user } = useAuth();
   const { isFree } = useSubscriptionPlan()
-  const isMobile = useIsMobile()
   const problemIcon = getProblemIcon(problem.id);
   const [showMobileUpgradeModal, setShowMobileUpgradeModal] = useState(false)
   const [openedInsightFromCard, setOpenedInsightFromCard] = useState(false)
@@ -512,6 +509,30 @@ export default function ProblemDetailClient({
                         {renderInlineMath(problem.statement)}
                       </div>
                     </div>
+                    <div className="lg:hidden">
+                      {hasAnswerCard ? (
+                        <ProblemAnswerCard
+                          problem={problem}
+                          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                          onSolvedCorrectly={handleMarkSolved}
+                          isSolved={isSolved}
+                          userId={user?.id ?? null}
+                          onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                          showHintButton={!isClassroomEmbed}
+                          onHintClick={
+                            !isClassroomEmbed
+                              ? () => {
+                                  setOpenedInsightFromCard(true)
+                                  setInsightSidebarOpen(true)
+                                  setInitialHintMessage("Am nevoie de un hint")
+                                }
+                              : undefined
+                          }
+                        />
+                      ) : (
+                        <NoAnswerCard />
+                      )}
+                    </div>
                     {hasProblemImage && (
                       <div className="flex justify-center lg:hidden">
                         {!imageLoaded && <ImageSkeleton />}
@@ -708,36 +729,7 @@ export default function ProblemDetailClient({
         />
       )}
 
-      {isMobile && (
-        <ProblemAnswerBottomSheet
-          problem={problem}
-          hasAnswerCard={hasAnswerCard}
-          isSolved={isSolved}
-          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-          onSolvedCorrectly={handleMarkSolved}
-          userId={user?.id ?? null}
-          onWrongAnswerPenalty={handleWrongAnswerPenalty}
-          onOpenHint={
-            isClassroomEmbed
-              ? undefined
-              : () => {
-                  setOpenedInsightFromCard(true)
-                  setInsightSidebarOpen(true)
-                  setInitialHintMessage("Am nevoie de un hint")
-                }
-          }
-          onOpenChat={
-            isClassroomEmbed
-              ? undefined
-              : () => {
-                  setOpenedInsightFromCard(false)
-                  setInsightSidebarOpen(true)
-                }
-          }
-        />
-      )}
-
-      {!isClassroomEmbed && !isMobile && (
+      {!isClassroomEmbed && (
         <ProblemOrbButton
           onOpenSidebar={() => {
             setOpenedInsightFromCard(false)

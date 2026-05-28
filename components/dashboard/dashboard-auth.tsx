@@ -30,7 +30,7 @@ import {
   getLearningPathChapters,
   getLearningPathLessonsByChapterId,
   getLastWorkedLearningPathChapterIdForUser,
-  getLearningPathResumeHrefForChapter,
+  getLearningPathChapterDashboardSnapshot,
   getLearningPathResumeHrefForUser,
   getProblemsByClass,
   type LearningPathChapter,
@@ -83,6 +83,8 @@ export function DashboardAuth() {
     dashboardLearningPaths: LearningPathChapter[]
     dashboardLessonsByChapter: Record<string, LearningPathLesson[]>
     dashboardStartHrefByChapter: Record<string, string>
+    dashboardLevelByChapter: Record<string, number>
+    dashboardHasStartedByChapter: Record<string, boolean>
     recommendedProblems: Problem[]
   } | null>(null)
   const fakeSolveProblemPool = useMemo<FakeSolveProblem[]>(() => {
@@ -245,6 +247,8 @@ export function DashboardAuth() {
           dashboardLearningPaths: learningPathsData.chapters,
           dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
+          dashboardLevelByChapter: learningPathsData.levelByChapterId,
+          dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
           recommendedProblems: recommendedProblemsData,
         }
 
@@ -328,6 +332,8 @@ export function DashboardAuth() {
           dashboardLearningPaths: learningPathsData.chapters,
           dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
+          dashboardLevelByChapter: learningPathsData.levelByChapterId,
+          dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
           recommendedProblems: recommendedProblemsData,
         }
 
@@ -693,6 +699,8 @@ export function DashboardAuth() {
                         chapters={dashboardData.dashboardLearningPaths}
                         lessonsByChapter={dashboardData.dashboardLessonsByChapter}
                         startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
+                        levelByChapter={dashboardData.dashboardLevelByChapter}
+                        hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
                       />
                     </div>
 
@@ -1336,6 +1344,8 @@ interface DashboardLearningPathsData {
   chapters: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
   startHrefByChapterId: Record<string, string>
+  levelByChapterId: Record<string, number>
+  hasStartedByChapterId: Record<string, boolean>
 }
 
 function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): LearningPathChapter[] {
@@ -1416,17 +1426,22 @@ async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLea
   )
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
   const startHrefByChapterId: Record<string, string> = {}
+  const levelByChapterId: Record<string, number> = {}
+  const hasStartedByChapterId: Record<string, boolean> = {}
 
   await Promise.all(
     selectedChapters.map(async (chapter) => {
       const lessons = await getLearningPathLessonsByChapterId(chapter.id)
-      lessonsByChapter[chapter.id] = lessons.slice(0, 2)
-      startHrefByChapterId[chapter.id] = await getLearningPathResumeHrefForChapter(
+      const snapshot = await getLearningPathChapterDashboardSnapshot(
         supabase,
         userId,
         chapter,
         lessons
       )
+      lessonsByChapter[chapter.id] = snapshot.previewLessons
+      startHrefByChapterId[chapter.id] = snapshot.resumeHref
+      levelByChapterId[chapter.id] = snapshot.currentLevel
+      hasStartedByChapterId[chapter.id] = snapshot.hasStarted
     })
   )
 
@@ -1434,6 +1449,8 @@ async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLea
     chapters: selectedChapters,
     lessonsByChapter,
     startHrefByChapterId,
+    levelByChapterId,
+    hasStartedByChapterId,
   }
 }
 

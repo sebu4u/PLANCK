@@ -11,7 +11,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Navigare principală"
-      className="fixed inset-x-0 bottom-0 z-[300] border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom,0px)] burger:hidden"
+      className="fixed inset-x-0 bottom-0 z-[300] bg-white pb-[env(safe-area-inset-bottom,0px)] burger:hidden"
     >
       <div className="flex h-[4.5rem] items-stretch">
         {MOBILE_BOTTOM_NAV_ITEMS.map(({ href, label, icon: Icon, isActive }) => {
