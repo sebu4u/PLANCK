@@ -2,7 +2,8 @@
 
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, BookOpen, Play, ChevronLeft, ChevronRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Loader2, Play } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import {
@@ -194,31 +195,41 @@ function StartContinueButton({
   hasStarted,
   colors,
   className,
+  isLoading = false,
   onClick,
 }: {
   href: string
   hasStarted: boolean
   colors: ChapterTheme
   className?: string
+  isLoading?: boolean
   onClick?: (e: React.MouseEvent) => void
 }) {
   return (
     <Link
       href={href}
+      aria-busy={isLoading}
       className={cn(
-        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow]",
+        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity]",
         colors.gradient,
         colors.buttonShadow,
         colors.buttonHoverShadow,
         colors.buttonActiveShadow,
+        isLoading && "pointer-events-none opacity-70",
         className
       )}
       style={{ "--start-glow-tint": colors.buttonGlowTint } as CSSProperties}
       onClick={onClick}
     >
       <span className="relative z-[1] inline-flex items-center justify-center gap-2">
-        {hasStarted ? "Continuă" : "Start"}
-        <ArrowRight className="h-4 w-4" />
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+        ) : (
+          <>
+            {hasStarted ? "Continuă" : "Start"}
+            <ArrowRight className="h-4 w-4" />
+          </>
+        )}
       </span>
     </Link>
   )
@@ -231,7 +242,9 @@ export function DashboardLearningPathsCarousel({
   levelByChapter = {},
   hasStartedByChapter = {},
 }: DashboardLearningPathsCarouselProps) {
+  const router = useRouter()
   const [activeIndex, setActiveIndex] = useState(0)
+  const [continueLoading, setContinueLoading] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef(0)
@@ -257,6 +270,22 @@ export function DashboardLearningPathsCarousel({
 
   const activeLevel = activeChapter ? (levelByChapter[activeChapter.id] ?? 1) : 1
   activeIndexRef.current = activeIndex
+
+  useEffect(() => {
+    setContinueLoading(false)
+  }, [activeIndex, activeHref])
+
+  const handleMobileContinueClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      if (continueLoading) return
+
+      setContinueLoading(true)
+      router.prefetch(activeHref)
+      router.push(activeHref)
+    },
+    [activeHref, continueLoading, router]
+  )
 
   const getClosestIndexFromScroll = useCallback(() => {
     const root = mobileScrollRef.current
@@ -424,10 +453,10 @@ export function DashboardLearningPathsCarousel({
   }
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col items-center gap-2">
       {/* Mobile: hero swipe + fixed bottom card */}
-      <div className="relative flex w-full min-h-[calc(100dvh-4rem)] flex-col md:hidden">
-        <div className="flex flex-1 flex-col items-center justify-center px-4 pt-1 pb-[200px]">
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden md:hidden">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-hidden px-4 pt-3 pb-[200px]">
           {activeChapter ? (
             <div className="w-full text-center transition-opacity duration-200">
               <h2 className="text-[1.75rem] font-bold leading-tight tracking-tight text-[#111111]">
@@ -447,7 +476,7 @@ export function DashboardLearningPathsCarousel({
           <div
             ref={mobileScrollRef}
             className={cn(
-              "-mx-4 mt-4 flex w-[calc(100%+2rem)] snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar-hide",
+              "-mx-4 mt-3 flex w-[calc(100%+2rem)] snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar-hide",
               MOBILE_CHAPTER_ICON_ROW_HEIGHT_CLASS
             )}
             onScroll={onMobileScroll}
@@ -520,7 +549,7 @@ export function DashboardLearningPathsCarousel({
         {activeChapter ? (
           <div
             className={cn(
-              "fixed inset-x-0 z-20 px-4 pb-2",
+              "fixed inset-x-0 z-20 px-4 pb-4",
               MOBILE_BOTTOM_NAV_OFFSET_CLASS
             )}
           >
@@ -531,6 +560,8 @@ export function DashboardLearningPathsCarousel({
                 hasStarted={activeHasStarted}
                 colors={activeColors}
                 className="!mt-2.5 !py-2.5 active:translate-y-1"
+                isLoading={continueLoading}
+                onClick={handleMobileContinueClick}
               />
             </article>
           </div>

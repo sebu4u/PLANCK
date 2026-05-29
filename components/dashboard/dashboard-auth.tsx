@@ -8,7 +8,6 @@ import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import { Navigation } from "@/components/navigation"
-import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-wrapper"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
@@ -489,10 +488,8 @@ export function DashboardAuth() {
           {/* Floating Card Container */}
           <div className="m-[3px] mt-0 flex-1 min-h-0 bg-white md:bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
-            {/* Scrollable Content Area */}
-            <div
-              className={`flex-1 overflow-hidden md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#f8f9fa] min-h-[calc(100dvh-4rem)] md:min-h-0 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}
-            >
+            {/* Scrollable Content Area — locked on mobile, scrollable from md up */}
+            <div className="flex-1 min-h-0 overflow-hidden overscroll-none md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#f8f9fa]">
               {!isPaid ? (
                 <div className="hidden md:block bg-[#f7f9fa]">
                   {postOnboardingDiscount.active ? (
@@ -543,8 +540,8 @@ export function DashboardAuth() {
                   )}
                 </div>
               ) : null}
-              <main className="p-0 md:p-8 lg:p-10 animate-fade-in-up min-h-[calc(100dvh-4rem)] md:min-h-0">
-                <div className="max-w-[1000px] mx-auto min-h-[calc(100dvh-4rem)] md:min-h-0">
+              <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:block md:h-auto md:overflow-visible md:p-8 lg:p-10 animate-fade-in-up">
+                <div className="mx-auto flex h-full min-h-0 w-full max-w-[1000px] flex-col md:h-auto md:min-h-0">
                   {/* Desktop welcome */}
                   <div className="mb-8 hidden md:block">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -553,7 +550,7 @@ export function DashboardAuth() {
                     <p className="text-gray-600">Here's your learning progress today</p>
                   </div>
 
-                  <div className={`grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6 ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
+                  <div className={`grid min-h-0 flex-1 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[340px_minmax(0,1fr)] md:flex-none ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
                     <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
                         currentStreak={dashboardData.stats.current_streak}
@@ -629,7 +626,7 @@ export function DashboardAuth() {
                       ) : null}
                     </div>
 
-                    <div className="order-2 md:order-3 xl:order-none overflow-visible xl:col-start-2 xl:row-span-2 min-h-[calc(100dvh-4rem)] md:min-h-0">
+                    <div className="order-2 flex min-h-0 flex-col overflow-hidden md:order-3 md:overflow-visible xl:order-none xl:col-start-2 xl:row-span-2 md:min-h-0">
                       <DashboardLearningPathsCarousel
                         chapters={dashboardData.dashboardLearningPaths}
                         lessonsByChapter={dashboardData.dashboardLessonsByChapter}
