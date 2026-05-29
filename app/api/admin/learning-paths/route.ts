@@ -387,6 +387,7 @@ export async function POST(req: NextRequest) {
         problem_id: toNullableString(body.problem_id),
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
+        hub_show_nou_badge: toBoolean(body.hub_show_nou_badge, false),
       }
 
       const { data, error } = await supabase.from("learning_path_lessons").insert(payload).select().single()
@@ -533,6 +534,9 @@ export async function PUT(req: NextRequest) {
       if (body.problem_id !== undefined) updateData.problem_id = toNullableString(body.problem_id)
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
+      if (body.hub_show_nou_badge !== undefined) {
+        updateData.hub_show_nou_badge = toBoolean(body.hub_show_nou_badge, false)
+      }
       updateData.updated_at = new Date().toISOString()
 
       const { data, error } = await supabase

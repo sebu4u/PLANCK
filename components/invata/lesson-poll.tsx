@@ -30,8 +30,8 @@ export function LessonPoll({ imageSrc, imageAlt, options }: LessonPollProps) {
   return (
     <div className="space-y-6">
       {showImage ? (
-        <div className="aspect-video w-full overflow-hidden rounded-2xl border border-[#e8e8e8] bg-white">
-          <img src={imageSrc} alt={imageAlt} className="h-full w-full object-cover" />
+        <div className="w-full overflow-hidden rounded-2xl border border-[#e8e8e8] bg-white">
+          <img src={imageSrc} alt={imageAlt} className="mx-auto w-full object-contain" />
         </div>
       ) : null}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

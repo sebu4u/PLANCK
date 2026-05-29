@@ -101,9 +101,9 @@ export function DashboardRecommendedProblemsCard({
 
   if (!problems.length) {
     return (
-      <section className="rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+      <section className="rounded-3xl border border-[#e5e5e5] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
         <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Problema recomandata</p>
-        <p className="mt-3 text-sm text-[#5f5f5f]">
+        <p className="mt-2 text-sm text-[#5f5f5f]">
           {userGrade
             ? "Momentan nu avem recomandari pentru clasa selectata."
             : "Selecteaza clasa in profil pentru recomandari personalizate."}
@@ -118,14 +118,14 @@ export function DashboardRecommendedProblemsCard({
         setApi={setApi}
         opts={{ align: "start", loop: problems.length > 1 }}
         plugins={[AutoHeight()]}
-        className="w-full [&>*]:px-1 [&>*]:pb-4"
+        className="w-full [&>*]:px-1 [&>*]:pb-2"
       >
         <CarouselContent className="items-start">
           {problems.map((problem) => {
             const classLabel = toClassLabel(problem)
             return (
               <CarouselItem key={problem.id} className="self-start">
-                <div className="rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+                <div className="rounded-3xl border border-[#e5e5e5] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="rounded-full bg-[#f0ebff] px-2.5 py-1 font-semibold text-[#6f43db]">
                       {problem.difficulty || "Nivel mixt"}
@@ -139,16 +139,16 @@ export function DashboardRecommendedProblemsCard({
 
                   <LatexRichText
                     content={problem.title}
-                    className="mt-3 text-lg font-semibold leading-snug text-[#191919] [&_.katex]:text-[#191919]"
+                    className="mt-2 text-lg font-semibold leading-snug text-[#191919] [&_.katex]:text-[#191919]"
                   />
                   <LatexRichText
                     content={toSnippet(problem)}
-                    className="mt-2 text-sm text-[#666666] [&_.katex]:text-[#666666]"
+                    className="mt-1.5 text-sm text-[#666666] [&_.katex]:text-[#666666]"
                   />
 
                   <Link
                     href={`/probleme/${problem.id}`}
-                    className="dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-4 py-3 text-sm font-semibold text-[#2f2a3c] shadow-[0_4px_0_#c4b5d4] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#c4b5d4] active:translate-y-1 active:shadow-[0_1px_0_#c4b5d4]"
+                    className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-4 py-2.5 text-sm font-semibold text-[#2f2a3c] shadow-[0_4px_0_#c4b5d4] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#c4b5d4] active:translate-y-1 active:shadow-[0_1px_0_#c4b5d4]"
                     style={{ "--start-glow-tint": "rgba(250, 238, 245, 0.88)" } as CSSProperties}
                   >
                     <span className="relative z-[1] inline-flex items-center justify-center gap-2">
@@ -164,7 +164,7 @@ export function DashboardRecommendedProblemsCard({
       </Carousel>
 
       {problems.length > 1 ? (
-        <div className="mt-2 flex items-center justify-center gap-2">
+        <div className="mt-1 flex items-center justify-center gap-2">
           {problems.map((problem, index) => (
             <button
               key={problem.id}

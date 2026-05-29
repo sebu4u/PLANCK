@@ -46,10 +46,7 @@ import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/d
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
-import { DashboardFakeSolveSocialOverlay } from "@/components/dashboard/dashboard-fake-solve-social-overlay"
-import { useDashboardFakeSolveSocialProof } from "@/hooks/use-dashboard-fake-solve-social-proof"
 import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
-import type { FakeSolveProblem } from "@/lib/dashboard/fake-solve-social-proof"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -62,7 +59,6 @@ export function DashboardAuth() {
   const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
-  const [fakeSolveProblems, setFakeSolveProblems] = useState<FakeSolveProblem[]>([])
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -87,72 +83,12 @@ export function DashboardAuth() {
     dashboardHasStartedByChapter: Record<string, boolean>
     recommendedProblems: Problem[]
   } | null>(null)
-  const fakeSolveProblemPool = useMemo<FakeSolveProblem[]>(() => {
-    if (fakeSolveProblems.length > 0) return fakeSolveProblems
-
-    return (dashboardData?.recommendedProblems || []).map((problem) => ({
-      id: String(problem.id),
-      title: problem.title || `problema ${problem.id}`,
-    }))
-  }, [dashboardData?.recommendedProblems, fakeSolveProblems])
 
   useStreakTrigger({ enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack })
   useSocialProofTrigger({
     enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
-  const {
-    mobileNotification: fakeSolveMobileNotification,
-    mobileVisible: fakeSolveMobileVisible,
-    dismissMobileNotification: dismissFakeSolveMobileNotification,
-  } = useDashboardFakeSolveSocialProof({
-    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack,
-    problemPool: fakeSolveProblemPool,
-  })
-
-  useEffect(() => {
-    if (authLoading || !user?.id) {
-      setFakeSolveProblems([])
-      return
-    }
-
-    let cancelled = false
-
-    async function fetchFakeSolveProblems() {
-      const { data, error } = await supabase
-        .from("problems")
-        .select("id, title")
-        .order("created_at", { ascending: false })
-        .limit(400)
-
-      if (cancelled) return
-
-      if (error) {
-        console.error("Error fetching fake solve problem pool:", error)
-        setFakeSolveProblems([])
-        return
-      }
-
-      setFakeSolveProblems(
-        (data || [])
-          .filter((problem) => problem.id != null)
-          .map((problem) => {
-            const id = String(problem.id)
-            const title = typeof problem.title === "string" && problem.title.trim()
-              ? problem.title.trim()
-              : `problema ${id}`
-
-            return { id, title }
-          }),
-      )
-    }
-
-    void fetchFakeSolveProblems()
-
-    return () => {
-      cancelled = true
-    }
-  }, [authLoading, user?.id])
 
   useEffect(() => {
     if (authLoading) return
@@ -551,12 +487,14 @@ export function DashboardAuth() {
         {/* Content Wrapper - takes remaining width */}
         <div className="flex-1 lg:ml-[250px] h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
           {/* Floating Card Container */}
-          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
+          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-white md:bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
             {/* Scrollable Content Area */}
-            <div className={`flex-1 overflow-y-auto dashboard-scrollbar bg-[#f8f9fa] ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}>
+            <div
+              className={`flex-1 overflow-hidden md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#f8f9fa] min-h-[calc(100dvh-4rem)] md:min-h-0 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}
+            >
               {!isPaid ? (
-                <div className="bg-[#f7f9fa]">
+                <div className="hidden md:block bg-[#f7f9fa]">
                   {postOnboardingDiscount.active ? (
                     <Link
                       href="/pricing"
@@ -605,8 +543,8 @@ export function DashboardAuth() {
                   )}
                 </div>
               ) : null}
-              <main className="p-4 md:p-8 lg:p-10 animate-fade-in-up">
-                <div className="max-w-[1000px] mx-auto">
+              <main className="p-0 md:p-8 lg:p-10 animate-fade-in-up min-h-[calc(100dvh-4rem)] md:min-h-0">
+                <div className="max-w-[1000px] mx-auto min-h-[calc(100dvh-4rem)] md:min-h-0">
                   {/* Desktop welcome */}
                   <div className="mb-8 hidden md:block">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -616,7 +554,7 @@ export function DashboardAuth() {
                   </div>
 
                   <div className={`grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 md:gap-6 ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
-                    <div className="order-1 xl:col-start-1 xl:row-start-1">
+                    <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
                         currentStreak={dashboardData.stats.current_streak}
                         problemsToday={dashboardData.stats.problems_solved_today}
@@ -691,10 +629,7 @@ export function DashboardAuth() {
                       ) : null}
                     </div>
 
-                    <div className="order-2 md:order-3 xl:order-none overflow-visible xl:col-start-2 xl:row-span-2">
-                      <p className="mb-3 text-sm font-bold text-gray-500 md:hidden">
-                        Continuă de unde ai rămas
-                      </p>
+                    <div className="order-2 md:order-3 xl:order-none overflow-visible xl:col-start-2 xl:row-span-2 min-h-[calc(100dvh-4rem)] md:min-h-0">
                       <DashboardLearningPathsCarousel
                         chapters={dashboardData.dashboardLearningPaths}
                         lessonsByChapter={dashboardData.dashboardLessonsByChapter}
@@ -726,12 +661,6 @@ export function DashboardAuth() {
           ctaLoading={welcomeCtaLoading}
         />
       )}
-
-      <DashboardFakeSolveSocialOverlay
-        notification={fakeSolveMobileNotification}
-        visible={fakeSolveMobileVisible}
-        onDismiss={dismissFakeSolveMobileNotification}
-      />
 
     </DashboardSidebarProvider>
   )

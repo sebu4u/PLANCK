@@ -683,6 +683,48 @@ export function LearningPathsManager({
     setLessonImageUrlInput(selectedLesson.image_url ?? "")
   }, [selectedLesson?.id, selectedLesson?.image_url])
 
+  const handleToggleLessonHubNouBadge = async (checked: boolean) => {
+    if (!selectedLesson || saving) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error("Sesiune expirată.")
+
+      const payload: Record<string, unknown> = {
+        type: "lesson",
+        id: selectedLesson.id,
+        hub_show_nou_badge: checked,
+      }
+      if (isDev && devSubject) {
+        payload.subject = devSubject
+      }
+
+      const response = await fetch(apiBase, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut actualiza eticheta „nou”.")
+      }
+
+      setSuccessMessage(checked ? "Eticheta „nou” activată pe mobil." : "Eticheta „nou” dezactivată.")
+      setTimeout(() => setSuccessMessage(null), 3000)
+      await fetchData()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Eroare la actualizarea etichetei „nou”.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const selectedChapter = useMemo(() => {
     if (!selectedLesson) return null
     return chapters.find((chapter) => chapter.id === selectedLesson.chapter_id) || null
@@ -2747,6 +2789,20 @@ export function LearningPathsManager({
                     referrerPolicy="no-referrer"
                   />
                 ) : null}
+              </div>
+
+              <div className="rounded-md border border-white/10 bg-black/20 p-4">
+                <label className="flex cursor-pointer items-center gap-3 text-sm text-gray-200">
+                  <Checkbox
+                    checked={selectedLesson.hub_show_nou_badge === true}
+                    disabled={saving}
+                    onCheckedChange={(value) => void handleToggleLessonHubNouBadge(value === true)}
+                  />
+                  <span>
+                    Afișează eticheta <span className="font-semibold text-emerald-400">nou</span> pe cardul
+                    lecției în hub-ul /invata (mobil)
+                  </span>
+                </label>
               </div>
 
               <div className="space-y-0">

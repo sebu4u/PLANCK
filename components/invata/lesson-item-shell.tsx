@@ -319,7 +319,7 @@ function LessonItemShellInner({
           type="button"
           onClick={() => setShowQuitDialog(true)}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#4d4d4d] transition-colors hover:bg-[#f5f5f5] hover:text-[#111111]"
-          aria-label="Înapoi la dashboard"
+          aria-label="Înapoi la lecție"
         >
           <X className="h-5 w-5" />
         </button>
@@ -507,10 +507,10 @@ function LessonItemShellInner({
             </button>
             <button
               type="button"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push(lessonBaseHref)}
               className="text-sm font-medium text-red-500 transition-colors hover:text-red-600"
             >
-              Du-mă la dashboard
+              Ieși din lecție
             </button>
           </div>
           </div>

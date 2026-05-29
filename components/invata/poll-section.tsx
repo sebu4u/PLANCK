@@ -16,6 +16,7 @@ import {
 } from "@/lib/learning-path-insight-context"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
+import { cn } from "@/lib/utils"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 export type PollBarState = "verify" | "correct" | "incorrect"
@@ -76,6 +77,7 @@ interface PollSectionProps {
   lessonSlug: string
   chapterId?: string | null
   itemTitle?: string | null
+  hasImage?: boolean
   children: React.ReactNode
 }
 
@@ -91,6 +93,7 @@ export function PollSection({
   lessonSlug,
   chapterId,
   itemTitle,
+  hasImage = false,
   children,
 }: PollSectionProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -226,8 +229,20 @@ export function PollSection({
         onVerify,
       }}
     >
-      <div className="flex min-h-[calc(100dvh-3.5rem-8rem)] w-full flex-col items-center justify-center px-1 sm:min-h-[calc(100dvh-3.5rem-7.5rem)]">
-        <div className="w-full max-w-3xl space-y-6">
+      <div
+        className={cn(
+          "flex w-full flex-col px-1",
+          hasImage
+            ? "h-[calc(100dvh-3.5rem)] min-h-0 overflow-y-auto py-4 sm:py-6"
+            : "min-h-[calc(100dvh-3.5rem-8rem)] items-center justify-center sm:min-h-[calc(100dvh-3.5rem-7.5rem)]",
+        )}
+        style={
+          hasImage
+            ? { paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }
+            : undefined
+        }
+      >
+        <div className={cn("w-full max-w-3xl space-y-6", hasImage && "mx-auto my-auto")}>
           <div className="text-center text-lg font-bold leading-snug text-[#111111] md:text-xl md:leading-snug">
             <LatexRichText
               content={displayText}

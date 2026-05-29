@@ -474,7 +474,9 @@ export function Navigation() {
       ? "shadow-none"
       : showMobileLessonShell
         ? "shadow-none burger:shadow-md"
-        : `shadow-md ${!isDashboardPage && !navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
+        : isDashboardPage
+          ? "shadow-none burger:shadow-md"
+          : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
   const showMobileBottomNav = showMobileAppShell
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"

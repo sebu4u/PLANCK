@@ -55,8 +55,16 @@ export interface LearningPathLesson {
   problem_id: string | null
   order_index: number
   is_active: boolean
+  /** Green „nou” pill on /invata mobile hub cards. */
+  hub_show_nou_badge: boolean
   created_at: string
   updated_at: string
+}
+
+export function learningPathLessonShowsHubNouBadge(
+  lesson: Pick<LearningPathLesson, "hub_show_nou_badge">,
+): boolean {
+  return lesson.hub_show_nou_badge === true
 }
 
 export interface LearningPathLessonItem {

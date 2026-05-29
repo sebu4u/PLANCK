@@ -1,15 +1,15 @@
 import Link from "next/link"
 import {
   getLearningPathLessonHref,
+  learningPathLessonShowsHubNouBadge,
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
 import { LessonItemProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { cn } from "@/lib/utils"
 
-/** Same surface as card_sort items in learning-path-interactive-lesson-item.tsx */
 const LESSON_HUB_CARD_CLASS =
-  "rounded-xl border-[3px] border-[#cfc3dc] bg-white px-3.5 py-3.5 shadow-[0_4px_0_#9d8ab3] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-[0_2px_0_#9d8ab3]"
+  "rounded-xl border-[3px] border-[#e6e6e6] bg-white px-3.5 py-3.5 shadow-[0_4px_0_#e6e6e6] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-[0_2px_0_#cfcfcf]"
 
 export type LessonProgress = {
   completed: number
@@ -41,6 +41,7 @@ export function InvataMobileLessonList({
       {lessons.map((lesson) => {
         const progress = lessonProgressByLessonId[lesson.id] ?? { completed: 0, total: 0 }
         const href = getLearningPathLessonHref(chapter, lesson)
+        const showNouBadge = learningPathLessonShowsHubNouBadge(lesson)
 
         return (
           <Link
@@ -51,6 +52,14 @@ export function InvataMobileLessonList({
               LESSON_HUB_CARD_CLASS
             )}
           >
+            {showNouBadge ? (
+              <span
+                className="absolute right-3 top-3 z-[2] rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold leading-none text-white"
+                aria-hidden
+              >
+                nou
+              </span>
+            ) : null}
             <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
               {lesson.image_url ? (
                 <img
@@ -64,7 +73,7 @@ export function InvataMobileLessonList({
               )}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className={cn("min-w-0 flex-1", showNouBadge && "pr-11")}>
               <p className="line-clamp-2 text-sm font-semibold text-[#222]">{lesson.title}</p>
               <LessonItemProgressBar
                 completed={progress.completed}

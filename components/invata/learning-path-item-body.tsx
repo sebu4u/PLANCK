@@ -314,6 +314,7 @@ export function LearningPathItemBody({
     if (!pollData || !nextItemHref || !lessonId) {
       return <p className="text-sm text-[#777777]">Sondajul nu este configurat încă.</p>
     }
+    const pollHasImage = pollData.imageSrc.trim().length > 0
     return (
       <PollSection
         question={pollData.question}
@@ -327,6 +328,7 @@ export function LearningPathItemBody({
         lessonSlug={lessonSlug ?? ""}
         chapterId={chapterId}
         itemTitle={item.title}
+        hasImage={pollHasImage}
       >
         <LessonPollClientWrapper
           imageSrc={pollData.imageSrc}
