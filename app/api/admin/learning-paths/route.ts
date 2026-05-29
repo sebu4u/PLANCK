@@ -345,6 +345,7 @@ export async function POST(req: NextRequest) {
 
       const payload = {
         title,
+        nav_title: toNullableString(body.nav_title),
         slug: toNullableString(body.slug),
         description: toNullableString(body.description),
         icon_url: toNullableString(body.icon_url),
@@ -490,6 +491,7 @@ export async function PUT(req: NextRequest) {
     if (type === "chapter") {
       const updateData: Record<string, unknown> = {}
       if (body.title !== undefined) updateData.title = toNullableString(body.title)
+      if (body.nav_title !== undefined) updateData.nav_title = toNullableString(body.nav_title)
       if (body.slug !== undefined) updateData.slug = toNullableString(body.slug)
       if (body.description !== undefined) updateData.description = toNullableString(body.description)
       if (body.icon_url !== undefined) updateData.icon_url = toNullableString(body.icon_url)

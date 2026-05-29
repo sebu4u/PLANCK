@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { BookOpen } from "lucide-react"
-import type { LearningPathChapter } from "@/lib/supabase-learning-paths"
+import {
+  getLearningPathChapterNavTitle,
+  type LearningPathChapter,
+} from "@/lib/supabase-learning-paths"
 import { invataChapterSectionDomId } from "@/components/invata/invata-chapter-section-indicator"
 import { cn } from "@/lib/utils"
 
@@ -164,7 +167,7 @@ export function InvataMobilePathNav({
                   isActive ? "text-violet-700" : "text-[#4f4f4f]"
                 )}
               >
-                {chapter.title}
+                {getLearningPathChapterNavTitle(chapter)}
               </span>
             </button>
           )

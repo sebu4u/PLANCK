@@ -18,21 +18,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 type SubjectKey = "fizica" | "informatica" | "matematica" | "biologie" | "ai"
 type ApiSubject = "physics" | "informatics" | "math"
-type DevLearningPathSubject = "physics" | "informatics" | "math" | "biology" | "all"
 
 function toApiSubject(key: SubjectKey): ApiSubject {
   if (key === "fizica") return "physics"
   if (key === "informatica") return "informatics"
   return "math"
-}
-
-function toDevLearningPathSubject(key: SubjectKey): DevLearningPathSubject | undefined {
-  if (key === "fizica") return "physics"
-  if (key === "informatica") return "informatics"
-  if (key === "matematica") return "math"
-  if (key === "biologie") return "biology"
-  if (key === "ai") return "all"
-  return undefined
 }
 
 function publicCatalogHref(key: SubjectKey): string {
@@ -121,7 +111,6 @@ async function getAuthJsonHeaders(): Promise<Record<string, string> | null> {
 
 export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   const apiSubject = toApiSubject(subjectKey)
-  const devLearningPathSubject = toDevLearningPathSubject(subjectKey)
   const learningPathsOnly = subjectKey === "biologie" || subjectKey === "ai"
   const title =
     subjectKey === "fizica"
@@ -1062,15 +1051,15 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               <div className="px-4 sm:px-6">
                 <h2 className="text-xl font-bold text-white">Learning paths (/invata)</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Același panou ca la admin: structură, preview lecție, formulare pentru toate tipurile de itemi. Pentru capitole
-                  noi sau alte operații doar admin, folosește contul admin.
+                  Același panou ca la admin: vezi și editezi toate capitolele (fizică, informatică, matematică, biologie), preview
+                  lecție, formulare pentru toate tipurile de itemi. Pentru operații doar admin, folosește contul admin.
                 </p>
               </div>
               <div className="mt-6 px-4 sm:px-6">
                 <LearningPathsManager
                   mode="dev"
-                  devSubject={devLearningPathSubject}
-                  devViewSubject={subjectKey === "matematica" || subjectKey === "ai" ? "all" : devLearningPathSubject}
+                  devSubject="all"
+                  devViewSubject="all"
                   onDevCelebrate={triggerDevCelebration}
                 />
               </div>

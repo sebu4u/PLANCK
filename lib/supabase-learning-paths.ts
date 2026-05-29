@@ -25,6 +25,8 @@ export interface LearningPathChapter {
   id: string
   slug: string | null
   title: string
+  /** Optional short label for the /invata mobile top bar; falls back to `title`. */
+  nav_title: string | null
   description: string | null
   icon_url: string | null
   problem_category: string | null
@@ -32,6 +34,11 @@ export interface LearningPathChapter {
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+export function getLearningPathChapterNavTitle(chapter: Pick<LearningPathChapter, "title" | "nav_title">): string {
+  const navTitle = chapter.nav_title?.trim()
+  return navTitle || chapter.title
 }
 
 export interface LearningPathLesson {
