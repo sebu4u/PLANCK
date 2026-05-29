@@ -79,9 +79,12 @@ const congratulationMessages = [
 ]
 
 const difficultyAccentClasses: Record<string, string> = {
-  "Ușor": "border-emerald-600/30 bg-emerald-50 text-emerald-800",
-  "Mediu": "border-amber-600/30 bg-amber-50 text-amber-800",
-  "Avansat": "border-rose-600/30 bg-rose-50 text-rose-800",
+  "Ușor":
+    "border-emerald-600/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-600/30",
+  "Mediu":
+    "border-amber-600/30 bg-amber-50 text-amber-800 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-600/30",
+  "Avansat":
+    "border-rose-600/30 bg-rose-50 text-rose-800 hover:bg-rose-50 hover:text-rose-800 hover:border-rose-600/30",
 }
 
 const CATALOG_RETURN_HREF_STORAGE_KEY = "catalog:catalogReturnHref"
@@ -240,7 +243,9 @@ export default function ProblemDetailClient({
     })
   }
 
-  const difficultyTone = difficultyAccentClasses[problem.difficulty] || "border-[#0b0d10]/15 bg-white text-[#2C2F33]"
+  const difficultyTone =
+    difficultyAccentClasses[problem.difficulty] ||
+    "border-[#0b0d10]/15 bg-white text-[#2C2F33] hover:bg-white hover:text-[#2C2F33] hover:border-[#0b0d10]/15"
   const classLabel = problem.classString
     ? problem.classString
     : typeof problem.class === 'number'
@@ -249,15 +254,27 @@ export default function ProblemDetailClient({
 
   const renderProblemMetaBadges = (className?: string) => (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <Badge className={cn("border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]", difficultyTone)}>
+      <Badge
+        variant="outline"
+        className={cn(
+          "cursor-default border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]",
+          difficultyTone,
+        )}
+      >
         {problem.difficulty}
       </Badge>
-      <Badge className="flex items-center gap-2 border border-[#0b0d10]/15 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-[#2C2F33]">
+      <Badge
+        variant="outline"
+        className="flex cursor-default items-center gap-2 border border-[#0b0d10]/15 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-[#2C2F33] hover:bg-white hover:text-[#2C2F33] hover:border-[#0b0d10]/15"
+      >
         <span className="text-base leading-none">{categoryIcons?.[problem.category] ?? '📘'}</span>
         {problem.category}
       </Badge>
       {hasVideo && (
-        <Badge className="border border-red-600/30 bg-red-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-800">
+        <Badge
+          variant="outline"
+          className="cursor-default border border-red-600/30 bg-red-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-800 hover:border-red-600/30 hover:bg-red-50 hover:text-red-800"
+        >
           🎥 Video
         </Badge>
       )}

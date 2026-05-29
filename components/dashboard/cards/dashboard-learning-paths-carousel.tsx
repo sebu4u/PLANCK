@@ -456,7 +456,7 @@ export function DashboardLearningPathsCarousel({
     <div className="flex h-full min-h-0 flex-col items-center gap-2">
       {/* Mobile: hero swipe + fixed bottom card */}
       <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden md:hidden">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-hidden px-4 pt-3 pb-[200px]">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4 pt-1 pb-[200px]">
           {activeChapter ? (
             <div className="w-full text-center transition-opacity duration-200">
               <h2 className="text-[1.75rem] font-bold leading-tight tracking-tight text-[#111111]">
@@ -476,7 +476,7 @@ export function DashboardLearningPathsCarousel({
           <div
             ref={mobileScrollRef}
             className={cn(
-              "-mx-4 mt-3 flex w-[calc(100%+2rem)] snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar-hide",
+              "-mx-4 mt-4 flex w-[calc(100%+2rem)] snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar-hide",
               MOBILE_CHAPTER_ICON_ROW_HEIGHT_CLASS
             )}
             onScroll={onMobileScroll}
