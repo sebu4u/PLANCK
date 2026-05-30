@@ -2,6 +2,9 @@ export const FREE_DAILY_LIMIT = 3;
 export const FREE_RAPTOR1_MONTHLY_LIMIT = 10;
 export const PLUS_MONTHLY_LIMIT = 800;
 
+/** Learning path „De ce?”, pagina de problemă și alte chat-uri problem_tutor. */
+export const INSIGHT_PROBLEM_TUTOR_TEMPERATURE = 0.2;
+
 export const INSIGHT_ALLOWED_MODELS = ['gpt-4o', 'gpt-4o-mini', 'deep-thinking'] as const;
 
 export type InsightModel = (typeof INSIGHT_ALLOWED_MODELS)[number];

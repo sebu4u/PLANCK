@@ -11,6 +11,7 @@ import { estimateCostUSD } from '@/lib/insight-cost';
 import {
   FREE_DAILY_LIMIT,
   FREE_RAPTOR1_MONTHLY_LIMIT,
+  INSIGHT_PROBLEM_TUTOR_TEMPERATURE,
   PLUS_MONTHLY_LIMIT,
   isInsightIdeFastModel,
   resolveInsightModel,
@@ -643,6 +644,9 @@ Asigură-te că JSON-ul este valid.`;
         messages: finalMessages,
         stream: true,
         ...maxTokensParam,
+        ...(personaKey === 'problem_tutor'
+          ? { temperature: INSIGHT_PROBLEM_TUTOR_TEMPERATURE }
+          : {}),
       };
 
       stream = await openai.chat.completions.create(completionParams);
