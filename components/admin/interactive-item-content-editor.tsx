@@ -20,6 +20,8 @@ import { SliderExploreEditor } from "./interactive-item-editors/slider-explore-e
 import { SpeedRoundEditor } from "./interactive-item-editors/speed-round-editor"
 import { SwipeClassifyEditor } from "./interactive-item-editors/swipe-classify-editor"
 import { TableFillEditor } from "./interactive-item-editors/table-fill-editor"
+import { InteractiveItemEditorLayout } from "./interactive-item-editors/editor-layout"
+import { InteractiveItemLivePreview } from "./interactive-item-editors/interactive-item-live-preview"
 import { adminFieldClass } from "./interactive-item-editors/shared-fields"
 
 function parseDraft(json: string, itemType: LearningPathInteractiveItemType): Record<string, unknown> {
@@ -102,14 +104,31 @@ export function InteractiveItemContentEditor({
 
   return (
     <div className="space-y-4">
-      {editor}
-      {validationError ? (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-          {validationError}
-        </p>
-      ) : (
-        <p className="text-xs text-emerald-400/90">Structura respectă validarea pentru acest tip.</p>
-      )}
+      <p className="text-xs leading-relaxed text-gray-400">
+        Preview live în dreapta — același UI ca la elev. Editează câmpurile din stânga; preview-ul se actualizează
+        instant când structura e validă.
+      </p>
+      <InteractiveItemEditorLayout
+        editor={
+          <>
+            {editor}
+            {validationError ? (
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                {validationError}
+              </p>
+            ) : (
+              <p className="text-xs text-emerald-400/90">Structura respectă validarea pentru acest tip.</p>
+            )}
+          </>
+        }
+        preview={
+          <InteractiveItemLivePreview
+            itemType={itemType}
+            draft={draft}
+            validationError={validationError}
+          />
+        }
+      />
 
       <details className="rounded-md border border-white/10 bg-black/20">
         <summary className="cursor-pointer select-none px-3 py-2 text-sm text-gray-300 hover:text-white">
