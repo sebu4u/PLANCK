@@ -46,10 +46,12 @@ import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-corre
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
-import { LatexRichText } from "@/components/classrooms/latex-rich-text"
-import { InlineMath } from "react-katex"
-import katex from "katex"
-import { hasMixedLatexDelimiters } from "@/lib/parse-mixed-latex"
+import { FillSlotFormula, FillSlotLatex } from "@/components/invata/fill-slot-formula"
+import {
+  buildFillSlotLatex,
+  FILL_SLOT_CHIP_DRAG_MIME,
+  FILL_SLOT_CHIP_SELECTED,
+} from "@/lib/fill-slot-latex"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 function shuffleInPlace<T>(arr: T[]) {
@@ -109,182 +111,6 @@ function RichMini({ text, className }: { text: string; className?: string }) {
     <div className={cn("prose prose-sm max-w-none text-[#222]", className)}>
       <LessonRichContent content={text} theme="light" />
     </div>
-  )
-}
-
-function normalizeLatexSegment(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed) return ""
-  if (trimmed.startsWith("$") && trimmed.endsWith("$") && trimmed.length > 2 && !trimmed.slice(1, -1).includes("$")) {
-    return trimmed.slice(1, -1).trim()
-  }
-  if (trimmed.startsWith("\\(") && trimmed.endsWith("\\)")) {
-    return trimmed.slice(2, -2).trim()
-  }
-  return trimmed
-}
-
-function FillSlotLatex({ content, className }: { content: string; className?: string }) {
-  const trimmed = content.trim()
-  if (!trimmed) return null
-
-  if (hasMixedLatexDelimiters(trimmed)) {
-    return (
-      <LatexRichText
-        content={trimmed}
-        className={cn("text-inherit [&_.katex]:text-inherit", className)}
-      />
-    )
-  }
-
-  return (
-    <span className={cn("inline-block text-inherit [&_.katex]:text-inherit", className)}>
-      <InlineMath math={normalizeLatexSegment(trimmed)} />
-    </span>
-  )
-}
-
-function chipToLatex(chip: string): string {
-  const value = normalizeLatexSegment(chip)
-  if (!value) return "\\text{?}"
-  if (/\\[a-zA-Z]+|[\^_{}=]/.test(value)) return value
-  return `\\text{${value.replace(/([#%&_{}])/g, "\\$1")}}`
-}
-
-function buildFillSlotPlaceholder(
-  slotId: string,
-  value: string | null,
-  isActive: boolean,
-  autoResult: "ok" | "bad" | null,
-  slotCorrect: boolean,
-): string {
-  const inner = value ? chipToLatex(value) : "\\text{?}"
-  let body = `\\boxed{${inner}}`
-
-  if (autoResult === "ok") {
-    body = `\\color{#059669}{${body}}`
-  } else if (autoResult === "bad" && value) {
-    body = slotCorrect ? `\\color{#059669}{${body}}` : `\\color{#dc2626}{${body}}`
-  } else if (isActive) {
-    body = `\\color{#7c3aed}{${body}}`
-  }
-
-  return `\\htmlId{fill-slot-${slotId}}{${body}}`
-}
-
-function buildFillSlotLatex(
-  template: string,
-  assign: Record<string, string | null>,
-  active: string | null,
-  autoResult: "ok" | "bad" | null,
-  slots: FillSlotContent["slots"],
-): string {
-  const base = normalizeLatexSegment(template)
-  const answerById = new Map(slots.map((s) => [s.id, s.answer.trim()]))
-
-  return base.replace(/\{\{(\w+)\}\}/g, (_, slotId: string) => {
-    const value = assign[slotId] ?? null
-    const slotCorrect = value ? value.trim() === (answerById.get(slotId) ?? "") : false
-    return buildFillSlotPlaceholder(slotId, value, active === slotId, autoResult, slotCorrect)
-  })
-}
-
-const FILL_SLOT_CHIP_DRAG_MIME = "application/x-planck-fill-chip"
-const FILL_SLOT_CHIP_SELECTED =
-  "border-violet-500 shadow-[0_4px_0_#5b21b6] ring-2 ring-violet-300 ring-offset-1"
-
-function FillSlotFormula({
-  latex,
-  slotIds,
-  autoResult,
-  dragOverSlot,
-  onSelectSlot,
-  onDropChip,
-  setDragOverSlot,
-}: {
-  latex: string
-  slotIds: string[]
-  autoResult: "ok" | "bad" | null
-  dragOverSlot: string | null
-  onSelectSlot: (slotId: string) => void
-  onDropChip: (chip: string, slotId: string) => void
-  setDragOverSlot: (slotId: string | null) => void
-}) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  const html = useMemo(() => {
-    try {
-      return katex.renderToString(latex, {
-        trust: true,
-        strict: "ignore",
-        throwOnError: false,
-        displayMode: true,
-      })
-    } catch {
-      return ""
-    }
-  }, [latex])
-
-  useEffect(() => {
-    const root = containerRef.current
-    if (!root) return
-
-    const cleanups: Array<() => void> = []
-
-    for (const slotId of slotIds) {
-      const el = root.querySelector(`#fill-slot-${slotId}`) as HTMLElement | null
-      if (!el) continue
-
-      el.setAttribute("role", "button")
-      el.setAttribute("tabindex", autoResult === "ok" ? "-1" : "0")
-      el.classList.add("fill-slot-target", "rounded-sm", "transition-shadow")
-      el.style.cursor = autoResult === "ok" ? "default" : "pointer"
-      el.classList.toggle("ring-2", dragOverSlot === slotId && autoResult !== "ok")
-      el.classList.toggle("ring-violet-400", dragOverSlot === slotId && autoResult !== "ok")
-      el.classList.toggle("ring-offset-2", dragOverSlot === slotId && autoResult !== "ok")
-
-      const onClick = () => onSelectSlot(slotId)
-      const onDragOver = (e: DragEvent) => {
-        if (autoResult === "ok") return
-        e.preventDefault()
-        if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
-        setDragOverSlot(slotId)
-      }
-      const onDragLeave = () => setDragOverSlot(null)
-      const onDrop = (e: DragEvent) => {
-        e.preventDefault()
-        setDragOverSlot(null)
-        if (autoResult === "ok") return
-        const raw =
-          e.dataTransfer?.getData(FILL_SLOT_CHIP_DRAG_MIME) || e.dataTransfer?.getData("text/plain")
-        if (raw) onDropChip(raw, slotId)
-      }
-
-      el.addEventListener("click", onClick)
-      el.addEventListener("dragover", onDragOver)
-      el.addEventListener("dragleave", onDragLeave)
-      el.addEventListener("drop", onDrop)
-
-      cleanups.push(() => {
-        el.removeEventListener("click", onClick)
-        el.removeEventListener("dragover", onDragOver)
-        el.removeEventListener("dragleave", onDragLeave)
-        el.removeEventListener("drop", onDrop)
-      })
-    }
-
-    return () => cleanups.forEach((fn) => fn())
-  }, [html, slotIds, autoResult, dragOverSlot, onSelectSlot, onDropChip, setDragOverSlot])
-
-  return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "w-full max-w-4xl overflow-x-auto px-2 text-center text-[#1a1423]",
-        "[&_.katex-display]:my-0 [&_.katex]:text-[1.35rem] sm:[&_.katex]:text-[1.65rem] md:[&_.katex]:text-[1.95rem]",
-      )}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
   )
 }
 
@@ -732,6 +558,14 @@ function FillSlotView({
         )}
       >
         <div className="flex w-full max-w-full flex-col items-center">
+          {data.instructions ? (
+            <div className="mb-5 w-full max-w-md px-1 text-center sm:mb-6 sm:max-w-lg sm:px-2">
+              <RichMini
+                text={data.instructions}
+                className="text-[#2a2433] [&_.prose]:text-center [&_p]:mx-auto [&_p]:max-w-none"
+              />
+            </div>
+          ) : null}
           <div className="mb-8 w-full sm:mb-10">
             <FillSlotFormula
               latex={renderedLatex}
