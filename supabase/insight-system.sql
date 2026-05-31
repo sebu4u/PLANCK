@@ -46,20 +46,7 @@ create policy "insight_usage_select_own"
   to authenticated
   using ((select auth.uid()) = user_id);
 
--- Users can insert their own usage
-drop policy if exists "insight_usage_insert_own" on public.insight_usage;
-create policy "insight_usage_insert_own"
-  on public.insight_usage for insert
-  to authenticated
-  with check ((select auth.uid()) = user_id);
-
--- Users can update their own usage
-drop policy if exists "insight_usage_update_own" on public.insight_usage;
-create policy "insight_usage_update_own"
-  on public.insight_usage for update
-  to authenticated
-  using ((select auth.uid()) = user_id)
-  with check ((select auth.uid()) = user_id);
+-- Writes are restricted to security-definer RPC functions (see migration 20260531_insight_usage_security.sql)
 
 -- 5. RLS Policies for insight_logs
 

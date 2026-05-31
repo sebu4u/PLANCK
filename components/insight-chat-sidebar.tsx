@@ -1316,7 +1316,7 @@ export default function InsightChatSidebar({
     setLoginLoading(null)
   }
 
-  const stopGeneration = useCallback(async () => {
+  const stopGeneration = useCallback(() => {
     if (!isStreaming) return
 
     const controller = abortControllerRef.current
@@ -1333,41 +1333,7 @@ export default function InsightChatSidebar({
     setBusy(false)
     setLoadingMessage(null)
     pendingStreamAnchorRef.current = false
-
-    if (!user) {
-      try {
-        await fetch('/api/insight/increment', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona }),
-        })
-      } catch (err) {
-        console.error('Failed to increment usage after manual stop:', err)
-      }
-      return
-    }
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token
-
-      if (!accessToken) return
-
-      await fetch('/api/insight/increment', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          persona,
-        }),
-      })
-    } catch (err) {
-      console.error('Failed to increment usage after manual stop:', err)
-    }
-  }, [isStreaming, supabase, user])
+  }, [isStreaming])
 
   const send = () => submitMessage()
   const isInputDisabled = busy

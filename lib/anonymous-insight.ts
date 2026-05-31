@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 
 export const ANONYMOUS_INSIGHT_COOKIE = 'planck_insight_anon';
@@ -24,6 +25,26 @@ export function parseAnonymousIdFromCookieHeader(cookieHeader: string | null): s
   return null;
 }
 
+function deriveStableAnonymousId(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  const ip =
+    forwarded?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    '127.0.0.1';
+  const ua = req.headers.get('user-agent') || '';
+  const pepper =
+    process.env.ANONYMOUS_INSIGHT_ID_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    'planck-anon-dev-pepper';
+
+  const digest = createHash('sha256').update(`${ip}\0${ua}\0${pepper}`).digest();
+  const bytes = Buffer.from(digest.subarray(0, 16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 export function resolveAnonymousIdentity(req: NextRequest): {
   anonymousId: string;
   /** When true, response must Set-Cookie this id */
@@ -33,11 +54,8 @@ export function resolveAnonymousIdentity(req: NextRequest): {
   if (existing) {
     return { anonymousId: existing, isNewAnonymousId: false };
   }
-  const crypto = globalThis.crypto;
-  if (!crypto?.randomUUID) {
-    throw new Error('crypto.randomUUID is not available');
-  }
-  return { anonymousId: crypto.randomUUID(), isNewAnonymousId: true };
+
+  return { anonymousId: deriveStableAnonymousId(req), isNewAnonymousId: true };
 }
 
 export function buildAnonymousInsightCookieHeader(anonymousId: string): string {

@@ -9,17 +9,14 @@ import { createServerClientWithToken } from '@/lib/supabaseServer';
 import { isJwtExpired } from '@/lib/auth-validate';
 import { estimateCostUSD } from '@/lib/insight-cost';
 import {
-  FREE_DAILY_LIMIT,
-  FREE_RAPTOR1_MONTHLY_LIMIT,
   INSIGHT_PROBLEM_TUTOR_TEMPERATURE,
-  PLUS_MONTHLY_LIMIT,
   isInsightIdeFastModel,
   resolveInsightModel,
   shouldUseRaptorFreeTierLimits,
 } from '@/lib/insight-limits';
 import { logger } from '@/lib/logger';
 import { resolvePlanForRequest } from '@/lib/subscription-plan-server';
-import type { SubscriptionPlan } from '@/lib/subscription-plan';
+import { reserveAuthenticatedInsightUsage } from '@/lib/insight-usage-reserve';
 import { handleAnonymousInsightChat } from '@/lib/insight-chat-anonymous';
 import {
   buildInsightAttachmentRecords,
@@ -180,8 +177,6 @@ export async function POST(req: NextRequest) {
 
     // Get user's plan
     const userPlan = await resolvePlanForRequest(supabase, accessToken);
-    const isFreePlan = userPlan === 'free';
-    const isPlusPlan = userPlan === 'plus';
 
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
 
@@ -234,110 +229,13 @@ export async function POST(req: NextRequest) {
     const modelToUseParam = resolveInsightModel(body?.model);
     const isIdeFastModel = isInsightIdeFastModel(modelToUseParam);
 
-    // Check usage limits based on plan
-    if (isFreePlan) {
-      // Block Deep Thinking (Raptor1 heavy) for Free plan
-      if (modelToUseParam === 'deep-thinking') {
-        return NextResponse.json(
-          { error: 'Modelul Raptor1 heavy este disponibil doar în planul Plus. Fă upgrade pentru a-l folosi.' },
-          { status: 403 }
-        );
-      }
-
-      if (useRaptorFreeTierLimits) {
-        if (!isIdeFastModel) {
-          // IDE + Raptor1 (gpt-4o): Monthly limit check (10/month)
-          const now = new Date();
-          const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-          const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
-
-          const { data: monthlyUsageRow } = await supabase
-            .from('ai_monthly_usage')
-            .select('prompts_count')
-            .eq('user_id', user.id)
-            .eq('usage_month', monthKey)
-            .maybeSingle();
-
-          const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
-          if (currentMonthlyCount >= FREE_RAPTOR1_MONTHLY_LIMIT) {
-            return NextResponse.json(
-              { error: 'Ai atins limita lunară pentru Raptor1 (10 solicitări/lună) pe planul Free. Treci la Raptor1 fast sau fă upgrade.' },
-              { status: 429 }
-            );
-          }
-        } else {
-          // IDE + Raptor1 fast (gpt-4o-mini): Daily limit check (3/day)
-          const usageDate = new Date().toISOString().split('T')[0]; // UTC date YYYY-MM-DD
-          const { data: usageRow } = await supabase
-            .from('insight_usage')
-            .select('prompts_count')
-            .eq('user_id', user.id)
-            .eq('usage_date', usageDate)
-            .maybeSingle();
-
-          const currentCount = usageRow?.prompts_count ?? 0;
-          if (currentCount >= FREE_DAILY_LIMIT) {
-            const now = new Date();
-            const nextReset = new Date(now);
-            nextReset.setUTCHours(24, 0, 0, 0); // Next midnight UTC
-
-            return NextResponse.json(
-              {
-                error: 'Ai atins limita zilnică pentru Raptor1 fast (3 solicitări/zi).',
-                resetTime: nextReset.toISOString()
-              },
-              { status: 429 }
-            );
-          }
-        }
-      } else {
-        // Insight (problemă, lecție, /insight/chat): daily limit only — same bucket as pre-Raptor general Insight
-        const usageDate = new Date().toISOString().split('T')[0];
-        const { data: usageRow } = await supabase
-          .from('insight_usage')
-          .select('prompts_count')
-          .eq('user_id', user.id)
-          .eq('usage_date', usageDate)
-          .maybeSingle();
-
-        const currentCount = usageRow?.prompts_count ?? 0;
-        if (currentCount >= FREE_DAILY_LIMIT) {
-          const now = new Date();
-          const nextReset = new Date(now);
-          nextReset.setUTCHours(24, 0, 0, 0);
-
-          return NextResponse.json(
-            {
-              error: 'Ai atins limita zilnică pentru Insight (3 solicitări/zi) pe planul Free. Încearcă mâine sau fă upgrade.',
-              resetTime: nextReset.toISOString()
-            },
-            { status: 429 }
-          );
-        }
-      }
-    } else if (isPlusPlan) {
-      // Plus plan: monthly limit check (800 prompts/month combined for Insight + AI Agent)
-      // All models draw from the same bucket
-      const now = new Date();
-      const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const monthKey = currentMonth.toISOString().split('T')[0]; // YYYY-MM-01
-
-      const { data: monthlyUsageRow } = await supabase
-        .from('ai_monthly_usage')
-        .select('prompts_count')
-        .eq('user_id', user.id)
-        .eq('usage_month', monthKey)
-        .maybeSingle();
-
-      const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
-      if (currentMonthlyCount >= PLUS_MONTHLY_LIMIT) {
-        return NextResponse.json(
-          { error: `Ai atins limita lunară pentru planul Plus (800 solicitări/lună pentru Insight și AI Agent).` },
-          { status: 429 }
-        );
-      }
+    // Block Deep Thinking (Raptor1 heavy) for Free plan
+    if (userPlan === 'free' && modelToUseParam === 'deep-thinking') {
+      return NextResponse.json(
+        { error: 'Modelul Raptor1 heavy este disponibil doar în planul Plus. Fă upgrade pentru a-l folosi.' },
+        { status: 403 }
+      );
     }
-    // Premium plan: no limits (for now, can be extended later)
 
     // Handle session: create if needed, validate ownership if exists
     // Skip session handling for IDE requests as they don't need persistent history
@@ -633,6 +531,17 @@ Asigură-te că JSON-ul este valid.`;
       max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
     };
 
+    // Atomically reserve quota immediately before OpenAI (prevents race conditions and abort bypass)
+    const usageReserve = await reserveAuthenticatedInsightUsage(supabase, {
+      plan: userPlan,
+      userId: user.id,
+      useRaptorFreeTierLimits,
+      isIdeFastModel,
+    });
+    if (!usageReserve.ok) {
+      return NextResponse.json(usageReserve.body, { status: usageReserve.status });
+    }
+
     // Call OpenAI Chat Completions API with streaming
     const t0 = Date.now();
     let stream: any;
@@ -651,7 +560,7 @@ Asigură-te că JSON-ul este valid.`;
 
       stream = await openai.chat.completions.create(completionParams);
     } catch (openaiError: any) {
-      // Handle specific OpenAI errors - don't increment counter on failure
+      // Handle specific OpenAI errors (quota already reserved before the call)
       if (openaiError?.status === 429) {
         const errorCode = openaiError?.code || '';
         if (errorCode === 'insufficient_quota') {
@@ -767,77 +676,6 @@ Asigură-te că JSON-ul este valid.`;
             if (insAsstMsgErr) {
               logger.error('Failed to save assistant message:', insAsstMsgErr);
             }
-          }
-
-          if (!clientAborted) {
-            // Only increment counter after successful OpenAI call
-            // Use appropriate tracking based on plan
-            if (isFreePlan) {
-              if (useRaptorFreeTierLimits) {
-                if (!isIdeFastModel) {
-                  // IDE Raptor1 (gpt-4o): increment monthly usage
-                  const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-                    'ai_check_and_increment_monthly',
-                    {
-                      p_user_id: user.id,
-                      p_monthly_limit: FREE_RAPTOR1_MONTHLY_LIMIT,
-                    }
-                  );
-
-                  if (rpcErr) {
-                    logger.error('RPC error after OpenAI success (Raptor1 monthly)', rpcErr);
-                  } else if (!incrementAllowed) {
-                    logger.warn('Monthly counter increment failed for Raptor1 after success');
-                  }
-                } else {
-                  // IDE Raptor1 fast (gpt-4o-mini): increment daily usage
-                  const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-                    'insight_check_and_increment',
-                    {
-                      p_user_id: user.id,
-                      p_daily_limit: FREE_DAILY_LIMIT,
-                    }
-                  );
-
-                  if (rpcErr) {
-                    logger.error('RPC error after OpenAI success', rpcErr);
-                  } else if (!incrementAllowed) {
-                    logger.warn('Counter increment failed after OpenAI success - race condition?');
-                  }
-                }
-              } else {
-                // General Insight (non-IDE): daily usage only
-                const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-                  'insight_check_and_increment',
-                  {
-                    p_user_id: user.id,
-                    p_daily_limit: FREE_DAILY_LIMIT,
-                  }
-                );
-
-                if (rpcErr) {
-                  logger.error('RPC error after OpenAI success (Insight daily)', rpcErr);
-                } else if (!incrementAllowed) {
-                  logger.warn('Daily counter increment failed after OpenAI success - race condition?');
-                }
-              }
-            } else if (isPlusPlan) {
-              // Plus plan: increment monthly usage (combined for Insight + AI Agent)
-              const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
-                'ai_check_and_increment_monthly',
-                {
-                  p_user_id: user.id,
-                  p_monthly_limit: PLUS_MONTHLY_LIMIT,
-                }
-              );
-
-              if (rpcErr) {
-                logger.error('RPC error after OpenAI success (monthly)', rpcErr);
-              } else if (!incrementAllowed) {
-                logger.warn('Monthly counter increment failed after OpenAI success - race condition?');
-              }
-            }
-            // Premium plan: no tracking needed (unlimited)
           }
 
           // Calculate cost

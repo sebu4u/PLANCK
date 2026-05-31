@@ -930,7 +930,7 @@ function InsightChatPageContent() {
     return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
   };
 
-  const stopGeneration = useCallback(async () => {
+  const stopGeneration = useCallback(() => {
     if (!isStreaming) return;
 
     const controller = abortControllerRef.current;
@@ -945,38 +945,7 @@ function InsightChatPageContent() {
     setIsStreaming(false);
     setBusy(false);
     setLoadingMessage(null);
-
-    try {
-      if (!user) {
-        await fetch('/api/insight/increment', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona: 'general_insight' }),
-        });
-        return;
-      }
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-
-      if (!accessToken) return;
-
-      await fetch('/api/insight/increment', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          persona: 'general_insight',
-        }),
-      });
-      await loadSessions(accessToken);
-    } catch (err) {
-      console.error('Failed to increment usage after manual stop:', err);
-    }
-  }, [isStreaming, supabase, user, loadSessions]);
+  }, [isStreaming]);
 
   const send = async (overrideMessage?: string) => {
     const messageSource = typeof overrideMessage === 'string' ? overrideMessage : input;

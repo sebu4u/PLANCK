@@ -2,13 +2,12 @@ import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { estimateCostUSD } from '@/lib/insight-cost';
 import {
-  FREE_DAILY_LIMIT,
-  FREE_RAPTOR1_MONTHLY_LIMIT,
   INSIGHT_PROBLEM_TUTOR_TEMPERATURE,
   isInsightIdeFastModel,
   resolveInsightModel,
   shouldUseRaptorFreeTierLimits,
 } from '@/lib/insight-limits';
+import { reserveAnonymousInsightUsage } from '@/lib/insight-usage-reserve';
 import { logger } from '@/lib/logger';
 import {
   buildAnonymousInsightCookieHeader,
@@ -144,62 +143,6 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
       }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
     );
-  }
-
-  const usageDate = new Date().toISOString().split('T')[0];
-  const now = new Date();
-  const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const monthKey = currentMonth.toISOString().split('T')[0];
-
-  if (useRaptorFreeTierLimits) {
-    if (!isIdeFastModel) {
-      const { data: monthlyUsageRow } = await admin
-        .from('anonymous_ai_monthly_usage')
-        .select('prompts_count')
-        .eq('anonymous_id', anonymousId)
-        .eq('usage_month', monthKey)
-        .maybeSingle();
-
-      const currentMonthlyCount = monthlyUsageRow?.prompts_count ?? 0;
-      if (currentMonthlyCount >= FREE_RAPTOR1_MONTHLY_LIMIT) {
-        return createAnonymousLimitExceededStream(req, setCookieHeader, {
-          persona: typeof persona === 'string' ? persona : null,
-          mode,
-        });
-      }
-    } else {
-      const { data: usageRow } = await admin
-        .from('anonymous_insight_usage')
-        .select('prompts_count')
-        .eq('anonymous_id', anonymousId)
-        .eq('usage_date', usageDate)
-        .maybeSingle();
-
-      const currentCount = usageRow?.prompts_count ?? 0;
-      if (currentCount >= FREE_DAILY_LIMIT) {
-        return createAnonymousLimitExceededStream(req, setCookieHeader, {
-          persona: typeof persona === 'string' ? persona : null,
-          mode,
-          resetTime: nextUtcMidnightIso(),
-        });
-      }
-    }
-  } else {
-    const { data: usageRow } = await admin
-      .from('anonymous_insight_usage')
-      .select('prompts_count')
-      .eq('anonymous_id', anonymousId)
-      .eq('usage_date', usageDate)
-      .maybeSingle();
-
-    const currentCount = usageRow?.prompts_count ?? 0;
-    if (currentCount >= FREE_DAILY_LIMIT) {
-      return createAnonymousLimitExceededStream(req, setCookieHeader, {
-        persona: typeof persona === 'string' ? persona : null,
-        mode,
-        resetTime: nextUtcMidnightIso(),
-      });
-    }
   }
 
   let history: Array<{ role: string; content: string }> = [];
@@ -357,6 +300,30 @@ Asigură-te că JSON-ul este valid.`;
     max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
   };
 
+  const usageReserve = await reserveAnonymousInsightUsage(
+    admin,
+    anonymousId,
+    useRaptorFreeTierLimits,
+    isIdeFastModel
+  );
+
+  if (!usageReserve.ok) {
+    if ('limitExceeded' in usageReserve && usageReserve.limitExceeded) {
+      return createAnonymousLimitExceededStream(req, setCookieHeader, {
+        persona: typeof persona === 'string' ? persona : null,
+        mode,
+        resetTime: useRaptorFreeTierLimits && !isIdeFastModel ? undefined : nextUtcMidnightIso(),
+      });
+    }
+
+    if ('status' in usageReserve && 'body' in usageReserve) {
+      return new Response(JSON.stringify(usageReserve.body), {
+        status: usageReserve.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   const t0 = Date.now();
   let stream: AsyncIterable<any>;
   try {
@@ -437,36 +404,6 @@ Asigură-te că JSON-ul este valid.`;
         const outputTokens = usage?.completion_tokens ?? 0;
         const totalTokens = usage?.total_tokens ?? 0;
         const latencyMs = Date.now() - t0;
-
-        if (!clientAborted) {
-          if (useRaptorFreeTierLimits) {
-            if (!isIdeFastModel) {
-              const { error: rpcErr } = await admin.rpc('anonymous_ai_check_and_increment_monthly', {
-                p_anonymous_id: anonymousId,
-                p_monthly_limit: FREE_RAPTOR1_MONTHLY_LIMIT,
-              });
-              if (rpcErr) {
-                logger.error('Anonymous RPC error (Raptor1 monthly)', rpcErr);
-              }
-            } else {
-              const { error: rpcErr } = await admin.rpc('anonymous_insight_check_and_increment', {
-                p_anonymous_id: anonymousId,
-                p_daily_limit: FREE_DAILY_LIMIT,
-              });
-              if (rpcErr) {
-                logger.error('Anonymous RPC error (daily fast)', rpcErr);
-              }
-            }
-          } else {
-            const { error: rpcErr } = await admin.rpc('anonymous_insight_check_and_increment', {
-              p_anonymous_id: anonymousId,
-              p_daily_limit: FREE_DAILY_LIMIT,
-            });
-            if (rpcErr) {
-              logger.error('Anonymous RPC error (Insight daily)', rpcErr);
-            }
-          }
-        }
 
         const costUSD = estimateCostUSD(inputTokens, outputTokens);
 

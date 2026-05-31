@@ -543,50 +543,13 @@ export function InsightIdeChat({
     }
   }, [selectedModel, subscriptionPlan])
 
-  const stopStreaming = useCallback(async () => {
+  const stopStreaming = useCallback(() => {
     if (!isStreaming) return
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     setIsStreaming(false)
     setBusy(false)
-
-    if (!user) {
-      try {
-        await fetch("/api/insight/increment", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            persona: "ide",
-            model: mode === "ask" ? "gpt-4o" : selectedModel,
-          }),
-        })
-      } catch (error) {
-        console.error("Failed to increment usage after manual stop:", error)
-      }
-      return
-    }
-
-    try {
-      const { data } = await supabase.auth.getSession()
-      const accessToken = data.session?.access_token
-      if (!accessToken) return
-
-      await fetch("/api/insight/increment", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          persona: "ide",
-          model: mode === "ask" ? "gpt-4o" : selectedModel,
-        }),
-      })
-    } catch (error) {
-      console.error("Failed to increment usage after manual stop:", error)
-    }
-  }, [isStreaming, mode, selectedModel, supabase, user])
+  }, [isStreaming])
 
   const sendMessage = useCallback(async () => {
     if (!input.trim() || busy) return
