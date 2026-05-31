@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { evaluate } from "mathjs"
 import { Reorder } from "framer-motion"
 import { motion, useMotionValue, useTransform } from "framer-motion"
+import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
