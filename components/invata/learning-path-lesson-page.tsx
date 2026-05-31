@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, Loader2, Lock } from "lucide-react"
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Lock } from "lucide-react"
 import {
   getLearningPathLessonHref,
   getLearningPathRouteSegments,
@@ -276,32 +277,41 @@ export function LearningPathLessonPage({
   return (
     <div className="mx-auto w-full max-w-7xl px-5 pt-16 pb-6 sm:px-8 lg:px-12 lg:pt-28 lg:pb-10">
       <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
-          <div className="flex w-full justify-center bg-transparent lg:justify-start">
-            {lesson.image_url ? (
-              <img
-                src={lesson.image_url}
-                alt={lesson.title}
-                className="mx-auto h-36 w-auto max-w-full object-contain sm:h-40 lg:mx-0 lg:h-36 lg:object-left"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-36 w-36 items-center justify-center text-[#8a8a95] sm:h-40 sm:w-40 lg:h-36 lg:w-36">
-                <BookOpen className="h-9 w-9 sm:h-10 sm:w-10 lg:h-10 lg:w-10" />
-              </div>
-            )}
-          </div>
-          <div className="mt-5 w-full text-center lg:mt-4 lg:text-left">
-            <p className="mb-0 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6fac] sm:text-xs lg:mb-2 lg:block">Level 1</p>
-            <h1 className="text-xl font-bold leading-tight text-[#111111] sm:text-2xl lg:mt-1">{lesson.title}</h1>
-            <p className="mt-3 text-sm leading-snug text-[#6f657b] lg:mt-3 lg:text-sm">
-              {lesson.description || "Construiește pas cu pas această lecție."}
-            </p>
-            <p className="mt-3 text-sm font-semibold text-[#22192d] lg:mt-4">
-              {items.length} {items.length === 1 ? "lecție" : "lecții"}
-            </p>
-          </div>
-        </aside>
+        <div className="flex flex-col gap-3 lg:sticky lg:top-28 lg:self-start">
+          <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
+            <div className="flex w-full justify-center bg-transparent lg:justify-start">
+              {lesson.image_url ? (
+                <img
+                  src={lesson.image_url}
+                  alt={lesson.title}
+                  className="mx-auto h-36 w-auto max-w-full object-contain sm:h-40 lg:mx-0 lg:h-36 lg:object-left"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-36 w-36 items-center justify-center text-[#8a8a95] sm:h-40 sm:w-40 lg:h-36 lg:w-36">
+                  <BookOpen className="h-9 w-9 sm:h-10 sm:w-10 lg:h-10 lg:w-10" />
+                </div>
+              )}
+            </div>
+            <div className="mt-5 w-full text-center lg:mt-4 lg:text-left">
+              <p className="mb-0 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6fac] sm:text-xs lg:mb-2 lg:block">Level 1</p>
+              <h1 className="text-xl font-bold leading-tight text-[#111111] sm:text-2xl lg:mt-1">{lesson.title}</h1>
+              <p className="mt-3 text-sm leading-snug text-[#6f657b] lg:mt-3 lg:text-sm">
+                {lesson.description || "Construiește pas cu pas această lecție."}
+              </p>
+              <p className="mt-3 text-sm font-semibold text-[#22192d] lg:mt-4">
+                {items.length} {items.length === 1 ? "lecție" : "lecții"}
+              </p>
+            </div>
+          </aside>
+          <Link
+            href="/invata"
+            className="hidden lg:inline-flex items-center gap-1.5 px-1 text-sm font-semibold text-[#6f657b] transition-colors hover:text-[#111111]"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Înapoi la trasee
+          </Link>
+        </div>
 
         <section className="relative flex min-w-0 flex-col items-center">
           {items.length ? (

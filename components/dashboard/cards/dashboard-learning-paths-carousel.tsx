@@ -148,13 +148,13 @@ function LessonPreviewRows({
   )
 }
 
-const MOBILE_ICON_SLOT_WIDTH_REM = 11
+const MOBILE_ICON_SLOT_WIDTH_REM = 13
 /** Extra space beside the focused edge neighbor so first/last icons sit visually centered. */
 const MOBILE_EDGE_NEIGHBOR_GAP_REM = 2
 /** Fixed 1:1 frame so layout does not shift between chapters or focus states. */
-const MOBILE_CHAPTER_ICON_ROW_HEIGHT_CLASS = "h-48"
-const MOBILE_CHAPTER_ICON_FOCUSED_CLASS = "h-44 w-44"
-const MOBILE_CHAPTER_ICON_PEEK_CLASS = "h-28 w-28"
+const MOBILE_CHAPTER_ICON_ROW_HEIGHT_CLASS = "h-60"
+const MOBILE_CHAPTER_ICON_FOCUSED_CLASS = "h-56 w-56"
+const MOBILE_CHAPTER_ICON_PEEK_CLASS = "h-36 w-36"
 const MOBILE_LESSON_THUMB_CLASS = "h-9 w-9 shrink-0 aspect-square"
 
 const MOBILE_EDGE_INSET_STYLE = `calc(50% - ${MOBILE_ICON_SLOT_WIDTH_REM / 2}rem)`
@@ -521,7 +521,7 @@ export function DashboardLearningPathsCarousel({
                         isFocused ? MOBILE_CHAPTER_ICON_FOCUSED_CLASS : cn(MOBILE_CHAPTER_ICON_PEEK_CLASS, "opacity-40 transition-opacity duration-200")
                       )}
                     >
-                      <BookOpen className={cn(isFocused ? "h-16 w-16" : "h-11 w-11")} />
+                      <BookOpen className={cn(isFocused ? "h-20 w-20" : "h-14 w-14")} />
                     </div>
                   )}
                 </div>
