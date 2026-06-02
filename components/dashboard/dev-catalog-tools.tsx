@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
 import { LearningPathsManager } from "@/components/admin/learning-paths-manager"
 import { DevCelebrationCard } from "@/components/dashboard/dev-celebration-card"
+import { InformaticsProblemLivePreview } from "@/components/dashboard/informatics-problem-live-preview"
 import { pickRandomDevCelebrationMessage, type DevCelebrationMessage } from "@/lib/dev-celebration-messages"
 import { Loader2, ArrowLeft, Plus, Trash2, ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -353,7 +354,11 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   return (
     <>
       <Navigation />
-      <main className="mx-auto max-w-[1500px] px-4 pb-10 pt-24">
+      <main
+        className={`mx-auto px-4 pb-10 pt-24 ${
+          subjectKey === "informatica" ? "max-w-[1800px]" : "max-w-[1500px]"
+        }`}
+      >
         <Link
           href="/dashboard/dev"
           className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -410,7 +415,11 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
 
           {!learningPathsOnly ? (
           <TabsContent value="catalog" className="mt-6">
-            <section className="mx-auto max-w-4xl space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <section
+              className={`mx-auto space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm ${
+                subjectKey === "informatica" ? "max-w-full" : "max-w-4xl"
+              }`}
+            >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-gray-900">Catalog probleme</h2>
                 <Button variant="outline" size="sm" asChild>
@@ -631,7 +640,8 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               </Button>
             </div>
           ) : (
-            <div className="space-y-8">
+            <div className="grid gap-8 xl:grid-cols-2 xl:items-start">
+              <div className="space-y-8">
               <p className="text-xs text-gray-500">
                 Completează câmpurile obligatorii (slug, titlu, enunț) și cel puțin un test judge. Restul sunt opționale.
               </p>
@@ -1024,6 +1034,31 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               <Button type="button" disabled={busy} onClick={() => void submitInfoProblem()} className="w-full sm:w-auto">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Adaugă problema de informatică"}
               </Button>
+              </div>
+
+              <div className="xl:sticky xl:top-24">
+                <InformaticsProblemLivePreview
+                  input={{
+                    slug: infoForm.slug,
+                    title: infoForm.title,
+                    statement_markdown: infoForm.statement_markdown,
+                    requirement_markdown: infoForm.requirement_markdown,
+                    input_format: infoForm.input_format,
+                    output_format: infoForm.output_format,
+                    constraints_markdown: infoForm.constraints_markdown,
+                    difficulty: infoForm.difficulty,
+                    class: infoForm.class,
+                    chapter: infoForm.chapter,
+                    language: infoForm.language,
+                    tags: infoForm.tags,
+                    sample_input: infoForm.sample_input,
+                    sample_output: infoForm.sample_output,
+                    boilerplate_cpp: infoForm.boilerplate_cpp,
+                    boilerplate_python: infoForm.boilerplate_python,
+                    tests: infoForm.tests,
+                  }}
+                />
+              </div>
             </div>
           )}
 

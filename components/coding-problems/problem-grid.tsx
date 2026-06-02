@@ -7,6 +7,7 @@ interface CodingProblemGridProps {
   loading: boolean
   onSelectProblem?: (problem: CodingProblem) => void
   canAccessProblem?: (problem: CodingProblem) => boolean
+  showDevEdit?: boolean
 }
 
 const PLACEHOLDER_ITEMS = Array.from({ length: 8 })
@@ -16,6 +17,7 @@ export function CodingProblemGrid({
   loading,
   onSelectProblem,
   canAccessProblem,
+  showDevEdit = false,
 }: CodingProblemGridProps) {
   if (loading) {
     return (
@@ -56,6 +58,7 @@ export function CodingProblemGrid({
           problem={problem}
           onSelect={onSelectProblem}
           isLocked={canAccessProblem ? !canAccessProblem(problem) : false}
+          showDevEdit={showDevEdit}
         />
       ))}
     </div>

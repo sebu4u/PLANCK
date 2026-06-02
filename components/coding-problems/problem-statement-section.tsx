@@ -27,6 +27,21 @@ export function ProblemStatementSection({
         <span>{problem.title}</span>
       </h1>
 
+      {problem.statement_markdown?.trim() && (
+        <section className="space-y-2">
+          <h2 className="font-vt323 text-lg font-semibold uppercase tracking-[0.2em] text-white">Enunț</h2>
+          <div className="rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <ReactMarkdown
+              className="font-vt323 text-base leading-relaxed text-white/80"
+              remarkPlugins={[remarkMath, remarkGfm]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {problem.statement_markdown}
+            </ReactMarkdown>
+          </div>
+        </section>
+      )}
+
       {/* Cerința */}
       {problem.requirement_markdown && (
         <section className="space-y-2">

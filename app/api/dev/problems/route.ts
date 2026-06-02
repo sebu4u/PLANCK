@@ -3,6 +3,11 @@ import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { requireDevSession } from "@/lib/dev-api-session"
 import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
+import {
+  buildInformaticsProblemRow,
+  parseCodingTags,
+  CLASS_SET,
+} from "@/lib/dev-informatics-problem"
 
 function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -12,18 +17,6 @@ function createServiceClient() {
   }
   return createClient(url, key)
 }
-
-const CODING_DIFFICULTY: Record<string, string> = {
-  "inițiere": "Inițiere",
-  initiere: "Inițiere",
-  "ușor": "Ușor",
-  usor: "Ușor",
-  mediu: "Mediu",
-  avansat: "Avansat",
-  concurs: "Concurs",
-}
-
-const CLASS_SET = new Set([9, 10, 11, 12])
 
 const MATH_DIFFICULTY_SET = new Set(["Ușor", "Mediu", "Avansat"])
 
@@ -80,105 +73,6 @@ function parseMathValueSubpoints(raw: unknown):
     value.push({ label, text_before, text_after, correct_value })
   }
   return { ok: true, value }
-}
-
-type ParsedCodingTest = {
-  stdin: string
-  expected_stdout: string
-  is_sample: boolean
-  weight: number
-  order_index: number
-}
-
-function parseCodingProblemTests(raw: unknown):
-  | { ok: true; value: ParsedCodingTest[] }
-  | { ok: false; message: string } {
-  if (raw === undefined || raw === null) {
-    return { ok: false, message: "Adaugă cel puțin un test (stdin + ieșire așteptată)." }
-  }
-  if (!Array.isArray(raw)) {
-    return { ok: false, message: "tests trebuie să fie un array de obiecte." }
-  }
-  if (raw.length === 0) {
-    return { ok: false, message: "Problema trebuie să aibă cel puțin un test pentru judge." }
-  }
-
-  const value: ParsedCodingTest[] = []
-  let totalWeight = 0
-
-  for (let i = 0; i < raw.length; i++) {
-    const item = raw[i]
-    if (!item || typeof item !== "object") {
-      return { ok: false, message: `Testul #${i + 1} trebuie să fie un obiect.` }
-    }
-    const o = item as Record<string, unknown>
-    if (typeof o.stdin !== "string" || typeof o.expected_stdout !== "string") {
-      return {
-        ok: false,
-        message: `Testul #${i + 1}: stdin și expected_stdout trebuie să fie stringuri (pot fi goale).`,
-      }
-    }
-
-    const weightRaw = o.weight
-    const weight =
-      typeof weightRaw === "number" && Number.isFinite(weightRaw) && weightRaw >= 0
-        ? weightRaw
-        : typeof weightRaw === "string" && weightRaw.trim()
-          ? Number.parseFloat(weightRaw)
-          : 1
-
-    if (!Number.isFinite(weight) || weight < 0) {
-      return { ok: false, message: `Testul #${i + 1}: weight trebuie să fie un număr ≥ 0.` }
-    }
-
-    totalWeight += weight
-    value.push({
-      stdin: o.stdin,
-      expected_stdout: o.expected_stdout,
-      is_sample: o.is_sample === true,
-      weight,
-      order_index: i,
-    })
-  }
-
-  if (totalWeight <= 0) {
-    return { ok: false, message: "Suma ponderilor testelor trebuie să fie mai mare decât 0." }
-  }
-
-  return { ok: true, value }
-}
-
-function parseCodingTags(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw
-      .filter((t): t is string => typeof t === "string")
-      .map((t) => t.trim())
-      .filter(Boolean)
-  }
-  if (typeof raw === "string") {
-    return raw
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
-  }
-  return []
-}
-
-function nullableTrimmedString(raw: unknown): string | null {
-  if (typeof raw !== "string") return null
-  const s = raw.trim()
-  return s.length ? s : null
-}
-
-/** String DB opțional păstrată ca trimisă (ex. intrări/ieșiri), gol → null */
-function nullableAsProvidedString(raw: unknown): string | null {
-  if (typeof raw !== "string") return null
-  return raw.length ? raw : null
-}
-
-function normalizeCodingDifficulty(raw: string): string {
-  const key = raw.trim().toLowerCase()
-  return CODING_DIFFICULTY[key] ?? raw.trim()
 }
 
 /**
@@ -429,78 +323,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, problem: data })
     }
 
-    const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : ""
-    const title = typeof body.title === "string" ? body.title.trim() : ""
-    const statement_markdown = typeof body.statement_markdown === "string" ? body.statement_markdown.trim() : ""
-    const chapter = typeof body.chapter === "string" && body.chapter.trim() ? body.chapter.trim() : "Capitol neclasificat"
-
-    const classRaw = body.class
-    const classNum =
-      typeof classRaw === "number" && Number.isFinite(classRaw)
-        ? Math.floor(classRaw)
-        : typeof classRaw === "string"
-          ? Number.parseInt(classRaw, 10)
-          : 9
-
-    if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-      return NextResponse.json(
-        { error: "slug obligatoriu (litere mici, cifre și cratime, ex: suma-cifrelor)." },
-        { status: 400 }
-      )
-    }
-    if (!title || !statement_markdown) {
-      return NextResponse.json({ error: "title și statement_markdown sunt obligatorii." }, { status: 400 })
-    }
-    if (!CLASS_SET.has(classNum)) {
-      return NextResponse.json({ error: "class trebuie să fie 9, 10, 11 sau 12." }, { status: 400 })
+    const parsed = buildInformaticsProblemRow(body)
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.message }, { status: 400 })
     }
 
-    const diffRaw = typeof body.difficulty === "string" ? body.difficulty.trim() : "Ușor"
-    const difficulty = normalizeCodingDifficulty(diffRaw)
-
-    const language =
-      body.language === "python" || body.language === "cpp" ? body.language : "python"
-
-    const insertRow: Record<string, unknown> = {
-      slug,
-      title,
-      statement_markdown,
-      requirement_markdown: nullableTrimmedString(body.requirement_markdown),
-      input_format: nullableTrimmedString(body.input_format),
-      output_format: nullableTrimmedString(body.output_format),
-      constraints_markdown: nullableTrimmedString(body.constraints_markdown),
-      difficulty,
-      class: classNum,
-      chapter,
-      points: typeof body.points === "number" && body.points >= 0 ? Math.floor(body.points) : 100,
-      time_limit_ms:
-        typeof body.time_limit_ms === "number" && body.time_limit_ms > 0 ? Math.floor(body.time_limit_ms) : 2000,
-      memory_limit_kb:
-        typeof body.memory_limit_kb === "number" && body.memory_limit_kb > 0
-          ? Math.floor(body.memory_limit_kb)
-          : 256000,
-      tags: parseCodingTags(body.tags),
-      is_active: body.is_active === false ? false : true,
-      sample_input: nullableAsProvidedString(body.sample_input),
-      sample_output: nullableAsProvidedString(body.sample_output),
-      explanation_markdown: nullableTrimmedString(body.explanation_markdown),
-      boilerplate_cpp: nullableAsProvidedString(body.boilerplate_cpp),
-      boilerplate_python: nullableAsProvidedString(body.boilerplate_python),
-      language,
-    }
-
-    const parsedTests = parseCodingProblemTests(body.tests)
-    if (!parsedTests.ok) {
-      return NextResponse.json({ error: parsedTests.message }, { status: 400 })
-    }
-
-    const { data, error } = await service.from("coding_problems").insert(insertRow).select("id, slug, title").single()
+    const { data, error } = await service
+      .from("coding_problems")
+      .insert(parsed.row)
+      .select("id, slug, title")
+      .single()
     if (error) {
       logger.error("[dev/problems] coding insert:", error)
       return NextResponse.json({ error: error.message || "Nu am putut crea problema de informatică." }, { status: 500 })
     }
 
-    const testRows = parsedTests.value.map((t) => ({
+    const testRows = parsed.tests.map((t) => ({
       problem_id: data.id,
       stdin: t.stdin,
       expected_stdout: t.expected_stdout,

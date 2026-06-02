@@ -3,7 +3,7 @@ import type { MouseEventHandler } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Lock } from "lucide-react"
+import { Lock, Pencil } from "lucide-react"
 import { CodingProblem } from "./types"
 
 const CLASS_LABELS: Record<number, string> = {
@@ -41,9 +41,10 @@ interface CodingProblemCardProps {
   problem: CodingProblem
   onSelect?: (problem: CodingProblem) => void
   isLocked?: boolean
+  showDevEdit?: boolean
 }
 
-export function CodingProblemCard({ problem, onSelect, isLocked = false }: CodingProblemCardProps) {
+export function CodingProblemCard({ problem, onSelect, isLocked = false, showDevEdit = false }: CodingProblemCardProps) {
   const preview = normalizePreview(problem.statement_markdown ?? problem.title)
   const difficultyStyle =
     DIFFICULTY_STYLES[problem.difficulty] ?? "border-white/15 bg-white/10 text-white/70"
@@ -138,7 +139,7 @@ export function CodingProblemCard({ problem, onSelect, isLocked = false }: Codin
         )}
       </div>
 
-      <div className={`mt-auto flex items-center justify-between gap-3 ${isLocked ? "pointer-events-none" : ""}`}>
+      <div className={`mt-auto flex items-center gap-2 ${isLocked ? "pointer-events-none" : ""}`}>
         {isLocked ? (
           <Button
             disabled
@@ -147,14 +148,28 @@ export function CodingProblemCard({ problem, onSelect, isLocked = false }: Codin
             Blocat pentru PLUS+
           </Button>
         ) : (
-          <Button
-            asChild
-            className="w-full rounded-full border border-white/15 bg-white text-sm font-semibold text-black transition hover:bg-white/90"
-          >
-            <Link href={`/informatica/probleme/${problem.slug}`} onClick={handleNavigate}>
-              Vezi problema
-            </Link>
-          </Button>
+          <>
+            {showDevEdit ? (
+              <Button
+                asChild
+                variant="outline"
+                className="rounded-full border-white/20 bg-transparent text-sm font-semibold text-white/90 hover:bg-white/10"
+              >
+                <Link href={`/dashboard/dev/catalog/informatica/edit/${problem.slug}`}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editează
+                </Link>
+              </Button>
+            ) : null}
+            <Button
+              asChild
+              className={`rounded-full border border-white/15 bg-white text-sm font-semibold text-black transition hover:bg-white/90 ${showDevEdit ? "flex-1" : "w-full"}`}
+            >
+              <Link href={`/informatica/probleme/${problem.slug}`} onClick={handleNavigate}>
+                Vezi problema
+              </Link>
+            </Button>
+          </>
         )}
       </div>
     </Card>

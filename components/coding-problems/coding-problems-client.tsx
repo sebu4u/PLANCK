@@ -15,6 +15,7 @@ import { CodingProblemFilterBar } from "./filter-bar"
 import { CodingProblemGrid } from "./problem-grid"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { ALLOW_ALL_CODING_PROBLEMS } from "@/lib/access-config"
+import { useAuth } from "@/components/auth-provider"
 
 const DEFAULT_FILTERS: CodingProblemFiltersState = {
   search: "",
@@ -44,6 +45,8 @@ export function CodingProblemsClient({
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const { isFree, isPaid } = useSubscriptionPlan()
+  const { isDev, profileSyncedUserId, user } = useAuth()
+  const showDevEdit = Boolean(user && profileSyncedUserId === user.id && isDev)
 
   const didMountRef = useRef(false)
 
@@ -165,6 +168,7 @@ export function CodingProblemsClient({
       <CodingProblemGrid
         problems={problems}
         loading={loading}
+        showDevEdit={showDevEdit}
         canAccessProblem={(problem) => {
           // Access controlled by centralized config - see lib/access-config.ts
           if (ALLOW_ALL_CODING_PROBLEMS) return true
