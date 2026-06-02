@@ -9,6 +9,7 @@ import {
   isInteractiveLessonItemType,
   validateInteractiveItemContent,
 } from "@/lib/learning-path-interactive-items"
+import { generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 
@@ -84,6 +85,26 @@ function formatDbError(error: unknown): string {
   const dbError = error as DbErrorLike
   const parts = [dbError.code, dbError.message, dbError.details, dbError.hint].filter(Boolean)
   return parts.join(" | ") || "Unknown database error."
+}
+
+function jsonLessonCreateError(error: unknown): NextResponse {
+  const details = formatDbError(error)
+  const db = error as DbErrorLike
+  const combinedCheck = [String(db.message || ""), db.details, db.hint].filter(Boolean).join(" ")
+
+  if (db.code === "PGRST204" && combinedCheck.includes("hub_show_nou_badge")) {
+    return NextResponse.json(
+      {
+        error:
+          "Coloana hub_show_nou_badge lipsește din baza de date. Aplică migrarea `20260529_learning_path_lesson_hub_nou_badge.sql` pe proiectul Supabase.",
+        details,
+      },
+      { status: 500 }
+    )
+  }
+
+  logger.error("[admin/learning-paths] Failed to create lesson:", details)
+  return NextResponse.json({ error: "Nu am putut crea lecția.", details }, { status: 500 })
 }
 
 async function shiftItemOrderRange(
@@ -374,9 +395,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "lesson_type invalid." }, { status: 400 })
       }
 
+      const requestedLessonSlug = toNullableString(body.slug)
+      const lessonSlug =
+        requestedLessonSlug ||
+        (await generateUniqueLessonSlug(supabase, chapterId, title))
+
       const payload = {
         chapter_id: chapterId,
-        slug: toNullableString(body.slug),
+        slug: lessonSlug,
         title,
         description: toNullableString(body.description),
         image_url: toNullableString(body.image_url),
@@ -387,13 +413,11 @@ export async function POST(req: NextRequest) {
         problem_id: toNullableString(body.problem_id),
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
-        hub_show_nou_badge: toBoolean(body.hub_show_nou_badge, false),
       }
 
       const { data, error } = await supabase.from("learning_path_lessons").insert(payload).select().single()
       if (error) {
-        logger.error("[admin/learning-paths] Failed to create lesson:", error)
-        return NextResponse.json({ error: "Nu am putut crea lecția." }, { status: 500 })
+        return jsonLessonCreateError(error)
       }
       return NextResponse.json({ success: true, lesson: data })
     }
