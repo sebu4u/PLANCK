@@ -3,6 +3,7 @@
 import { BlockMath, InlineMath } from "react-katex"
 import "katex/dist/katex.min.css"
 import { cn } from "@/lib/utils"
+import { LessonCodeSnippet, normalizeCodeSnippetContent } from "@/components/lesson-code-snippet"
 
 interface LessonRichContentProps {
   content: string
@@ -199,6 +200,17 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
         return
       }
 
+      if (trimmed.startsWith("[COD]")) {
+        flushParagraph(idx)
+        const codMatch = trimmed.match(/^\[COD\]([\s\S]*?)\[\/COD\]$/)
+        if (codMatch) {
+          blocks.push(
+            <LessonCodeSnippet key={`cod-${keyPrefix}-${idx}`} code={normalizeCodeSnippetContent(codMatch[1])} />
+          )
+        }
+        return
+      }
+
       if (
         trimmed.startsWith("[ENUNT]") ||
         trimmed.startsWith("[IMPORTANT]") ||
@@ -261,13 +273,20 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
 
   const renderContentWithMath = (value: string) => {
     const tagPattern =
-      /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\]|\[INDENT\][\s\S]*?\[\/INDENT\])/g
+      /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[COD\][\s\S]*?\[\/COD\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\]|\[INDENT\][\s\S]*?\[\/INDENT\])/g
     const segments = value.split(tagPattern)
 
     return (
       <div>
         {segments.map((segment, idx) => {
           if (!segment) return null
+
+          const codMatch = segment.match(/^\[COD\]([\s\S]*?)\[\/COD\]$/)
+          if (codMatch) {
+            return (
+              <LessonCodeSnippet key={`cod-${idx}`} code={normalizeCodeSnippetContent(codMatch[1])} />
+            )
+          }
 
           const tagMatch = segment.match(/^\[(FORMULA|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]([\s\S]*?)\[\/\1\]$/)
           if (tagMatch) {

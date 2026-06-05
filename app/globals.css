@@ -1410,9 +1410,17 @@
   .enunt-highlight,
   .important-highlight,
   .definition-highlight,
+  .example-highlight,
+  .lesson-code-snippet {
+    margin: 12px 0;
+  }
+
+  .formula-highlight,
+  .enunt-highlight,
+  .important-highlight,
+  .definition-highlight,
   .example-highlight {
     padding: 8px 12px;
-    margin: 12px 0;
     font-size: 0.9rem;
   }
 

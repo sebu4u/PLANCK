@@ -159,9 +159,11 @@ function CardSortView({
     if (checkPhase === "correct") return
     const ok = order.every((id, i) => id === data.correctOrder[i])
     if (ok) {
+      playSuccessSound()
       setCheckPhase("correct")
       onDone()
     } else {
+      playErrorSound()
       setCheckPhase("wrong")
     }
   }
@@ -239,10 +241,15 @@ function CardSortView({
               Ordinea nu este corectă. Rearanjează cardurile.
             </p>
           ) : null}
+          {checkPhase === "correct" ? (
+            <p className="mt-4 text-center text-sm font-medium text-emerald-600">
+              Foarte bine — ordinea este corectă!
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <InteractiveBottomChrome registrationDeps={[canContinue, checkPhase]}>
+      <InteractiveBottomChrome registrationDeps={[canContinue, checkPhase, order]}>
         <button
           type="button"
           onClick={handleWhy}

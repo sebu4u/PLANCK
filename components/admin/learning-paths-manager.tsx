@@ -154,7 +154,7 @@ const ITEM_TYPES: LearningPathLessonType[] = [
   "reveal_steps",
 ]
 
-const MARKERS = ["FORMULA", "ENUNT", "IMPORTANT", "DEFINITIE", "EXEMPLU", "INDENT"] as const
+const MARKERS = ["FORMULA", "ENUNT", "IMPORTANT", "DEFINITIE", "EXEMPLU", "INDENT", "COD"] as const
 
 function createPollOption(index: number): PollOption {
   const labelByIndex = ["A", "B", "C", "D", "E", "F"]
@@ -1699,7 +1699,7 @@ export function LearningPathsManager({
             value={form.custom_text_body}
             onChange={(e) => updateForm("custom_text_body", e.target.value)}
             rows={14}
-            placeholder="Scrie textul itemului aici. Suportă [FORMULA], [IMPORTANT], markdown și LaTeX."
+            placeholder="Scrie textul itemului aici. Suportă [FORMULA], [IMPORTANT], [COD] (Python), markdown și LaTeX."
             className="font-mono bg-black/40 border-white/20 text-gray-100"
           />
           <Button
