@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const customerId = resolveCustomerId(session.customer)
     const stripeMode = resolveStripeModeFromLivemode(session.livemode)
-    await updateProfileFromSubscription(subscription, customerId, userId, stripeMode, supabase)
+    await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {

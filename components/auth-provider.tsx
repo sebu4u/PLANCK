@@ -38,6 +38,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const FREE_PLAN_IDENTIFIER = "free"
+const REFERRAL_CODE_STORAGE_KEY = "planck_referral_code"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
@@ -182,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfileSyncedUserId(null)
     const { data } = await supabase
       .from("profiles")
-      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, is_admin, is_dev")
+      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev")
       .eq("user_id", user.id)
       .single()
 
@@ -227,7 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!insertError) {
       const { data: created } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade, plan, plus_months_remaining, is_admin, is_dev")
+        .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev")
         .eq("user_id", user.id)
         .single()
       if (created) {
@@ -272,10 +273,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user])
 
+  const processPendingReferral = useCallback(async () => {
+    if (!user || typeof window === "undefined") return
+
+    const referralCode = localStorage.getItem(REFERRAL_CODE_STORAGE_KEY)
+    if (!referralCode) return
+
+    if (profile?.referred_by) {
+      localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY)
+      return
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+    if (!token) return
+
+    try {
+      const response = await fetch("/api/referral/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          referral_code: referralCode,
+          referred_user_id: user.id,
+        }),
+      })
+
+      if (response.ok || response.status === 400) {
+        localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY)
+      }
+    } catch (error) {
+      console.error("[auth] Failed to process referral:", error)
+    }
+  }, [user, profile?.referred_by])
+
   useEffect(() => {
     fetchProfile()
     fetchUserStats()
   }, [fetchProfile, fetchUserStats])
+
+  useEffect(() => {
+    if (!user || profileSyncedUserId !== user.id) return
+    void processPendingReferral()
+  }, [user, profileSyncedUserId, processPendingReferral])
 
   const login = async (email: string, password: string) => {
     setLoading(true)

@@ -2,9 +2,8 @@ import type { NextRequest } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   FREE_PLAN,
-  PLAN_PROPERTY_PRIORITY,
   SubscriptionPlan,
-  resolvePlanFromCandidates,
+  normalizeSubscriptionPlan,
 } from "./subscription-plan"
 
 export const parseAccessToken = (request: NextRequest) => {
@@ -40,21 +39,9 @@ export const resolvePlanForRequest = async (
       .eq("user_id", user.id)
       .maybeSingle()
 
-    const metadata = (user.user_metadata as Record<string, unknown>) ?? {}
-    const appMetadata = (user.app_metadata as Record<string, unknown>) ?? {}
+    const resolvedPlan = normalizeSubscriptionPlan(profile?.plan)
 
-    const candidates: unknown[] = [profile?.plan]
-    PLAN_PROPERTY_PRIORITY.forEach((prop) => {
-      candidates.push(metadata[prop])
-    })
-    PLAN_PROPERTY_PRIORITY.forEach((prop) => {
-      candidates.push(appMetadata[prop])
-    })
-
-    const resolvedPlan = resolvePlanFromCandidates(candidates)
-
-    // Check for referral rewards (override free plan if user has Plus months remaining)
-    if (resolvedPlan === "free" && profile?.plus_months_remaining > 0) {
+    if (resolvedPlan === "free" && (profile?.plus_months_remaining ?? 0) > 0) {
       return "plus"
     }
 
@@ -64,4 +51,3 @@ export const resolvePlanForRequest = async (
     return FREE_PLAN
   }
 }
-

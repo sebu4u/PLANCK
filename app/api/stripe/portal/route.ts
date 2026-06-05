@@ -4,7 +4,11 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getStripeClient } from "@/lib/stripe"
 import { getStripeConfig } from "@/lib/stripe-config"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
-import { findStripeCustomerIdForUser, isStripeMissingCustomerError } from "@/lib/stripe-subscription"
+import {
+  findStripeCustomerIdForUser,
+  getSupabaseAdmin,
+  isStripeMissingCustomerError,
+} from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
 
@@ -56,7 +60,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (hadInvalidStoredCustomer && !recoveredCustomerId) {
-      const { error: cleanupError } = await supabase
+      const supabaseAdmin = getSupabaseAdmin()
+      const { error: cleanupError } = await supabaseAdmin
         .from("profiles")
         .update({
           plan: "free",
@@ -79,7 +84,8 @@ export async function POST(req: NextRequest) {
     const { siteUrl } = getStripeConfig()
 
     if (recoveredCustomerId !== profile?.stripe_customer_id) {
-      const { error: updateError } = await supabase
+      const supabaseAdmin = getSupabaseAdmin()
+      const { error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({ stripe_customer_id: recoveredCustomerId })
         .eq("user_id", userData.user.id)

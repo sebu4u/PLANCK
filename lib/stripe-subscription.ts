@@ -122,21 +122,9 @@ export const updateProfileFromSubscription = async (
   subscription: Stripe.Subscription,
   customerId: string | null,
   userId?: string | null,
-  mode?: StripeMode,
-  fallbackSupabase?: SupabaseClient
+  mode?: StripeMode
 ) => {
-  let supabase: SupabaseClient
-  try {
-    supabase = getSupabaseAdmin()
-  } catch (error) {
-    if (!fallbackSupabase) {
-      throw error
-    }
-    // Fallback for post-checkout sync when service role is missing.
-    // Webhooks still require service role and should be fixed in env config.
-    console.warn("[stripe] Falling back to authenticated Supabase client for profile sync.")
-    supabase = fallbackSupabase
-  }
+  const supabase = getSupabaseAdmin()
 
   const effectiveMode = mode ?? resolveStripeModeFromLivemode(subscription.livemode)
   const prices = getStripePrices(effectiveMode)

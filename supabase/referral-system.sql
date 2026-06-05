@@ -70,11 +70,9 @@ CREATE POLICY "referrals_select_own"
   TO authenticated
   USING (referrer_id = (SELECT auth.uid()) OR referred_id = (SELECT auth.uid()));
 
+-- Referral rows are inserted only by service_role or process_referral (SECURITY DEFINER).
+-- No INSERT policy for authenticated/anon.
 DROP POLICY IF EXISTS "referrals_insert_all" ON public.referrals;
-CREATE POLICY "referrals_insert_all"
-  ON public.referrals FOR INSERT
-  TO authenticated, anon
-  WITH CHECK (true);
 
 -- Function to generate unique referral code (8 characters, alphanumeric without confusing chars)
 CREATE OR REPLACE FUNCTION generate_referral_code()
@@ -184,6 +182,12 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+REVOKE EXECUTE ON FUNCTION public.process_referral(text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_referral(text, uuid) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.ensure_referral_code(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ensure_referral_code(uuid) TO service_role;
 
 -- Create indexes for faster lookups
 CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code);

@@ -8,6 +8,7 @@ import { parseAccessToken } from "@/lib/subscription-plan-server"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import {
   getOrCreateStripeCustomerId,
+  getSupabaseAdmin,
   hasPortalManagedSubscription,
   isStripeMissingCustomerError,
 } from "@/lib/stripe-subscription"
@@ -127,7 +128,8 @@ export async function POST(req: NextRequest) {
         )
         existingCustomerId = null
 
-        const { error: cleanupError } = await supabase
+        const supabaseAdmin = getSupabaseAdmin()
+        const { error: cleanupError } = await supabaseAdmin
           .from("profiles")
           .update({
             plan: "free",
@@ -153,7 +155,8 @@ export async function POST(req: NextRequest) {
     })
 
     if (stripeCustomerId !== existingCustomerId) {
-      const { error: updateError } = await supabase
+      const supabaseAdmin = getSupabaseAdmin()
+      const { error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({ stripe_customer_id: stripeCustomerId })
         .eq("user_id", user.id)
