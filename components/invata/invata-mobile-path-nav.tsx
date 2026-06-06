@@ -7,7 +7,67 @@ import {
   type LearningPathChapter,
 } from "@/lib/supabase-learning-paths"
 import { invataChapterSectionDomId } from "@/components/invata/invata-chapter-section-indicator"
+import {
+  InvataDeferredImage,
+  useInvataChapterImagesEnabled,
+} from "@/components/invata/invata-chapter-image-load-context"
 import { cn } from "@/lib/utils"
+
+interface InvataMobilePathNavChapterButtonProps {
+  chapter: LearningPathChapter
+  index: number
+  isActive: boolean
+  onSelect: (chapterId: string, index: number) => void
+  buttonRef: (element: HTMLButtonElement | null) => void
+}
+
+function InvataMobilePathNavChapterButton({
+  chapter,
+  index,
+  isActive,
+  onSelect,
+  buttonRef,
+}: InvataMobilePathNavChapterButtonProps) {
+  const imagesEnabled = useInvataChapterImagesEnabled(index)
+
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={() => onSelect(chapter.id, index)}
+      className="relative flex w-[104px] shrink-0 flex-col items-center gap-1.5"
+      aria-current={isActive ? "true" : undefined}
+    >
+      <div
+        className={cn(
+          "relative h-[52px] w-full overflow-hidden rounded-xl border-2 border-[#e6e6e6] bg-white transition-colors",
+          isActive && "shadow-sm"
+        )}
+      >
+        {chapter.icon_url ? (
+          <InvataDeferredImage
+            src={chapter.icon_url}
+            enabled={imagesEnabled}
+            alt=""
+            className="absolute inset-0 h-full w-full object-contain p-2"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-white">
+            <BookOpen className="h-7 w-7 text-[#5f5f5f]" aria-hidden="true" />
+          </div>
+        )}
+      </div>
+      <span
+        className={cn(
+          "line-clamp-2 w-full text-center text-[11px] font-medium leading-tight",
+          isActive ? "text-violet-700" : "text-[#4f4f4f]"
+        )}
+      >
+        {getLearningPathChapterNavTitle(chapter)}
+      </span>
+    </button>
+  )
+}
 
 interface InvataMobilePathNavProps {
   chapters: LearningPathChapter[]
@@ -129,49 +189,18 @@ export function InvataMobilePathNav({
           embeddedInNavbar ? "items-start pt-1.5" : "relative pb-1"
         )}
       >
-        {chapters.map((chapter, index) => {
-          const isActive = index === activeIndex
-          return (
-            <button
-              key={chapter.id}
-              ref={(el) => {
-                cardRefs.current[index] = el
-              }}
-              type="button"
-              onClick={() => scrollToChapter(chapter.id, index)}
-              className="relative flex w-[104px] shrink-0 flex-col items-center gap-1.5"
-              aria-current={isActive ? "true" : undefined}
-            >
-              <div
-                className={cn(
-                  "relative h-[52px] w-full overflow-hidden rounded-xl border-2 border-[#e6e6e6] bg-white transition-colors",
-                  isActive && "shadow-sm"
-                )}
-              >
-                {chapter.icon_url ? (
-                  <img
-                    src={chapter.icon_url}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-contain p-2"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-white">
-                    <BookOpen className="h-7 w-7 text-[#5f5f5f]" aria-hidden="true" />
-                  </div>
-                )}
-              </div>
-              <span
-                className={cn(
-                  "line-clamp-2 w-full text-center text-[11px] font-medium leading-tight",
-                  isActive ? "text-violet-700" : "text-[#4f4f4f]"
-                )}
-              >
-                {getLearningPathChapterNavTitle(chapter)}
-              </span>
-            </button>
-          )
-        })}
+        {chapters.map((chapter, index) => (
+          <InvataMobilePathNavChapterButton
+            key={chapter.id}
+            chapter={chapter}
+            index={index}
+            isActive={index === activeIndex}
+            onSelect={scrollToChapter}
+            buttonRef={(el) => {
+              cardRefs.current[index] = el
+            }}
+          />
+        ))}
       </div>
 
       {activeIndicator.width > 0 ? (

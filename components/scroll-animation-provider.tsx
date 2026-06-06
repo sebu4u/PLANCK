@@ -16,11 +16,17 @@ interface ScrollAnimationProviderProps {
    * @default 0.1
    */
   smoothness?: number
+  /**
+   * Whether to enable inertia-based smooth scrolling
+   * @default true
+   */
+  enableSmoothScroll?: boolean
 }
 
 export default function ScrollAnimationProvider({
   children,
-  smoothness = 0.1
+  smoothness = 0.1,
+  enableSmoothScroll = true
 }: ScrollAnimationProviderProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -85,6 +91,7 @@ export default function ScrollAnimationProvider({
   // Initialize smooth scroll
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (!enableSmoothScroll) return
 
     const content = contentRef.current
     const wrapper = wrapperRef.current
@@ -179,7 +186,7 @@ export default function ScrollAnimationProvider({
         content.style.transform = ''
       }
     }
-  }, [setBodyHeight, shouldDisableSmoothScroll, smoothScroll, smoothness])
+  }, [enableSmoothScroll, setBodyHeight, shouldDisableSmoothScroll, smoothScroll, smoothness])
 
   // Scroll-triggered animations (existing functionality)
   useEffect(() => {

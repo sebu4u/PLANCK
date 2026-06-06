@@ -18,6 +18,11 @@ import {
   InvataChapterSectionIndicator,
   invataChapterSectionDomId,
 } from "@/components/invata/invata-chapter-section-indicator"
+import {
+  InvataDeferredImage,
+  useInvataChapterImagesEnabled,
+  useRegisterInvataChapterSection,
+} from "@/components/invata/invata-chapter-image-load-context"
 
 export type LessonProgressByLessonId = Record<string, { completed: number; total: number }>
 
@@ -371,6 +376,169 @@ function ElasticLessonsScroller({
   )
 }
 
+interface InvataChapterSectionProps {
+  chapter: LearningPathChapter
+  chapterIndex: number
+  chapterLessons: LearningPathLesson[]
+  isLocked: boolean
+  completedLessonIds: string[]
+  lessonProgressByLessonId: LessonProgressByLessonId
+}
+
+function InvataChapterSection({
+  chapter,
+  chapterIndex,
+  chapterLessons,
+  isLocked,
+  completedLessonIds,
+  lessonProgressByLessonId,
+}: InvataChapterSectionProps) {
+  const sectionRef = useRegisterInvataChapterSection(chapterIndex)
+  const imagesEnabled = useInvataChapterImagesEnabled(chapterIndex)
+
+  return (
+    <section
+      ref={sectionRef}
+      id={invataChapterSectionDomId(chapter.id)}
+      className={
+        chapterIndex === 0
+          ? "relative max-sm:scroll-mt-[calc(5.875rem+3rem)] sm:scroll-mt-0"
+          : "relative max-sm:scroll-mt-[calc(5.875rem+3rem)] border-t border-[#ececec] pt-10 sm:scroll-mt-0 sm:pt-10"
+      }
+      aria-label={chapter.title}
+    >
+      <div className="relative mb-5 sm:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div
+            className="relative min-w-0 flex-1"
+            style={{ zIndex: INVATA_HUB_LESSON_CARDS_Z }}
+          >
+            <h2 className="text-xl font-bold text-[#111111]">{chapter.title}</h2>
+            {chapter.description ? (
+              <p className="mt-1 text-sm text-[#707070]">{chapter.description}</p>
+            ) : null}
+            {isLocked ? (
+              <span className="mt-3 inline-flex rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
+                În curând..
+              </span>
+            ) : null}
+          </div>
+          {chapter.icon_url ? (
+            <div
+              className="relative shrink-0"
+              style={{ zIndex: INVATA_HUB_CHAPTER_IMAGE_Z }}
+            >
+              <InvataDeferredImage
+                src={chapter.icon_url}
+                enabled={imagesEnabled}
+                alt=""
+                className="h-20 w-20 object-contain"
+              />
+            </div>
+          ) : (
+            <div
+              className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]"
+              style={{ zIndex: INVATA_HUB_CHAPTER_IMAGE_Z }}
+            >
+              <BookOpen className="h-10 w-10" aria-hidden="true" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
+        <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
+          {chapter.icon_url ? (
+            <InvataDeferredImage
+              src={chapter.icon_url}
+              enabled={imagesEnabled}
+              alt={chapter.title}
+              className="h-24 w-24 shrink-0 rounded-xl object-contain sm:h-28 sm:w-28"
+            />
+          ) : (
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
+              <BookOpen className="h-12 w-12 sm:h-14 sm:w-14" />
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-[#111111]">{chapter.title}</h2>
+            {chapter.description ? (
+              <p className="mt-0.5 text-sm text-[#707070]">{chapter.description}</p>
+            ) : null}
+            {chapterLessons.length > 0 ? (
+              <LearningPathSegmentedProgress
+                lessons={chapterLessons}
+                completedLessonIds={completedLessonIds}
+              />
+            ) : null}
+          </div>
+        </div>
+        {isLocked ? (
+          <span className="shrink-0 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
+            In curand..
+          </span>
+        ) : null}
+      </div>
+
+      <div className="relative sm:hidden" style={{ zIndex: INVATA_HUB_LESSON_CARDS_Z }}>
+        <InvataMobileLessonList
+          chapter={chapter}
+          lessons={chapterLessons}
+          lessonProgressByLessonId={lessonProgressByLessonId}
+          loadImages={imagesEnabled}
+        />
+      </div>
+
+      <div className="hidden sm:block">
+        <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
+          {chapterLessons.length ? (
+            <ElasticLessonsScroller>
+              {chapterLessons.map((lesson, lessonIndex) => {
+                const lessonHref = getLearningPathLessonHref(chapter, lesson)
+                const cardContent = (
+                  <div className="relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]">
+                    <div className="flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]">
+                      {lesson.image_url ? (
+                        <InvataDeferredImage
+                          src={lesson.image_url}
+                          enabled={imagesEnabled}
+                          alt={lesson.title}
+                          className="h-full w-full object-contain"
+                          draggable={false}
+                          onDragStart={(event) => event.preventDefault()}
+                        />
+                      ) : (
+                        <div className="h-full w-full rounded-xl bg-[#f3f3f3]" />
+                      )}
+                    </div>
+
+                    {lessonIndex < chapterLessons.length - 1 ? (
+                      <div className="pointer-events-none absolute left-[155px] top-[71px] h-[5px] w-[42px] bg-[#e6e6e6] sm:left-[176px] sm:top-[81px] sm:w-[48px]" />
+                    ) : null}
+
+                    <p className="mt-3 line-clamp-2 text-center text-base font-medium text-[#1f1f1f]">
+                      {lesson.title}
+                    </p>
+                  </div>
+                )
+
+                return (
+                  <Link key={lesson.id} href={lessonHref} className="block shrink-0">
+                    {cardContent}
+                  </Link>
+                )
+              })}
+            </ElasticLessonsScroller>
+          ) : (
+            <p className="text-sm text-[#7a7a7a]">Acest capitol nu are încă lecții.</p>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function LearningPathsList({
   chapters,
   lessonsByChapter,
@@ -396,152 +564,17 @@ export function LearningPathsList({
       <InvataChapterSectionIndicator chapterIds={chapters.map((c) => c.id)} />
 
       <div className="space-y-12 sm:space-y-10">
-        {chapters.map((chapter, chapterIndex) => {
-          const chapterLessons = lessonsByChapter[chapter.id] || []
-          const isLocked = lockedChapterIdSet.has(chapter.id)
-
-          return (
-            <section
-              key={chapter.id}
-              id={invataChapterSectionDomId(chapter.id)}
-              className={
-                chapterIndex === 0
-                  ? "relative max-sm:scroll-mt-[calc(5.875rem+3rem)] sm:scroll-mt-0"
-                  : "relative max-sm:scroll-mt-[calc(5.875rem+3rem)] border-t border-[#ececec] pt-10 sm:scroll-mt-0 sm:pt-10"
-              }
-              aria-label={chapter.title}
-            >
-              <div className="relative mb-5 sm:hidden">
-                <div className="flex items-start justify-between gap-3">
-                  <div
-                    className="relative min-w-0 flex-1"
-                    style={{ zIndex: INVATA_HUB_LESSON_CARDS_Z }}
-                  >
-                    <h2 className="text-xl font-bold text-[#111111]">{chapter.title}</h2>
-                    {chapter.description ? (
-                      <p className="mt-1 text-sm text-[#707070]">{chapter.description}</p>
-                    ) : null}
-                    {isLocked ? (
-                      <span className="mt-3 inline-flex rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
-                        În curând..
-                      </span>
-                    ) : null}
-                  </div>
-                  {chapter.icon_url ? (
-                    <div
-                      className="relative shrink-0"
-                      style={{ zIndex: INVATA_HUB_CHAPTER_IMAGE_Z }}
-                    >
-                      <img
-                        src={chapter.icon_url}
-                        alt=""
-                        className="h-20 w-20 object-contain"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]"
-                      style={{ zIndex: INVATA_HUB_CHAPTER_IMAGE_Z }}
-                    >
-                      <BookOpen className="h-10 w-10" aria-hidden="true" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
-                <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
-                  {chapter.icon_url ? (
-                    <img
-                      src={chapter.icon_url}
-                      alt={chapter.title}
-                      className="h-24 w-24 shrink-0 rounded-xl object-contain sm:h-28 sm:w-28"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
-                      <BookOpen className="h-12 w-12 sm:h-14 sm:w-14" />
-                    </div>
-                  )}
-
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-xl font-semibold text-[#111111]">{chapter.title}</h2>
-                    {chapter.description ? (
-                      <p className="mt-0.5 text-sm text-[#707070]">{chapter.description}</p>
-                    ) : null}
-                    {chapterLessons.length > 0 ? (
-                      <LearningPathSegmentedProgress
-                        lessons={chapterLessons}
-                        completedLessonIds={completedLessonIds}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-                {isLocked ? (
-                  <span className="shrink-0 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
-                    In curand..
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="relative sm:hidden" style={{ zIndex: INVATA_HUB_LESSON_CARDS_Z }}>
-                <InvataMobileLessonList
-                  chapter={chapter}
-                  lessons={chapterLessons}
-                  lessonProgressByLessonId={lessonProgressByLessonId}
-                />
-              </div>
-
-              <div className="hidden sm:block">
-                <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
-                  {chapterLessons.length ? (
-                    <ElasticLessonsScroller>
-                      {chapterLessons.map((lesson, lessonIndex) => {
-                        const lessonHref = getLearningPathLessonHref(chapter, lesson)
-                        const cardContent = (
-                          <div className="relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]">
-                            <div className="flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]">
-                              {lesson.image_url ? (
-                                <img
-                                  src={lesson.image_url}
-                                  alt={lesson.title}
-                                  className="h-full w-full object-contain"
-                                  loading="lazy"
-                                  draggable={false}
-                                  onDragStart={(event) => event.preventDefault()}
-                                />
-                              ) : (
-                                <div className="h-full w-full rounded-xl bg-[#f3f3f3]" />
-                              )}
-                            </div>
-
-                            {lessonIndex < chapterLessons.length - 1 ? (
-                              <div className="pointer-events-none absolute left-[155px] top-[71px] h-[5px] w-[42px] bg-[#e6e6e6] sm:left-[176px] sm:top-[81px] sm:w-[48px]" />
-                            ) : null}
-
-                            <p className="mt-3 line-clamp-2 text-center text-base font-medium text-[#1f1f1f]">
-                              {lesson.title}
-                            </p>
-                          </div>
-                        )
-
-                        return (
-                          <Link key={lesson.id} href={lessonHref} className="block shrink-0">
-                            {cardContent}
-                          </Link>
-                        )
-                      })}
-                    </ElasticLessonsScroller>
-                  ) : (
-                    <p className="text-sm text-[#7a7a7a]">Acest capitol nu are încă lecții.</p>
-                  )}
-                </div>
-              </div>
-
-            </section>
-          )
-        })}
+        {chapters.map((chapter, chapterIndex) => (
+          <InvataChapterSection
+            key={chapter.id}
+            chapter={chapter}
+            chapterIndex={chapterIndex}
+            chapterLessons={lessonsByChapter[chapter.id] || []}
+            isLocked={lockedChapterIdSet.has(chapter.id)}
+            completedLessonIds={completedLessonIds}
+            lessonProgressByLessonId={lessonProgressByLessonId}
+          />
+        ))}
       </div>
     </div>
   )

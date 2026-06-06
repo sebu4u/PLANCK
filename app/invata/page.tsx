@@ -21,6 +21,7 @@ import {
   parseGuestLearningPathProgress,
 } from "@/lib/guest-learning-path-cookie"
 import { createClient } from "@/lib/supabase/server"
+import { InvataChapterImageLoadProvider } from "@/components/invata/invata-chapter-image-load-context"
 import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context"
 import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
@@ -101,48 +102,50 @@ export default async function InvataPage() {
 
   return (
     <InvataHubNavProvider chapters={chapters}>
-      <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
-      <Navigation />
-      {chapters.length > 0 ? <InvataHubTopGlow /> : null}
+      <InvataChapterImageLoadProvider chapterCount={chapters.length}>
+        <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
+        <Navigation />
+        {chapters.length > 0 ? <InvataHubTopGlow /> : null}
 
-      <main
-        className={`relative min-h-screen max-sm:bg-transparent bg-[#ffffff] max-sm:pt-[calc(5.875rem+3rem)] pt-16 burger:pt-28 burger:pb-10 sm:pt-16 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}
-      >
-        <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
-          <header className="mb-8 hidden flex-col gap-4 sm:flex sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">
-                Trasee de învățare
-              </h1>
-              <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">
-                Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
-              </p>
-            </div>
-            <div className="flex flex-col items-start gap-3 sm:items-end">
-              {user ? (
-                <Link
-                  href="/invata/flashcard-uri"
-                  className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100"
-                >
-                  <Layers className="h-4 w-4" />
-                  Flashcard-urile mele
-                </Link>
-              ) : null}
-              <InvataAdminLearningPathsLink />
-            </div>
-          </header>
+        <main
+          className={`relative min-h-screen max-sm:bg-transparent bg-[#ffffff] max-sm:pt-[calc(5.875rem+3rem)] pt-16 burger:pt-28 burger:pb-10 sm:pt-16 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}
+        >
+          <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
+            <header className="mb-8 hidden flex-col gap-4 sm:flex sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">
+                  Trasee de învățare
+                </h1>
+                <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">
+                  Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
+                </p>
+              </div>
+              <div className="flex flex-col items-start gap-3 sm:items-end">
+                {user ? (
+                  <Link
+                    href="/invata/flashcard-uri"
+                    className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                  >
+                    <Layers className="h-4 w-4" />
+                    Flashcard-urile mele
+                  </Link>
+                ) : null}
+                <InvataAdminLearningPathsLink />
+              </div>
+            </header>
 
-          <LearningPathsList
-            chapters={chapters}
-            lessonsByChapter={lessonsByChapter}
-            lockedChapterIds={lockedChapterIds}
-            completedLessonIds={completedLessonIds}
-            lessonProgressByLessonId={lessonProgressByLessonId}
-          />
+            <LearningPathsList
+              chapters={chapters}
+              lessonsByChapter={lessonsByChapter}
+              lockedChapterIds={lockedChapterIds}
+              completedLessonIds={completedLessonIds}
+              lessonProgressByLessonId={lessonProgressByLessonId}
+            />
 
-          <InvataSeoIntro />
-        </div>
-      </main>
+            <InvataSeoIntro />
+          </div>
+        </main>
+      </InvataChapterImageLoadProvider>
     </InvataHubNavProvider>
   )
 }

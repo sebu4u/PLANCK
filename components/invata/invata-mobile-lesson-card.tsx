@@ -6,6 +6,7 @@ import {
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
 import { LessonItemProgressBar } from "@/components/invata/lesson-item-progress-bar"
+import { InvataDeferredImage } from "@/components/invata/invata-chapter-image-load-context"
 import { cn } from "@/lib/utils"
 
 const LESSON_HUB_CARD_CLASS =
@@ -20,12 +21,14 @@ interface InvataMobileLessonListProps {
   chapter: LearningPathChapter
   lessons: LearningPathLesson[]
   lessonProgressByLessonId: Record<string, LessonProgress>
+  loadImages?: boolean
 }
 
 export function InvataMobileLessonList({
   chapter,
   lessons,
   lessonProgressByLessonId,
+  loadImages = true,
 }: InvataMobileLessonListProps) {
   if (!lessons.length) {
     return <p className="text-sm text-[#7a7a7a]">Acest capitol nu are încă lecții.</p>
@@ -62,11 +65,11 @@ export function InvataMobileLessonList({
             ) : null}
             <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
               {lesson.image_url ? (
-                <img
+                <InvataDeferredImage
                   src={lesson.image_url}
+                  enabled={loadImages}
                   alt=""
                   className="h-full w-full object-contain p-0.5"
-                  loading="lazy"
                 />
               ) : (
                 <div className="h-full w-full rounded-md bg-[#f3f3f3]" />

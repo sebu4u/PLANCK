@@ -16,7 +16,7 @@ export default async function HomePage() {
     <>
       <StructuredData data={homepageFaqStructuredData} id="homepage-faq" />
       <DashboardRedirect />
-      <ScrollAnimationProvider>
+      <ScrollAnimationProvider enableSmoothScroll={false}>
         <HomePageContent isMobile={isMobile} />
       </ScrollAnimationProvider>
     </>
