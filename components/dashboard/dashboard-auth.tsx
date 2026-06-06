@@ -30,17 +30,15 @@ import {
   getLastWorkedLearningPathChapterIdForUser,
   getLearningPathChapterDashboardSnapshot,
   getLearningPathResumeHrefForUser,
-  getProblemsByClass,
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
-import type { Problem } from "@/data/problems"
 import {
   DashboardStreakCard,
   type DashboardStreakDay,
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
-import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
+import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
@@ -81,7 +79,6 @@ export function DashboardAuth() {
     dashboardStartHrefByChapter: Record<string, string>
     dashboardLevelByChapter: Record<string, number>
     dashboardHasStartedByChapter: Record<string, boolean>
-    recommendedProblems: Problem[]
   } | null>(null)
 
   useStreakTrigger({ enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack })
@@ -141,7 +138,6 @@ export function DashboardAuth() {
           eloHistoryData,
           streakDaysData,
           learningPathsData,
-          recommendedProblemsData,
         ] = await Promise.all([
           fetchUserStats(user.id, isInitialLoadRef.current),
           fetchRandomLessons(),
@@ -156,7 +152,6 @@ export function DashboardAuth() {
           fetchEloHistory(user.id),
           fetchLastFiveStreakDays(user.id),
           fetchDashboardLearningPaths(user.id),
-          fetchRecommendedProblemsForDashboard(profile?.grade),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -185,7 +180,6 @@ export function DashboardAuth() {
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
           dashboardLevelByChapter: learningPathsData.levelByChapterId,
           dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
-          recommendedProblems: recommendedProblemsData,
         }
 
         setDashboardData(completeData)
@@ -227,7 +221,6 @@ export function DashboardAuth() {
           eloHistoryData,
           streakDaysData,
           learningPathsData,
-          recommendedProblemsData,
         ] = await Promise.all([
           fetchUserStats(userId, true), // Skip streak check in background fetch
           fetchRandomLessons(),
@@ -242,7 +235,6 @@ export function DashboardAuth() {
           fetchEloHistory(userId),
           fetchLastFiveStreakDays(userId),
           fetchDashboardLearningPaths(userId),
-          fetchRecommendedProblemsForDashboard(profile?.grade),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -270,7 +262,6 @@ export function DashboardAuth() {
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
           dashboardLevelByChapter: learningPathsData.levelByChapterId,
           dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
-          recommendedProblems: recommendedProblemsData,
         }
 
         // Only update cache, don't update UI if silent mode
@@ -627,9 +618,9 @@ export function DashboardAuth() {
                     </div>
 
                     <div className="order-3 hidden md:block md:order-2 xl:order-none xl:col-start-1 xl:row-start-2">
-                      <DashboardRecommendedProblemsCard
-                        problems={dashboardData.recommendedProblems}
-                        userGrade={profile?.grade}
+                      <DashboardRankCard
+                        rank={dashboardData.stats.rank}
+                        elo={dashboardData.stats.elo}
                       />
                     </div>
                   </div>
@@ -1424,18 +1415,6 @@ async function fetchLastFiveStreakDays(userId: string): Promise<DashboardStreakD
   }
 
   return streakDays
-}
-
-async function fetchRecommendedProblemsForDashboard(grade: unknown): Promise<Problem[]> {
-  const gradeValue =
-    typeof grade === "number" || typeof grade === "string"
-      ? grade
-      : null
-
-  const scopedProblems = await getProblemsByClass(gradeValue, 5)
-  if (scopedProblems.length > 0) return scopedProblems
-
-  return getProblemsByClass(null, 5)
 }
 
 function getContinueLearningPlaceholder(): ContinueLearningItem[] {

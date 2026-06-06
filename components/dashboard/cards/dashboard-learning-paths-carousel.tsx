@@ -214,7 +214,7 @@ function StartContinueButton({
       type="button"
       aria-busy={isLoading}
       className={cn(
-        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity]",
+        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity] hover:translate-y-1 active:translate-y-1",
         colors.gradient,
         colors.buttonShadow,
         colors.buttonHoverShadow,
@@ -463,7 +463,7 @@ export function DashboardLearningPathsCarousel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col items-center gap-2 md:gap-0">
       {/* Mobile: hero swipe + fixed bottom card */}
       <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden md:hidden">
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4 pt-1 pb-[200px]">
@@ -569,7 +569,7 @@ export function DashboardLearningPathsCarousel({
                 href={activeHref}
                 hasStarted={activeHasStarted}
                 colors={activeColors}
-                className="!mt-2.5 !py-2.5 active:translate-y-1"
+                className="!mt-2.5 !py-2.5"
                 isLoading={continueLoadingHref === activeHref}
                 onContinue={handleContinueClick}
               />
@@ -582,7 +582,7 @@ export function DashboardLearningPathsCarousel({
       <div
         ref={containerRef}
         className="relative hidden w-full select-none overflow-visible md:block"
-        style={{ height: 520 }}
+        style={{ height: 500 }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -671,7 +671,7 @@ export function DashboardLearningPathsCarousel({
       </div>
 
       {count > 1 && (
-        <div className="hidden items-center gap-4 md:flex">
+        <div className="hidden items-center gap-4 md:-mt-5 md:flex">
           <button
             type="button"
             aria-label="Previous learning path"
