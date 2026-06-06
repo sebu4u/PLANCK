@@ -19,6 +19,12 @@ export function CodeTraceEditor({
   onChange: (next: Record<string, unknown>) => void
 }) {
   const language = typeof value.language === "string" ? value.language : "python"
+  const imageUrl =
+    typeof value.imageUrl === "string"
+      ? value.imageUrl
+      : typeof value.image_url === "string"
+        ? value.image_url
+        : ""
   const linesArr = Array.isArray(value.lines) ? value.lines.map((l) => (typeof l === "string" ? l : String(l))) : [""]
   const linesText = linesArr.join("\n")
 
@@ -66,6 +72,26 @@ export function CodeTraceEditor({
 
   return (
     <div className="space-y-4">
+      <div className="space-y-1">
+        <AdminFieldLabel>Imagine deasupra codului (URL, opțional)</AdminFieldLabel>
+        <AdminTextInput
+          value={imageUrl}
+          placeholder="https://..."
+          onChange={(e) => {
+            const next = e.target.value.trim()
+            onChange({ ...value, imageUrl: next || undefined })
+          }}
+        />
+        {imageUrl.trim().startsWith("http") ? (
+          <img
+            src={imageUrl.trim()}
+            alt=""
+            className="mt-2 h-24 max-w-full rounded-md border border-white/15 object-contain"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : null}
+      </div>
       <div className="space-y-1">
         <AdminFieldLabel>Limbă (etichetă)</AdminFieldLabel>
         <AdminTextInput

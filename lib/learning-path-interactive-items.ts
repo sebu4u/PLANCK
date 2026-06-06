@@ -99,6 +99,8 @@ export type GraphBuildContent =
 
 export interface CodeTraceContent {
   language?: string
+  /** Optional image shown above the code block */
+  imageUrl?: string
   lines: string[]
   steps: {
     lineIndex: number
@@ -365,7 +367,9 @@ function parseCodeTrace(c: Record<string, unknown>): Res<CodeTraceContent> {
     }
     steps.push({ lineIndex, prompt, inputMode, options, answer })
   }
-  return ok({ language, lines, steps })
+  const imageUrlRaw = (asString(c.imageUrl) || asString(c.image_url) || "").trim()
+  const imageUrl = imageUrlRaw || undefined
+  return ok({ language, ...(imageUrl ? { imageUrl } : {}), lines, steps })
 }
 
 function parseSwipe(c: Record<string, unknown>): Res<SwipeClassifyContent> {

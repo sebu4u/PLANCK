@@ -1291,14 +1291,15 @@ function CodeTraceView({
   const [wrong, setWrong] = useState(false)
   const cur = data.steps[step]
   const done = step >= data.steps.length
+  const usesChoiceInput = cur?.inputMode === "choice" && !!cur.options?.length
 
   const tryAdvance = () => {
     if (!cur) return
     let ok = false
-    if (cur.inputMode === "text") {
-      ok = normAns(textVal) === normAns(cur.answer)
-    } else {
+    if (usesChoiceInput) {
       ok = choice !== null && normAns(choice) === normAns(cur.answer)
+    } else {
+      ok = normAns(textVal) === normAns(cur.answer)
     }
     if (!ok) {
       setWrong(true)
@@ -1322,8 +1323,7 @@ function CodeTraceView({
   }
 
   const canVerifyStep =
-    !!cur &&
-    (cur.inputMode === "text" ? textVal.trim().length > 0 : choice !== null)
+    !!cur && (usesChoiceInput ? choice !== null : textVal.trim().length > 0)
 
   return (
     <>
@@ -1331,6 +1331,17 @@ function CodeTraceView({
         <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-[#6f657b]">
           {data.language || "code"}
         </p>
+        {data.imageUrl ? (
+          <div className="mb-4 flex justify-center">
+            <img
+              src={data.imageUrl}
+              alt=""
+              className="max-h-64 w-full max-w-full rounded-xl border-[3px] border-[#cfc3dc] object-contain shadow-[0_4px_0_#9d8ab3]"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        ) : null}
         <div className="mb-5 overflow-hidden rounded-xl border-[3px] border-[#cfc3dc] shadow-[0_4px_0_#9d8ab3]">
           <pre
             className={cn(
@@ -1348,13 +1359,16 @@ function CodeTraceView({
         {!done && cur ? (
           <div className="space-y-4 rounded-xl border-[3px] border-[#cfc3dc] bg-white px-4 py-4 shadow-[0_4px_0_#9d8ab3] sm:px-5 sm:py-5">
             <RichMini text={cur.prompt} className="[&_.prose]:text-[#2a2433]" />
-            {cur.inputMode === "choice" && cur.options ? (
+            {usesChoiceInput && cur.options ? (
               <div className="flex flex-wrap gap-2">
                 {cur.options.map((o) => (
                   <button
                     type="button"
                     key={o}
-                    onClick={() => setChoice(o)}
+                    onClick={() => {
+                      setChoice(o)
+                      setWrong(false)
+                    }}
                     className={cn(
                       "rounded-full border-[2.5px] px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:py-2.5",
                       choice === o
@@ -1370,7 +1384,10 @@ function CodeTraceView({
               <input
                 className="w-full rounded-xl border-[2.5px] border-[#cfc3dc] bg-white px-3 py-2.5 text-sm shadow-[0_3px_0_#9d8ab3] outline-none focus:border-violet-400"
                 value={textVal}
-                onChange={(e) => setTextVal(e.target.value)}
+                onChange={(e) => {
+                  setTextVal(e.target.value)
+                  setWrong(false)
+                }}
                 placeholder="Răspuns"
               />
             )}
@@ -1385,7 +1402,9 @@ function CodeTraceView({
         )}
       </div>
 
-      <InteractiveBottomChrome registrationDeps={[done, canVerifyStep, wrong, step]}>
+      <InteractiveBottomChrome
+        registrationDeps={[done, canVerifyStep, wrong, step, choice, textVal, usesChoiceInput]}
+      >
         {done ? (
           <Link
             href={nextItemHref}
