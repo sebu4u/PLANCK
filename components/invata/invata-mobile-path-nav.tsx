@@ -7,10 +7,7 @@ import {
   type LearningPathChapter,
 } from "@/lib/supabase-learning-paths"
 import { invataChapterSectionDomId } from "@/components/invata/invata-chapter-section-indicator"
-import {
-  InvataDeferredImage,
-  useInvataChapterImagesEnabled,
-} from "@/components/invata/invata-chapter-image-load-context"
+import { InvataDeferredImage } from "@/components/invata/invata-chapter-image-load-context"
 import { cn } from "@/lib/utils"
 
 interface InvataMobilePathNavChapterButtonProps {
@@ -28,8 +25,6 @@ function InvataMobilePathNavChapterButton({
   onSelect,
   buttonRef,
 }: InvataMobilePathNavChapterButtonProps) {
-  const imagesEnabled = useInvataChapterImagesEnabled(index)
-
   return (
     <button
       ref={buttonRef}
@@ -47,7 +42,7 @@ function InvataMobilePathNavChapterButton({
         {chapter.icon_url ? (
           <InvataDeferredImage
             src={chapter.icon_url}
-            enabled={imagesEnabled}
+            enabled
             alt=""
             className="absolute inset-0 h-full w-full object-contain p-2"
           />

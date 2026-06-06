@@ -9,31 +9,6 @@ import { Navigation } from "@/components/navigation"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
 import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-wrapper"
-import type {
-  Achievement,
-  ContinueLearningItem,
-  DashboardUpdate,
-  UserStats,
-  UserTask,
-} from "@/lib/dashboard-data"
-
-/** Valori neutre — secțiunea „Today” e ascunsă în sidebar pentru dev. */
-const DEV_SIDEBAR_PLACEHOLDER_STATS: UserStats = {
-  elo: 0,
-  rank: "—",
-  current_streak: 0,
-  best_streak: 0,
-  total_time_minutes: 0,
-  problems_solved_today: 0,
-  problems_solved_total: 0,
-  last_activity_date: null,
-}
-
-const EMPTY_TASKS: UserTask[] = []
-const EMPTY_CONTINUE: ContinueLearningItem[] = []
-const EMPTY_ACHIEVEMENTS: Achievement[] = []
-const EMPTY_UPDATES: DashboardUpdate[] = []
-
 const DEV_SUBJECT_CARDS: {
   title: string
   className: string
@@ -107,16 +82,11 @@ export function DevDashboard() {
       <div className="relative flex h-[100dvh] flex-row overflow-hidden bg-[#ffffff] pt-16">
         <DashboardClientWrapper
           user={userData}
-          stats={DEV_SIDEBAR_PLACEHOLDER_STATS}
-          initialTasks={EMPTY_TASKS}
-          continueItems={EMPTY_CONTINUE}
-          recentAchievements={EMPTY_ACHIEVEMENTS}
-          updates={EMPTY_UPDATES}
           dashboardHomeHref="/dashboard/dev"
           sidebarVariant="dev"
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#ffffff] transition-all duration-300 lg:ml-[250px]">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#ffffff] transition-all duration-300">
           <div className="m-[3px] mt-0 flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f8f9fa] lg:mt-0 lg:rounded-xl">
             <div className="dashboard-scrollbar flex-1 overflow-y-auto bg-[#f8f9fa]">
               <main className="animate-fade-in-up p-4 md:p-8 lg:p-10">

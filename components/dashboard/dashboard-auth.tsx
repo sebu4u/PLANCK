@@ -1,7 +1,6 @@
 "use client"
 
 import { type CSSProperties, useEffect, useRef, useState, useMemo } from "react"
-import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
@@ -43,6 +42,7 @@ import {
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRecommendedProblemsCard } from "@/components/dashboard/cards/dashboard-recommended-problems-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
+import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
@@ -58,6 +58,7 @@ export function DashboardAuth() {
   const realtimeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -474,17 +475,10 @@ export function DashboardAuth() {
 
       {/* Main Container - Fixed Height matching viewport minus header */}
       <div className="h-[100dvh] pt-16 overflow-hidden bg-[#ffffff] relative flex flex-row">
-        <DashboardClientWrapper
-          user={userData}
-          stats={dashboardData.stats}
-          initialTasks={dashboardData.tasks}
-          continueItems={dashboardData.continueItems}
-          recentAchievements={dashboardData.achievements}
-          updates={dashboardData.updates}
-        />
+        <DashboardClientWrapper user={userData} />
 
         {/* Content Wrapper - takes remaining width */}
-        <div className="flex-1 lg:ml-[250px] h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
+        <div className="flex-1 h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
           {/* Floating Card Container */}
           <div className="m-[3px] mt-0 flex-1 min-h-0 bg-white md:bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
@@ -493,8 +487,9 @@ export function DashboardAuth() {
               {!isPaid ? (
                 <div className="hidden md:block bg-[#f7f9fa]">
                   {postOnboardingDiscount.active ? (
-                    <Link
-                      href="/pricing"
+                    <button
+                      type="button"
+                      onClick={() => setPremiumUpgradeOpen(true)}
                       className="group flex w-full items-center justify-center gap-2 border-y border-[#e8e8e8] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-3 py-[8.5px] text-center sm:px-4"
                     >
                       <span className="relative hidden h-9 w-9 flex-shrink-0 items-center justify-center lg:inline-flex">
@@ -517,10 +512,11 @@ export function DashboardAuth() {
                           </span>
                         </span>
                       </span>
-                    </Link>
+                    </button>
                   ) : (
-                    <Link
-                      href="/pricing"
+                    <button
+                      type="button"
+                      onClick={() => setPremiumUpgradeOpen(true)}
                       className="group flex w-full items-center justify-center gap-2 border-y border-[#e8e8e8] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-4 py-[8.5px] text-center"
                     >
                       <span className="relative hidden h-9 w-9 flex-shrink-0 items-center justify-center lg:inline-flex">
@@ -536,20 +532,12 @@ export function DashboardAuth() {
                         Treci la Premium și accesează Insight fără limite.{" "}
                         <span className="underline-offset-2 group-hover:underline">Go Premium →</span>
                       </span>
-                    </Link>
+                    </button>
                   )}
                 </div>
               ) : null}
               <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:block md:h-auto md:overflow-visible md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="mx-auto flex h-full min-h-0 w-full max-w-[1000px] flex-col md:h-auto md:min-h-0">
-                  {/* Desktop welcome */}
-                  <div className="mb-8 hidden md:block">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                      Welcome back, {userData.username || 'Student'}! 👋
-                    </h1>
-                    <p className="text-gray-600">Here's your learning progress today</p>
-                  </div>
-
                   <div className={`grid min-h-0 flex-1 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[340px_minmax(0,1fr)] md:flex-none ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
                     <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
@@ -561,9 +549,10 @@ export function DashboardAuth() {
 
                       {!isPaid ? (
                         postOnboardingDiscount.active ? (
-                          <Link
-                            href="/pricing"
-                            className="group mt-4 hidden lg:block rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[transform,box-shadow] hover:shadow-[0_8px_24px_rgba(185,28,28,0.12)]"
+                          <button
+                            type="button"
+                            onClick={() => setPremiumUpgradeOpen(true)}
+                            className="group mt-4 hidden w-full text-left lg:block rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[transform,box-shadow] hover:shadow-[0_8px_24px_rgba(185,28,28,0.12)]"
                           >
                             <div className="flex items-start gap-3">
                               <div className="relative h-11 w-11 flex-shrink-0">
@@ -591,7 +580,7 @@ export function DashboardAuth() {
                             >
                               Revendică −50% acum
                             </span>
-                          </Link>
+                          </button>
                         ) : (
                           <div className="mt-4 hidden lg:block rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
                             <div className="flex items-center gap-3">
@@ -614,13 +603,14 @@ export function DashboardAuth() {
                               </div>
                             </div>
 
-                            <Link
-                              href="/pricing"
+                            <button
+                              type="button"
+                              onClick={() => setPremiumUpgradeOpen(true)}
                               className="dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-3 text-base font-bold text-[#101117] shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#9a5aa8] active:translate-y-1 active:shadow-[0_1px_0_#9a5aa8]"
                               style={{ "--start-glow-tint": "rgba(248, 220, 228, 0.88)" } as CSSProperties}
                             >
                               Explorează Premium
-                            </Link>
+                            </button>
                           </div>
                         )
                       ) : null}
@@ -649,6 +639,10 @@ export function DashboardAuth() {
           </div>
         </div>
       </div>
+
+      {premiumUpgradeOpen ? (
+        <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
 
       {showWelcomeBack && (
         <WelcomeBackOverlay

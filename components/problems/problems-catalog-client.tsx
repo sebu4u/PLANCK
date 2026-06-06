@@ -833,7 +833,8 @@ export default function ProblemsCatalogClient({
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
           <SheetContent
             side="left"
-            className="flex w-[85vw] max-w-[340px] flex-col bg-white p-0 text-[#2c2f33]"
+            className="!z-[401] flex w-[85vw] max-w-[340px] flex-col bg-white p-0 text-[#2c2f33]"
+            overlayClassName="!z-[400]"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <SheetHeader className="flex-shrink-0 border-b border-[#0b0c0f]/10 px-5 py-4">

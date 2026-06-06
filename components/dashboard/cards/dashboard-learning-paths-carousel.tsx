@@ -1,7 +1,6 @@
 "use client"
 
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Loader2, Play } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -190,24 +189,29 @@ function MobileAspectImage({
   )
 }
 
+function isCarouselInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return Boolean(target.closest("a, button, input, textarea, select, label"))
+}
+
 function StartContinueButton({
   href,
   hasStarted,
   colors,
   className,
   isLoading = false,
-  onClick,
+  onContinue,
 }: {
   href: string
   hasStarted: boolean
   colors: ChapterTheme
   className?: string
   isLoading?: boolean
-  onClick?: (e: React.MouseEvent) => void
+  onContinue: (href: string) => void
 }) {
   return (
-    <Link
-      href={href}
+    <button
+      type="button"
       aria-busy={isLoading}
       className={cn(
         "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity]",
@@ -219,7 +223,12 @@ function StartContinueButton({
         className
       )}
       style={{ "--start-glow-tint": colors.buttonGlowTint } as CSSProperties}
-      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (isLoading) return
+        onContinue(href)
+      }}
     >
       <span className="relative z-[1] inline-flex items-center justify-center gap-2">
         {isLoading ? (
@@ -231,7 +240,7 @@ function StartContinueButton({
           </>
         )}
       </span>
-    </Link>
+    </button>
   )
 }
 
@@ -244,7 +253,7 @@ export function DashboardLearningPathsCarousel({
 }: DashboardLearningPathsCarouselProps) {
   const router = useRouter()
   const [activeIndex, setActiveIndex] = useState(0)
-  const [continueLoading, setContinueLoading] = useState(false)
+  const [continueLoadingHref, setContinueLoadingHref] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef(0)
@@ -272,19 +281,18 @@ export function DashboardLearningPathsCarousel({
   activeIndexRef.current = activeIndex
 
   useEffect(() => {
-    setContinueLoading(false)
+    setContinueLoadingHref(null)
   }, [activeIndex, activeHref])
 
-  const handleMobileContinueClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      if (continueLoading) return
+  const handleContinueClick = useCallback(
+    (href: string) => {
+      if (continueLoadingHref) return
 
-      setContinueLoading(true)
-      router.prefetch(activeHref)
-      router.push(activeHref)
+      setContinueLoadingHref(href)
+      router.prefetch(href)
+      router.push(href)
     },
-    [activeHref, continueLoading, router]
+    [continueLoadingHref, router]
   )
 
   const getClosestIndexFromScroll = useCallback(() => {
@@ -389,6 +397,8 @@ export function DashboardLearningPathsCarousel({
   const goPrev = useCallback(() => goTo(activeIndex - 1), [activeIndex, goTo])
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (isCarouselInteractiveTarget(e.target)) return
+
     setIsDragging(true)
     dragStartRef.current = e.clientX
     setDragOffset(0)
@@ -560,8 +570,8 @@ export function DashboardLearningPathsCarousel({
                 hasStarted={activeHasStarted}
                 colors={activeColors}
                 className="!mt-2.5 !py-2.5 active:translate-y-1"
-                isLoading={continueLoading}
-                onClick={handleMobileContinueClick}
+                isLoading={continueLoadingHref === activeHref}
+                onContinue={handleContinueClick}
               />
             </article>
           </div>
@@ -652,7 +662,8 @@ export function DashboardLearningPathsCarousel({
                 href={chapterHref}
                 hasStarted={hasStarted}
                 colors={colors}
-                onClick={(e) => e.stopPropagation()}
+                isLoading={continueLoadingHref === chapterHref}
+                onContinue={handleContinueClick}
               />
             </article>
           )

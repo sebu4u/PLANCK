@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { useDashboardSidebar } from "@/components/dashboard/dashboard-sidebar-context"
-import { UserStats, UserTask, DashboardUpdate, ContinueLearningItem, Achievement } from "@/lib/dashboard-data"
 
 interface DashboardClientWrapperProps {
   user: {
@@ -12,48 +10,20 @@ interface DashboardClientWrapperProps {
     avatar_url?: string
     username?: string
   }
-  stats: UserStats
-  initialTasks: UserTask[]
-  continueItems: ContinueLearningItem[]
-  recentAchievements: Achievement[]
-  updates: DashboardUpdate[]
-  /** Ruta pentru link-ul „Dashboard” din sidebar (implicit /dashboard) */
   dashboardHomeHref?: string
-  /** Sidebar fără Today / tasks / referral — pentru /dashboard/dev */
   sidebarVariant?: "standard" | "dev"
 }
 
 export function DashboardClientWrapper({
   user,
-  stats,
-  initialTasks,
-  continueItems,
-  recentAchievements,
-  updates,
   dashboardHomeHref = "/dashboard",
   sidebarVariant = "standard",
 }: DashboardClientWrapperProps) {
-  const [tasks, setTasks] = useState(initialTasks)
   const { isOpen, setIsOpen } = useDashboardSidebar()
-
-  const handleTaskToggle = (taskId: string) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId ? { ...task, is_completed: !task.is_completed } : task
-      )
-    )
-    // TODO: Update task in database via API call
-  }
 
   return (
     <DashboardSidebar
       user={user}
-      stats={stats}
-      tasks={tasks}
-      continueItems={continueItems}
-      recentAchievements={recentAchievements}
-      updates={updates}
-      onTaskToggle={handleTaskToggle}
       open={isOpen}
       onOpenChange={setIsOpen}
       dashboardHomeHref={dashboardHomeHref}
@@ -61,4 +31,3 @@ export function DashboardClientWrapper({
     />
   )
 }
-

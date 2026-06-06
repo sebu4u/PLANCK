@@ -58,7 +58,7 @@ export function PremiumComparisonContent({
   return (
     <div className="flex w-full min-w-0 max-w-2xl flex-col items-center text-center">
       <h2 className="text-3xl font-bold leading-tight text-[#111111] sm:text-4xl md:text-5xl">
-        Avansează cu{" "}
+        Avansează la{" "}
         <span className={premiumWordGradientClass}>Premium</span>
       </h2>
 
