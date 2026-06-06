@@ -565,12 +565,12 @@ export function LearningPathsManager({
       return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem")
     }
     if (devSubject === "math") {
-      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "coding_problem")
+      return ITEM_TYPES.filter((t) => t !== "problem")
     }
     if (devSubject === "biology") {
-      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem" && t !== "coding_problem")
+      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem")
     }
-    return ITEM_TYPES.filter((t) => t !== "math_problem" && t !== "coding_problem")
+    return ITEM_TYPES.filter((t) => t !== "math_problem")
   }, [isDev, devSubject])
 
   const [lessonCreateChapterId, setLessonCreateChapterId] = useState<string | null>(null)

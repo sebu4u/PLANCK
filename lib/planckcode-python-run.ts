@@ -245,6 +245,18 @@ try:
 except ImportError:
     run_sync = None
 
+def _planck_format_exception(exc):
+    tb = exc.__traceback__
+    cleaned = None
+    cur = tb
+    while cur is not None:
+        if cur.tb_frame.f_code.co_filename.startswith("/planck/"):
+            cleaned = cur
+            break
+        cur = cur.tb_next
+    text = "".join(traceback.format_exception(type(exc), exc, cleaned))
+    return text.replace('File "/planck/', 'File "')
+
 _use_interactive = bool(globals().get("__planck_use_interactive_stdin"))
 _JS_WAIT_STDIN = globals().get("__planck_wait_stdin_js")
 
@@ -348,9 +360,9 @@ except SystemExit as e:
         _exit = e.code
     else:
         _exit = 1
-except BaseException:
+except BaseException as e:
     _exit = 1
-    _os_err.write(traceback.format_exc())
+    _os_err.write(_planck_format_exception(e))
 finally:
     sys.stdout, sys.stderr, sys.stdin = _old_out, _old_err, _old_stdin
 

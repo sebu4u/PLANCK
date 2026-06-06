@@ -674,12 +674,12 @@ export async function POST(req: NextRequest) {
     }
     if (
       itemChapterPc === BIOLOGIE_LEARNING_PATH_MARKER &&
-      (itemType === "problem" || itemType === "math_problem" || itemType === "coding_problem")
+      (itemType === "problem" || itemType === "math_problem")
     ) {
       return NextResponse.json(
         {
           error:
-            "Pe capitole de biologie nu se folosesc itemi din cataloagele de probleme (problem / math_problem / coding_problem).",
+            "Pe capitole de biologie nu se folosesc itemi de problemă fizică sau matematică (problem / math_problem).",
         },
         { status: 400 }
       )
@@ -732,14 +732,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (itemType === "coding_problem" && itemChapterPc !== INFORMATICA_LEARNING_PATH_MARKER) {
-      return NextResponse.json(
-        { error: "Itemul coding_problem se folosește doar pe capitole de informatică." },
-        { status: 400 }
-      )
-    }
-
-    if (itemType === "coding_problem" && itemChapterPc === INFORMATICA_LEARNING_PATH_MARKER) {
+    if (itemType === "coding_problem") {
       const problemId = toNullableString(body.problem_id)
       if (!problemId) {
         return NextResponse.json({ error: "problem_id lipsă." }, { status: 400 })
@@ -1036,12 +1029,12 @@ export async function PUT(req: NextRequest) {
       }
       if (
         pcPut === BIOLOGIE_LEARNING_PATH_MARKER &&
-        (itemType === "problem" || itemType === "math_problem" || itemType === "coding_problem")
+        (itemType === "problem" || itemType === "math_problem")
       ) {
         return NextResponse.json(
           {
             error:
-              "Pe capitole de biologie nu se folosesc itemi din cataloagele de probleme (problem / math_problem / coding_problem).",
+              "Pe capitole de biologie nu se folosesc itemi de problemă fizică sau matematică (problem / math_problem).",
           },
           { status: 400 }
         )
@@ -1094,22 +1087,18 @@ export async function PUT(req: NextRequest) {
     if (
       pcTarget === BIOLOGIE_LEARNING_PATH_MARKER &&
       (effectiveItemType === "problem" ||
-        effectiveItemType === "math_problem" ||
-        effectiveItemType === "coding_problem")
+        effectiveItemType === "math_problem")
     ) {
       return NextResponse.json(
         {
           error:
-            "Pe capitole de biologie nu se folosesc itemi din cataloagele de probleme (problem / math_problem / coding_problem).",
+            "Pe capitole de biologie nu se folosesc itemi de problemă fizică sau matematică (problem / math_problem).",
         },
         { status: 400 }
       )
     }
 
-    if (
-      pcTarget === INFORMATICA_LEARNING_PATH_MARKER &&
-      effectiveItemType === "coding_problem"
-    ) {
+    if (effectiveItemType === "coding_problem") {
       const pid =
         toNullableString(body.problem_id) ??
         (await supabase.from("learning_path_lesson_items").select("problem_id").eq("id", id).single()).data
@@ -1128,16 +1117,6 @@ export async function PUT(req: NextRequest) {
           return NextResponse.json({ error: "Problema de informatică nu este activă." }, { status: 400 })
         }
       }
-    }
-
-    if (
-      pcTarget !== INFORMATICA_LEARNING_PATH_MARKER &&
-      effectiveItemType === "coding_problem"
-    ) {
-      return NextResponse.json(
-        { error: "Itemul coding_problem se folosește doar pe capitole de informatică." },
-        { status: 400 }
-      )
     }
 
     if (
