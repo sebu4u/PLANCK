@@ -28,6 +28,11 @@ import {
   isMobileLessonItemsShellRoute,
 } from "@/lib/mobile-app-nav"
 
+function isInsideMonacoEditor(element: EventTarget | null): boolean {
+  if (!(element instanceof HTMLElement)) return false
+  return !!element.closest(".monaco-editor") || element.classList.contains("inputarea")
+}
+
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
 
 /** Desktop: ca butonul „Start” din dashboard (gradient + glow). */
@@ -141,22 +146,30 @@ export function Navigation() {
   }, [user, isLoginModalOpen])
 
   // Open search modal with '/' when not typing in an input/textarea/contentEditable
-  // Disable on IDE page to allow typing '/' in code editor
+  // Disable on IDE page and inside Monaco so '/' is typed in the code editor
   useEffect(() => {
     const onGlobalKey = (e: KeyboardEvent) => {
-      if (e.key === '/') {
-        // Don't activate search on IDE page
-        const isOnIDEPage = pathname?.startsWith('/planckcode/ide') ?? false
-        if (isOnIDEPage) {
-          return
-        }
-        const target = e.target as HTMLElement | null
-        const isTyping = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target as any).isContentEditable)
-        if (!isTyping) {
-          e.preventDefault()
-          setIsSearchDialogOpen(true)
-          setTimeout(() => inputRef.current?.focus(), 0)
-        }
+      if (e.key !== '/') return
+
+      const isOnIDEPage = pathname?.startsWith('/planckcode/ide') ?? false
+      if (isOnIDEPage) return
+
+      const target = e.target
+      const activeElement = document.activeElement
+      const isInCodeEditor =
+        isInsideMonacoEditor(target) || isInsideMonacoEditor(activeElement)
+      if (isInCodeEditor) return
+
+      const targetEl = target instanceof HTMLElement ? target : null
+      const isTyping =
+        !!targetEl &&
+        (targetEl.tagName === 'INPUT' ||
+          targetEl.tagName === 'TEXTAREA' ||
+          targetEl.isContentEditable)
+      if (!isTyping) {
+        e.preventDefault()
+        setIsSearchDialogOpen(true)
+        setTimeout(() => inputRef.current?.focus(), 0)
       }
     }
     window.addEventListener('keydown', onGlobalKey)

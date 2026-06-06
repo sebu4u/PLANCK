@@ -21,6 +21,14 @@ const TAG_CLASS_MAP = {
   indent: "indent",
 } as const
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
 function getThemeClasses(theme: "dark" | "light", emphasizedBody: boolean) {
   if (theme === "light") {
     return {
@@ -30,6 +38,7 @@ function getThemeClasses(theme: "dark" | "light", emphasizedBody: boolean) {
       problemLinkClass:
         "inline-block mt-4 rounded-xl bg-[#111111] px-4 py-2 text-center font-bold text-white shadow-md transition-opacity duration-200 hover:opacity-90",
       paragraphClass: cn("mb-4 leading-relaxed text-[#222222]", emphasizedBody && "font-medium"),
+      inlineCodeClass: "lesson-inline-code lesson-inline-code--light",
       headingClasses: {
         1: "mt-8 mb-6 text-3xl font-bold text-[#111111]",
         2: "mt-6 mb-4 text-2xl font-bold text-[#111111]",
@@ -46,6 +55,7 @@ function getThemeClasses(theme: "dark" | "light", emphasizedBody: boolean) {
     problemLinkClass:
       "inline-block mt-4 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-center font-bold text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-pink-700",
     paragraphClass: cn("mb-4 leading-relaxed text-white", emphasizedBody && "font-medium"),
+    inlineCodeClass: "lesson-inline-code lesson-inline-code--dark",
     headingClasses: {
       1: "mt-8 mb-6 text-3xl font-bold text-white",
       2: "mt-6 mb-4 text-2xl font-bold text-white",
@@ -60,6 +70,10 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
 
   const renderInlineMarkdownContent = (value: string) => {
     let processedContent = value
+    processedContent = processedContent.replace(
+      /\[CODINLINE\]([\s\S]*?)\[\/CODINLINE\]/g,
+      (_, inner) => `<code class="${themeClasses.inlineCodeClass}">${escapeHtml(inner)}</code>`
+    )
     processedContent = processedContent.replace(
       /\*\*(.*?)\*\*/g,
       `<strong class="${themeClasses.strongClass}">$1</strong>`

@@ -155,6 +155,7 @@ const ITEM_TYPES: LearningPathLessonType[] = [
 ]
 
 const MARKERS = ["FORMULA", "ENUNT", "IMPORTANT", "DEFINITIE", "EXEMPLU", "INDENT", "COD"] as const
+const INLINE_MARKERS = ["CODINLINE"] as const
 
 function createPollOption(index: number): PollOption {
   const labelByIndex = ["A", "B", "C", "D", "E", "F"]
@@ -814,7 +815,10 @@ export function LearningPathsManager({
     })
   }
 
-  const insertMarker = (field: "custom_text_body" | "simulation_intro_markdown", marker: (typeof MARKERS)[number]) => {
+  const insertMarker = (
+    field: "custom_text_body" | "simulation_intro_markdown",
+    marker: (typeof MARKERS)[number] | (typeof INLINE_MARKERS)[number]
+  ) => {
     const targetRef = field === "custom_text_body" ? customTextRef : simulationIntroRef
     const textarea = targetRef.current
     if (!form || !textarea) return
@@ -1665,6 +1669,19 @@ export function LearningPathsManager({
           [{marker}]
         </Button>
       ))}
+      {INLINE_MARKERS.map((marker) => (
+        <Button
+          key={marker}
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => insertMarker(field, marker)}
+          title="Cod inline (variabile, denumiri scurte)"
+          className="border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-emerald-100"
+        >
+          [{marker}]
+        </Button>
+      ))}
       <Button
         type="button"
         variant="outline"
@@ -1699,7 +1716,7 @@ export function LearningPathsManager({
             value={form.custom_text_body}
             onChange={(e) => updateForm("custom_text_body", e.target.value)}
             rows={14}
-            placeholder="Scrie textul itemului aici. Suportă [FORMULA], [IMPORTANT], [COD] (Python), markdown și LaTeX."
+            placeholder="Scrie textul itemului aici. Suportă [FORMULA], [IMPORTANT], [COD] (Python), [CODINLINE] (cod inline), markdown și LaTeX."
             className="font-mono bg-black/40 border-white/20 text-gray-100"
           />
           <Button
