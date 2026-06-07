@@ -216,7 +216,7 @@ export function ContestDashboardPromo({ variant }: { variant: Variant }) {
         showLiveNow && "ring-1 ring-emerald-400/35 ring-inset",
         isMobile
           ? "lg:hidden rounded-none border-0 shadow-none hover:translate-y-0 hover:shadow-none active:shadow-none px-4 py-3.5"
-          : "hidden lg:block rounded-3xl border border-[#e5e5e5] shadow-[0_12px_30px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.06)] active:translate-y-0 active:shadow-[0_12px_30px_rgba(0,0,0,0.03)] mb-4 px-5 py-5 md:mb-6 md:px-7 md:py-6"
+          : "hidden lg:block rounded-3xl border border-[#e5e5e5] shadow-[0_8px_20px_rgba(0,0,0,0.02)] hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(0,0,0,0.04)] active:translate-y-0 active:shadow-[0_8px_20px_rgba(0,0,0,0.02)] mb-4 px-5 py-5 md:mb-6 md:px-7 md:py-6"
       )}
     >
       <div

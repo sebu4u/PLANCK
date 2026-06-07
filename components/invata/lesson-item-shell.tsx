@@ -126,6 +126,7 @@ function LessonItemShellInner({
   const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
   const itemNavigation = useOptionalLearningPathItemNavigation()
   const chrome = useLearningPathItemChrome()
+  const edgeToEdge = chrome?.edgeToEdge ?? false
   const flashcardFlow = useLearningPathFlashcardFlow()
   const navSlideDirection = itemNavigation?.slideDirection ?? "forward"
   const slideDirection = flashcardFlow.isActive ? flashcardFlow.slideDirection : navSlideDirection
@@ -422,12 +423,18 @@ function LessonItemShellInner({
       >
         <div
           className={cn(
-            "mx-auto w-full px-5 sm:px-8 lg:px-12",
-            !fullWidth && "max-w-5xl",
+            "mx-auto w-full",
+            edgeToEdge
+              ? "max-w-none px-0"
+              : cn("px-5 sm:px-8 lg:px-12", !fullWidth && "max-w-5xl"),
           )}
         >
           {itemNavigation ? (
-            <LearningPathItemSlideContainer itemKey={slideKey} direction={slideDirection}>
+            <LearningPathItemSlideContainer
+              itemKey={slideKey}
+              direction={slideDirection}
+              allowOverflowX={edgeToEdge}
+            >
               {flashcardFlow.phase === "offer" ? <LearningPathFlashcardOfferScreen /> : null}
               {flashcardFlow.phase === "session" ? <LearningPathFlashcardSessionScreen /> : null}
               {flashcardFlow.phase === "idle" ? children : null}

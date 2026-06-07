@@ -13,7 +13,7 @@ export function DashboardRankCard({ rank, elo }: DashboardRankCardProps) {
   const rankIconPath = getRankIconPath(rank)
 
   return (
-    <section className="rounded-[2rem] border-2 border-[#e5e5e5] bg-white px-6 py-8 text-center shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+    <section className="rounded-[2rem] border-2 border-[#e5e5e5] bg-white px-6 py-8 text-center shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
       <Image
         src={rankIconPath}
         alt={rank}

@@ -21,6 +21,7 @@ export interface PlanckPythonRunResult {
   stdout: string
   stderr: string
   exitCode: number
+  errorName: string
   /** Relative paths under project root → new content (changed or new files). */
   fileUpdates: Record<string, string>
 }
@@ -38,9 +39,13 @@ export interface PlanckInteractiveStdinPump {
 
   submitLine(line: string): void
 
+  submitEof(): void
+
   /** Respinge așteptarea curentă (rulare anulată / început rulare nou). */
   cancel(reason?: Error): void
 }
+
+const PLANCK_STDIN_EOF = "\u0004"
 
 export function createPlanckInteractiveStdinPump(onAwaitStdin?: () => void): PlanckInteractiveStdinPump {
   let pending: {
@@ -53,6 +58,13 @@ export function createPlanckInteractiveStdinPump(onAwaitStdin?: () => void): Pla
     const { resolve } = pending
     pending = null
     resolve(line)
+  }
+
+  function submitEof() {
+    if (!pending) return
+    const { resolve } = pending
+    pending = null
+    resolve(PLANCK_STDIN_EOF)
   }
 
   function cancel(reason?: Error) {
@@ -72,6 +84,7 @@ export function createPlanckInteractiveStdinPump(onAwaitStdin?: () => void): Pla
   return {
     waitLineJs,
     submitLine,
+    submitEof,
     cancel,
   }
 }
@@ -79,6 +92,21 @@ export function createPlanckInteractiveStdinPump(onAwaitStdin?: () => void): Pla
 /** Heuristic pentru cod care citește de la consolă (nu din textarea-ul „stdin”). */
 export function planckPythonUsesConsoleInput(source: string): boolean {
   return /\binput\s*\(/.test(source) || /\bsys\.stdin\b/.test(source)
+}
+
+export function getPlanckPythonStatus(exitCode: number, errorName?: string): {
+  id: number
+  description: string
+} {
+  if (exitCode === 0) {
+    return { id: 3, description: "Accepted" }
+  }
+
+  if (errorName === "SyntaxError" || errorName === "IndentationError" || errorName === "TabError") {
+    return { id: 6, description: "Syntax Error" }
+  }
+
+  return { id: 11, description: "Runtime Error" }
 }
 
 /** Suprafață minimă folosită de Planck (fără import din pachetul npm — compatibil Turbopack). */
@@ -259,18 +287,32 @@ def _planck_format_exception(exc):
 
 _use_interactive = bool(globals().get("__planck_use_interactive_stdin"))
 _JS_WAIT_STDIN = globals().get("__planck_wait_stdin_js")
+_PLANCK_STDIN_EOF = "\\x04"
 
 _os_out = io.StringIO()
 _os_err = io.StringIO()
 
 # Fiecare print trimite imediat la consolă (comportament apropiat de -u), astfel încât
 # liniile rulează vizibil pe rând până la următorul input().
-_orig_print = builtins.print
+_old_print = builtins.print
 
 def _planck_print(*args, **kwargs):
-    if "flush" not in kwargs:
-        kwargs["flush"] = True
-    return _orig_print(*args, **kwargs)
+    sep = kwargs.pop("sep", " ")
+    end = kwargs.pop("end", "\\n")
+    file = kwargs.pop("file", None)
+    flush = kwargs.pop("flush", True)
+    if kwargs:
+        bad_kw = next(iter(kwargs))
+        raise TypeError(f"'{bad_kw}' is an invalid keyword argument for print()")
+    if sep is None:
+        sep = " "
+    if end is None:
+        end = "\\n"
+    if file is None:
+        file = sys.stdout
+    file.write(sep.join(str(arg) for arg in args) + end)
+    if flush:
+        file.flush()
 
 builtins.print = _planck_print
 
@@ -313,13 +355,16 @@ if _use_interactive:
     class _PlanckInteractiveStdin(io.TextIOBase):
         encoding = "utf-8"
         errors = "replace"
+        __slots__ = ("_buf",)
+
+        def __init__(self):
+            super().__init__()
+            self._buf = ""
 
         def readable(self):
             return True
 
-        def readline(self, size=-1):
-            if size != -1:
-                raise io.UnsupportedOperation("Planck stdin: readline(size) nesuportat")
+        def _read_js_line(self):
             nl = chr(10)
             cr = chr(13)
             if run_sync is None:
@@ -330,19 +375,94 @@ if _use_interactive:
                 raise RuntimeError("Intrare lipsă pentru modul terminal.")
             future = _JS_WAIT_STDIN()
             raw = run_sync(future)
-            if raw is None:
-                s = ""
-            else:
-                s = str(raw)
-                s = s.replace(cr + nl, nl).replace(cr, nl)
+            if raw is None or str(raw) == _PLANCK_STDIN_EOF:
+                return ""
+            s = str(raw)
+            s = s.replace(cr + nl, nl).replace(cr, nl)
             if not s.endswith(nl):
                 s += nl
             return s
 
+        def readline(self, size=-1):
+            nl = chr(10)
+            if size is None or size < 0:
+                limit = -1
+            else:
+                limit = int(size)
+                if limit == 0:
+                    return ""
+
+            out = []
+            remaining = limit
+            while limit < 0 or remaining > 0:
+                if not self._buf:
+                    self._buf = self._read_js_line()
+                    if not self._buf:
+                        break
+
+                newline_idx = self._buf.find(nl)
+                take_len = newline_idx + 1 if newline_idx >= 0 else len(self._buf)
+                if limit >= 0:
+                    take_len = min(take_len, remaining)
+
+                out.append(self._buf[:take_len])
+                self._buf = self._buf[take_len:]
+                if limit >= 0:
+                    remaining -= take_len
+                if newline_idx >= 0 or take_len == 0:
+                    break
+
+            return "".join(out)
+
         def read(self, size=-1):
-            raise io.UnsupportedOperation(
-                "Planck stdin.read() nesuportat — folosește input() sau readline()."
-            )
+            if size is None or size < 0:
+                chunks = []
+                if self._buf:
+                    chunks.append(self._buf)
+                    self._buf = ""
+                while True:
+                    line = self._read_js_line()
+                    if line == "":
+                        break
+                    chunks.append(line)
+                return "".join(chunks)
+
+            remaining = int(size)
+            if remaining <= 0:
+                return ""
+            chunks = []
+            while remaining > 0:
+                if not self._buf:
+                    self._buf = self._read_js_line()
+                    if not self._buf:
+                        break
+                chunk = self._buf[:remaining]
+                chunks.append(chunk)
+                self._buf = self._buf[len(chunk):]
+                remaining -= len(chunk)
+            return "".join(chunks)
+
+        def readlines(self, hint=-1):
+            lines = []
+            total = 0
+            while True:
+                line = self.readline()
+                if line == "":
+                    break
+                lines.append(line)
+                total += len(line)
+                if hint is not None and hint > 0 and total >= hint:
+                    break
+            return lines
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            line = self.readline()
+            if line == "":
+                raise StopIteration
+            return line
 
     sys.stdin = _PlanckInteractiveStdin()
 else:
@@ -350,6 +470,7 @@ else:
     sys.stdin = io.StringIO(_seed)
 
 _exit = 0
+_exception_name = ""
 try:
     os.chdir("/planck")
     runpy.run_path(globals()["__planck_entry"], run_name="__main__")
@@ -362,13 +483,20 @@ except SystemExit as e:
         _exit = 1
 except BaseException as e:
     _exit = 1
+    _exception_name = type(e).__name__
     _os_err.write(_planck_format_exception(e))
 finally:
     sys.stdout, sys.stderr, sys.stdin = _old_out, _old_err, _old_stdin
+    # Pyodide keeps the interpreter alive between runs; avoid stacking print wrappers.
+    if getattr(_old_print, "__name__", "") == "_planck_print":
+        builtins.print = _planck_print
+    else:
+        builtins.print = _old_print
 
 globals()["_planck_stdout"] = _os_out.getvalue()
 globals()["_planck_stderr"] = _os_err.getvalue()
 globals()["_planck_exit"] = _exit
+globals()["_planck_exception_name"] = _exception_name
 `
 
 export async function runPythonProject(
@@ -402,6 +530,7 @@ export async function runPythonProject(
       stdout: "",
       stderr: `Fișierul de intrare lipsește: ${input.entryFileName}`,
       exitCode: 1,
+      errorName: "FileNotFoundError",
       fileUpdates: {},
     }
   }
@@ -436,6 +565,7 @@ export async function runPythonProject(
   const stdout = pyGlobalToString(py, "_planck_stdout")
   const stderr = pyGlobalToString(py, "_planck_stderr")
   const exitCode = Number(pyGlobalToString(py, "_planck_exit")) || 0
+  const errorName = pyGlobalToString(py, "_planck_exception_name")
 
   const disk = collectPlanckFiles(FS, PLANCK_ROOT)
   const fileUpdates: Record<string, string> = {}
@@ -446,7 +576,7 @@ export async function runPythonProject(
     }
   }
 
-  return { stdout, stderr, exitCode, fileUpdates }
+  return { stdout, stderr, exitCode, errorName, fileUpdates }
 }
 
 export function inferPlanckFileKind(fileName: string): "cpp" | "txt" | "python" {

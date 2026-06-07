@@ -471,12 +471,12 @@ export function DashboardAuth() {
         {/* Content Wrapper - takes remaining width */}
         <div className="flex-1 h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
           {/* Floating Card Container */}
-          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-white md:bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
+          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-white md:bg-[#ffffff] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
 
             {/* Scrollable Content Area — locked on mobile, scrollable from md up */}
-            <div className="flex-1 min-h-0 overflow-hidden overscroll-none md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#f8f9fa]">
+            <div className="flex-1 min-h-0 overflow-hidden overscroll-none md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#ffffff]">
               {!isPaid ? (
-                <div className="hidden md:block bg-[#f7f9fa]">
+                <div className="hidden md:block bg-[#ffffff]">
                   {postOnboardingDiscount.active ? (
                     <button
                       type="button"

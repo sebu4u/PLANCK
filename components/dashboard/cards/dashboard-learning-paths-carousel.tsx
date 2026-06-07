@@ -40,7 +40,7 @@ function getChapterTheme(title: string): ChapterTheme {
     return {
       text: "text-[#f7c325]",
       border: "border-[#f7c325]/40",
-      shadow: "shadow-[0_12px_40px_rgba(247,195,37,0.2)]",
+      shadow: "shadow-[0_8px_24px_rgba(247,195,37,0.14)]",
       gradient: "from-[#fcd34d] to-[#f7c325]",
       accentBorder: "border-[#f7c325]",
       accentRing: "ring-[#f7c325]/30",
@@ -55,7 +55,7 @@ function getChapterTheme(title: string): ChapterTheme {
     return {
       text: "text-[#456dff]",
       border: "border-[#456dff]/40",
-      shadow: "shadow-[0_12px_40px_rgba(69,109,255,0.2)]",
+      shadow: "shadow-[0_8px_24px_rgba(69,109,255,0.14)]",
       gradient: "from-[#60a5fa] to-[#456dff]",
       accentBorder: "border-[#456dff]",
       accentRing: "ring-[#456dff]/30",
@@ -69,7 +69,7 @@ function getChapterTheme(title: string): ChapterTheme {
   return {
     text: "text-[#7c3aed]",
     border: "border-[#d4d0f9]",
-    shadow: "shadow-[0_12px_40px_rgba(124,58,237,0.12)]",
+    shadow: "shadow-[0_8px_24px_rgba(124,58,237,0.08)]",
     gradient: "from-[#8b5cf6] to-[#7c3aed]",
     accentBorder: "border-[#7c3aed]",
     accentRing: "ring-[#7c3aed]/30",
@@ -456,7 +456,7 @@ export function DashboardLearningPathsCarousel({
 
   if (!count) {
     return (
-      <div className="rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+      <div className="rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)] md:shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
         <p className="text-xl font-semibold text-[#171717]">Learning paths indisponibile momentan.</p>
       </div>
     )
@@ -582,7 +582,7 @@ export function DashboardLearningPathsCarousel({
       <div
         ref={containerRef}
         className="relative hidden w-full select-none overflow-visible md:block"
-        style={{ height: 500 }}
+        style={{ height: 540 }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -618,7 +618,7 @@ export function DashboardLearningPathsCarousel({
                 isDragging ? "duration-0" : "duration-300 ease-out",
                 isActive
                   ? `${colors.border} ${colors.shadow}`
-                  : "border-[#e5e5e5] shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
+                  : "border-[#e5e5e5] shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
               )}
               style={{
                 left: 24,
@@ -643,13 +643,13 @@ export function DashboardLearningPathsCarousel({
                   <img
                     src={chapter.icon_url}
                     alt={chapter.title}
-                    className="h-28 w-28 object-contain sm:h-32 sm:w-32"
+                    className="h-40 w-40 object-contain"
                     loading="lazy"
                     draggable={false}
                   />
                 ) : (
-                  <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-[#f3f3f3] text-[#737373] sm:h-32 sm:w-32">
-                    <BookOpen className="h-11 w-11" />
+                  <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-[#f3f3f3] text-[#737373]">
+                    <BookOpen className="h-14 w-14" />
                   </div>
                 )}
               </div>
@@ -693,7 +693,7 @@ export function DashboardLearningPathsCarousel({
                   className={cn(
                     "flex h-16 w-24 items-center justify-center rounded-2xl border bg-white p-3 transition-all sm:h-20 sm:w-28",
                     activeIndex === index
-                      ? `${colors.accentBorder} ${colors.accentRing} ring-2 shadow-[0_6px_14px_rgba(0,0,0,0.08)]`
+                      ? `${colors.accentBorder} ${colors.accentRing} ring-2 shadow-[0_4px_10px_rgba(0,0,0,0.05)]`
                       : "border-[#e5e5e5] hover:border-[#cfcfcf]"
                   )}
                 >

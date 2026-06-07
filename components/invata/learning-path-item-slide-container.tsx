@@ -24,15 +24,17 @@ interface LearningPathItemSlideContainerProps {
   itemKey: string
   direction: LearningPathSlideDirection
   children: React.ReactNode
+  allowOverflowX?: boolean
 }
 
 export function LearningPathItemSlideContainer({
   itemKey,
   direction,
   children,
+  allowOverflowX = false,
 }: LearningPathItemSlideContainerProps) {
   return (
-    <div className="relative w-full overflow-x-clip">
+    <div className={allowOverflowX ? "relative w-full overflow-x-visible" : "relative w-full overflow-x-clip"}>
       <AnimatePresence initial={false} mode="popLayout" custom={direction}>
         <motion.div
           key={itemKey}

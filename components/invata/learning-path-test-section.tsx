@@ -1,11 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react"
+import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useLearningPathEdgeToEdge } from "@/components/invata/learning-path-item-chrome-context"
 import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -13,12 +15,6 @@ import {
   RefreshCcw,
   XCircle,
 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
@@ -28,12 +24,13 @@ import { useProgressTrigger } from "@/hooks/engagement/use-progress-trigger"
 import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useLpTestBatteryState, type LpTestBatteryState, LP_TEST_MAX_BATTERIES } from "@/hooks/use-lp-test-battery-state"
 import { LpTestBatteryStrip } from "@/components/invata/lp-test-battery-strip"
-import { resolveTestIcon } from "@/components/invata/test-icons"
 import {
   getTestPassThreshold,
   type TestPublicContent,
   type TestPublicProblem,
 } from "@/lib/learning-path-test"
+
+const TEST_START_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
 type BatteryState = LpTestBatteryState
 
@@ -112,9 +109,7 @@ function DifficultyDots({ value, max = 5 }: { value: number; max?: number }) {
   )
 }
 
-interface IntroPopupProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+interface TestIntroScreenProps {
   title: string
   content: TestPublicContent
   battery: BatteryState | null
@@ -124,9 +119,7 @@ interface IntroPopupProps {
   onStart: () => void
 }
 
-function IntroPopup({
-  open,
-  onOpenChange,
+function TestIntroScreen({
   title,
   content,
   battery,
@@ -134,123 +127,133 @@ function IntroPopup({
   starting,
   startError,
   onStart,
-}: IntroPopupProps) {
+}: TestIntroScreenProps) {
   const [, forceTick] = useState(0)
   useEffect(() => {
-    if (!open) return
     if (!battery?.nextRefillAt || (battery?.count ?? 0) >= LP_TEST_MAX_BATTERIES) return
     const interval = window.setInterval(() => forceTick((tick) => tick + 1), 1000)
     return () => window.clearInterval(interval)
-  }, [battery?.nextRefillAt, battery?.count, open])
+  }, [battery?.nextRefillAt, battery?.count])
 
   const countdown = formatCountdown(battery?.nextRefillAt ?? null)
   const noBatteries = !batteryLoading && (battery?.count ?? 0) <= 0
-  const Icon = resolveTestIcon(content.icon) ?? null
+
+  const viewportHeight =
+    "calc(100dvh - 3.5rem + max(16px, env(safe-area-inset-bottom, 0px)))"
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="!z-[401] max-h-[calc(100svh-1.5rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-[#e5e5e5] bg-white p-4 shadow-xl sm:w-full sm:p-6"
-        style={{ borderRadius: "20px" }}
-        overlayClassName="!z-[400] !bg-black/45 backdrop-blur-none"
-      >
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_8px_16px_rgba(124,58,237,0.24)] sm:h-12 sm:w-12">
-            {Icon ? <Icon className="h-5 w-5 sm:h-6 sm:w-6" /> : <span className="text-base font-bold sm:text-lg">T</span>}
-          </div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8b6fac]">Test</p>
-          <DialogTitle className="text-center text-lg font-bold leading-tight text-[#111111] sm:text-xl">
-            <LatexRichText content={title} className="break-words text-center" />
-          </DialogTitle>
-        </DialogHeader>
+    <div
+      className="mb-[calc(-1*max(16px,env(safe-area-inset-bottom,0px)))] flex w-full flex-col lg:flex-row lg:items-stretch"
+      style={
+        {
+          minHeight: viewportHeight,
+          "--test-intro-viewport-height": viewportHeight,
+        } as CSSProperties
+      }
+    >
+      <div className="flex flex-1 flex-col py-8 pl-6 pr-5 sm:pl-8 sm:pr-8 lg:w-1/2 lg:shrink-0 lg:justify-center lg:py-10 lg:pl-20 lg:pr-12 xl:pl-28">
+        <h1 className="text-3xl font-bold leading-tight text-[#111111] sm:text-4xl lg:text-[2.75rem] lg:leading-[1.1]">
+          <LatexRichText content={title} className="break-words" />
+        </h1>
 
-        <div className="mt-3 space-y-3 text-[#3f3550] sm:space-y-4">
-          <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:text-sm">
-            <span className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl bg-[#f4efff] px-2 py-2 text-[#5b21b6] sm:min-h-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3 sm:py-1">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="leading-tight">{describeTime(content.timeLimitSeconds)}</span>
-            </span>
-            <span className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl bg-[#f5f3fb] px-2 py-2 text-[#3f3550] sm:min-h-0 sm:flex-row sm:gap-2 sm:rounded-full sm:px-3 sm:py-1">
-              <span>Dificultate</span>
-              <DifficultyDots value={content.difficulty} />
-            </span>
-            <span className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#f5f3fb] px-2 py-2 text-[#3f3550] sm:min-h-0 sm:rounded-full sm:px-3 sm:py-1">
-              <span className="leading-tight">
-                {content.problems.length} {content.problems.length === 1 ? "problemă" : "probleme"}
-              </span>
-            </span>
-          </div>
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-[#3f3550] sm:mt-6 sm:text-base">
+          <span className="inline-flex items-center gap-2 text-[#5b21b6]">
+            <Clock className="h-4 w-4 shrink-0" />
+            {describeTime(content.timeLimitSeconds)}
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span>Dificultate</span>
+            <DifficultyDots value={content.difficulty} />
+          </span>
+          <span>
+            {content.problems.length} {content.problems.length === 1 ? "problemă" : "probleme"}
+          </span>
+        </div>
 
+        <div className="mt-6 w-full max-w-none text-[#3f3550] sm:mt-8">
           {content.description.trim() ? (
-            <div className="max-h-36 overflow-y-auto rounded-2xl border border-[#ece8f5] bg-[#fbfaff] p-3 text-left sm:max-h-48 sm:p-4">
-              <div className="prose prose-sm max-w-none prose-headings:break-words prose-p:break-words prose-p:my-2">
-                <LessonRichContent content={content.description} theme="light" />
-              </div>
+            <div className="prose prose-sm max-w-none prose-headings:break-words prose-p:break-words prose-p:my-2 sm:prose-base">
+              <LessonRichContent content={content.description} theme="light" />
             </div>
           ) : (
-            <p className="text-center text-sm text-[#6f657b]">
+            <p className="text-sm leading-6 text-[#6f657b] sm:text-base">
               Acesta este un test grilă. Trebuie să obții peste 80% pentru a trece la pasul următor.
             </p>
           )}
+        </div>
 
-          <div className="rounded-2xl border border-[#ece8f5] bg-[#fbfaff] p-3 sm:p-4">
-            <p className="text-center text-xs font-semibold uppercase tracking-[0.16em] text-[#8b6fac]">
-              Bateriile tale
-            </p>
-            <div className="mt-2 sm:mt-3">
-              {batteryLoading ? (
-                <div className="flex items-center justify-center text-sm text-[#6f657b]">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verific bateriile...
-                </div>
-              ) : (
-                <LpTestBatteryStrip count={battery?.count ?? 0} />
-              )}
+        <div className="mt-6 sm:mt-8">
+          {batteryLoading ? (
+            <div className="flex items-center text-sm text-[#6f657b]">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verific bateriile...
             </div>
-            <p className="mx-auto mt-2 max-w-xs text-center text-[11px] leading-snug text-[#6f657b] sm:mt-3 sm:text-xs">
-              {noBatteries ? (
-                <>Nu mai ai baterii. Așteaptă reîncărcarea pentru a încerca din nou.</>
-              ) : (
-                <>Fiecare încercare consumă o baterie. Bateriile se reîncarcă în 12h.</>
-              )}
-            </p>
-            {countdown ? (
-              <p className="mt-1.5 text-center text-xs font-medium text-[#5b21b6] sm:mt-2">
-                Următoarea baterie în {countdown}
-              </p>
+          ) : (
+            <div className="[&>div]:!justify-start">
+              <LpTestBatteryStrip count={battery?.count ?? 0} />
+            </div>
+          )}
+          <p className="mt-3 max-w-md text-xs leading-snug text-[#6f657b] sm:text-sm">
+            {noBatteries ? (
+              <>Nu mai ai baterii. Așteaptă reîncărcarea pentru a încerca din nou.</>
             ) : (
-              <p className="mt-1.5 text-center text-xs font-medium text-emerald-600 sm:mt-2">
-                Toate bateriile sunt pline.
-              </p>
+              <>Fiecare încercare consumă o baterie. Bateriile se reîncarcă în 12h.</>
             )}
-          </div>
-
-          {startError ? (
-            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-              <span>{startError}</span>
-            </div>
+          </p>
+          {countdown ? (
+            <p className="mt-1.5 text-sm font-medium text-[#5b21b6]">
+              Următoarea baterie în {countdown}
+            </p>
+          ) : !batteryLoading ? (
+            <p className="mt-1.5 text-sm font-medium text-emerald-600">
+              Toate bateriile sunt pline.
+            </p>
           ) : null}
         </div>
 
-        <div className="mt-4 flex flex-col items-stretch gap-2 sm:mt-6">
-          <Button
-            type="button"
-            onClick={onStart}
-            disabled={starting || batteryLoading || noBatteries}
-            className="h-12 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-base font-semibold text-white hover:opacity-95"
-          >
+        {startError ? (
+          <div className="mt-4 flex max-w-md items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 sm:text-sm">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+            <span>{startError}</span>
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={starting || batteryLoading || noBatteries}
+          aria-busy={starting}
+          className="dashboard-start-glow mt-8 inline-flex w-full max-w-md items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-8 py-4 text-base font-semibold text-white shadow-[0_4px_0_#5b21b6] transition-[transform,box-shadow,opacity] hover:translate-y-1 hover:shadow-[0_1px_0_#5b21b6] active:translate-y-1 active:shadow-[0_1px_0_#5b21b6] disabled:pointer-events-none disabled:opacity-70 sm:mt-10 sm:min-h-[3.5rem] sm:px-10 sm:py-4 sm:text-lg"
+          style={{ "--start-glow-tint": TEST_START_GLOW_TINT } as CSSProperties}
+        >
+          <span className="relative z-[1] inline-flex items-center justify-center gap-2">
             {starting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Se pornește...
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+                Se pornește...
               </>
             ) : (
-              "Începe testul"
+              <>
+                Începe testul
+                <ArrowRight className="h-5 w-5 shrink-0" aria-hidden />
+              </>
             )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </span>
+        </button>
+      </div>
+
+      <div className="relative mt-auto flex w-full shrink-0 items-end justify-center overflow-visible lg:mt-0 lg:min-h-0 lg:w-1/2 lg:justify-end">
+        <Image
+          src="/test-desktop.png"
+          alt="Elev concentrat la un test"
+          width={1200}
+          height={1200}
+          className="block h-auto w-full max-h-[min(52vh,420px)] max-w-none object-contain object-bottom object-center lg:max-h-[var(--test-intro-viewport-height)] lg:object-right"
+          sizes="(max-width: 1023px) 100vw, 50vw"
+          priority
+        />
+      </div>
+    </div>
   )
 }
 
@@ -368,14 +371,13 @@ export function LearningPathTestSection({
   lessonId,
   isLastItem,
 }: LearningPathTestSectionProps) {
-  const router = useRouter()
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const { user } = useAuth()
   const pushProgress = useProgressTrigger()
   const pushMomentum = useMomentumTrigger()
 
   const [screen, setScreen] = useState<ScreenState>("intro")
-  const [introOpen, setIntroOpen] = useState(true)
+  useLearningPathEdgeToEdge(screen === "intro")
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
 
@@ -498,7 +500,6 @@ export function LearningPathTestSection({
       setSubmitError(null)
       setAutoSubmitArmed(false)
       setSecondsLeft(content.timeLimitSeconds)
-      setIntroOpen(false)
       setScreen("test")
     } catch (err: any) {
       setStartError(err.message || "A apărut o eroare la pornirea testului.")
@@ -510,7 +511,6 @@ export function LearningPathTestSection({
   const handleRetry = useCallback(async () => {
     await refreshBattery()
     setScreen("intro")
-    setIntroOpen(true)
     setResult(null)
     setSubmitError(null)
     setAnswers({})
@@ -547,34 +547,15 @@ export function LearningPathTestSection({
 
   if (screen === "intro") {
     return (
-      <>
-        <IntroPopup
-          open={introOpen}
-          onOpenChange={(next) => {
-            if (!next) {
-              router.back()
-              return
-            }
-            setIntroOpen(next)
-          }}
-          title={title}
-          content={content}
-          battery={battery}
-          batteryLoading={batteryLoading}
-          starting={starting}
-          startError={startError}
-          onStart={handleStart}
-        />
-        <div className="flex min-h-[40vh] items-center justify-center text-sm text-[#6f657b]">
-          {batteryLoading ? (
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Se pregătește testul...
-            </span>
-          ) : (
-            <span>Acest pas este un test. Confirmă în pop-up pentru a începe.</span>
-          )}
-        </div>
-      </>
+      <TestIntroScreen
+        title={title}
+        content={content}
+        battery={battery}
+        batteryLoading={batteryLoading}
+        starting={starting}
+        startError={startError}
+        onStart={handleStart}
+      />
     )
   }
 

@@ -33,12 +33,14 @@ import {
   mergePlanckIdeFiles,
   runPythonProject,
   createPlanckInteractiveStdinPump,
+  getPlanckPythonStatus,
   planckPythonUsesConsoleInput,
   type PlanckInteractiveStdinPump,
 } from "@/lib/planckcode-python-run"
 import { supabase } from "@/lib/supabaseClient"
 import type { CodingSubmitResponse } from "./types"
 import { CodingSubmitResultOverlay } from "./coding-submit-result-overlay"
+import { cn } from "@/lib/utils"
 
 const defaultCppCode = `#include <iostream>
 using namespace std;
@@ -180,6 +182,10 @@ export interface EmbeddedIDEProps {
   problemSlug?: string | null
   /** Apelat după o trimitere acceptată (status `accepted`). */
   onAcceptedSubmit?: () => void
+  /** După Continuă pe cardul de rezultat acceptat — navigare la itemul următor. */
+  onAcceptedContinue?: () => Promise<void> | void
+  /** Controlează doar cromatica/layout-ul exterior; logica editorului și terminalului rămâne aceeași. */
+  presentation?: "default" | "learning-path"
 }
 
 export default function EmbeddedIDE({
@@ -187,6 +193,8 @@ export default function EmbeddedIDE({
   defaultLanguage = "cpp",
   problemSlug = null,
   onAcceptedSubmit,
+  onAcceptedContinue,
+  presentation = "default",
 }: EmbeddedIDEProps) {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
@@ -380,6 +388,15 @@ export default function EmbeddedIDE({
     setWaitingForPythonConsoleLine(false)
   }
 
+  const submitPythonTerminalEof = () => {
+    const pump = pythonStdinPumpRef.current
+    if (!pump || !waitingForPythonConsoleLine) return
+
+    pump.submitEof()
+    setPythonConsoleLineInput("")
+    setWaitingForPythonConsoleLine(false)
+  }
+
   const handleRunCode = async () => {
     if (!isTerminalOpen) {
       setIsTerminalOpen(true)
@@ -451,10 +468,7 @@ export default function EmbeddedIDE({
           stdout: result.stdout || null,
           stderr: result.stderr || null,
           compile_output: null,
-          status: {
-            id: result.exitCode === 0 ? 3 : 11,
-            description: result.exitCode === 0 ? "Accepted" : "Runtime Error",
-          },
+          status: getPlanckPythonStatus(result.exitCode, result.errorName),
           time: null,
           memory: null,
         })
@@ -526,14 +540,15 @@ export default function EmbeddedIDE({
     activeFile?.type === "python"
       ? "Python rulează în browser (prima rulare poate descărca interpretorul)."
       : "Compiling and running your code..."
+  const isLearningPathPresentation = presentation === "learning-path"
 
-  return (
+  const fileTabs = (
     <div
-      className="h-full flex flex-col overflow-hidden bg-black"
-      style={{ touchAction: "pan-y" }}
+      className={cn(
+        "flex items-center justify-between gap-1 overflow-x-auto border-b border-[#3b3b3b] bg-[#1e1e1e] px-4 py-2",
+        isLearningPathPresentation && "border-white/10 bg-[#0f141c]",
+      )}
     >
-      {/* File Tabs */}
-      <div className="flex items-center justify-between gap-1 px-4 py-2 bg-[#1e1e1e] border-b border-[#3b3b3b] overflow-x-auto">
         <div className="flex items-center gap-1 flex-1 min-w-0">
           {files.map((file) => (
             <div
@@ -598,35 +613,272 @@ export default function EmbeddedIDE({
           ) : null}
         </div>
       </div>
+  )
 
-      {/* Editor and Terminal Section */}
+  const editorPane = (
+    <div className="h-full overflow-hidden">
+      <Editor
+        height="100%"
+        language={activeFile ? monacoLanguageForFile(activeFile) : "plaintext"}
+        theme={settings.theme}
+        defaultValue={activeFile?.content || ""}
+        path={activeFile ? `${activeFile.id}/${activeFile.name}` : undefined}
+        keepCurrentModel
+        beforeMount={handleEditorBeforeMount}
+        onMount={handleEditorMount}
+        onChange={handleEditorChange}
+        options={{
+          minimap: { enabled: true },
+          fontSize: settings.fontSize,
+          fontFamily: editorFontFamily,
+          mouseWheelZoom: true,
+          lineNumbers: "on",
+          roundedSelection: false,
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          tabSize: 2,
+          wordWrap: "on",
+        }}
+      />
+    </div>
+  )
+
+  const terminalPanel = (
+    <div
+      className={cn(
+        "h-full flex flex-col bg-[#181818] border-t border-[#3b3b3b]",
+        isLearningPathPresentation && "border-t-0 bg-[#141820]",
+      )}
+    >
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b3b3b]">
+        <div className="text-sm font-semibold text-gray-300">Console</div>
+        <button
+          onClick={() => setIsTerminalOpen(false)}
+          className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
+          title="Close Terminal"
+        >
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        </button>
+      </div>
+
+      <div className={cn("flex-1 flex min-h-0", isLearningPathPresentation && "max-md:flex-col")}>
+        <div
+          className={cn(
+            "flex-1 flex flex-col min-h-0",
+            stdinSidebarVisible && "border-r border-[#3b3b3b]",
+            isLearningPathPresentation && stdinSidebarVisible && "max-md:border-r-0",
+          )}
+        >
+          <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e] shrink-0">
+            <div className="text-xs font-semibold text-gray-400">Output:</div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 min-h-0">
+            {loading && pythonLiveStdout === null && (
+              <div className="flex items-center gap-2 text-gray-400 mb-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{runHint}</span>
+              </div>
+            )}
+
+            {loading && pythonLiveStdout !== null && (
+              <div className="flex items-center gap-2 text-amber-200/90 text-xs mb-2 font-mono">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Rulează — răspunde în zona de mai jos când apare.
+              </div>
+            )}
+
+            {pythonLiveStdout !== null && (
+              <div className="space-y-2 mb-2">
+                {pythonLiveStderr !== null && pythonLiveStderr.length > 0 ? (
+                  <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                    <span className="font-semibold">Stderr:</span>
+                    {"\n"}
+                    {pythonLiveStderr}
+                  </div>
+                ) : null}
+                <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">{pythonLiveStdout}</div>
+              </div>
+            )}
+
+            {error && (
+              <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                Error: {error}
+              </div>
+            )}
+
+            {!loading && !error && output && pythonLiveStdout === null && (
+              <div className="space-y-2">
+                {output.compile_output && (
+                  <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                    <span className="font-semibold">Compilation Error:</span>
+                    {"\n"}
+                    {output.compile_output}
+                  </div>
+                )}
+
+                {output.stderr && (
+                  <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                    <span className="font-semibold">{output.status.description}:</span>
+                    {"\n"}
+                    {output.stderr}
+                  </div>
+                )}
+
+                {output.stdout && (
+                  <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">
+                    {output.stdout}
+                  </div>
+                )}
+
+                {!output.stdout && !output.stderr && !output.compile_output && (
+                  <div className="text-gray-400 font-mono text-sm">
+                    Status: {output.status.description}
+                    {output.time && ` (Time: ${output.time}s)`}
+                    {output.memory && ` (Memory: ${output.memory} KB)`}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!loading && !error && !output && pythonLiveStdout === null && (
+              <div className="text-gray-500 text-sm italic">
+                {problemSlug && defaultLanguage === "python"
+                  ? "Apasă „Run Code” pentru test local sau „Trimite” pentru evaluare pe server."
+                  : 'Click "Run Code" to execute your program'}
+              </div>
+            )}
+          </div>
+
+          {waitingForPythonConsoleLine && activeFile?.type === "python" ? (
+            <div className="border-t border-[#3b3b3b] bg-[#1e1e1e]/90 px-4 py-2 shrink-0">
+              <div className="text-xs font-semibold text-yellow-400 mb-2">
+                Introdu o linie (input / sys.stdin.readline). Pentru sys.stdin.read(), apasă EOF când ai terminat:
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={pythonConsoleLineInput}
+                  onChange={(e) => setPythonConsoleLineInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      submitPythonTerminalLine()
+                    }
+                  }}
+                  placeholder="Valoarea liniei și Enter"
+                  className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  onClick={submitPythonTerminalLine}
+                  className="bg-green-600 hover:bg-green-700 text-white shrink-0 px-4"
+                >
+                  Trimite
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitPythonTerminalEof}
+                  variant="outline"
+                  className="border-yellow-500/40 bg-yellow-500/10 text-yellow-100 hover:bg-yellow-500/20 shrink-0 px-4"
+                >
+                  EOF
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {stdinSidebarVisible ? (
+          <div
+            className={cn(
+              "w-[480px] shrink-0 flex flex-col bg-[#1a1a1a] min-h-0",
+              isLearningPathPresentation && "max-lg:w-[320px] max-md:h-[180px] max-md:w-full max-md:border-t max-md:border-[#3b3b3b]",
+            )}
+          >
+            <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
+              <div className="text-xs font-semibold text-gray-400">Input (stdin):</div>
+            </div>
+
+            <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+              <div className="flex-1 flex flex-col min-h-0">
+                <label className="text-xs text-gray-400 mb-2">
+                  Enter program inputs (one per line):
+                </label>
+                <textarea
+                  value={stdin}
+                  onChange={(e) => setStdin(e.target.value)}
+                  placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
+                  className="flex-1 min-h-[120px] px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+
+  const collapsedTerminal = (
+    <div className="border-t border-[#3b3b3b] bg-[#181818] px-4 py-2 flex items-center justify-between">
+      <div className="text-sm font-semibold text-gray-300">Terminal</div>
+      <button
+        onClick={() => setIsTerminalOpen(true)}
+        className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
+        title="Open Terminal"
+      >
+        <ChevronUp className="w-4 h-4 text-gray-400" />
+      </button>
+    </div>
+  )
+
+  const submitOverlay =
+    problemSlug && defaultLanguage === "python" ? (
+      <CodingSubmitResultOverlay
+        open={submitLoading || Boolean(submitError) || Boolean(submitResult)}
+        loading={submitLoading}
+        error={submitError}
+        result={submitResult}
+        onClose={() => {
+          submitDismissedRef.current = true
+          setSubmitLoading(false)
+          setSubmitResult(null)
+          setSubmitError(null)
+        }}
+        onAcceptedContinue={onAcceptedContinue}
+      />
+    ) : null
+
+  if (isLearningPathPresentation) {
+    return (
+      <>
+        <div
+          className="flex h-full min-h-0 flex-col gap-4 bg-transparent"
+          style={{ touchAction: "pan-y" }}
+        >
+          <section className="flex min-h-[460px] flex-[3] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#060b10] shadow-[0_8px_24px_rgba(3,7,18,0.12)]">
+            {fileTabs}
+            <div className="min-h-0 flex-1">{editorPane}</div>
+          </section>
+
+          <section className="flex min-h-[240px] flex-[1] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#141820] shadow-[0_6px_20px_rgba(3,7,18,0.1)]">
+            {isTerminalOpen ? terminalPanel : collapsedTerminal}
+          </section>
+        </div>
+        {submitOverlay}
+      </>
+    )
+  }
+
+  return (
+    <div
+      className="h-full flex flex-col overflow-hidden bg-black"
+      style={{ touchAction: "pan-y" }}
+    >
+      {fileTabs}
+
       <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
         <ResizablePanel defaultSize={isTerminalOpen ? 70 : 100} minSize={30}>
-          <div className="h-full overflow-hidden">
-            <Editor
-              height="100%"
-              language={activeFile ? monacoLanguageForFile(activeFile) : "plaintext"}
-              theme={settings.theme}
-              defaultValue={activeFile?.content || ""}
-              path={activeFile ? `${activeFile.id}/${activeFile.name}` : undefined}
-              keepCurrentModel
-              beforeMount={handleEditorBeforeMount}
-              onMount={handleEditorMount}
-              onChange={handleEditorChange}
-              options={{
-                minimap: { enabled: true },
-                fontSize: settings.fontSize,
-                fontFamily: editorFontFamily,
-                mouseWheelZoom: true,
-                lineNumbers: "on",
-                roundedSelection: false,
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: "on",
-              }}
-            />
-          </div>
+          {editorPane}
         </ResizablePanel>
 
         {isTerminalOpen && (
@@ -636,188 +888,17 @@ export default function EmbeddedIDE({
               className="bg-[#3b3b3b] hover:bg-[#4b4b4b] transition-colors"
             />
             <ResizablePanel defaultSize={30} minSize={10}>
-              <div className="h-full flex flex-col bg-[#181818] border-t border-[#3b3b3b]">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b3b3b]">
-                  <div className="text-sm font-semibold text-gray-300">Console</div>
-                  <button
-                    onClick={() => setIsTerminalOpen(false)}
-                    className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
-                    title="Close Terminal"
-                  >
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                </div>
-
-                <div className="flex-1 flex min-h-0">
-                  <div
-                    className={`flex-1 flex flex-col min-h-0 ${stdinSidebarVisible ? "border-r border-[#3b3b3b]" : ""}`}
-                  >
-                    <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e] shrink-0">
-                      <div className="text-xs font-semibold text-gray-400">Output:</div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 min-h-0">
-                      {loading && pythonLiveStdout === null && (
-                        <div className="flex items-center gap-2 text-gray-400 mb-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>{runHint}</span>
-                        </div>
-                      )}
-
-                      {loading && pythonLiveStdout !== null && (
-                        <div className="flex items-center gap-2 text-amber-200/90 text-xs mb-2 font-mono">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Rulează — răspunde în zona de mai jos când apare.
-                        </div>
-                      )}
-
-                      {pythonLiveStdout !== null && (
-                        <div className="space-y-2 mb-2">
-                          {pythonLiveStderr !== null && pythonLiveStderr.length > 0 ? (
-                            <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                              <span className="font-semibold">Stderr:</span>
-                              {"\n"}
-                              {pythonLiveStderr}
-                            </div>
-                          ) : null}
-                          <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">{pythonLiveStdout}</div>
-                        </div>
-                      )}
-
-                      {error && (
-                        <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                          Error: {error}
-                        </div>
-                      )}
-
-                      {!loading && !error && output && pythonLiveStdout === null && (
-                        <div className="space-y-2">
-                          {output.compile_output && (
-                            <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                              <span className="font-semibold">Compilation Error:</span>
-                              {"\n"}
-                              {output.compile_output}
-                            </div>
-                          )}
-
-                          {output.stderr && (
-                            <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                              <span className="font-semibold">Runtime Error:</span>
-                              {"\n"}
-                              {output.stderr}
-                            </div>
-                          )}
-
-                          {output.stdout && (
-                            <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">
-                              {output.stdout}
-                            </div>
-                          )}
-
-                          {!output.stdout && !output.stderr && !output.compile_output && (
-                            <div className="text-gray-400 font-mono text-sm">
-                              Status: {output.status.description}
-                              {output.time && ` (Time: ${output.time}s)`}
-                              {output.memory && ` (Memory: ${output.memory} KB)`}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {!loading && !error && !output && pythonLiveStdout === null && (
-                        <div className="text-gray-500 text-sm italic">
-                          {problemSlug && defaultLanguage === "python"
-                            ? "Apasă „Run Code” pentru test local sau „Trimite” pentru evaluare pe server."
-                            : 'Click "Run Code" to execute your program'}
-                        </div>
-                      )}
-                    </div>
-
-                    {waitingForPythonConsoleLine && activeFile?.type === "python" ? (
-                      <div className="border-t border-[#3b3b3b] bg-[#1e1e1e]/90 px-4 py-2 shrink-0">
-                        <div className="text-xs font-semibold text-yellow-400 mb-2">
-                          Introdu o linie (input / sys.stdin.readline):
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            value={pythonConsoleLineInput}
-                            onChange={(e) => setPythonConsoleLineInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault()
-                                submitPythonTerminalLine()
-                              }
-                            }}
-                            placeholder="Valoarea liniei și Enter"
-                            className="flex-1 bg-[#2d2d2d] border-[#3b3b3b] text-white text-sm font-mono focus:border-yellow-500"
-                            autoFocus
-                          />
-                          <Button
-                            type="button"
-                            onClick={submitPythonTerminalLine}
-                            className="bg-green-600 hover:bg-green-700 text-white shrink-0 px-4"
-                          >
-                            Trimite
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {stdinSidebarVisible ? (
-                    <div className="w-[480px] shrink-0 flex flex-col bg-[#1a1a1a] min-h-0">
-                      <div className="px-4 py-2 border-b border-[#3b3b3b] bg-[#1e1e1e]">
-                        <div className="text-xs font-semibold text-gray-400">Input (stdin):</div>
-                      </div>
-
-                      <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
-                        <div className="flex-1 flex flex-col min-h-0">
-                          <label className="text-xs text-gray-400 mb-2">
-                            Enter program inputs (one per line):
-                          </label>
-                          <textarea
-                            value={stdin}
-                            onChange={(e) => setStdin(e.target.value)}
-                            placeholder="Example:&#10;10&#10;20&#10;John&#10;3.14"
-                            className="flex-1 min-h-[120px] px-3 py-2 bg-[#2d2d2d] border border-[#3b3b3b] rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-green-600 placeholder-gray-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+              {terminalPanel}
             </ResizablePanel>
           </>
         )}
       </ResizablePanelGroup>
 
       {!isTerminalOpen && (
-        <div className="border-t border-[#3b3b3b] bg-[#181818] px-4 py-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-gray-300">Terminal</div>
-          <button
-            onClick={() => setIsTerminalOpen(true)}
-            className="p-1 hover:bg-[#2d2d2d] rounded transition-colors"
-            title="Open Terminal"
-          >
-            <ChevronUp className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
+        collapsedTerminal
       )}
 
-      {problemSlug && defaultLanguage === "python" ? (
-        <CodingSubmitResultOverlay
-          open={submitLoading || Boolean(submitError) || Boolean(submitResult)}
-          loading={submitLoading}
-          error={submitError}
-          result={submitResult}
-          onClose={() => {
-            submitDismissedRef.current = true
-            setSubmitLoading(false)
-            setSubmitResult(null)
-            setSubmitError(null)
-          }}
-        />
-      ) : null}
+      {submitOverlay}
     </div>
   )
 }

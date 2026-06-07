@@ -101,7 +101,7 @@ export function DashboardRecommendedProblemsCard({
 
   if (!problems.length) {
     return (
-      <section className="rounded-3xl border border-[#e5e5e5] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+      <section className="rounded-3xl border border-[#e5e5e5] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.03)] md:shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
         <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Problema recomandata</p>
         <p className="mt-2 text-sm text-[#5f5f5f]">
           {userGrade
@@ -125,7 +125,7 @@ export function DashboardRecommendedProblemsCard({
             const classLabel = toClassLabel(problem)
             return (
               <CarouselItem key={problem.id} className="self-start">
-                <div className="rounded-3xl border border-[#e5e5e5] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+                <div className="rounded-3xl border border-[#e5e5e5] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.03)] md:shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="rounded-full bg-[#f0ebff] px-2.5 py-1 font-semibold text-[#6f43db]">
                       {problem.difficulty || "Nivel mixt"}

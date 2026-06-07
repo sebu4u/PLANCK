@@ -87,8 +87,8 @@ export function DevDashboard() {
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#ffffff] transition-all duration-300">
-          <div className="m-[3px] mt-0 flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f8f9fa] lg:mt-0 lg:rounded-xl">
-            <div className="dashboard-scrollbar flex-1 overflow-y-auto bg-[#f8f9fa]">
+          <div className="m-[3px] mt-0 flex min-h-0 flex-1 flex-col overflow-hidden bg-[#ffffff] lg:mt-0 lg:rounded-xl">
+            <div className="dashboard-scrollbar flex-1 overflow-y-auto bg-[#ffffff]">
               <main className="animate-fade-in-up p-4 md:p-8 lg:p-10">
                 <div className="mx-auto max-w-[1000px]">
                   <div className="mb-4 pt-3 md:hidden">

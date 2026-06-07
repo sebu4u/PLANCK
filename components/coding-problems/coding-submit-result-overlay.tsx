@@ -13,6 +13,8 @@ interface CodingSubmitResultOverlayProps {
   error: string | null
   result: CodingSubmitResponse | null
   onClose: () => void
+  /** După o soluție acceptată, navighează la itemul următor (ex. learning path). */
+  onAcceptedContinue?: () => Promise<void> | void
 }
 
 function statusLabel(status: string): string {
@@ -44,6 +46,7 @@ export function CodingSubmitResultOverlay({
   error,
   result,
   onClose,
+  onAcceptedContinue,
 }: CodingSubmitResultOverlayProps) {
   const [view, setView] = useState<ResultView>("summary")
   const [displayElo, setDisplayElo] = useState(500)
@@ -101,6 +104,14 @@ export function CodingSubmitResultOverlay({
       : "bg-[linear-gradient(180deg,#f1f5f9_0%,#f8fafc_100%)]"
 
   const eloNumberClass = eloPositive ? "text-emerald-700" : eloNegative ? "text-rose-700" : "text-slate-700"
+
+  const handleSummaryContinue = async () => {
+    const shouldNavigate = result?.status === "accepted" && onAcceptedContinue
+    onClose()
+    if (shouldNavigate) {
+      await onAcceptedContinue()
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[460] flex items-center justify-center bg-black/40 px-5 backdrop-blur-sm">
@@ -185,7 +196,7 @@ export function CodingSubmitResultOverlay({
               ) : null}
               <Button
                 type="button"
-                onClick={onClose}
+                onClick={() => void handleSummaryContinue()}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-base font-bold text-white shadow-[0_4px_0_#047857] transition-[transform,box-shadow] hover:translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_2px_0_#047857]"
               >
                 Continuă

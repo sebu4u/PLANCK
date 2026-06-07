@@ -57,6 +57,7 @@ import {
   mergePlanckIdeFiles,
   runPythonProject,
   createPlanckInteractiveStdinPump,
+  getPlanckPythonStatus,
   planckPythonUsesConsoleInput,
   type PlanckInteractiveStdinPump,
 } from "@/lib/planckcode-python-run"
@@ -865,6 +866,15 @@ function IDEPageContent() {
     setWaitingForPythonConsoleLine(false)
   }
 
+  const submitPythonTerminalEof = () => {
+    const pump = pythonStdinPumpRef.current
+    if (!pump || !waitingForPythonConsoleLine) return
+
+    pump.submitEof()
+    setPythonConsoleLineInput('')
+    setWaitingForPythonConsoleLine(false)
+  }
+
   const handleSendStdin = async () => {
     if (pythonStdinPumpRef.current && waitingForPythonConsoleLine) {
       submitPythonTerminalLine()
@@ -1452,10 +1462,7 @@ function IDEPageContent() {
           stdout: result.stdout || null,
           stderr: result.stderr || null,
           compile_output: null,
-          status: {
-            id: result.exitCode === 0 ? 3 : 11,
-            description: result.exitCode === 0 ? 'Accepted' : 'Runtime Error',
-          },
+          status: getPlanckPythonStatus(result.exitCode, result.errorName),
           time: null,
           memory: null,
         })
@@ -2051,7 +2058,7 @@ function IDEPageContent() {
 
                               {output.stderr && (
                                 <div className="text-red-400 font-mono text-sm whitespace-pre-wrap">
-                                  <span className="font-semibold">Runtime Error:</span>
+                                  <span className="font-semibold">{output.status.description}:</span>
                                   {'\n'}
                                   {output.stderr}
                                 </div>
@@ -2083,7 +2090,7 @@ function IDEPageContent() {
                         {waitingForPythonConsoleLine && activeFile?.type === 'python' ? (
                           <div className="border-t border-[#3b3b3b] bg-[#1e1e1e]/90 px-4 py-2 shrink-0">
                             <div className="text-xs font-semibold text-yellow-400 mb-2">
-                              Introdu o linie (ca la input() în consolă locală):
+                              Introdu o linie (ca la input() în consolă locală). Pentru sys.stdin.read(), apasă EOF când ai terminat:
                             </div>
                             <div className="flex gap-2">
                               <Input
@@ -2105,6 +2112,14 @@ function IDEPageContent() {
                                 className="bg-green-600 hover:bg-green-700 text-white shrink-0"
                               >
                                 Trimite linia
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={submitPythonTerminalEof}
+                                variant="outline"
+                                className="border-yellow-500/40 bg-yellow-500/10 text-yellow-100 hover:bg-yellow-500/20 shrink-0"
+                              >
+                                EOF
                               </Button>
                             </div>
                           </div>

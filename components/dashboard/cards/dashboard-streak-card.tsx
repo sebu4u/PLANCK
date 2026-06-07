@@ -66,7 +66,7 @@ export function DashboardStreakCard({
         </div>
       </section>
 
-      <section className="hidden md:block rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
+      <section className="hidden md:block rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-5xl font-bold leading-none text-[#121212]">{currentStreak}</p>

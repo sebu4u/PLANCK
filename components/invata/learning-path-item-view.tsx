@@ -120,18 +120,16 @@ export function LearningPathItemView({
         itemTitle={item.title}
       >
         {isTest ? (
-          <div className="py-4 sm:py-6">
-            <LearningPathItemBody
-              item={item}
-              sourceLesson={sourceLesson}
-              sourceProblem={sourceProblem}
-              sourceQuizQuestion={sourceQuizQuestion}
-              nextItemHref={nextItemHref}
-              lessonId={lessonId}
-              isLastItem={isLastItem}
-              {...routeMeta}
-            />
-          </div>
+          <LearningPathItemBody
+            item={item}
+            sourceLesson={sourceLesson}
+            sourceProblem={sourceProblem}
+            sourceQuizQuestion={sourceQuizQuestion}
+            nextItemHref={nextItemHref}
+            lessonId={lessonId}
+            isLastItem={isLastItem}
+            {...routeMeta}
+          />
         ) : isPoll ? (
           <LearningPathItemBody
             item={item}

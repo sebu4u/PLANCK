@@ -3,8 +3,8 @@
 export function DashboardSkeleton() {
     return (
         <div className="flex-1 relative h-[calc(100vh-4rem)] mt-16 transition-all duration-300 bg-[#ffffff]">
-            <div className="absolute inset-[3px] bg-white md:bg-[#f8f9fa] lg:rounded-xl overflow-hidden flex flex-col">
-                <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-white md:bg-[#f8f9fa]">
+            <div className="absolute inset-[3px] bg-white md:bg-[#ffffff] lg:rounded-xl overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-y-auto dashboard-scrollbar bg-white md:bg-[#ffffff]">
                     <main className="p-4 md:p-8 lg:p-10">
                         <div className="max-w-[1000px] mx-auto">
                             {/* Header skeleton */}

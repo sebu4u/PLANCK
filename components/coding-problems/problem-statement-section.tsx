@@ -6,21 +6,39 @@ import rehypeKatex from "rehype-katex"
 import remarkGfm from "remark-gfm"
 import { Card } from "@/components/ui/card"
 import { CodingProblem, CodingProblemExample } from "./types"
+import { cn } from "@/lib/utils"
 
 interface ProblemStatementSectionProps {
   problem: CodingProblem
   examples: CodingProblemExample[]
+  theme?: "dark" | "light"
 }
 
 export function ProblemStatementSection({
   problem,
   examples,
+  theme = "dark",
 }: ProblemStatementSectionProps) {
+  const isLight = theme === "light"
+  const bodyFontClass = isLight ? "" : "font-vt323"
+  const textClass = isLight ? "text-[#2b2433]" : "text-white/80"
+  const headingClass = isLight ? "text-[#111111]" : "text-white"
+  const eyebrowClass = isLight ? "text-[#6f657b]" : "text-white/50"
+  const sectionLabelClass = isLight
+    ? "text-sm font-semibold text-[#111111]"
+    : "text-lg font-semibold uppercase tracking-[0.2em]"
+  const sectionCardClass = isLight
+    ? "rounded-2xl border border-[#ece7f2] bg-[#ffffff] px-4 py-3"
+    : "rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+  const preClass = isLight
+    ? "rounded-xl border border-[#ded6e8] bg-[#171421] p-4 font-mono text-sm text-[#f8f5ff] whitespace-pre-wrap"
+    : "rounded-lg border border-white/10 bg-black/40 p-4 font-mono text-sm text-white/90 whitespace-pre-wrap"
+
   return (
     <div className="space-y-8">
-      <h1 className="font-vt323 text-3xl sm:text-4xl font-semibold leading-tight text-white flex flex-wrap items-baseline gap-3">
+      <h1 className={cn(bodyFontClass, "flex flex-wrap items-baseline gap-3 text-2xl font-bold leading-tight sm:text-3xl", headingClass)}>
         {typeof problem.numeric_id === "number" && (
-          <span className="font-mono text-base uppercase tracking-[0.4em] text-white/50">
+          <span className={cn("font-mono text-sm uppercase tracking-[0.3em]", isLight ? "text-[#8d7b9f]" : "text-white/50")}>
             #{problem.numeric_id}
           </span>
         )}
@@ -29,10 +47,10 @@ export function ProblemStatementSection({
 
       {problem.statement_markdown?.trim() && (
         <section className="space-y-2">
-          <h2 className="font-vt323 text-lg font-semibold uppercase tracking-[0.2em] text-white">Enunț</h2>
-          <div className="rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <h2 className={cn(bodyFontClass, sectionLabelClass, headingClass)}>Enunț</h2>
+          <div className={sectionCardClass}>
             <ReactMarkdown
-              className="font-vt323 text-base leading-relaxed text-white/80"
+              className={cn(bodyFontClass, "text-base leading-relaxed", textClass)}
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
             >
@@ -45,10 +63,10 @@ export function ProblemStatementSection({
       {/* Cerința */}
       {problem.requirement_markdown && (
         <section className="space-y-2">
-          <h2 className="font-vt323 text-lg font-semibold uppercase tracking-[0.2em] text-white">Cerință</h2>
-          <div className="rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <h2 className={cn(bodyFontClass, sectionLabelClass, headingClass)}>Cerință</h2>
+          <div className={sectionCardClass}>
             <ReactMarkdown
-              className="font-vt323 text-base leading-relaxed text-white/80"
+              className={cn(bodyFontClass, "text-base leading-relaxed", textClass)}
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
             >
@@ -61,10 +79,10 @@ export function ProblemStatementSection({
       {/* Date de intrare */}
       {problem.input_format && (
         <section className="space-y-2">
-          <h2 className="font-vt323 text-lg font-semibold uppercase tracking-[0.2em] text-white">Date de intrare</h2>
-          <div className="rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <h2 className={cn(bodyFontClass, sectionLabelClass, headingClass)}>Date de intrare</h2>
+          <div className={sectionCardClass}>
             <ReactMarkdown
-              className="font-vt323 text-base leading-relaxed text-white/80"
+              className={cn(bodyFontClass, "text-base leading-relaxed", textClass)}
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
             >
@@ -77,10 +95,10 @@ export function ProblemStatementSection({
       {/* Date de ieșire */}
       {problem.output_format && (
         <section className="space-y-2">
-          <h2 className="font-vt323 text-lg font-semibold uppercase tracking-[0.2em] text-white">Date de ieșire</h2>
-          <div className="rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <h2 className={cn(bodyFontClass, sectionLabelClass, headingClass)}>Date de ieșire</h2>
+          <div className={sectionCardClass}>
             <ReactMarkdown
-              className="font-vt323 text-base leading-relaxed text-white/80"
+              className={cn(bodyFontClass, "text-base leading-relaxed", textClass)}
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
             >
@@ -93,10 +111,10 @@ export function ProblemStatementSection({
       {/* Restricții */}
       {problem.constraints_markdown && (
         <section className="space-y-2">
-          <h2 className="font-vt323 text-lg font-semibold uppercase tracking-[0.2em] text-white">Restricții</h2>
-          <div className="prose prose-invert max-w-none text-white/85">
+          <h2 className={cn(bodyFontClass, sectionLabelClass, headingClass)}>Restricții</h2>
+          <div className={cn("prose max-w-none", isLight ? "prose-neutral text-[#2b2433]" : "prose-invert text-white/85")}>
             <ReactMarkdown
-              className="font-vt323 text-base leading-relaxed text-white/80"
+              className={cn(bodyFontClass, "text-base leading-relaxed", textClass)}
               remarkPlugins={[remarkMath, remarkGfm]}
               rehypePlugins={[rehypeKatex]}
             >
@@ -108,40 +126,40 @@ export function ProblemStatementSection({
 
       {/* Exemple */}
       {examples.length > 0 && (
-        <Card className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <h2 className="font-vt323 mb-4 text-lg font-semibold text-white">Exemple</h2>
+        <Card className={cn("rounded-2xl p-6", isLight ? "border-[#e7dff0] bg-[#ffffff] shadow-[0_16px_40px_rgba(76,44,114,0.08)]" : "border-white/10 bg-white/[0.03]")}>
+          <h2 className={cn(bodyFontClass, "mb-4 text-lg font-semibold", headingClass)}>Exemple</h2>
           <div className="space-y-6">
             {examples.map((example, idx) => (
               <div key={example.id} className="space-y-3">
-                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">
+                <div className={cn(bodyFontClass, "text-sm font-semibold", isLight ? "text-[#6f657b]" : "uppercase tracking-[0.2em] text-white/60")}>
                   Exemplu {idx + 1}
                 </div>
                 {example.sample_input && (
                   <div>
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "" : "uppercase tracking-[0.2em]", eyebrowClass)}>
                       Intrare
                     </div>
-                    <pre className="rounded-lg border border-white/10 bg-black/40 p-4 font-mono text-sm text-white/90 whitespace-pre-wrap">
+                    <pre className={preClass}>
                       {example.sample_input}
                     </pre>
                   </div>
                 )}
                 {example.sample_output && (
                   <div>
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "" : "uppercase tracking-[0.2em]", eyebrowClass)}>
                       Ieșire
                     </div>
-                    <pre className="rounded-lg border border-white/10 bg-black/40 p-4 font-mono text-sm text-white/90 whitespace-pre-wrap">
+                    <pre className={preClass}>
                       {example.sample_output}
                     </pre>
                   </div>
                 )}
                 {example.explanation && (
-                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">
+                  <div className={cn("rounded-lg border p-4", isLight ? "border-[#cbd5ff] bg-[#eef2ff]" : "border-blue-500/20 bg-blue-500/10")}>
+                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "text-[#4251b5]" : "uppercase tracking-[0.2em] text-blue-200")}>
                       Explicație
                     </div>
-                    <p className="text-sm text-blue-100/90">{example.explanation}</p>
+                    <p className={cn(bodyFontClass, "text-sm", isLight ? "text-[#293178]" : "text-blue-100/90")}>{example.explanation}</p>
                   </div>
                 )}
               </div>
