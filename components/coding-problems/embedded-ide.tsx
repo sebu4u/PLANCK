@@ -4,7 +4,23 @@ import { useState, useEffect, useRef } from "react"
 import { flushSync } from "react-dom"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 // Lazy load Monaco Editor to reduce initial bundle size
 const Editor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.default), {
@@ -15,7 +31,17 @@ const Editor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.de
     </div>
   ),
 })
-import { Loader2, Play, File, FileCode, ChevronDown, ChevronUp, SendHorizontal } from "lucide-react"
+import {
+  Loader2,
+  Play,
+  Plus,
+  File,
+  FileCode,
+  ChevronDown,
+  ChevronUp,
+  SendHorizontal,
+  X,
+} from "lucide-react"
 import axios from "axios"
 import type { editor as MonacoEditor } from "monaco-editor"
 import {
@@ -75,6 +101,25 @@ function monacoLanguageForFile(file: FileItem): string {
   if (file.type === "cpp") return "cpp"
   if (file.type === "python") return "python"
   return "plaintext"
+}
+
+function defaultNewFileType(language: "cpp" | "python"): "cpp" | "txt" | "python" {
+  return language === "python" ? "python" : "cpp"
+}
+
+function isProtectedEntryFile(file: FileItem, language: "cpp" | "python"): boolean {
+  return language === "python" ? file.name === "main.py" : file.name === "main.cpp"
+}
+
+function buildNewFileName(trimmedName: string, fileType: "cpp" | "txt" | "python"): string {
+  if (fileType === "cpp") {
+    return trimmedName.endsWith(".cpp") ? trimmedName : `${trimmedName}.cpp`
+  }
+  if (fileType === "python") {
+    return trimmedName.endsWith(".py") ? trimmedName : `${trimmedName}.py`
+  }
+  const hasExtension = trimmedName.includes(".") && trimmedName.indexOf(".") > 0
+  return hasExtension ? trimmedName : `${trimmedName}.txt`
 }
 
 const MONACO_THEME_DEFINITIONS: Record<PlanckCodeThemeId, MonacoEditor.IStandaloneThemeData> = {
@@ -216,6 +261,11 @@ export default function EmbeddedIDE({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitResult, setSubmitResult] = useState<CodingSubmitResponse | null>(null)
   const submitDismissedRef = useRef(false)
+  const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false)
+  const [newFileName, setNewFileName] = useState("")
+  const [newFileType, setNewFileType] = useState<"cpp" | "txt" | "python">(() =>
+    defaultNewFileType(defaultLanguage),
+  )
 
   const editorRef = useRef<import("monaco-editor").editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
@@ -397,6 +447,55 @@ export default function EmbeddedIDE({
     setWaitingForPythonConsoleLine(false)
   }
 
+  const resetNewFileDialog = () => {
+    setIsNewFileDialogOpen(false)
+    setNewFileName("")
+    setNewFileType(defaultNewFileType(defaultLanguage))
+  }
+
+  const handleCreateFile = () => {
+    const trimmedName = newFileName.trim()
+    if (!trimmedName) return
+
+    const fileName = buildNewFileName(trimmedName, newFileType)
+    if (files.some((f) => f.name === fileName)) {
+      window.alert("Există deja un fișier cu acest nume.")
+      return
+    }
+
+    const newFile: FileItem = {
+      id: Date.now().toString(),
+      name: fileName,
+      content:
+        newFileType === "cpp"
+          ? "// Scrie codul C++ aici\n"
+          : newFileType === "python"
+            ? "# Scrie codul Python aici\n"
+            : "",
+      type: newFileType,
+    }
+
+    setFiles((prev) => [...prev, newFile])
+    setActiveFileId(newFile.id)
+    resetNewFileDialog()
+  }
+
+  const handleDeleteFile = (fileId: string) => {
+    const fileToDelete = files.find((f) => f.id === fileId)
+    if (!fileToDelete) return
+    if (isProtectedEntryFile(fileToDelete, defaultLanguage)) return
+    if (files.length === 1) return
+
+    const fileIndex = files.findIndex((f) => f.id === fileId)
+    const newFiles = files.filter((f) => f.id !== fileId)
+    setFiles(newFiles)
+
+    if (activeFileId === fileId) {
+      const newActiveIndex = Math.max(0, fileIndex - 1)
+      setActiveFileId(newFiles[newActiveIndex]?.id ?? newFiles[0].id)
+    }
+  }
+
   const handleRunCode = async () => {
     if (!isTerminalOpen) {
       setIsTerminalOpen(true)
@@ -567,9 +666,34 @@ export default function EmbeddedIDE({
               ) : (
                 <File className="w-4 h-4" />
               )}
-              <span>{file.name}</span>
+              <span className="max-w-[9rem] truncate sm:max-w-none">{file.name}</span>
+              {files.length > 1 && !isProtectedEntryFile(file, defaultLanguage) ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleDeleteFile(file.id)
+                  }}
+                  className="ml-0.5 rounded p-0.5 text-gray-500 transition-colors hover:text-red-400"
+                  aria-label={`Șterge ${file.name}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              ) : null}
             </div>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setNewFileType(defaultNewFileType(defaultLanguage))
+              setIsNewFileDialogOpen(true)
+            }}
+            className="flex shrink-0 items-center gap-1 rounded px-2 py-1.5 text-sm text-gray-400 transition-colors hover:bg-[#3d3d3d] hover:text-white sm:px-3"
+            aria-label="Fișier nou"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Fișier nou</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 ml-4 shrink-0">
@@ -831,6 +955,89 @@ export default function EmbeddedIDE({
     </div>
   )
 
+  const newFileDialog = (
+    <Dialog
+      open={isNewFileDialogOpen}
+      onOpenChange={(open) => {
+        if (open) {
+          setIsNewFileDialogOpen(true)
+          return
+        }
+        resetNewFileDialog()
+      }}
+    >
+      <DialogContent className="z-[480] border-[#3b3b3b] bg-[#1e1e1e] text-white">
+        <DialogHeader>
+          <DialogTitle>Fișier nou</DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Adaugă un fișier auxiliar pentru proiect. Poți importa module Python sau citi fișiere text
+            din <span className="font-mono text-gray-300">main.py</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="embedded-ide-filename">Nume fișier</Label>
+            <Input
+              id="embedded-ide-filename"
+              placeholder="ex: utils, input.txt"
+              value={newFileName}
+              onChange={(event) => setNewFileName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") handleCreateFile()
+              }}
+              className="border-[#3b3b3b] bg-[#2d2d2d] text-white"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="embedded-ide-filetype">Tip fișier</Label>
+            <Select
+              value={newFileType}
+              onValueChange={(value: "cpp" | "txt" | "python") => setNewFileType(value)}
+            >
+              <SelectTrigger
+                id="embedded-ide-filetype"
+                className="border-[#3b3b3b] bg-[#2d2d2d] text-white"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-[490] border-[#3b3b3b] bg-[#2d2d2d] text-white">
+                {defaultLanguage === "python" ? (
+                  <>
+                    <SelectItem value="python">Python (.py)</SelectItem>
+                    <SelectItem value="txt">Text (.txt)</SelectItem>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="cpp">C++ (.cpp)</SelectItem>
+                    <SelectItem value="txt">Text (.txt)</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={resetNewFileDialog}
+            className="border-[#3b3b3b] bg-transparent text-white hover:bg-[#3d3d3d]"
+          >
+            Anulează
+          </Button>
+          <Button
+            type="button"
+            onClick={handleCreateFile}
+            className="bg-green-600 text-white hover:bg-green-700"
+          >
+            Creează
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
   const submitOverlay =
     problemSlug && defaultLanguage === "python" ? (
       <CodingSubmitResultOverlay
@@ -851,20 +1058,18 @@ export default function EmbeddedIDE({
   if (isLearningPathPresentation) {
     return (
       <>
-        <div
-          className="flex h-full min-h-0 flex-col gap-4 bg-transparent"
-          style={{ touchAction: "pan-y" }}
-        >
-          <section className="flex min-h-[460px] flex-[3] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#060b10] shadow-[0_8px_24px_rgba(3,7,18,0.12)]">
+        <div className="flex h-full min-h-0 flex-col gap-3 bg-transparent max-xl:h-auto sm:gap-4">
+          <section className="flex min-h-[min(52dvh,400px)] flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[#060b10] shadow-[0_8px_24px_rgba(3,7,18,0.12)] max-xl:h-[min(52dvh,400px)] sm:rounded-[22px] xl:min-h-[460px] xl:flex-[3]">
             {fileTabs}
             <div className="min-h-0 flex-1">{editorPane}</div>
           </section>
 
-          <section className="flex min-h-[240px] flex-[1] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#141820] shadow-[0_6px_20px_rgba(3,7,18,0.1)]">
+          <section className="flex min-h-[min(34dvh,260px)] flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[#141820] shadow-[0_6px_20px_rgba(3,7,18,0.1)] max-xl:h-[min(34dvh,260px)] sm:rounded-[22px] xl:min-h-[240px] xl:flex-[1]">
             {isTerminalOpen ? terminalPanel : collapsedTerminal}
           </section>
         </div>
         {submitOverlay}
+        {newFileDialog}
       </>
     )
   }
@@ -899,6 +1104,7 @@ export default function EmbeddedIDE({
       )}
 
       {submitOverlay}
+      {newFileDialog}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useCallback } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
+import { PLANCK_STREAK_UPDATED_EVENT } from "@/hooks/use-learning-path-item-completion"
 
 interface LearningPathCorrectAnswerEloInput {
   itemId: string
@@ -45,6 +46,10 @@ export function useLearningPathCorrectAnswerElo({
 
     const row = (Array.isArray(data) ? data[0] : data) as LearningPathEloAwardRow | null
     if (!row) return null
+
+    if (row.awarded && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(PLANCK_STREAK_UPDATED_EVENT))
+    }
 
     return {
       awarded: Boolean(row.awarded),

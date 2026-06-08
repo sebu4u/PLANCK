@@ -15,6 +15,7 @@ import { PrivacySettings } from "@/components/privacy-settings";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
+import { getRankIconPath } from "@/lib/rank-icon";
 import {
   Dialog,
   DialogContent,
@@ -76,20 +77,6 @@ const ProfilPage = () => {
       router.replace("/login");
     }
   }, [loading, user, router]);
-
-  // Get rank icon path
-  const getRankIconPath = (rankName: string): string => {
-    const rankLower = rankName?.toLowerCase() || '';
-    if (rankLower.includes('bronze')) return '/ranks/bronze.png';
-    if (rankLower.includes('silver')) return '/ranks/silver.png';
-    if (rankLower.includes('gold')) return '/ranks/gold.png';
-    if (rankLower.includes('platinum')) return '/ranks/platinum.png';
-    if (rankLower.includes('diamond')) return '/ranks/diamond.png';
-    if (rankLower.includes('masters')) return '/ranks/masters.png';
-    if (rankLower.includes('ascendant')) return '/ranks/ascendant.png';
-    if (rankLower.includes('singularity')) return '/ranks/singularity.png';
-    return '/ranks/bronze.png';
-  };
 
   // Get rank color
   const getRankColor = (rankName: string) => {
@@ -290,7 +277,7 @@ const ProfilPage = () => {
   }
 
   const nextRankInfo = userStats ? getNextRankThreshold(userStats.elo) : { nextRank: 'Bronze II', threshold: 650, progress: 0 };
-  const rankIconPath = userStats ? getRankIconPath(userStats.rank) : '/ranks/bronze.png';
+  const rankIconPath = userStats ? getRankIconPath(userStats.rank) : getRankIconPath("Bronze");
   const rankColor = userStats ? getRankColor(userStats.rank) : 'text-gray-400';
 
   return (

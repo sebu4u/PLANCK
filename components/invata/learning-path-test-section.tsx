@@ -21,6 +21,7 @@ import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { useProgressTrigger } from "@/hooks/engagement/use-progress-trigger"
+import { PLANCK_STREAK_UPDATED_EVENT } from "@/hooks/use-learning-path-item-completion"
 import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useLpTestBatteryState, type LpTestBatteryState, LP_TEST_MAX_BATTERIES } from "@/hooks/use-lp-test-battery-state"
 import { LpTestBatteryStrip } from "@/components/invata/lp-test-battery-strip"
@@ -441,6 +442,10 @@ export function LearningPathTestSection({
       setScreen("result")
 
       if (parsed.passed && user?.id) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(PLANCK_STREAK_UPDATED_EVENT))
+        }
+
         const { count } = await supabase
           .from("user_learning_path_item_progress")
           .select("item_id", { count: "exact", head: true })

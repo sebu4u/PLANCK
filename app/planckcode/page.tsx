@@ -382,7 +382,7 @@ export default function PlanckCodePage() {
           <div className="flex items-center justify-center gap-8 sm:gap-12 lg:gap-16 scroll-animate-fade-up animate-delay-400">
             <div className="scroll-animate-scale w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 rounded-full border-2 border-white/30 bg-white/5 flex items-center justify-center overflow-hidden">
               <img
-                src="/ranks/bronze.png"
+                src="/ranks/bronze.webp"
                 alt="Bronze Rank"
                 className="w-full h-full object-cover rounded-full"
               />
@@ -392,7 +392,7 @@ export default function PlanckCodePage() {
               <div className="absolute inset-0 bg-gradient-radial from-blue-500/40 via-purple-500/30 to-transparent blur-2xl rounded-full pointer-events-none"></div>
               <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 rounded-full border-2 border-white/30 bg-white/5 flex items-center justify-center relative z-[1] overflow-hidden">
                 <img
-                  src="/ranks/singularity.png"
+                  src="/ranks/singularity.webp"
                   alt="Singularity Rank"
                   className="w-full h-full object-cover rounded-full"
                 />

@@ -3,6 +3,7 @@
 import { Progress } from "@/components/ui/progress"
 import { Trophy } from "lucide-react"
 import Image from "next/image"
+import { getRankIconPath } from "@/lib/rank-icon"
 
 interface RankEloCardProps {
   elo: number
@@ -35,20 +36,6 @@ export function RankEloCard({
     if (rankName.includes('Ascendant')) return 'text-indigo-400'
     if (rankName.includes('Singularity')) return 'text-pink-400'
     return 'text-gray-500'
-  }
-
-  // Get rank icon path (extract rank name from full rank string, e.g., "Bronze III" -> "bronze")
-  const getRankIconPath = (rankName: string): string => {
-    const rankLower = rankName.toLowerCase()
-    if (rankLower.includes('bronze')) return '/ranks/bronze.png'
-    if (rankLower.includes('silver')) return '/ranks/silver.png'
-    if (rankLower.includes('gold')) return '/ranks/gold.png'
-    if (rankLower.includes('platinum')) return '/ranks/platinum.png'
-    if (rankLower.includes('diamond')) return '/ranks/diamond.png'
-    if (rankLower.includes('masters')) return '/ranks/masters.png'
-    if (rankLower.includes('ascendant')) return '/ranks/ascendant.png'
-    if (rankLower.includes('singularity')) return '/ranks/singularity.png'
-    return '/ranks/bronze.png' // Default fallback
   }
 
   const eloGain = nextThreshold - elo

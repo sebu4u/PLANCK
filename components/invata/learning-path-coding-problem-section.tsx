@@ -92,18 +92,18 @@ export function LearningPathCodingProblemSection({
     <PlanckCodeSettingsProvider>
       <div
         className={cn(
-          "-mx-5 min-h-[calc(100dvh-3.5rem)] bg-[#ffffff] px-5 py-5 sm:-mx-8 sm:px-8 sm:py-7 lg:-mx-12 lg:px-12",
-          showContinueBar && isPython && "pb-[calc(6rem+env(safe-area-inset-bottom,0px))]",
+          "-mx-5 bg-[#ffffff] px-4 py-4 sm:-mx-8 sm:px-8 sm:py-7 lg:-mx-12 lg:min-h-[calc(100dvh-3.5rem)] lg:px-12",
+          showContinueBar && "pb-[calc(6rem+env(safe-area-inset-bottom,0px))]",
         )}
       >
-        <div className="mx-auto grid min-h-[calc(100dvh-7rem)] w-full max-w-[1800px] gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(620px,1.08fr)]">
-          <section className="min-w-0 rounded-[30px] border border-[#ebe4f1] bg-[#ffffff] shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
-            <div className="px-5 py-6 sm:px-7 sm:py-8">
+        <div className="mx-auto grid w-full max-w-[1800px] gap-4 sm:gap-5 max-xl:grid-cols-1 xl:min-h-[calc(100dvh-7rem)] xl:grid-cols-[minmax(0,0.92fr)_minmax(620px,1.08fr)]">
+          <section className="min-w-0 rounded-[22px] border border-[#ebe4f1] bg-[#ffffff] shadow-[0_12px_32px_rgba(76,44,114,0.06)] sm:rounded-[30px] sm:shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
+            <div className="px-4 py-5 sm:px-7 sm:py-8">
               <ProblemStatementSection problem={problem} examples={examples} theme="light" />
             </div>
           </section>
 
-          <section className="min-h-[760px] min-w-0 xl:sticky xl:top-4 xl:h-[calc(100dvh-8rem)]">
+          <section className="min-w-0 max-xl:min-h-0 xl:sticky xl:top-4 xl:h-[calc(100dvh-8rem)] xl:min-h-[760px]">
             <EmbeddedIDE
               presentation="learning-path"
               defaultLanguage={isPython ? "python" : "cpp"}

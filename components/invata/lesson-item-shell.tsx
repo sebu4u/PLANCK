@@ -21,7 +21,10 @@ import {
 } from "@/components/invata/grila-lesson-context"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
-import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
+import {
+  PLANCK_STREAK_UPDATED_EVENT,
+  useLearningPathItemCompletion,
+} from "@/hooks/use-learning-path-item-completion"
 import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
@@ -232,6 +235,9 @@ function LessonItemShellInner({
       setStreak(null)
       return
     }
+
+    let cancelled = false
+
     const fetchStreak = async () => {
       const { error: streakRpcError } = await supabase.rpc("check_and_reset_streak_if_needed", {
         user_uuid: user.id,
@@ -244,9 +250,22 @@ function LessonItemShellInner({
         .select("current_streak")
         .eq("user_id", user.id)
         .single()
-      setStreak(data?.current_streak ?? 0)
+      if (!cancelled) {
+        setStreak(data?.current_streak ?? 0)
+      }
     }
-    fetchStreak()
+
+    void fetchStreak()
+
+    const onStreakUpdated = () => {
+      void fetchStreak()
+    }
+    window.addEventListener(PLANCK_STREAK_UPDATED_EVENT, onStreakUpdated)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(PLANCK_STREAK_UPDATED_EVENT, onStreakUpdated)
+    }
   }, [user])
 
   useEffect(() => {
@@ -412,7 +431,7 @@ function LessonItemShellInner({
       <main
         className={cn(
           "relative z-10 min-h-screen bg-[#ffffff] pt-14",
-          overflowHidden && "overflow-hidden",
+          overflowHidden && "overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden",
           insightDesktopOpen && "lg:mr-[25vw]",
         )}
         style={{

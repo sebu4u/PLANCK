@@ -5,6 +5,13 @@ import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useProgressTrigger } from "@/hooks/engagement/use-progress-trigger"
 
+export const PLANCK_STREAK_UPDATED_EVENT = "planck:streak-updated"
+
+function notifyStreakUpdated() {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new CustomEvent(PLANCK_STREAK_UPDATED_EVENT))
+}
+
 interface LearningPathItemCompletionInput {
   itemId: string
   lessonId: string
@@ -37,6 +44,14 @@ export function useLearningPathItemCompletion({
       return
     }
 
+    const { data: existingProgress } = await supabase
+      .from("user_learning_path_item_progress")
+      .select("item_id")
+      .eq("user_id", user.id)
+      .eq("item_id", itemId)
+      .maybeSingle()
+
+    const isFirstCompletion = !existingProgress
     const completedAt = new Date().toISOString()
     const { error: itemError } = await supabase
       .from("user_learning_path_item_progress")
@@ -52,6 +67,17 @@ export function useLearningPathItemCompletion({
     if (itemError) {
       console.error("learning path item progress upsert:", itemError)
       return
+    }
+
+    if (isFirstCompletion) {
+      const { error: streakError } = await supabase.rpc("record_user_streak_activity", {
+        user_uuid: user.id,
+      })
+      if (streakError) {
+        console.warn("learning path streak activity:", streakError.message || streakError)
+      } else {
+        notifyStreakUpdated()
+      }
     }
 
     const { count } = await supabase
