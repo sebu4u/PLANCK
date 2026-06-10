@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { mergeInformaticaChaptersForClass } from "@/lib/informatica-catalog-chapters"
 import {
   CodingProblemFacets,
   CodingProblemFiltersState,
@@ -47,17 +48,13 @@ function chapterOptionsForClass(
   selectedClass: ClassFilterValue,
   facets?: CodingProblemFacets | null
 ): string[] {
-  if (!facets) {
-    return []
-  }
-
   if (selectedClass === "Toate") {
     return []
   }
 
   const key = String(selectedClass)
-  const list = facets.chaptersByClass?.[key] ?? []
-  return list
+  const fromDb = facets?.chaptersByClass?.[key] ?? []
+  return mergeInformaticaChaptersForClass(selectedClass, fromDb)
 }
 
 export function CodingProblemFilterBar({

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
+import { INFORMATICA_CATALOG_CHAPTER_OPTIONS } from "@/lib/informatica-catalog-chapters"
 import { LearningPathsManager } from "@/components/admin/learning-paths-manager"
 import { DevCelebrationCard } from "@/components/dashboard/dev-celebration-card"
 import { InformaticsProblemLivePreview } from "@/components/dashboard/informatics-problem-live-preview"
@@ -76,6 +77,10 @@ function initialInformaticsTestRow(isSample = false): InformaticsTestRow {
 }
 
 function initialInformaticsForm() {
+  const defaultClass = "9"
+  const defaultChapter =
+    INFORMATICA_CATALOG_CHAPTER_OPTIONS[9][0] ?? "Capitol neclasificat"
+
   return {
     slug: "",
     title: "",
@@ -85,8 +90,8 @@ function initialInformaticsForm() {
     output_format: "",
     constraints_markdown: "",
     difficulty: "Ușor" as (typeof CODING_DIFFICULTIES)[number],
-    class: "10",
-    chapter: "Capitol neclasificat",
+    class: defaultClass,
+    chapter: defaultChapter,
     language: "python" as "cpp" | "python",
     time_limit_ms: 2000,
     memory_limit_kb: 256000,
@@ -739,7 +744,16 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                       id="info-class"
                       className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                       value={infoForm.class}
-                      onChange={(e) => setInfoForm({ ...infoForm, class: e.target.value })}
+                      onChange={(e) => {
+                        const nextClass = e.target.value
+                        const classNum = Number.parseInt(nextClass, 10)
+                        const chapters = INFORMATICA_CATALOG_CHAPTER_OPTIONS[classNum as 9 | 10 | 11 | 12] ?? []
+                        setInfoForm({
+                          ...infoForm,
+                          class: nextClass,
+                          chapter: chapters[0] ?? infoForm.chapter,
+                        })
+                      }}
                     >
                       {["9", "10", "11", "12"].map((c) => (
                         <option key={c} value={c}>
@@ -782,12 +796,30 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
                   </div>
                   <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                     <Label htmlFor="info-chapter">Capitol</Label>
-                    <Input
-                      id="info-chapter"
-                      placeholder="Capitol neclasificat"
-                      value={infoForm.chapter}
-                      onChange={(e) => setInfoForm({ ...infoForm, chapter: e.target.value })}
-                    />
+                    {INFORMATICA_CATALOG_CHAPTER_OPTIONS[Number.parseInt(infoForm.class, 10) as 9 | 10 | 11 | 12]
+                      ?.length ? (
+                      <select
+                        id="info-chapter"
+                        className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                        value={infoForm.chapter}
+                        onChange={(e) => setInfoForm({ ...infoForm, chapter: e.target.value })}
+                      >
+                        {INFORMATICA_CATALOG_CHAPTER_OPTIONS[
+                          Number.parseInt(infoForm.class, 10) as 9 | 10 | 11 | 12
+                        ].map((chapter) => (
+                          <option key={chapter} value={chapter}>
+                            {chapter}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id="info-chapter"
+                        placeholder="Capitol neclasificat"
+                        value={infoForm.chapter}
+                        onChange={(e) => setInfoForm({ ...infoForm, chapter: e.target.value })}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

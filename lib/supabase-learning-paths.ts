@@ -29,6 +29,8 @@ export interface LearningPathChapter {
   nav_title: string | null
   description: string | null
   icon_url: string | null
+  /** Hex accent for dashboard cards (e.g. #7c3aed); null uses default purple. */
+  accent_color: string | null
   problem_category: string | null
   order_index: number
   is_active: boolean

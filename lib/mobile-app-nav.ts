@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { BookOpen, Calculator, Home, User, Users } from "lucide-react"
+import { BookOpen, Calculator, Home, KeyRound, User } from "lucide-react"
 
 export const MOBILE_BOTTOM_NAV_HEIGHT = "4.5rem"
 
@@ -50,7 +50,7 @@ export function isMobileAppShellRoute(
     pathname.startsWith("/dashboard/") ||
     pathname.startsWith("/invata") ||
     pathname.startsWith("/probleme") ||
-    pathname.startsWith("/classrooms") ||
+    pathname.startsWith("/abonament") ||
     pathname.startsWith("/profil") ||
     pathname === "/grile"
   )
@@ -90,8 +90,8 @@ export function getMobileTopBarContent(
     return { primary: "Exerseaza" }
   }
 
-  if (pathname?.startsWith("/classrooms")) {
-    return { primary: "Classroom" }
+  if (pathname?.startsWith("/abonament")) {
+    return { primary: "Premium" }
   }
 
   if (pathname?.startsWith("/profil")) {
@@ -134,10 +134,10 @@ export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
     isActive: (pathname) => Boolean(pathname?.startsWith("/probleme")),
   },
   {
-    href: "/classrooms",
-    label: "Classroom",
-    icon: Users,
-    isActive: (pathname) => Boolean(pathname?.startsWith("/classrooms")),
+    href: "/abonament",
+    label: "Premium",
+    icon: KeyRound,
+    isActive: (pathname) => Boolean(pathname?.startsWith("/abonament")),
   },
   {
     href: "/profil",

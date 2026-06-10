@@ -10,6 +10,7 @@ import {
   validateInteractiveItemContent,
 } from "@/lib/learning-path-interactive-items"
 import { generateUniqueLessonSlug } from "@/lib/learning-path-slug"
+import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 
@@ -174,6 +175,11 @@ function toNullableString(value: unknown): string | null {
   if (typeof value !== "string") return null
   const normalized = value.trim()
   return normalized ? normalized : null
+}
+
+function toAccentColor(value: unknown): string | null {
+  if (value === null) return null
+  return normalizeLearningPathChapterAccentColor(toNullableString(value))
 }
 
 function toBoolean(value: unknown, fallback: boolean): boolean {
@@ -364,12 +370,21 @@ export async function POST(req: NextRequest) {
       const title = toNullableString(body.title)
       if (!title) return NextResponse.json({ error: "title este obligatoriu." }, { status: 400 })
 
+      const accentColor = body.accent_color === undefined ? null : toAccentColor(body.accent_color)
+      if (body.accent_color !== undefined && body.accent_color !== null && accentColor === null) {
+        return NextResponse.json(
+          { error: "accent_color trebuie să fie un cod hex valid (ex. #7c3aed)." },
+          { status: 400 }
+        )
+      }
+
       const payload = {
         title,
         nav_title: toNullableString(body.nav_title),
         slug: toNullableString(body.slug),
         description: toNullableString(body.description),
         icon_url: toNullableString(body.icon_url),
+        accent_color: accentColor,
         problem_category: toNullableString(body.problem_category),
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
@@ -520,6 +535,16 @@ export async function PUT(req: NextRequest) {
       if (body.slug !== undefined) updateData.slug = toNullableString(body.slug)
       if (body.description !== undefined) updateData.description = toNullableString(body.description)
       if (body.icon_url !== undefined) updateData.icon_url = toNullableString(body.icon_url)
+      if (body.accent_color !== undefined) {
+        const accentColor = toAccentColor(body.accent_color)
+        if (body.accent_color !== null && accentColor === null) {
+          return NextResponse.json(
+            { error: "accent_color trebuie să fie un cod hex valid (ex. #7c3aed)." },
+            { status: 400 }
+          )
+        }
+        updateData.accent_color = accentColor
+      }
       if (body.problem_category !== undefined) updateData.problem_category = toNullableString(body.problem_category)
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)

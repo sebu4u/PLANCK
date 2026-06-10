@@ -12,6 +12,7 @@ import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { InfoCatalogHeader } from "@/components/info-catalog-header"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
+import { mergeInformaticaChaptersByClass } from "@/lib/informatica-catalog-chapters"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -74,6 +75,13 @@ function buildFacets(rows: FacetRow[]): CodingProblemFacets {
     }
   })
 
+  const chaptersByClassRaw = Array.from(chaptersByClass.entries()).reduce<
+    Record<string, string[]>
+  >((acc, [cls, chapters]) => {
+    acc[String(cls)] = Array.from(chapters).sort((a, b) => a.localeCompare(b, "ro"))
+    return acc
+  }, {})
+
   return {
     classes: Array.from(classCounts.entries())
       .sort(([a], [b]) => a - b)
@@ -81,14 +89,7 @@ function buildFacets(rows: FacetRow[]): CodingProblemFacets {
     difficulties: Array.from(difficultyCounts.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "ro"))
       .map(([value, count]) => ({ value, count })),
-    chaptersByClass: Array.from(chaptersByClass.entries()).reduce<
-      Record<string, string[]>
-    >((acc, [cls, chapters]) => {
-      acc[String(cls)] = Array.from(chapters).sort((a, b) =>
-        a.localeCompare(b, "ro")
-      )
-      return acc
-    }, {}),
+    chaptersByClass: mergeInformaticaChaptersByClass(chaptersByClassRaw),
   }
 }
 
@@ -163,7 +164,7 @@ export default async function CodingProblemsPage() {
           <Navigation />
           <main className="flex min-h-[calc(100vh-64px)] flex-col overflow-hidden">
             <section className="bg-[#090909]/80 backdrop-blur-sm pb-16 pt-20 info-catalog-section">
-              <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 sm:px-8 md:px-12 lg:px-16">
+              <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 sm:px-8 md:px-12 lg:px-16">
                 <InfoCatalogHeader 
                   totalProblems={totalProblems}
                   pageSize={meta.pageSize}

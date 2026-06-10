@@ -6,6 +6,7 @@ import { parseAccessToken, resolvePlanForRequest } from "@/lib/subscription-plan
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
 import { ALLOW_ALL_CODING_PROBLEMS } from "@/lib/access-config";
+import { mergeInformaticaChaptersByClass } from "@/lib/informatica-catalog-chapters";
 
 // Server-side: access environment variables directly
 // These are validated at build time in next.config.mjs
@@ -158,6 +159,15 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      const chaptersByClassRaw = Array.from(chaptersByClass.entries()).reduce<
+        Record<string, string[]>
+      >((acc, [cls, chapters]) => {
+        acc[String(cls)] = Array.from(chapters).sort((a, b) =>
+          a.localeCompare(b, "ro")
+        );
+        return acc;
+      }, {});
+
       facets = {
         classes: Array.from(classCounts.entries())
           .sort(([a], [b]) => a - b)
@@ -165,14 +175,7 @@ export async function GET(request: NextRequest) {
         difficulties: Array.from(difficultyCounts.entries())
           .sort((a, b) => a[0].localeCompare(b[0], "ro"))
           .map(([value, count]) => ({ value, count })),
-        chaptersByClass: Array.from(chaptersByClass.entries()).reduce<
-          Record<string, string[]>
-        >((acc, [cls, chapters]) => {
-          acc[String(cls)] = Array.from(chapters).sort((a, b) =>
-            a.localeCompare(b, "ro")
-          );
-          return acc;
-        }, {}),
+        chaptersByClass: mergeInformaticaChaptersByClass(chaptersByClassRaw),
       };
     } else if (facetError) {
       logger.error("[coding-problems] Facet error:", facetError);

@@ -6,6 +6,10 @@ import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Loader2, Play } from "
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import {
+  getLearningPathChapterTheme,
+  type LearningPathChapterTheme,
+} from "@/lib/learning-path-chapter-theme"
+import {
   getLearningPathChapterNavTitle,
   getLearningPathLessonHref,
   type LearningPathChapter,
@@ -20,65 +24,8 @@ interface DashboardLearningPathsCarouselProps {
   hasStartedByChapter?: Record<string, boolean>
 }
 
-type ChapterTheme = {
-  text: string
-  border: string
-  shadow: string
-  gradient: string
-  accentBorder: string
-  accentRing: string
-  buttonShadow: string
-  buttonHoverShadow: string
-  buttonActiveShadow: string
-  buttonGlowTint: string
-  dotActive: string
-}
-
-function getChapterTheme(title: string): ChapterTheme {
-  const t = title.toLowerCase()
-  if (t.includes("dinamic")) {
-    return {
-      text: "text-[#f7c325]",
-      border: "border-[#f7c325]/40",
-      shadow: "shadow-[0_8px_24px_rgba(247,195,37,0.14)]",
-      gradient: "from-[#fcd34d] to-[#f7c325]",
-      accentBorder: "border-[#f7c325]",
-      accentRing: "ring-[#f7c325]/30",
-      buttonShadow: "shadow-[0_4px_0_#b88e08]",
-      buttonHoverShadow: "hover:shadow-[0_1px_0_#b88e08]",
-      buttonActiveShadow: "active:shadow-[0_1px_0_#b88e08]",
-      buttonGlowTint: "rgba(255, 238, 170, 0.86)",
-      dotActive: "bg-[#f7c325]",
-    }
-  }
-  if (t.includes("optic")) {
-    return {
-      text: "text-[#456dff]",
-      border: "border-[#456dff]/40",
-      shadow: "shadow-[0_8px_24px_rgba(69,109,255,0.14)]",
-      gradient: "from-[#60a5fa] to-[#456dff]",
-      accentBorder: "border-[#456dff]",
-      accentRing: "ring-[#456dff]/30",
-      buttonShadow: "shadow-[0_4px_0_#2448cc]",
-      buttonHoverShadow: "hover:shadow-[0_1px_0_#2448cc]",
-      buttonActiveShadow: "active:shadow-[0_1px_0_#2448cc]",
-      buttonGlowTint: "rgba(186, 218, 255, 0.84)",
-      dotActive: "bg-[#456dff]",
-    }
-  }
-  return {
-    text: "text-[#7c3aed]",
-    border: "border-[#d4d0f9]",
-    shadow: "shadow-[0_8px_24px_rgba(124,58,237,0.08)]",
-    gradient: "from-[#8b5cf6] to-[#7c3aed]",
-    accentBorder: "border-[#7c3aed]",
-    accentRing: "ring-[#7c3aed]/30",
-    buttonShadow: "shadow-[0_4px_0_#5b21b6]",
-    buttonHoverShadow: "hover:shadow-[0_1px_0_#5b21b6]",
-    buttonActiveShadow: "active:shadow-[0_1px_0_#5b21b6]",
-    buttonGlowTint: "rgba(221, 211, 255, 0.84)",
-    dotActive: "bg-[#7c3aed]",
-  }
+function getChapterTheme(chapter: Pick<LearningPathChapter, "accent_color">): LearningPathChapterTheme {
+  return getLearningPathChapterTheme(chapter.accent_color)
 }
 
 function getChapterHref(
@@ -204,7 +151,7 @@ function StartContinueButton({
 }: {
   href: string
   hasStarted: boolean
-  colors: ChapterTheme
+  colors: LearningPathChapterTheme
   className?: string
   isLoading?: boolean
   onContinue: (href: string) => void
@@ -214,15 +161,20 @@ function StartContinueButton({
       type="button"
       aria-busy={isLoading}
       className={cn(
-        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity] hover:translate-y-1 active:translate-y-1",
-        colors.gradient,
-        colors.buttonShadow,
-        colors.buttonHoverShadow,
-        colors.buttonActiveShadow,
+        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity] hover:translate-y-1 hover:shadow-[0_1px_0_var(--lp-accent-dark)] active:translate-y-1 active:shadow-[0_1px_0_var(--lp-accent-dark)]",
         isLoading && "pointer-events-none opacity-70",
         className
       )}
-      style={{ "--start-glow-tint": colors.buttonGlowTint } as CSSProperties}
+      style={
+        {
+          "--lp-accent-light": colors.accentLight,
+          "--lp-accent": colors.accent,
+          "--lp-accent-dark": colors.accentDark,
+          "--start-glow-tint": colors.buttonGlowTint,
+          backgroundImage: "linear-gradient(to right, var(--lp-accent-light), var(--lp-accent))",
+          boxShadow: "0 4px 0 var(--lp-accent-dark)",
+        } as CSSProperties
+      }
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation()
@@ -269,7 +221,9 @@ export function DashboardLearningPathsCarousel({
   const count = chapters.length
   const activeChapter = chapters[activeIndex]
   const activeLessons = activeChapter ? lessonsByChapter[activeChapter.id] || [] : []
-  const activeColors = activeChapter ? getChapterTheme(activeChapter.title) : getChapterTheme("")
+  const activeColors = activeChapter
+    ? getChapterTheme(activeChapter)
+    : getLearningPathChapterTheme(null)
   const activeHasStarted = activeChapter
     ? (hasStartedByChapter[activeChapter.id] ?? false)
     : false
@@ -473,10 +427,8 @@ export function DashboardLearningPathsCarousel({
                 {getLearningPathChapterNavTitle(activeChapter)}
               </h2>
               <p
-                className={cn(
-                  "mt-1 text-sm font-semibold uppercase tracking-[0.16em]",
-                  activeColors.text
-                )}
+                className="mt-1 text-sm font-semibold uppercase tracking-[0.16em]"
+                style={{ color: activeColors.accent }}
               >
                 LEVEL {activeLevel}
               </p>
@@ -548,8 +500,11 @@ export function DashboardLearningPathsCarousel({
                   key={chapter.id}
                   className={cn(
                     "h-[5px] w-[5px] rounded-full",
-                    activeIndex === index ? activeColors.dotActive : "bg-[#d4d4d4]"
+                    activeIndex === index ? undefined : "bg-[#d4d4d4]"
                   )}
+                  style={
+                    activeIndex === index ? { backgroundColor: activeColors.accent } : undefined
+                  }
                 />
               ))}
             </div>
@@ -608,7 +563,7 @@ export function DashboardLearningPathsCarousel({
           const zIndex = 10 - absOffset
           const cardOpacity = absOffset > 2 ? 0 : absOffset === 0 ? 1 : 0.65
 
-          const colors = getChapterTheme(chapter.title)
+          const colors = getChapterTheme(chapter)
 
           return (
             <article
@@ -616,9 +571,7 @@ export function DashboardLearningPathsCarousel({
               className={cn(
                 "absolute rounded-3xl border bg-white p-5 sm:p-6 transition-all",
                 isDragging ? "duration-0" : "duration-300 ease-out",
-                isActive
-                  ? `${colors.border} ${colors.shadow}`
-                  : "border-[#e5e5e5] shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+                isActive ? undefined : "border-[#e5e5e5] shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
               )}
               style={{
                 left: 24,
@@ -629,12 +582,18 @@ export function DashboardLearningPathsCarousel({
                 transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotate}deg) scale(${scale})`,
                 transformOrigin: "center top",
                 pointerEvents: isActive ? "auto" : "none",
+                ...(isActive
+                  ? { borderColor: colors.accentMutedBorder, boxShadow: colors.accentShadow }
+                  : {}),
               }}
             >
               <h3 className="text-center text-2xl font-bold leading-tight text-[#111111] sm:text-3xl">
                 {chapter.title}
               </h3>
-              <p className={cn("mt-1 text-center text-sm font-semibold uppercase tracking-[0.16em]", colors.text)}>
+              <p
+                className="mt-1 text-center text-sm font-semibold uppercase tracking-[0.16em]"
+                style={{ color: colors.accent }}
+              >
                 LEVEL {currentLevel}
               </p>
 
@@ -683,7 +642,8 @@ export function DashboardLearningPathsCarousel({
 
           <div className="flex items-center gap-2">
             {chapters.map((chapter, index) => {
-              const colors = getChapterTheme(chapter.title)
+              const colors = getChapterTheme(chapter)
+              const isSelected = activeIndex === index
               return (
                 <button
                   key={chapter.id}
@@ -692,10 +652,16 @@ export function DashboardLearningPathsCarousel({
                   onClick={() => goTo(index)}
                   className={cn(
                     "flex h-16 w-24 items-center justify-center rounded-2xl border bg-white p-3 transition-all sm:h-20 sm:w-28",
-                    activeIndex === index
-                      ? `${colors.accentBorder} ${colors.accentRing} ring-2 shadow-[0_4px_10px_rgba(0,0,0,0.05)]`
-                      : "border-[#e5e5e5] hover:border-[#cfcfcf]"
+                    isSelected ? undefined : "border-[#e5e5e5] hover:border-[#cfcfcf]"
                   )}
+                  style={
+                    isSelected
+                      ? {
+                          borderColor: colors.accent,
+                          boxShadow: `0 0 0 2px ${colors.accentRing}, 0 4px 10px rgba(0,0,0,0.05)`,
+                        }
+                      : undefined
+                  }
                 >
                   {chapter.icon_url ? (
                     <img
@@ -706,7 +672,7 @@ export function DashboardLearningPathsCarousel({
                       draggable={false}
                     />
                   ) : (
-                    <BookOpen className={cn("h-7 w-7", colors.text)} />
+                    <BookOpen className="h-7 w-7" style={{ color: colors.accent }} />
                   )}
                 </button>
               )
