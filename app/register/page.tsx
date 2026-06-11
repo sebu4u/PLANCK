@@ -13,6 +13,10 @@ import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding
 import {
   getCinematicaFirstLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
+import {
+  consumePostOnboardingRedirect,
+  OAUTH_ONBOARDING_PARAM,
+} from "@/lib/onboarding"
 
 type SubjectOption = "fizica" | "informatica"
 type GradeOption = "9" | "10" | "11" | "12"
@@ -217,9 +221,10 @@ function RegisterPageContent() {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
+  const { user, profile, loginWithGoogle, loginWithGitHub, needsOnboarding, refreshProfile } = useAuth()
 
   const shouldForcePostAuthStep = searchParams.get("onboarding") === "1"
+  const shouldForceOAuthOnboarding = searchParams.get("onboarding") === OAUTH_ONBOARDING_PARAM
 
   useEffect(() => {
     const referralFromUrl = searchParams.get("ref")
@@ -245,7 +250,10 @@ function RegisterPageContent() {
       }
     }
 
-    if (shouldForcePostAuthStep) {
+    if (shouldForceOAuthOnboarding && user) {
+      parsedState.step = 2
+      parsedState.awaitingPostAuth = false
+    } else if (shouldForcePostAuthStep) {
       parsedState.step = 7
       parsedState.awaitingPostAuth = true
     }
@@ -266,12 +274,12 @@ function RegisterPageContent() {
     setOnboardingState(parsedState)
     setDisplayName(profile?.name ?? profile?.nickname ?? "")
     setHydrated(true)
-  }, [profile?.name, profile?.nickname, shouldForcePostAuthStep, user])
+  }, [profile?.name, profile?.nickname, shouldForceOAuthOnboarding, shouldForcePostAuthStep, user])
 
   useEffect(() => {
-    if (!shouldForcePostAuthStep) return
+    if (!shouldForcePostAuthStep && !shouldForceOAuthOnboarding) return
     router.replace("/register")
-  }, [router, shouldForcePostAuthStep])
+  }, [router, shouldForceOAuthOnboarding, shouldForcePostAuthStep])
 
   useEffect(() => {
     if (!hydrated) return
@@ -305,12 +313,23 @@ function RegisterPageContent() {
       onboardingState.awaitingPostAuth ||
       onboardingState.step === 7 ||
       onboardingState.step === "name"
+    const isAuthenticatedOnboardingStep =
+      onboardingState.step === 2 ||
+      onboardingState.step === 3 ||
+      onboardingState.step === 4 ||
+      onboardingState.step === "name"
 
-    if (!isOnboardingFinalFlow) {
+    if (needsOnboarding && !isOnboardingFinalFlow && !isAuthenticatedOnboardingStep) {
+      setOnboardingState((prev) => ({ ...prev, step: 2 }))
+      return
+    }
+
+    if (!needsOnboarding && !isOnboardingFinalFlow) {
       router.replace("/dashboard")
     }
   }, [
     hydrated,
+    needsOnboarding,
     onboardingState.awaitingPostAuth,
     onboardingState.step,
     router,
@@ -344,6 +363,12 @@ function RegisterPageContent() {
     isNumericStep(onboardingState.step) && onboardingState.step >= 2 && onboardingState.step <= 5
   const showBottomCta =
     isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 5
+  const isOAuthOnboardingFlow =
+    Boolean(user && needsOnboarding) &&
+    !onboardingState.awaitingPostAuth &&
+    onboardingState.step !== 5 &&
+    onboardingState.step !== 6 &&
+    onboardingState.step !== 7
 
   const progressPercent =
     isNumericStep(onboardingState.step) && onboardingState.step <= 6
@@ -404,6 +429,10 @@ function RegisterPageContent() {
             variant: "destructive",
           })
           return
+        }
+        if (isOAuthOnboardingFlow) {
+          setStep("name")
+          break
         }
         setStep(5)
         break
@@ -519,7 +548,10 @@ function RegisterPageContent() {
 
     setNameSaving(true)
 
-    const payload: { name: string; grade?: string } = { name: cleanName }
+    const payload: { name: string; grade?: string; onboarding_completed_at: string } = {
+      name: cleanName,
+      onboarding_completed_at: new Date().toISOString(),
+    }
     if (onboardingState.grade) payload.grade = onboardingState.grade
 
     const { error } = await supabase.from("profiles").update(payload).eq("user_id", user.id)
@@ -542,8 +574,10 @@ function RegisterPageContent() {
       // ignore
     }
 
+    await refreshProfile()
+    const postOnboardingRedirect = consumePostOnboardingRedirect()
     const cinematicaHref = await getCinematicaFirstLearningPathItemHref()
-    router.push(cinematicaHref ?? "/dashboard")
+    router.push(postOnboardingRedirect ?? cinematicaHref ?? "/dashboard")
   }
 
   const renderStepContent = () => {

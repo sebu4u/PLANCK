@@ -10,11 +10,23 @@ import { useToast } from '@/hooks/use-toast'
 import { Lock, Chrome, Github, ArrowLeft, Brain, Check, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import {
+  consumePostOnboardingRedirect,
+  REGISTER_ONBOARDING_PATH,
+  savePostOnboardingRedirect,
+} from '@/lib/onboarding'
 
 function InsightUnauthorizedContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading, loginWithGoogle, loginWithGitHub } = useAuth()
+  const {
+    user,
+    loading: authLoading,
+    loginWithGoogle,
+    loginWithGitHub,
+    needsOnboarding,
+    profileSyncedUserId,
+  } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<"google" | "github" | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -57,15 +69,22 @@ function InsightUnauthorizedContent() {
 
   // If user is already authenticated, redirect them to chat
   useEffect(() => {
-    if (!authLoading && user) {
+    if (authLoading || !user || profileSyncedUserId !== user.id) return
+
+    if (needsOnboarding) {
+      savePostOnboardingRedirect(redirectUrl)
+      router.push(REGISTER_ONBOARDING_PATH)
+    } else {
       router.push(redirectUrl)
     }
-  }, [user, authLoading, router, redirectUrl])
+  }, [user, authLoading, needsOnboarding, profileSyncedUserId, router, redirectUrl])
 
   const handleGoogleLogin = async () => {
     setLoading("google")
+    savePostOnboardingRedirect(redirectUrl)
     const { error, popupBlocked } = await loginWithGoogle()
     if (error) {
+      consumePostOnboardingRedirect()
       toast({
         title: "Eroare la autentificare cu Google",
         description: popupBlocked
@@ -79,8 +98,10 @@ function InsightUnauthorizedContent() {
 
   const handleGitHubLogin = async () => {
     setLoading("github")
+    savePostOnboardingRedirect(redirectUrl)
     const { error, popupBlocked } = await loginWithGitHub()
     if (error) {
+      consumePostOnboardingRedirect()
       toast({
         title: "Eroare la autentificare cu GitHub",
         description: popupBlocked

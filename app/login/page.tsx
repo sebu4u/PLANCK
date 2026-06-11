@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { LoginButton } from "@/components/LoginButton"
+import { REGISTER_ONBOARDING_PATH } from "@/lib/onboarding"
 import Link from "next/link"
 
 // Apple icon SVG component
@@ -38,14 +39,17 @@ function LoginPageContent() {
     // Check for "error" query param from Supabase Auth redirect
     const { toast } = useToast()
     const router = useRouter()
-    const { user } = useAuth()
+    const { user, needsOnboarding, profileSyncedUserId } = useAuth()
 
     // Redirect if already logged in
     useEffect(() => {
-        if (user) {
+        if (!user || profileSyncedUserId !== user.id) return
+        if (needsOnboarding) {
+            router.push(REGISTER_ONBOARDING_PATH)
+        } else {
             router.push("/dashboard")
         }
-    }, [user, router])
+    }, [needsOnboarding, profileSyncedUserId, user, router])
 
     const handleEmailSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -94,7 +98,7 @@ function LoginPageContent() {
         } else {
             // Success! The auth listener in AuthProvider will pick this up and redirect
             // But we can also force a redirect or just wait for the loop
-            router.push("/dashboard")
+            setLoading(null)
         }
     }
 

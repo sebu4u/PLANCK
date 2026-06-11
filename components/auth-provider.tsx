@@ -1,9 +1,16 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import type { AuthError, User } from "@supabase/supabase-js"
 import { clearSupabaseAuthStorage, supabase } from "@/lib/supabaseClient"
 import { isSuperDev as resolveIsSuperDev, normalizeDevSubjects, type DevSubjectKey } from "@/lib/dev-subjects"
+import {
+  isOnboardingRoute,
+  needsOnboarding as profileNeedsOnboarding,
+  REGISTER_ONBOARDING_PATH,
+  savePostOnboardingRedirect,
+} from "@/lib/onboarding"
 import {
   AUTH_MESSAGE_ERROR,
   AUTH_MESSAGE_SUCCESS,
@@ -31,6 +38,7 @@ interface AuthContextType {
   isDev: boolean
   devSubjects: DevSubjectKey[] | null
   isSuperDev: boolean
+  needsOnboarding: boolean
   /**
    * După login, `user.id` există înainte să avem profil din DB.
    * Cât timp `profileSyncedUserId !== user.id`, nu te baza pe `isDev` pentru redirect (ex. către /dashboard/dev).
@@ -42,8 +50,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const FREE_PLAN_IDENTIFIER = "free"
 const REFERRAL_CODE_STORAGE_KEY = "planck_referral_code"
+const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
+const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
+const PROFILE_SELECT =
+  "name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const router = useRouter()
+  const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null) // nou: profilul
@@ -53,6 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isDev, setIsDev] = useState<boolean>(false)
   const [devSubjects, setDevSubjects] = useState<DevSubjectKey[] | null>(null)
   const [profileSyncedUserId, setProfileSyncedUserId] = useState<string | null>(null)
+  const [pendingOAuthOnboardingCheck, setPendingOAuthOnboardingCheck] = useState(false)
+  const needsOnboarding = user ? profileNeedsOnboarding(profile) : false
 
   const isInvalidRefreshTokenError = (message?: string) => {
     if (!message) return false
@@ -158,6 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!isAuthPopupMessage(event.data)) return
 
       if (event.data.type === AUTH_MESSAGE_SUCCESS) {
+        setPendingOAuthOnboardingCheck(true)
         void hydrateUserFromSession()
         return
       }
@@ -190,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfileSyncedUserId(null)
     const { data } = await supabase
       .from("profiles")
-      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects")
+      .select(PROFILE_SELECT)
       .eq("user_id", user.id)
       .single()
 
@@ -236,7 +253,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!insertError) {
       const { data: created } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects")
+        .select(PROFILE_SELECT)
         .eq("user_id", user.id)
         .single()
       if (created) {
@@ -330,6 +347,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     void processPendingReferral()
   }, [user, profileSyncedUserId, processPendingReferral])
 
+  useEffect(() => {
+    if (!pendingOAuthOnboardingCheck || !user || profileSyncedUserId !== user.id) return
+
+    setPendingOAuthOnboardingCheck(false)
+    if (!needsOnboarding || isOnboardingRoute(pathname)) return
+
+    if (typeof window !== "undefined") {
+      const redirectTo = new URLSearchParams(window.location.search).get("redirect")
+      savePostOnboardingRedirect(redirectTo)
+    }
+    router.push(REGISTER_ONBOARDING_PATH)
+  }, [
+    needsOnboarding,
+    pathname,
+    pendingOAuthOnboardingCheck,
+    profileSyncedUserId,
+    router,
+    user,
+  ])
+
   const login = async (email: string, password: string) => {
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -357,8 +394,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     clearSupabaseAuthStorage()
     setUser(null)
     if (typeof window !== "undefined") {
-      localStorage.removeItem("planck_register_onboarding")
-      localStorage.removeItem("planck_onboarding_after_oauth")
+      localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
+      localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
     }
     setLoading(false)
   }
@@ -411,6 +448,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isDev,
         devSubjects,
         isSuperDev: resolveIsSuperDev(isDev, devSubjects),
+        needsOnboarding,
         profileSyncedUserId,
       }}
     >
