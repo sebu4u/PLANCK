@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { requireDevSession } from "@/lib/dev-api-session"
+import { assertDevCanAccessCatalog } from "@/lib/admin-check"
 import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
 import {
   buildInformaticsProblemRow,
@@ -91,6 +92,9 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       )
     }
+    if (!assertDevCanAccessCatalog(auth.permissions, catalog)) {
+      return NextResponse.json({ error: "Nu ai acces dev la catalogul cerut." }, { status: 403 })
+    }
 
     const service = createServiceClient()
 
@@ -167,6 +171,9 @@ export async function POST(req: NextRequest) {
 
     if (catalog !== "physics" && catalog !== "informatics" && catalog !== "math") {
       return NextResponse.json({ error: "catalog trebuie să fie physics, informatics sau math." }, { status: 400 })
+    }
+    if (!assertDevCanAccessCatalog(auth.permissions, catalog)) {
+      return NextResponse.json({ error: "Nu ai acces dev la catalogul cerut." }, { status: 403 })
     }
 
     const service = createServiceClient()

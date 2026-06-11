@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { requireDevSession } from "@/lib/dev-api-session"
+import { assertDevCanAccessCatalog } from "@/lib/admin-check"
 import { buildInformaticsProblemRow } from "@/lib/dev-informatics-problem"
 
 function createServiceClient() {
@@ -18,6 +19,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   try {
     const auth = await requireDevSession(req.headers)
     if (auth instanceof NextResponse) return auth
+    if (!assertDevCanAccessCatalog(auth.permissions, "informatics")) {
+      return NextResponse.json({ error: "Nu ai acces dev la catalogul de informatică." }, { status: 403 })
+    }
 
     const { slug: rawSlug } = await params
     const slug = rawSlug?.trim().toLowerCase()
@@ -62,6 +66,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   try {
     const auth = await requireDevSession(req.headers)
     if (auth instanceof NextResponse) return auth
+    if (!assertDevCanAccessCatalog(auth.permissions, "informatics")) {
+      return NextResponse.json({ error: "Nu ai acces dev la catalogul de informatică." }, { status: 403 })
+    }
 
     const { slug: rawSlug } = await params
     const currentSlug = rawSlug?.trim().toLowerCase()

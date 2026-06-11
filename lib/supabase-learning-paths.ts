@@ -32,6 +32,8 @@ export interface LearningPathChapter {
   /** Hex accent for dashboard cards (e.g. #7c3aed); null uses default purple. */
   accent_color: string | null
   problem_category: string | null
+  /** Dev user IDs explicitly allowed to edit this chapter; null/empty = only super-dev/admin. */
+  allowed_dev_user_ids: string[] | null
   order_index: number
   is_active: boolean
   created_at: string

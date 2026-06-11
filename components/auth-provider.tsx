@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"
 import type { AuthError, User } from "@supabase/supabase-js"
 import { clearSupabaseAuthStorage, supabase } from "@/lib/supabaseClient"
+import { isSuperDev as resolveIsSuperDev, normalizeDevSubjects, type DevSubjectKey } from "@/lib/dev-subjects"
 import {
   AUTH_MESSAGE_ERROR,
   AUTH_MESSAGE_SUCCESS,
@@ -28,6 +29,8 @@ interface AuthContextType {
   isAdmin: boolean
   /** true dacă profiles.is_dev = true (setat în DB / de admin) */
   isDev: boolean
+  devSubjects: DevSubjectKey[] | null
+  isSuperDev: boolean
   /**
    * După login, `user.id` există înainte să avem profil din DB.
    * Cât timp `profileSyncedUserId !== user.id`, nu te baza pe `isDev` pentru redirect (ex. către /dashboard/dev).
@@ -48,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userElo, setUserElo] = useState<number | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
   const [isDev, setIsDev] = useState<boolean>(false)
+  const [devSubjects, setDevSubjects] = useState<DevSubjectKey[] | null>(null)
   const [profileSyncedUserId, setProfileSyncedUserId] = useState<string | null>(null)
 
   const isInvalidRefreshTokenError = (message?: string) => {
@@ -65,6 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserElo(null)
     setIsAdmin(false)
     setIsDev(false)
+    setDevSubjects(null)
     setProfileSyncedUserId(null)
   }, [])
 
@@ -111,6 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUserElo(null)
         setIsAdmin(false)
         setIsDev(false)
+        setDevSubjects(null)
         setProfileSyncedUserId(null)
       } else {
         // Other events (SIGNED_IN, USER_UPDATED, etc.)
@@ -176,6 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserElo(null)
       setIsAdmin(false)
       setIsDev(false)
+      setDevSubjects(null)
       setProfileSyncedUserId(null)
       return
     }
@@ -183,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfileSyncedUserId(null)
     const { data } = await supabase
       .from("profiles")
-      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev")
+      .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects")
       .eq("user_id", user.id)
       .single()
 
@@ -211,6 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Setează starea de admin / dev din baza de date
       setIsAdmin(data.is_admin === true)
       setIsDev(data.is_dev === true)
+      setDevSubjects(normalizeDevSubjects(data.dev_subjects))
       setProfileSyncedUserId(user.id)
       return
     }
@@ -228,7 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!insertError) {
       const { data: created } = await supabase
         .from("profiles")
-        .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev")
+        .select("name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects")
         .eq("user_id", user.id)
         .single()
       if (created) {
@@ -248,13 +256,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         )
         setIsAdmin(created.is_admin === true)
         setIsDev(created.is_dev === true)
+        setDevSubjects(normalizeDevSubjects(created.dev_subjects))
       } else {
         setIsAdmin(false)
         setIsDev(false)
+        setDevSubjects(null)
       }
     } else {
       setIsAdmin(false)
       setIsDev(false)
+      setDevSubjects(null)
     }
     setProfileSyncedUserId(user.id)
   }, [user])
@@ -398,6 +409,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userElo,
         isAdmin,
         isDev,
+        devSubjects,
+        isSuperDev: resolveIsSuperDev(isDev, devSubjects),
         profileSyncedUserId,
       }}
     >

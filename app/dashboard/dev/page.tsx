@@ -14,11 +14,11 @@ export default async function DevDashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_dev")
+    .select("is_dev, is_admin")
     .eq("user_id", user.id)
     .maybeSingle()
 
-  if (profile?.is_dev !== true) {
+  if (profile?.is_dev !== true && profile?.is_admin !== true) {
     redirect("/dashboard")
   }
 

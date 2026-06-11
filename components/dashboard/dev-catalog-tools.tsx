@@ -14,20 +14,13 @@ import { LearningPathsManager } from "@/components/admin/learning-paths-manager"
 import { DevCelebrationCard } from "@/components/dashboard/dev-celebration-card"
 import { InformaticsProblemLivePreview } from "@/components/dashboard/informatics-problem-live-preview"
 import { pickRandomDevCelebrationMessage, type DevCelebrationMessage } from "@/lib/dev-celebration-messages"
+import { toApiSubject, toCatalog, type DevSubjectKey } from "@/lib/dev-subjects"
+import { useAuth } from "@/components/auth-provider"
 import { Loader2, ArrowLeft, Plus, Trash2, ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 
-type SubjectKey = "fizica" | "informatica" | "matematica" | "biologie" | "ai"
-type ApiSubject = "physics" | "informatics" | "math"
-
-function toApiSubject(key: SubjectKey): ApiSubject {
-  if (key === "fizica") return "physics"
-  if (key === "informatica") return "informatics"
-  return "math"
-}
-
-function publicCatalogHref(key: SubjectKey): string {
+function publicCatalogHref(key: DevSubjectKey): string {
   if (key === "fizica") return "/probleme"
   if (key === "informatica") return "/informatica/probleme"
   return "/matematica/probleme"
@@ -115,8 +108,10 @@ async function getAuthJsonHeaders(): Promise<Record<string, string> | null> {
   }
 }
 
-export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
+export function DevCatalogTools({ subjectKey }: { subjectKey: DevSubjectKey }) {
+  const { isSuperDev } = useAuth()
   const apiSubject = toApiSubject(subjectKey)
+  const catalogSubject = toCatalog(subjectKey)
   const learningPathsOnly = subjectKey === "biologie" || subjectKey === "ai"
   const title =
     subjectKey === "fizica"
@@ -159,9 +154,13 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
   }, [])
 
   const reloadProblems = useCallback(async () => {
+    if (!catalogSubject) {
+      setProblems([])
+      return
+    }
     const headers = await getAuthJsonHeaders()
     if (!headers) return
-    const q = new URLSearchParams({ catalog: apiSubject })
+    const q = new URLSearchParams({ catalog: catalogSubject })
     const res = await fetch(`/api/dev/problems?${q}`, { headers })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -169,7 +168,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
       return
     }
     setProblems(data.problems || [])
-  }, [apiSubject])
+  }, [catalogSubject])
 
   useEffect(() => {
     void reloadProblems()
@@ -1118,15 +1117,16 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: SubjectKey }) {
               <div className="px-4 sm:px-6">
                 <h2 className="text-xl font-bold text-white">Learning paths (/invata)</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Același panou ca la admin: vezi și editezi toate capitolele (fizică, informatică, matematică, biologie), preview
-                  lecție, formulare pentru toate tipurile de itemi. Pentru operații doar admin, folosește contul admin.
+                  {isSuperDev
+                    ? "Același panou ca la admin: vezi și editezi toate capitolele (fizică, informatică, matematică, biologie), preview lecție, formulare pentru toate tipurile de itemi."
+                    : "Vezi și editezi doar traseele la care ai fost asignat de admin. Pentru catalog folosești materia selectată; traseele apar indiferent de materie dacă ai acces."}
                 </p>
               </div>
               <div className="mt-6 px-4 sm:px-6">
                 <LearningPathsManager
                   mode="dev"
-                  devSubject="all"
-                  devViewSubject="all"
+                  devSubject={apiSubject}
+                  devViewSubject={isSuperDev ? apiSubject : "all"}
                   onDevCelebrate={triggerDevCelebration}
                 />
               </div>

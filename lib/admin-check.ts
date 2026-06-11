@@ -1,4 +1,18 @@
 import type { User, SupabaseClient } from "@supabase/supabase-js"
+import {
+  canDevEditChapter,
+  type ChapterDevAccessRow,
+} from "@/lib/dev-chapter-access"
+import {
+  canAccessApiSubject,
+  canAccessCatalog,
+  canAccessSubject,
+  isSuperDev,
+  normalizeDevSubjects,
+  type ApiDevSubject,
+  type DevCatalog,
+  type DevSubjectKey,
+} from "@/lib/dev-subjects"
 
 /**
  * Verifică dacă un utilizator este admin (verificare sincronă - fără DB)
@@ -91,6 +105,70 @@ export async function isDevFromDB(supabase: SupabaseClient, userId?: string | nu
   const { data: profile } = await supabase.from("profiles").select("is_dev").eq("user_id", uid).maybeSingle()
 
   return profile?.is_dev === true
+}
+
+export type DevPermissions = {
+  isDev: boolean
+  isAdmin: boolean
+  devSubjects: DevSubjectKey[] | null
+  isSuperDev: boolean
+}
+
+export async function getDevPermissionsFromDB(
+  supabase: SupabaseClient,
+  userId?: string | null,
+  user?: User | null
+): Promise<DevPermissions> {
+  let authUser: User | null = user ?? null
+  if (!authUser) {
+    try {
+      authUser = (await supabase.auth.getUser()).data.user ?? null
+    } catch {
+      authUser = null
+    }
+  }
+
+  const uid = userId ?? authUser?.id ?? null
+  if (!uid) {
+    return { isDev: false, isAdmin: false, devSubjects: null, isSuperDev: false }
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_dev, is_admin, dev_subjects")
+    .eq("user_id", uid)
+    .maybeSingle()
+
+  const resolvedIsDev = profile?.is_dev === true
+  const resolvedIsAdmin = profile?.is_admin === true || isAdmin(authUser)
+  const devSubjects = normalizeDevSubjects(profile?.dev_subjects)
+
+  return {
+    isDev: resolvedIsDev,
+    isAdmin: resolvedIsAdmin,
+    devSubjects,
+    isSuperDev: isSuperDev(resolvedIsDev, devSubjects),
+  }
+}
+
+export function assertDevCanAccessSubject(permissions: DevPermissions, subject: DevSubjectKey): boolean {
+  return canAccessSubject(permissions.isDev, permissions.devSubjects, subject, permissions.isAdmin)
+}
+
+export function assertDevCanAccessApiSubject(permissions: DevPermissions, subject: ApiDevSubject): boolean {
+  return canAccessApiSubject(permissions.isDev, permissions.devSubjects, subject, permissions.isAdmin)
+}
+
+export function assertDevCanAccessCatalog(permissions: DevPermissions, catalog: DevCatalog): boolean {
+  return canAccessCatalog(permissions.isDev, permissions.devSubjects, catalog, permissions.isAdmin)
+}
+
+export function assertDevCanEditChapter(
+  permissions: DevPermissions,
+  userId: string,
+  chapter: ChapterDevAccessRow
+): boolean {
+  return canDevEditChapter(permissions, userId, chapter)
 }
 
 /**

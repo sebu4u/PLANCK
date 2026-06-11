@@ -11,6 +11,7 @@ import {
 } from "@/lib/learning-path-interactive-items"
 import { generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
+import { parseAllowedDevUserIdsInput } from "@/lib/dev-chapter-access"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 
@@ -184,6 +185,23 @@ function toAccentColor(value: unknown): string | null {
 
 function toBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback
+}
+
+async function validateAllowedDevUserIds(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  ids: string[] | null
+): Promise<string | null> {
+  if (!ids || ids.length === 0) return null
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("is_dev", true)
+    .in("user_id", ids)
+  if (error) return "Nu am putut valida utilizatorii dev."
+  if ((data?.length ?? 0) !== ids.length) {
+    return "Unul sau mai mulți useri selectați nu sunt conturi dev."
+  }
+  return null
 }
 
 function toInt(value: unknown, fallback: number): number {
@@ -378,6 +396,18 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      const allowedDevUserIds =
+        body.allowed_dev_user_ids !== undefined
+          ? parseAllowedDevUserIdsInput(body.allowed_dev_user_ids)
+          : null
+      if (body.allowed_dev_user_ids !== undefined && body.allowed_dev_user_ids !== null && allowedDevUserIds === null) {
+        return NextResponse.json({ error: "allowed_dev_user_ids conține ID-uri invalide." }, { status: 400 })
+      }
+      const devIdsError = await validateAllowedDevUserIds(supabase, allowedDevUserIds)
+      if (devIdsError) {
+        return NextResponse.json({ error: devIdsError }, { status: 400 })
+      }
+
       const payload = {
         title,
         nav_title: toNullableString(body.nav_title),
@@ -386,6 +416,7 @@ export async function POST(req: NextRequest) {
         icon_url: toNullableString(body.icon_url),
         accent_color: accentColor,
         problem_category: toNullableString(body.problem_category),
+        allowed_dev_user_ids: allowedDevUserIds && allowedDevUserIds.length > 0 ? allowedDevUserIds : null,
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
       }
@@ -546,6 +577,18 @@ export async function PUT(req: NextRequest) {
         updateData.accent_color = accentColor
       }
       if (body.problem_category !== undefined) updateData.problem_category = toNullableString(body.problem_category)
+      if (body.allowed_dev_user_ids !== undefined) {
+        const allowedDevUserIds = parseAllowedDevUserIdsInput(body.allowed_dev_user_ids)
+        if (body.allowed_dev_user_ids !== null && allowedDevUserIds === null) {
+          return NextResponse.json({ error: "allowed_dev_user_ids conține ID-uri invalide." }, { status: 400 })
+        }
+        const devIdsError = await validateAllowedDevUserIds(supabase, allowedDevUserIds)
+        if (devIdsError) {
+          return NextResponse.json({ error: devIdsError }, { status: 400 })
+        }
+        updateData.allowed_dev_user_ids =
+          allowedDevUserIds && allowedDevUserIds.length > 0 ? allowedDevUserIds : null
+      }
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
       updateData.updated_at = new Date().toISOString()

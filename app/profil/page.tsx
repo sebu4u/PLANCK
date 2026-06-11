@@ -28,20 +28,20 @@ import { useRouter } from "next/navigation";
 
 // Skeleton components for profile page
 const ProfileSkeleton = () => (
-  <div className="rounded-xl bg-[#131316] border border-white/10 p-6 animate-pulse">
+  <div className="animate-pulse rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
     <div className="flex flex-col items-center gap-4">
-      <Skeleton className="w-32 h-32 rounded-full bg-white/5" />
-      <Skeleton className="w-32 h-6 bg-white/5" />
-      <Skeleton className="w-48 h-4 bg-white/5" />
-      <Skeleton className="w-full h-20 bg-white/5 rounded-lg" />
+      <Skeleton className="h-32 w-32 rounded-full bg-[#f1f1f1]" />
+      <Skeleton className="h-6 w-32 bg-[#f1f1f1]" />
+      <Skeleton className="h-4 w-48 bg-[#f1f1f1]" />
+      <Skeleton className="h-20 w-full rounded-2xl bg-[#f1f1f1]" />
     </div>
   </div>
 );
 
 const StatsSkeleton = () => (
   <div className="space-y-6">
-    <Skeleton className="w-full h-64 rounded-xl bg-[#131316]" />
-    <Skeleton className="w-full h-64 rounded-xl bg-[#131316]" />
+    <Skeleton className="h-64 w-full rounded-3xl bg-[#f1f1f1]" />
+    <Skeleton className="h-64 w-full rounded-3xl bg-[#f1f1f1]" />
   </div>
 );
 
@@ -81,14 +81,14 @@ const ProfilPage = () => {
   // Get rank color
   const getRankColor = (rankName: string) => {
     if (rankName?.includes('Bronze')) return 'text-amber-700';
-    if (rankName?.includes('Silver')) return 'text-gray-400';
-    if (rankName?.includes('Gold')) return 'text-yellow-400';
-    if (rankName?.includes('Platinum')) return 'text-cyan-400';
-    if (rankName?.includes('Diamond')) return 'text-blue-400';
-    if (rankName?.includes('Masters')) return 'text-purple-400';
-    if (rankName?.includes('Ascendant')) return 'text-indigo-400';
-    if (rankName?.includes('Singularity')) return 'text-pink-400';
-    return 'text-gray-400';
+    if (rankName?.includes('Silver')) return 'text-gray-600';
+    if (rankName?.includes('Gold')) return 'text-yellow-600';
+    if (rankName?.includes('Platinum')) return 'text-cyan-600';
+    if (rankName?.includes('Diamond')) return 'text-blue-600';
+    if (rankName?.includes('Masters')) return 'text-purple-600';
+    if (rankName?.includes('Ascendant')) return 'text-indigo-600';
+    if (rankName?.includes('Singularity')) return 'text-pink-600';
+    return 'text-gray-600';
   };
 
   useEffect(() => {
@@ -250,7 +250,7 @@ const ProfilPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0D0D0F]">
+      <div className="min-h-screen bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)]">
         <Navigation />
         <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           <div className="max-w-7xl mx-auto">
@@ -270,8 +270,8 @@ const ProfilPage = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0D0D0F] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
       </div>
     );
   }
@@ -282,20 +282,20 @@ const ProfilPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-[#0D0D0F]">
+      <div className="min-h-screen bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)]">
         <Navigation />
         <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-white/90 mb-2">Profil</h1>
-              <p className="text-white/60">Gestionează-ți profilul și setările</p>
+              <h1 className="mb-2 text-3xl font-bold tracking-tight text-[#111111]">Profil</h1>
+              <p className="text-[#6d6d6d]">Gestionează-ți profilul și setările</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Side - Profile Info */}
               <div className="lg:col-span-1">
-                <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-colors">
+                <div className="rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)] transition-colors hover:border-[#d4d4d4]">
                   {profileLoading ? (
                     <ProfileSkeleton />
                   ) : (
@@ -303,11 +303,11 @@ const ProfilPage = () => {
                       {/* Avatar with Rank Badge */}
                       <div className="relative group">
                         <div className="relative">
-                          <Avatar className="w-32 h-32 shadow-lg border-4 border-white/10">
+                          <Avatar className="h-32 w-32 border-4 border-white shadow-lg shadow-black/10">
                             {avatarUrl ? (
                               <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
                             ) : (
-                              <AvatarFallback className="bg-white/5 text-white/90 text-4xl">
+                              <AvatarFallback className="bg-[#f1f1f1] text-4xl text-[#191919]">
                                 {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
                               </AvatarFallback>
                             )}
@@ -322,7 +322,7 @@ const ProfilPage = () => {
                           )}
                           {/* Rank Badge Overlay */}
                           {userStats && (
-                            <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full bg-[#0D0D0F] border-2 border-white/20 flex items-center justify-center overflow-hidden">
+                            <div className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-lg shadow-black/10">
                               <Image
                                 src={rankIconPath}
                                 alt={userStats.rank}
@@ -333,7 +333,7 @@ const ProfilPage = () => {
                             </div>
                           )}
                         </div>
-                        <label className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 bg-white/10 hover:bg-white/20 text-white rounded-lg px-4 py-2 text-sm font-medium shadow cursor-pointer transition-all">
+                        <label className="absolute bottom-0 left-1/2 translate-y-8 -translate-x-1/2 transform cursor-pointer rounded-full border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#191919] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all hover:bg-[#f7f7f7]">
                           <input
                             type="file"
                             accept="image/*"
@@ -349,34 +349,34 @@ const ProfilPage = () => {
                       <div className="flex flex-col items-center gap-4 w-full mt-8">
                         {/* Username */}
                         <div className="w-full">
-                          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Username</label>
+                          <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Username</label>
                           {nicknameEdit ? (
                             <div className="flex flex-col gap-2">
                               <input
-                                className="w-full border border-white/10 rounded-lg p-2 px-3 bg-white/5 text-white/90 focus:outline-none focus:border-white/30"
+                                className="w-full rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-2 px-3 text-[#191919] focus:border-[#bdbdbd] focus:outline-none"
                                 value={nickname}
                                 onChange={e => setNickname(e.target.value)}
                                 maxLength={32}
                                 autoFocus
                               />
                               <div className="flex gap-2">
-                                <Button size="sm" onClick={handleNicknameSave} disabled={saving} className="flex-1 bg-white/10 hover:bg-white/20">
+                                <Button size="sm" onClick={handleNicknameSave} disabled={saving} className="flex-1 rounded-full bg-[#111111] text-white hover:bg-[#2a2a2a]">
                                   Salvează
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => setNicknameEdit(false)} className="flex-1 border-white/10 hover:bg-white/5">
+                                <Button size="sm" variant="outline" onClick={() => setNicknameEdit(false)} className="flex-1 rounded-full border-[#e5e5e5] bg-white text-[#444444] hover:bg-[#f7f7f7]">
                                   Anulează
                                 </Button>
                               </div>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/20 transition-all">
-                              <span className="text-white/90 font-medium">
-                                {nickname || <span className="italic text-white/40">Adaugă un username...</span>}
+                            <div className="flex items-center justify-between rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3 transition-all hover:border-[#d4d4d4]">
+                              <span className="font-medium text-[#191919]">
+                                {nickname || <span className="italic text-[#8a8a8a]">Adaugă un username...</span>}
                               </span>
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10"
+                                className="h-8 w-8 text-[#707070] hover:bg-[#eeeeee] hover:text-[#191919]"
                                 onClick={() => setNicknameEdit(true)}
                               >
                                 <Pencil size={16} />
@@ -387,9 +387,9 @@ const ProfilPage = () => {
 
                         {/* Name */}
                         <div className="w-full">
-                          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Nume</label>
-                          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-                            <span className="text-white/90 font-medium">
+                          <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Nume</label>
+                          <div className="rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3">
+                            <span className="font-medium text-[#191919]">
                               {profile?.name || user.email}
                             </span>
                           </div>
@@ -397,34 +397,34 @@ const ProfilPage = () => {
 
                         {/* Bio */}
                         <div className="w-full">
-                          <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Bio</label>
+                          <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Bio</label>
                           {bioEdit ? (
                             <div className="flex flex-col gap-2">
                               <textarea
-                                className="w-full border border-white/10 rounded-lg p-3 bg-white/5 text-white/90 min-h-[80px] focus:outline-none focus:border-white/30"
+                                className="min-h-[80px] w-full rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3 text-[#191919] focus:border-[#bdbdbd] focus:outline-none"
                                 value={bio}
                                 onChange={e => setBio(e.target.value)}
                                 maxLength={300}
                               />
                               <div className="flex gap-2">
-                                <Button size="sm" onClick={handleBioSave} disabled={saving} className="flex-1 bg-white/10 hover:bg-white/20">
+                                <Button size="sm" onClick={handleBioSave} disabled={saving} className="flex-1 rounded-full bg-[#111111] text-white hover:bg-[#2a2a2a]">
                                   Salvează
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => setBioEdit(false)} className="flex-1 border-white/10 hover:bg-white/5">
+                                <Button size="sm" variant="outline" onClick={() => setBioEdit(false)} className="flex-1 rounded-full border-[#e5e5e5] bg-white text-[#444444] hover:bg-[#f7f7f7]">
                                   Anulează
                                 </Button>
                               </div>
                             </div>
                           ) : (
-                            <div className="p-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/20 transition-all">
+                            <div className="rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3 transition-all hover:border-[#d4d4d4]">
                               <div className="flex items-start justify-between gap-2">
-                                <span className="text-white/70 text-sm flex-1">
-                                  {bio || <span className="italic text-white/40">Adaugă un bio...</span>}
+                                <span className="flex-1 text-sm text-[#666666]">
+                                  {bio || <span className="italic text-[#8a8a8a]">Adaugă un bio...</span>}
                                 </span>
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="h-8 w-8 text-white/60 hover:text-white/90 hover:bg-white/10"
+                                  className="h-8 w-8 text-[#707070] hover:bg-[#eeeeee] hover:text-[#191919]"
                                   onClick={() => setBioEdit(true)}
                                 >
                                   <Pencil size={16} />
@@ -437,10 +437,10 @@ const ProfilPage = () => {
                         {/* Rank Display */}
                         {userStats && (
                           <div className="w-full mt-2">
-                            <label className="text-xs text-white/60 uppercase tracking-wide mb-2 block">Rank</label>
-                            <div className="p-4 bg-white/5 rounded-lg border border-white/10 flex items-center justify-between">
+                            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Rank</label>
+                            <div className="flex items-center justify-between rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden">
+                                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[#e5e5e5] bg-white">
                                   <Image
                                     src={rankIconPath}
                                     alt={userStats.rank}
@@ -451,7 +451,7 @@ const ProfilPage = () => {
                                 </div>
                                 <div>
                                   <h4 className={`text-lg font-bold ${rankColor}`}>{userStats.rank}</h4>
-                                  <p className="text-xs text-white/60">Current Rank</p>
+                                  <p className="text-xs text-[#7f7f7f]">Current Rank</p>
                                 </div>
                               </div>
                             </div>
@@ -462,14 +462,14 @@ const ProfilPage = () => {
                         <div className="w-full mt-4 space-y-3">
                           <Button
                             onClick={() => router.push('/profil/referral')}
-                            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold border-none shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-[1.02]"
+                            className="w-full rounded-full border-none bg-gradient-to-r from-purple-600 to-pink-600 font-bold text-white shadow-lg shadow-purple-500/20 transition-all duration-300 hover:scale-[1.02] hover:from-purple-500 hover:to-pink-500 hover:shadow-purple-500/40"
                           >
                             <Gift className="w-4 h-4 mr-2" />
                             Invită prieteni & primește Plus+
                           </Button>
                           <Button
                             onClick={() => setShowChangePasswordModal(true)}
-                            className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                            className="w-full rounded-full border-[#e5e5e5] bg-white text-[#191919] hover:bg-[#f7f7f7]"
                             variant="outline"
                           >
                             <Lock className="w-4 h-4 mr-2" />
@@ -477,7 +477,7 @@ const ProfilPage = () => {
                           </Button>
                           <Button
                             onClick={() => setShowPrivacyModal(true)}
-                            className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                            className="w-full rounded-full border-[#e5e5e5] bg-white text-[#191919] hover:bg-[#f7f7f7]"
                             variant="outline"
                           >
                             <Shield className="w-4 h-4 mr-2" />
@@ -485,7 +485,7 @@ const ProfilPage = () => {
                           </Button>
                           <Button
                             onClick={() => router.push("/pricing")}
-                            className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                            className="w-full rounded-full border-[#e5e5e5] bg-white text-[#191919] hover:bg-[#f7f7f7]"
                             variant="outline"
                           >
                             <CreditCard className="w-4 h-4 mr-2" />
@@ -497,7 +497,7 @@ const ProfilPage = () => {
                               toast({ title: "Te-ai delogat cu succes!" })
                               router.push("/")
                             }}
-                            className="w-full border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                            className="w-full rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
                             variant="outline"
                           >
                             <LogOut className="w-4 h-4 mr-2" />
@@ -518,12 +518,12 @@ const ProfilPage = () => {
                   <>
                     {/* Rank & ELO Card */}
                     {userStats && (
-                      <div className="rounded-xl bg-[#131316] border border-white/10 p-6 hover:border-white/20 transition-colors">
-                        <h3 className="text-lg font-semibold text-white/90 mb-6">Rank & ELO</h3>
+                      <div className="rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)] transition-colors hover:border-[#d4d4d4]">
+                        <h3 className="mb-6 text-lg font-semibold text-[#191919]">Rank & ELO</h3>
 
                         <div className="flex items-center justify-between mb-6">
                           <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden">
+                            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[#e5e5e5] bg-[#fafafa]">
                               <Image
                                 src={rankIconPath}
                                 alt={userStats.rank}
@@ -534,46 +534,46 @@ const ProfilPage = () => {
                             </div>
                             <div>
                               <h4 className={`text-2xl font-bold ${rankColor}`}>{userStats.rank}</h4>
-                              <p className="text-sm text-white/60">Current Rank</p>
+                              <p className="text-sm text-[#7f7f7f]">Current Rank</p>
                             </div>
                           </div>
 
                           <div className="text-right">
                             <div className="flex items-center gap-2 justify-end">
                               <Trophy className="w-5 h-5 text-yellow-500" />
-                              <p className="text-4xl font-bold text-white/90">{userStats.elo}</p>
+                              <p className="text-4xl font-bold text-[#191919]">{userStats.elo}</p>
                             </div>
-                            <p className="text-xs text-white/60 mt-1">ELO Rating</p>
+                            <p className="mt-1 text-xs text-[#7f7f7f]">ELO Rating</p>
                           </div>
                         </div>
 
                         {/* Progress to Next Rank */}
                         <div className="mb-4">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-white/70">Progress to {nextRankInfo.nextRank}</p>
-                            <p className="text-sm text-white/60">+{nextRankInfo.threshold - userStats.elo} ELO needed</p>
+                            <p className="text-sm text-[#666666]">Progress to {nextRankInfo.nextRank}</p>
+                            <p className="text-sm text-[#7f7f7f]">+{nextRankInfo.threshold - userStats.elo} ELO needed</p>
                           </div>
                           <Progress
                             value={nextRankInfo.progress}
-                            className="h-2 bg-white/5"
-                            indicatorClassName="bg-white"
+                            className="h-2 bg-[#eeeeee]"
+                            indicatorClassName="bg-gradient-to-r from-purple-500 to-pink-500"
                           />
-                          <p className="text-xs text-white/50 mt-1">{Math.round(nextRankInfo.progress)}% complete</p>
+                          <p className="mt-1 text-xs text-[#8a8a8a]">{Math.round(nextRankInfo.progress)}% complete</p>
                         </div>
 
                         {/* Quick Stats */}
                         <div className="grid grid-cols-3 gap-3 mt-6">
-                          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
-                            <p className="text-xs text-white/60">Total Solved</p>
-                            <p className="text-lg font-semibold text-white/90">{userStats.problems_solved_total || 0}</p>
+                          <div className="rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3 text-center">
+                            <p className="text-xs text-[#7f7f7f]">Total Solved</p>
+                            <p className="text-lg font-semibold text-[#191919]">{userStats.problems_solved_total || 0}</p>
                           </div>
-                          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
-                            <p className="text-xs text-white/60">Current Streak</p>
-                            <p className="text-lg font-semibold text-white/90">{userStats.current_streak || 0}🔥</p>
+                          <div className="rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3 text-center">
+                            <p className="text-xs text-[#7f7f7f]">Current Streak</p>
+                            <p className="text-lg font-semibold text-[#191919]">{userStats.current_streak || 0}🔥</p>
                           </div>
-                          <div className="bg-white/[0.03] rounded-lg p-3 text-center">
-                            <p className="text-xs text-white/60">Best Streak</p>
-                            <p className="text-lg font-semibold text-white/90">{userStats.best_streak || 0}</p>
+                          <div className="rounded-2xl border border-[#e5e5e5] bg-[#fafafa] p-3 text-center">
+                            <p className="text-xs text-[#7f7f7f]">Best Streak</p>
+                            <p className="text-lg font-semibold text-[#191919]">{userStats.best_streak || 0}</p>
                           </div>
                         </div>
                       </div>
@@ -581,52 +581,52 @@ const ProfilPage = () => {
 
                     {/* Contest Registration Card */}
                     {!contestLoading && (
-                      <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-orange-600/5 border border-orange-500/20 p-6 hover:border-orange-500/40 transition-colors">
+                      <div className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)] transition-colors hover:border-orange-300">
                         <div className="flex items-center gap-3 mb-4">
-                          <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                            <GraduationCap className="w-5 h-5 text-orange-400" />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-100">
+                            <GraduationCap className="w-5 h-5 text-orange-600" />
                           </div>
-                          <h3 className="text-lg font-semibold text-white/90">Concursul PLANCK 2026</h3>
+                          <h3 className="text-lg font-semibold text-[#191919]">Concursul PLANCK 2026</h3>
                         </div>
 
                         {contestRegistration ? (
                           <div className="space-y-4">
                             {/* Contest Code Display */}
-                            <div className="bg-black/20 rounded-xl p-4 border border-orange-500/20">
-                              <p className="text-xs text-orange-300 font-medium mb-2">Codul tău de concurs:</p>
+                            <div className="rounded-2xl border border-orange-200 bg-white p-4">
+                              <p className="mb-2 text-xs font-medium text-orange-700">Codul tău de concurs:</p>
                               <div className="flex items-center justify-between">
-                                <span className="text-2xl font-mono font-bold text-white tracking-wider">
+                                <span className="font-mono text-2xl font-bold tracking-wider text-[#191919]">
                                   {contestRegistration.contest_code}
                                 </span>
                                 <button
                                   onClick={copyContestCode}
-                                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                                  className="rounded-xl bg-[#f7f7f7] p-2 transition-colors hover:bg-[#eeeeee]"
                                 >
                                   {codeCopied ? (
-                                    <Check className="w-4 h-4 text-green-400" />
+                                    <Check className="w-4 h-4 text-green-600" />
                                   ) : (
-                                    <Copy className="w-4 h-4 text-white/60" />
+                                    <Copy className="w-4 h-4 text-[#707070]" />
                                   )}
                                 </button>
                               </div>
                             </div>
 
                             {/* Registration Details */}
-                            <div className="text-sm text-white/60 space-y-1">
-                              <p><span className="text-white/40">Clasă:</span> a {contestRegistration.grade}-a</p>
-                              <p><span className="text-white/40">Școală:</span> {contestRegistration.school}</p>
+                            <div className="space-y-1 text-sm text-[#666666]">
+                              <p><span className="text-[#8a8a8a]">Clasă:</span> a {contestRegistration.grade}-a</p>
+                              <p><span className="text-[#8a8a8a]">Școală:</span> {contestRegistration.school}</p>
                             </div>
 
-                            <p className="text-xs text-orange-400/80">
+                            <p className="text-xs text-orange-700">
                               Folosește acest cod pentru a accesa subiectele în ziua concursului.
                             </p>
                           </div>
                         ) : (
                           <div className="text-center py-4">
-                            <p className="text-white/60 mb-4">Nu ești încă înscris la concurs.</p>
+                            <p className="mb-4 text-[#666666]">Nu ești încă înscris la concurs.</p>
                             <Button
                               onClick={() => router.push('/concurs/inscriere')}
-                              className="bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-medium"
+                              className="rounded-full bg-gradient-to-r from-orange-500 to-orange-400 font-medium text-white hover:from-orange-600 hover:to-orange-500"
                             >
                               Înscrie-te acum
                             </Button>
@@ -653,9 +653,9 @@ const ProfilPage = () => {
 
       {/* Privacy Settings Modal */}
       <Dialog open={showPrivacyModal} onOpenChange={setShowPrivacyModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#131316] border border-white/20 text-white">
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto rounded-3xl border border-[#e5e5e5] bg-white text-[#191919] shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-white/90">Setări Confidențialitate</DialogTitle>
+            <DialogTitle className="text-2xl text-[#191919]">Setări Confidențialitate</DialogTitle>
           </DialogHeader>
           <div className="mt-4">
             <PrivacySettings />

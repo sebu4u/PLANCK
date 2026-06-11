@@ -7,6 +7,15 @@ import {
   validateInteractiveItemContent,
 } from "@/lib/learning-path-interactive-items"
 import { requireDevSession } from "@/lib/dev-api-session"
+import { assertDevCanAccessApiSubject, type DevPermissions } from "@/lib/admin-check"
+import { chapterVisibleForDev } from "@/lib/dev-chapter-access"
+import {
+  chapterMatchesSubject,
+  isReservedLearningPathMarker,
+  isSuperDev,
+  type ApiDevSubject,
+} from "@/lib/dev-subjects"
+import { AI_LEARNING_PATH_MARKER } from "@/lib/learning-path-ai"
 import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
@@ -15,20 +24,12 @@ import { generateUniqueChapterSlug, generateUniqueLessonSlug } from "@/lib/learn
 import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
-type DevSubject = "physics" | "informatics" | "math" | "biology" | "all"
+type DevSubject = ApiDevSubject
 
 function parseSubjectStrict(trimmedInput: string): DevSubject | null {
   const s = trimmedInput.trim()
-  if (s === "physics" || s === "informatics" || s === "math" || s === "biology" || s === "all") return s
+  if (s === "physics" || s === "informatics" || s === "math" || s === "biology" || s === "ai" || s === "all") return s
   return null
-}
-
-function isReservedLearningPathMarker(pc: string | null): boolean {
-  return (
-    pc === INFORMATICA_LEARNING_PATH_MARKER ||
-    pc === MATEMATICA_LEARNING_PATH_MARKER ||
-    pc === BIOLOGIE_LEARNING_PATH_MARKER
-  )
 }
 
 /** GET: parametru absent / gol → `all` (toate parcursurile). */
@@ -43,6 +44,15 @@ function parseBodySubject(raw: unknown): DevSubject | null {
   if (typeof raw !== "string") return null
   if (raw.trim() === "") return "all"
   return parseSubjectStrict(raw)
+}
+
+const SUBJECT_ERROR = "subject trebuie să fie all, physics, informatics, math, biology sau ai."
+
+function resolveDevAccessSubject(subject: DevSubject, permissions: DevPermissions): DevSubject {
+  if (permissions.isAdmin || isSuperDev(permissions.isDev, permissions.devSubjects)) {
+    return subject
+  }
+  return "all"
 }
 
 const LESSON_TYPES = ["text", "video", "grila", "problem"] as const
@@ -215,7 +225,7 @@ async function shiftItemOrderBand(
 async function getChapterForLesson(
   supabase: SupabaseClient,
   lessonId: string
-): Promise<{ id: string; problem_category: string | null } | null> {
+): Promise<{ id: string; problem_category: string | null; allowed_dev_user_ids: string[] | null } | null> {
   const { data: lesson, error: lErr } = await supabase
     .from("learning_path_lessons")
     .select("chapter_id")
@@ -224,11 +234,11 @@ async function getChapterForLesson(
   if (lErr || !lesson?.chapter_id) return null
   const { data: chapter, error: cErr } = await supabase
     .from("learning_path_chapters")
-    .select("id, problem_category")
+    .select("id, problem_category, allowed_dev_user_ids")
     .eq("id", lesson.chapter_id)
     .maybeSingle()
   if (cErr || !chapter) return null
-  return chapter as { id: string; problem_category: string | null }
+  return chapter as { id: string; problem_category: string | null; allowed_dev_user_ids: string[] | null }
 }
 
 function toNullableString(value: unknown): string | null {
@@ -333,22 +343,13 @@ function validateItemBody(itemType: string, body: Record<string, unknown>) {
   return null
 }
 
-function chapterVisibleForSubject(
-  chapter: { problem_category: string | null },
-  subject: DevSubject
+function chapterVisibleForDevUser(
+  chapter: { problem_category: string | null; allowed_dev_user_ids?: string[] | null },
+  subject: DevSubject,
+  permissions: DevPermissions,
+  userId: string
 ): boolean {
-  if (subject === "all") return true
-  const pc = chapter.problem_category?.trim() || null
-  if (subject === "informatics") {
-    return pc === INFORMATICA_LEARNING_PATH_MARKER
-  }
-  if (subject === "math") {
-    return pc === MATEMATICA_LEARNING_PATH_MARKER
-  }
-  if (subject === "biology") {
-    return pc === BIOLOGIE_LEARNING_PATH_MARKER
-  }
-  return !isReservedLearningPathMarker(pc)
+  return chapterVisibleForDev(chapter, subject, permissions, userId)
 }
 
 /**
@@ -365,10 +366,11 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const subject = resolveQuerySubject(searchParams.get("subject"))
     if (!subject) {
-      return NextResponse.json(
-        { error: "Parametrul subject trebuie să fie all, physics, informatics, math sau biology." },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `Parametrul ${SUBJECT_ERROR}` }, { status: 400 })
+    }
+    const accessSubject = resolveDevAccessSubject(subject, auth.permissions)
+    if (accessSubject !== "all" && !assertDevCanAccessApiSubject(auth.permissions, accessSubject)) {
+      return NextResponse.json({ error: "Nu ai acces dev la materia cerută." }, { status: 403 })
     }
 
     const supabase = createServiceClient()
@@ -415,7 +417,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Nu am putut încărca capitolele." }, { status: 500 })
     }
 
-    const chapters = (allChapters || []).filter((c) => chapterVisibleForSubject(c, subject))
+    const chapters = (allChapters || []).filter((c) =>
+      chapterVisibleForDevUser(c, accessSubject, auth.permissions, auth.userId)
+    )
     const chapterIds = new Set(chapters.map((c) => c.id))
 
     const { data: allLessons, error: lessonsErr } = await supabase
@@ -462,10 +466,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const subject = parseBodySubject((body as Record<string, unknown>).subject)
     if (subject === null) {
-      return NextResponse.json(
-        { error: "subject în body trebuie să fie all, physics, informatics, math sau biology." },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `subject în body ${SUBJECT_ERROR}` }, { status: 400 })
+    }
+    const accessSubject = resolveDevAccessSubject(subject, auth.permissions)
+    if (accessSubject !== "all" && !assertDevCanAccessApiSubject(auth.permissions, accessSubject)) {
+      return NextResponse.json({ error: "Nu ai acces dev la materia cerută." }, { status: 403 })
     }
 
     const supabase = createServiceClient()
@@ -485,6 +490,8 @@ export async function POST(req: NextRequest) {
         problem_category = MATEMATICA_LEARNING_PATH_MARKER
       } else if (subject === "biology") {
         problem_category = BIOLOGIE_LEARNING_PATH_MARKER
+      } else if (subject === "ai") {
+        problem_category = AI_LEARNING_PATH_MARKER
       } else if (subject === "all") {
         const rawPc = toNullableString(body.problem_category)
         if (!rawPc) {
@@ -493,6 +500,7 @@ export async function POST(req: NextRequest) {
           rawPc === INFORMATICA_LEARNING_PATH_MARKER ||
           rawPc === MATEMATICA_LEARNING_PATH_MARKER ||
           rawPc === BIOLOGIE_LEARNING_PATH_MARKER ||
+          rawPc === AI_LEARNING_PATH_MARKER ||
           isPhysicsCatalogCategory(rawPc)
         ) {
           problem_category = rawPc
@@ -500,7 +508,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "problem_category invalid: lasă gol, sau informatica, matematica, biologie, sau un capitol valid din catalogul de fizică.",
+                "problem_category invalid: lasă gol, informatica, matematica, biologie, ai, sau un capitol valid din catalogul de fizică.",
             },
             { status: 400 }
           )
@@ -515,6 +523,9 @@ export async function POST(req: NextRequest) {
         }
         if (rawPc === BIOLOGIE_LEARNING_PATH_MARKER) {
           return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de biologie." }, { status: 400 })
+        }
+        if (rawPc === AI_LEARNING_PATH_MARKER) {
+          return NextResponse.json({ error: "Capitolele de fizică nu pot folosi marcatorul de AI." }, { status: 400 })
         }
         if (!rawPc) {
           problem_category = null
@@ -541,7 +552,7 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         title,
         nav_title: toNullableString(body.nav_title),
         slug,
@@ -551,6 +562,9 @@ export async function POST(req: NextRequest) {
         problem_category,
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
+      }
+      if (!auth.permissions.isAdmin && !isSuperDev(auth.permissions.isDev, auth.permissions.devSubjects)) {
+        payload.allowed_dev_user_ids = [auth.userId]
       }
 
       const { data, error } = await supabase.from("learning_path_chapters").insert(payload).select().single()
@@ -570,7 +584,7 @@ export async function POST(req: NextRequest) {
 
       const { data: chapterRow, error: chErr } = await supabase
         .from("learning_path_chapters")
-        .select("id, problem_category")
+        .select("id, problem_category, allowed_dev_user_ids")
         .eq("id", chapterId)
         .maybeSingle()
 
@@ -578,7 +592,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Capitolul nu există." }, { status: 404 })
       }
 
-      if (!chapterVisibleForSubject(chapterRow, subject)) {
+      if (!chapterVisibleForDevUser(chapterRow, accessSubject, auth.permissions, auth.userId)) {
         return NextResponse.json(
           { error: "Capitolul nu aparține domeniului selectat (fizică / informatică / matematică / biologie)." },
           { status: 403 }
@@ -653,7 +667,7 @@ export async function POST(req: NextRequest) {
 
     const { data: chapterRow, error: ch2Err } = await supabase
       .from("learning_path_chapters")
-      .select("id, problem_category")
+      .select("id, problem_category, allowed_dev_user_ids")
       .eq("id", lessonRow.chapter_id)
       .maybeSingle()
 
@@ -661,7 +675,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Capitolul lecției nu există." }, { status: 404 })
     }
 
-    if (!chapterVisibleForSubject(chapterRow, subject)) {
+    if (!chapterVisibleForDevUser(chapterRow, accessSubject, auth.permissions, auth.userId)) {
       return NextResponse.json({ error: "Lecția nu aparține domeniului selectat." }, { status: 403 })
     }
 
@@ -688,13 +702,13 @@ export async function POST(req: NextRequest) {
       )
     }
     if (
-      itemChapterPc === BIOLOGIE_LEARNING_PATH_MARKER &&
-      (itemType === "problem" || itemType === "math_problem")
+      (itemChapterPc === BIOLOGIE_LEARNING_PATH_MARKER || itemChapterPc === AI_LEARNING_PATH_MARKER) &&
+      (itemType === "problem" || itemType === "math_problem" || itemType === "coding_problem")
     ) {
       return NextResponse.json(
         {
           error:
-            "Pe capitole de biologie nu se folosesc itemi de problemă fizică sau matematică (problem / math_problem).",
+            "Pe capitole de biologie sau AI nu se folosesc itemi de catalog (problem / math_problem / coding_problem).",
         },
         { status: 400 }
       )
@@ -801,10 +815,11 @@ export async function PUT(req: NextRequest) {
     const body = await req.json()
     const subject = parseBodySubject((body as Record<string, unknown>).subject)
     if (subject === null) {
-      return NextResponse.json(
-        { error: "subject în body trebuie să fie all, physics, informatics, math sau biology." },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `subject în body ${SUBJECT_ERROR}` }, { status: 400 })
+    }
+    const accessSubject = resolveDevAccessSubject(subject, auth.permissions)
+    if (accessSubject !== "all" && !assertDevCanAccessApiSubject(auth.permissions, accessSubject)) {
+      return NextResponse.json({ error: "Nu ai acces dev la materia cerută." }, { status: 403 })
     }
 
     const supabase = createServiceClient()
@@ -817,13 +832,13 @@ export async function PUT(req: NextRequest) {
     if (type === "chapter") {
       const { data: existing, error: exErr } = await supabase
         .from("learning_path_chapters")
-        .select("id, problem_category")
+        .select("id, problem_category, allowed_dev_user_ids")
         .eq("id", id)
         .maybeSingle()
       if (exErr || !existing) {
         return NextResponse.json({ error: "Capitolul nu există." }, { status: 404 })
       }
-      if (!chapterVisibleForSubject(existing, subject)) {
+      if (!chapterVisibleForDevUser(existing, accessSubject, auth.permissions, auth.userId)) {
         return NextResponse.json({ error: "Capitolul nu este în domeniul tău dev." }, { status: 403 })
       }
 
@@ -866,6 +881,11 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ error: "Capitolele de biologie păstrează marcatorul fix." }, { status: 400 })
           }
           updateData.problem_category = BIOLOGIE_LEARNING_PATH_MARKER
+        } else if (subject === "ai") {
+          if (rawPc && rawPc !== AI_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Capitolele de AI păstrează marcatorul fix." }, { status: 400 })
+          }
+          updateData.problem_category = AI_LEARNING_PATH_MARKER
         } else if (subject === "all") {
           if (!rawPc) {
             updateData.problem_category = null
@@ -873,6 +893,7 @@ export async function PUT(req: NextRequest) {
             rawPc === INFORMATICA_LEARNING_PATH_MARKER ||
             rawPc === MATEMATICA_LEARNING_PATH_MARKER ||
             rawPc === BIOLOGIE_LEARNING_PATH_MARKER ||
+            rawPc === AI_LEARNING_PATH_MARKER ||
             isPhysicsCatalogCategory(rawPc)
           ) {
             updateData.problem_category = rawPc
@@ -880,7 +901,7 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json(
               {
                 error:
-                  "problem_category invalid: informatica, matematica, biologie, gol, sau capitol din catalogul de fizică.",
+                  "problem_category invalid: informatica, matematica, biologie, ai, gol, sau capitol din catalogul de fizică.",
               },
               { status: 400 }
             )
@@ -894,6 +915,9 @@ export async function PUT(req: NextRequest) {
           }
           if (rawPc === BIOLOGIE_LEARNING_PATH_MARKER) {
             return NextResponse.json({ error: "Nu poți seta marcatorul de biologie pe un capitol de fizică." }, { status: 400 })
+          }
+          if (rawPc === AI_LEARNING_PATH_MARKER) {
+            return NextResponse.json({ error: "Nu poți seta marcatorul de AI pe un capitol de fizică." }, { status: 400 })
           }
           if (rawPc && !isPhysicsCatalogCategory(rawPc)) {
             return NextResponse.json({ error: "problem_category invalid pentru fizică." }, { status: 400 })
@@ -927,7 +951,7 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ error: "Lecția nu există." }, { status: 404 })
       }
       const ch0 = await getChapterForLesson(supabase, existingLesson.id)
-      if (!ch0 || !chapterVisibleForSubject(ch0, subject)) {
+      if (!ch0 || !chapterVisibleForDevUser(ch0, accessSubject, auth.permissions, auth.userId)) {
         return NextResponse.json({ error: "Lecția nu este în domeniul tău dev." }, { status: 403 })
       }
 
@@ -936,10 +960,10 @@ export async function PUT(req: NextRequest) {
         if (newChId) {
           const { data: newCh, error: ncErr } = await supabase
             .from("learning_path_chapters")
-            .select("id, problem_category")
+            .select("id, problem_category, allowed_dev_user_ids")
             .eq("id", newChId)
             .maybeSingle()
-          if (ncErr || !newCh || !chapterVisibleForSubject(newCh, subject)) {
+          if (ncErr || !newCh || !chapterVisibleForDevUser(newCh, accessSubject, auth.permissions, auth.userId)) {
             return NextResponse.json({ error: "Capitolul țintă nu este permis." }, { status: 400 })
           }
         }
@@ -1012,7 +1036,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const chForItem = await getChapterForLesson(supabase, currentItem.lesson_id)
-    if (!chForItem || !chapterVisibleForSubject(chForItem, subject)) {
+    if (!chForItem || !chapterVisibleForDevUser(chForItem, accessSubject, auth.permissions, auth.userId)) {
       return NextResponse.json({ error: "Itemul nu este în domeniul tău dev." }, { status: 403 })
     }
 
@@ -1053,13 +1077,13 @@ export async function PUT(req: NextRequest) {
         )
       }
       if (
-        pcPut === BIOLOGIE_LEARNING_PATH_MARKER &&
-        (itemType === "problem" || itemType === "math_problem")
+        (pcPut === BIOLOGIE_LEARNING_PATH_MARKER || pcPut === AI_LEARNING_PATH_MARKER) &&
+        (itemType === "problem" || itemType === "math_problem" || itemType === "coding_problem")
       ) {
         return NextResponse.json(
           {
             error:
-              "Pe capitole de biologie nu se folosesc itemi de problemă fizică sau matematică (problem / math_problem).",
+              "Pe capitole de biologie sau AI nu se folosesc itemi de catalog (problem / math_problem / coding_problem).",
           },
           { status: 400 }
         )
@@ -1089,7 +1113,7 @@ export async function PUT(req: NextRequest) {
         ? updateData.lesson_id
         : currentItem.lesson_id
     const chTarget = await getChapterForLesson(supabase, targetLessonIdForScope)
-    if (!chTarget || !chapterVisibleForSubject(chTarget, subject)) {
+    if (!chTarget || !chapterVisibleForDevUser(chTarget, accessSubject, auth.permissions, auth.userId)) {
       return NextResponse.json({ error: "Lecția țintă nu este permisă." }, { status: 400 })
     }
 
@@ -1110,14 +1134,15 @@ export async function PUT(req: NextRequest) {
       )
     }
     if (
-      pcTarget === BIOLOGIE_LEARNING_PATH_MARKER &&
+      (pcTarget === BIOLOGIE_LEARNING_PATH_MARKER || pcTarget === AI_LEARNING_PATH_MARKER) &&
       (effectiveItemType === "problem" ||
-        effectiveItemType === "math_problem")
+        effectiveItemType === "math_problem" ||
+        effectiveItemType === "coding_problem")
     ) {
       return NextResponse.json(
         {
           error:
-            "Pe capitole de biologie nu se folosesc itemi de problemă fizică sau matematică (problem / math_problem).",
+            "Pe capitole de biologie sau AI nu se folosesc itemi de catalog (problem / math_problem / coding_problem).",
         },
         { status: 400 }
       )

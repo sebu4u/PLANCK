@@ -9,32 +9,39 @@ import { Navigation } from "@/components/navigation"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
 import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-wrapper"
+import type { DevSubjectKey } from "@/lib/dev-subjects"
 const DEV_SUBJECT_CARDS: {
+  key: DevSubjectKey
   title: string
   className: string
   href?: string
 }[] = [
   {
+    key: "matematica",
     title: "Matematică",
     className: "border-sky-200 bg-sky-50/80 text-sky-950",
     href: "/dashboard/dev/catalog/matematica",
   },
   {
+    key: "informatica",
     title: "Informatică",
     className: "border-indigo-200 bg-indigo-50/80 text-indigo-950",
     href: "/dashboard/dev/catalog/informatica",
   },
   {
+    key: "ai",
     title: "AI",
     className: "border-violet-200 bg-violet-50/80 text-violet-950",
     href: "/dashboard/dev/catalog/ai",
   },
   {
+    key: "fizica",
     title: "Fizică",
     className: "border-amber-200 bg-amber-50/80 text-amber-950",
     href: "/dashboard/dev/catalog/fizica",
   },
   {
+    key: "biologie",
     title: "Biologie",
     className: "border-emerald-200 bg-emerald-50/80 text-emerald-950",
     href: "/dashboard/dev/catalog/biologie",
@@ -43,7 +50,7 @@ const DEV_SUBJECT_CARDS: {
 
 export function DevDashboard() {
   const router = useRouter()
-  const { user, loading: authLoading, profile } = useAuth()
+  const { user, loading: authLoading, profile, devSubjects, isSuperDev } = useAuth()
   const { isAdmin } = useAdmin()
 
   const env = process.env.NODE_ENV
@@ -70,6 +77,11 @@ export function DevDashboard() {
       username: profile?.nickname || profile?.name,
     }
   }, [user?.id, user?.email, profile?.user_icon, profile?.nickname, profile?.name])
+
+  const visibleSubjectCards = useMemo(() => {
+    if (isAdmin || isSuperDev) return DEV_SUBJECT_CARDS
+    return DEV_SUBJECT_CARDS.filter((card) => devSubjects?.includes(card.key))
+  }, [devSubjects, isAdmin, isSuperDev])
 
   if (authLoading || !user) {
     return <LoadingVideoOverlay zIndex={600} />
@@ -125,7 +137,7 @@ export function DevDashboard() {
                       })()}
                     </p>
                     <p className="mt-2 text-xs font-medium text-amber-800/90">
-                      Mod dev — Fizică, Informatică, Matematică, Biologie și AI: adăugare conținut. Celelalte materii, în curând.
+                      Mod dev — vezi doar materiile la care ai acces.
                     </p>
                   </div>
 
@@ -139,13 +151,13 @@ export function DevDashboard() {
                       </span>
                     </div>
                     <p className="text-gray-600">
-                      Mod dev — Fizică, Informatică, Matematică, Biologie și AI: deschide cardul pentru catalog sau learning path (doar adăugare).
+                      Mod dev — deschide o materie pentru catalog sau learning path. Vezi doar conținutul tău.
                     </p>
                   </div>
 
                   <div className="rounded-xl border border-dashed border-gray-300 bg-white/60 p-5 md:p-6">
                     <div className="grid grid-cols-2 gap-3">
-                      {DEV_SUBJECT_CARDS.map((card) => {
+                      {visibleSubjectCards.map((card) => {
                         const cls = `flex min-h-[100px] flex-col justify-end rounded-xl border px-4 py-4 shadow-sm transition hover:opacity-95 ${card.className}`
                         const inner = <p className="text-base font-bold tracking-tight">{card.title}</p>
                         return card.href ? (

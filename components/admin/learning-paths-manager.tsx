@@ -34,6 +34,7 @@ import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
+import type { ApiDevSubject } from "@/lib/dev-subjects"
 import {
   AlertCircle,
   ArrowDown,
@@ -53,7 +54,16 @@ import {
   X,
 } from "lucide-react"
 
-type FormMode = "none" | "create-item" | "edit-item"
+type DevUserOption = {
+  user_id: string
+  email: string | null
+  nickname: string | null
+  name: string | null
+}
+
+function devUserLabel(user: DevUserOption): string {
+  return user.nickname || user.name || user.email || user.user_id
+}
 
 interface ProblemResult {
   id: string
@@ -518,9 +528,9 @@ export interface LearningPathsManagerProps {
   /** implicit `admin` — folosește `/api/admin/...` */
   mode?: "admin" | "dev"
   /** Mod dev: opțional; lipsă sau `all` = toate parcursurile (recomandat). */
-  devSubject?: "physics" | "informatics" | "math" | "biology" | "all"
+  devSubject?: ApiDevSubject
   /** Mod dev: filtru la încărcare; implicit = devSubject. Poate fi `all` pentru vizualizare cross-materie. */
-  devViewSubject?: "physics" | "informatics" | "math" | "biology" | "all"
+  devViewSubject?: ApiDevSubject
   /** Mod dev: apelat după crearea unui item nou (card motivațional). */
   onDevCelebrate?: () => void
 }
@@ -567,8 +577,8 @@ export function LearningPathsManager({
     if (devSubject === "math") {
       return ITEM_TYPES.filter((t) => t !== "problem")
     }
-    if (devSubject === "biology") {
-      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem")
+    if (devSubject === "biology" || devSubject === "ai") {
+      return ITEM_TYPES.filter((t) => t !== "problem" && t !== "math_problem" && t !== "coding_problem")
     }
     return ITEM_TYPES.filter((t) => t !== "math_problem")
   }, [isDev, devSubject])
@@ -580,6 +590,8 @@ export function LearningPathsManager({
   const [chapterIconDrafts, setChapterIconDrafts] = useState<Record<string, string>>({})
   const [chapterNavTitleDrafts, setChapterNavTitleDrafts] = useState<Record<string, string>>({})
   const [chapterAccentColorDrafts, setChapterAccentColorDrafts] = useState<Record<string, string>>({})
+  const [chapterDevEditorDrafts, setChapterDevEditorDrafts] = useState<Record<string, string[]>>({})
+  const [devUsers, setDevUsers] = useState<DevUserOption[]>([])
   const [lessonImageUrlInput, setLessonImageUrlInput] = useState("")
   const [orderedItemIds, setOrderedItemIds] = useState<string[]>([])
 
@@ -592,6 +604,7 @@ export function LearningPathsManager({
     accent_color: "",
     problem_category: "",
     order_index: "",
+    allowed_dev_user_ids: [] as string[],
   })
 
   const orderedItemIdsRef = useRef<string[]>([])
@@ -640,6 +653,39 @@ export function LearningPathsManager({
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useEffect(() => {
+    if (isDev) return
+    void (async () => {
+      const accessToken = await getAccessToken()
+      if (!accessToken) return
+      const response = await fetch("/api/admin/dev-users", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return
+      setDevUsers(
+        (data.devUsers || []).map((row: DevUserOption) => ({
+          user_id: row.user_id,
+          email: row.email ?? null,
+          nickname: row.nickname ?? null,
+          name: row.name ?? null,
+        }))
+      )
+    })()
+  }, [getAccessToken, isDev])
+
+  useEffect(() => {
+    setChapterDevEditorDrafts((prev) => {
+      const next = { ...prev }
+      for (const chapter of chapters) {
+        if (next[chapter.id] === undefined) {
+          next[chapter.id] = chapter.allowed_dev_user_ids ?? []
+        }
+      }
+      return next
+    })
+  }, [chapters])
 
   const sortedChapters = useMemo(() => [...chapters].sort((a, b) => a.order_index - b.order_index), [chapters])
 
@@ -1233,7 +1279,7 @@ export function LearningPathsManager({
       const order_index = Number.isFinite(orderParsed) ? orderParsed : nextChapterOrderDefault
 
       let problem_category: string | null = chapterForm.problem_category.trim() || null
-      if (isDev && (devSubject === "informatics" || devSubject === "math" || devSubject === "biology")) {
+      if (isDev && (devSubject === "informatics" || devSubject === "math" || devSubject === "biology" || devSubject === "ai")) {
         problem_category = null
       }
 
@@ -1251,6 +1297,9 @@ export function LearningPathsManager({
       }
       if (isDev && devSubject) {
         payload.subject = devSubject
+      }
+      if (!isDev && chapterForm.allowed_dev_user_ids.length > 0) {
+        payload.allowed_dev_user_ids = chapterForm.allowed_dev_user_ids
       }
 
       const response = await fetch(apiBase, {
@@ -1284,10 +1333,57 @@ export function LearningPathsManager({
         accent_color: "",
         problem_category: "",
         order_index: "",
+        allowed_dev_user_ids: [],
       })
       await fetchData()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Eroare la crearea capitolului.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveChapterDevEditors = async (chapterId: string) => {
+    if (isDev) return
+
+    const chapterRow = chapters.find((c) => c.id === chapterId)
+    if (!chapterRow) return
+
+    const nextIds = chapterDevEditorDrafts[chapterId] ?? chapterRow.allowed_dev_user_ids ?? []
+    const prevIds = chapterRow.allowed_dev_user_ids ?? []
+    const same =
+      nextIds.length === prevIds.length && nextIds.every((id) => prevIds.includes(id))
+    if (same) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error("Sesiune expirată.")
+
+      const response = await fetch(apiBase, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          type: "chapter",
+          id: chapterId,
+          allowed_dev_user_ids: nextIds,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut actualiza dev-ii pentru acest traseu.")
+      }
+
+      setSuccessMessage("Dev-ii cu acces la traseu au fost salvați.")
+      setTimeout(() => setSuccessMessage(null), 3000)
+      await fetchData()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Eroare la salvarea dev-ilor pentru traseu.")
     } finally {
       setSaving(false)
     }
@@ -2480,6 +2576,10 @@ export function LearningPathsManager({
               <p className="text-[11px] leading-snug text-gray-500">
                 Capitolul va fi marcat automat pentru parcursul de biologie (<code className="text-gray-400">problem_category</code>).
               </p>
+            ) : isDev && devSubject === "ai" ? (
+              <p className="text-[11px] leading-snug text-gray-500">
+                Capitolul va fi marcat automat pentru parcursul de AI (<code className="text-gray-400">problem_category</code>).
+              </p>
             ) : isDev && devSubject === "physics" ? (
               <label className="block text-[11px] text-gray-400">
                 Capitol catalog (opțional)
@@ -2501,7 +2601,7 @@ export function LearningPathsManager({
                 {isDev && devSubject === "all" ? (
                   <p className="text-[11px] leading-snug text-gray-500">
                     <code className="text-gray-400">problem_category</code>: lasă gol, sau <code className="text-gray-400">informatica</code>,{" "}
-                    <code className="text-gray-400">matematica</code>, <code className="text-gray-400">biologie</code>, sau un capitol din catalogul de fizică.
+                    <code className="text-gray-400">matematica</code>, <code className="text-gray-400">biologie</code>, <code className="text-gray-400">ai</code>, sau un capitol din catalogul de fizică.
                   </p>
                 ) : null}
                 <Input
@@ -2519,6 +2619,38 @@ export function LearningPathsManager({
               placeholder={`order_index (implicit ${nextChapterOrderDefault})`}
               className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
             />
+            {!isDev && devUsers.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Dev cu acces la editare
+                </p>
+                <p className="text-[11px] leading-snug text-gray-500">
+                  Dev-ii bifati pot gestiona acest traseu. Lasă nebifat dacă doar admin / super-dev pot edita.
+                </p>
+                <div className="max-h-32 space-y-1.5 overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2">
+                  {devUsers.map((user) => {
+                    const checked = chapterForm.allowed_dev_user_ids.includes(user.user_id)
+                    return (
+                      <label key={user.user_id} className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => {
+                            setChapterForm((f) => ({
+                              ...f,
+                              allowed_dev_user_ids:
+                                value === true
+                                  ? [...f.allowed_dev_user_ids, user.user_id]
+                                  : f.allowed_dev_user_ids.filter((id) => id !== user.user_id),
+                            }))
+                          }}
+                        />
+                        <span className="truncate">{devUserLabel(user)}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -2561,6 +2693,9 @@ export function LearningPathsManager({
                         {chapter.title}
                       </span>
                       {!chapter.is_active ? <EyeOff className="w-3.5 h-3.5 text-gray-500" /> : <Eye className="w-3.5 h-3.5 text-gray-500" />}
+                      {!isDev && (chapter.allowed_dev_user_ids?.length ?? 0) > 0 ? (
+                        <span className="text-[10px] text-amber-400/90">{chapter.allowed_dev_user_ids!.length} dev</span>
+                      ) : null}
                       <span className="text-xs text-gray-500">{chapterLessons.length}</span>
                     </button>
 
@@ -2820,6 +2955,62 @@ export function LearningPathsManager({
                             )
                           })()}
                         </div>
+
+                        {!isDev && devUsers.length > 0 ? (
+                          <div className="border-t border-white/10 px-3 py-3 pl-9 space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                              Dev cu acces la editare
+                            </p>
+                            <p className="text-[11px] leading-snug text-gray-500">
+                              Bifează dev-ii care pot gestiona acest traseu (lecții, itemi). Fără selecție, doar admin / super-dev pot edita.
+                            </p>
+                            <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2">
+                              {devUsers.map((user) => {
+                                const draftIds = chapterDevEditorDrafts[chapter.id] ?? chapter.allowed_dev_user_ids ?? []
+                                const checked = draftIds.includes(user.user_id)
+                                return (
+                                  <label
+                                    key={user.user_id}
+                                    className="flex cursor-pointer items-center gap-2 text-sm text-gray-200"
+                                  >
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(value) => {
+                                        setChapterDevEditorDrafts((prev) => {
+                                          const current = prev[chapter.id] ?? chapter.allowed_dev_user_ids ?? []
+                                          const next =
+                                            value === true
+                                              ? [...current, user.user_id]
+                                              : current.filter((id) => id !== user.user_id)
+                                          return { ...prev, [chapter.id]: next }
+                                        })
+                                      }}
+                                    />
+                                    <span className="truncate">{devUserLabel(user)}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={
+                                saving ||
+                                (() => {
+                                  const nextIds = chapterDevEditorDrafts[chapter.id] ?? chapter.allowed_dev_user_ids ?? []
+                                  const prevIds = chapter.allowed_dev_user_ids ?? []
+                                  return (
+                                    nextIds.length === prevIds.length && nextIds.every((id) => prevIds.includes(id))
+                                  )
+                                })()
+                              }
+                              onClick={() => void handleSaveChapterDevEditors(chapter.id)}
+                              className="bg-emerald-700 text-white hover:bg-emerald-600"
+                            >
+                              Salvează dev-ii
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </div>

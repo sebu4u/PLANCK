@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { isJwtExpired } from "@/lib/auth-validate"
-import { getAccessTokenFromRequest, isDevFromDB } from "@/lib/admin-check"
+import { getAccessTokenFromRequest, getDevPermissionsFromDB, type DevPermissions } from "@/lib/admin-check"
 
 export type DevSessionOk = {
   supabaseUser: ReturnType<typeof createServerClientWithToken>
   userId: string
+  permissions: DevPermissions
 }
 
 export async function requireDevSession(headers: Headers): Promise<DevSessionOk | NextResponse> {
@@ -23,9 +24,10 @@ export async function requireDevSession(headers: Headers): Promise<DevSessionOk 
     return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
   }
 
-  if (!(await isDevFromDB(supabaseUser, userData.user.id))) {
+  const permissions = await getDevPermissionsFromDB(supabaseUser, userData.user.id, userData.user)
+  if (!permissions.isDev && !permissions.isAdmin) {
     return NextResponse.json({ error: "Acces doar pentru conturi dev." }, { status: 403 })
   }
 
-  return { supabaseUser, userId: userData.user.id }
+  return { supabaseUser, userId: userData.user.id, permissions }
 }
