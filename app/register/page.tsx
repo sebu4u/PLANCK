@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
+import { GoogleIdentityButtonOverlay } from "@/components/google-oauth-bridge"
+import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { supabase } from "@/lib/supabaseClient"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
@@ -523,6 +525,36 @@ function RegisterPageContent() {
     setOauthLoading(null)
   }
 
+  const handleGoogleOAuthStart = () => {
+    setOauthLoading("google")
+    markStateForOAuthReturn()
+  }
+
+  const handleGoogleOAuthResult = (result: OAuthPopupResult) => {
+    if (result.cancelled) {
+      clearOAuthFlag()
+      setOauthLoading(null)
+      return
+    }
+
+    if (result.error) {
+      clearOAuthFlag()
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: 6,
+        awaitingPostAuth: false,
+      }))
+      toast({
+        title: "Eroare la autentificare cu Google",
+        description: result.popupBlocked
+          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
+          : result.error.message,
+        variant: "destructive",
+      })
+    }
+    setOauthLoading(null)
+  }
+
   const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -761,15 +793,21 @@ function RegisterPageContent() {
               <p className="mb-6 mt-2 text-center text-sm text-[#666a73]">ca să salvăm parcursul tău de învățare.</p>
 
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleOAuthLogin("google")}
-                  disabled={oauthLoading !== null}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-                >
-                  {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
-                  Continuă cu Google
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={oauthLoading !== null}
+                    className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
+                  >
+                    {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
+                    Continuă cu Google
+                  </button>
+                  <GoogleIdentityButtonOverlay
+                    disabled={oauthLoading !== null}
+                    onStart={handleGoogleOAuthStart}
+                    onResult={handleGoogleOAuthResult}
+                  />
+                </div>
 
                 <button
                   type="button"

@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Loader2 } from "lucide-react"
-import { supabase } from "@/lib/supabaseClient"
-import { signInWithOAuthPopup } from "@/lib/oauth-popup"
+import { GoogleIdentityButtonOverlay } from "@/components/google-oauth-bridge"
+import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { cn } from "@/lib/utils"
 
 type LoginButtonProps = {
@@ -39,40 +39,42 @@ const GoogleIcon = () => (
 export function LoginButton({ className, onError }: LoginButtonProps) {
   const [busy, setBusy] = useState(false)
 
-  const handleClick = async () => {
-    setBusy(true)
-    try {
-      const result = await signInWithOAuthPopup(supabase, "google")
-      if (result.error) {
-        if (result.popupBlocked) {
-          onError?.("Permite ferestrele pop-up pentru acest site, apoi încearcă din nou.")
-        } else if (result.error.message === "POPUP_BLOCKED") {
-          onError?.("Fereastra pop-up a fost blocată.")
-        } else {
-          onError?.(result.error.message)
-        }
-      }
-    } finally {
+  const handleResult = (result: OAuthPopupResult) => {
+    if (result.cancelled) {
       setBusy(false)
+      return
     }
+
+    if (result.error) {
+      if (result.popupBlocked) {
+        onError?.("Permite ferestrele pop-up pentru acest site, apoi încearcă din nou.")
+      } else if (result.error.message === "POPUP_BLOCKED") {
+        onError?.("Fereastra pop-up a fost blocată.")
+      } else {
+        onError?.(result.error.message)
+      }
+    }
+    setBusy(false)
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={busy}
-      className={cn(
-        "inline-flex h-12 w-full items-center justify-center gap-3 rounded-full border border-gray-300 bg-white px-4 text-base font-medium text-black transition-opacity hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-60",
-        className
-      )}
-    >
-      {busy ? (
-        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-gray-600" aria-hidden />
-      ) : (
-        <GoogleIcon />
-      )}
-      <span>Continuă cu Google</span>
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        disabled={busy}
+        className={cn(
+          "inline-flex h-12 w-full items-center justify-center gap-3 rounded-full border border-gray-300 bg-white px-4 text-base font-medium text-black transition-opacity hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-60",
+          className
+        )}
+      >
+        {busy ? (
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-gray-600" aria-hidden />
+        ) : (
+          <GoogleIcon />
+        )}
+        <span>Continuă cu Google</span>
+      </button>
+      <GoogleIdentityButtonOverlay onStart={() => setBusy(true)} onResult={handleResult} disabled={busy} />
+    </div>
   )
 }

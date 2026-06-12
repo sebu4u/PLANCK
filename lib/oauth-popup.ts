@@ -32,8 +32,8 @@ export function getCenteredPopupFeatures(): string {
 }
 
 export type OAuthPopupResult =
-  | { error: null }
-  | { error: Error; popupBlocked?: boolean }
+  | { error: null; cancelled?: boolean }
+  | { error: Error; popupBlocked?: boolean; cancelled?: boolean }
 
 export async function signInWithOAuthPopup(
   supabase: SupabaseClient,

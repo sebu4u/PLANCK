@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import type { AuthError, User } from "@supabase/supabase-js"
+import { GoogleOAuthBridgeProvider, useGoogleOAuthBridge } from "@/components/google-oauth-bridge"
 import { clearSupabaseAuthStorage, supabase } from "@/lib/supabaseClient"
 import { isSuperDev as resolveIsSuperDev, normalizeDevSubjects, type DevSubjectKey } from "@/lib/dev-subjects"
 import {
@@ -56,8 +57,17 @@ const PROFILE_SELECT =
   "name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  return (
+    <GoogleOAuthBridgeProvider>
+      <AuthProviderInner>{children}</AuthProviderInner>
+    </GoogleOAuthBridgeProvider>
+  )
+}
+
+const AuthProviderInner = ({ children }: { children: ReactNode }) => {
   const router = useRouter()
   const pathname = usePathname()
+  const googleOAuth = useGoogleOAuthBridge()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null) // nou: profilul
@@ -380,7 +390,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginWithGoogle = async () => {
     if (typeof window === "undefined") return { error: new Error("Client-only") }
-    return signInWithOAuthPopup(supabase, "google")
+    return googleOAuth.loginWithGoogle(supabase)
   }
 
   const loginWithGitHub = async () => {
