@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
-import { GoogleIdentityButtonOverlay } from "@/components/google-oauth-bridge"
+import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { supabase } from "@/lib/supabaseClient"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
@@ -793,21 +793,15 @@ function RegisterPageContent() {
               <p className="mb-6 mt-2 text-center text-sm text-[#666a73]">ca să salvăm parcursul tău de învățare.</p>
 
               <div className="space-y-3">
-                <div className="relative">
-                  <button
-                    type="button"
-                    disabled={oauthLoading !== null}
-                    className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-                  >
-                    {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
-                    Continuă cu Google
-                  </button>
-                  <GoogleIdentityButtonOverlay
-                    disabled={oauthLoading !== null}
-                    onStart={handleGoogleOAuthStart}
-                    onResult={handleGoogleOAuthResult}
-                  />
-                </div>
+                <GoogleSignInButton
+                  disabled={oauthLoading !== null}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
+                  onStart={handleGoogleOAuthStart}
+                  onResult={handleGoogleOAuthResult}
+                >
+                  {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
+                  Continuă cu Google
+                </GoogleSignInButton>
 
                 <button
                   type="button"

@@ -15,6 +15,7 @@ import {
   getLearningPathLessonBySlug,
   getCanonicalLearningPathLessonPath,
   getLearningPathLessonItems,
+  getLearningPathLessonsByChapterId,
   getNextIncompleteLearningPathItem,
   isUuid,
   learningPathUrlNeedsCanonicalRedirect,
@@ -100,6 +101,13 @@ export default async function InvataLessonDetailPage({
     redirect(canonicalRedirect)
   }
 
+  const chapterLessons = showRealContent ? await getLearningPathLessonsByChapterId(chapter.id) : []
+  const currentLessonIndex = chapterLessons.findIndex((chapterLesson) => chapterLesson.id === lesson.id)
+  const nextLesson =
+    currentLessonIndex >= 0 && currentLessonIndex < chapterLessons.length - 1
+      ? chapterLessons[currentLessonIndex + 1]
+      : null
+
   const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id) : []
   const items = rawItems.map((item) => ({
     ...item,
@@ -166,6 +174,7 @@ export default async function InvataLessonDetailPage({
               chapter={chapter}
               lesson={lesson}
               items={items}
+              nextLesson={nextLesson}
               initialSelectedItemId={initialSelectedItemId}
               completedItemIds={completedItemIdList}
               freeAccess={freeAccess}

@@ -28,6 +28,7 @@ export function mathProblemRowToProblem(row: {
   tags: unknown
   class: number
   difficulty: string
+  chapter?: string | null
   image_url?: string | null
   youtube_url?: string | null
   created_at: string
@@ -53,7 +54,8 @@ export function mathProblemRowToProblem(row: {
     description: row.description ?? "",
     statement: row.statement,
     difficulty: row.difficulty,
-    category: "Matematică",
+    category:
+      typeof row.chapter === "string" && row.chapter.trim() ? row.chapter.trim() : "Matematică",
     tags: tagsStr,
     youtube_url: yt,
     created_at: row.created_at,

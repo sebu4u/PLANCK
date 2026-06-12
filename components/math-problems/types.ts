@@ -21,6 +21,7 @@ export interface MathProblem {
   tags: string[]
   class: number
   difficulty: string
+  chapter?: string
   image_url: string | null
   youtube_url: string | null
   created_at: string

@@ -4,9 +4,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_ITEMS } from "@/lib/mobile-app-nav"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const { isPaid } = useSubscriptionPlan()
+
+  const navItems = isPaid
+    ? MOBILE_BOTTOM_NAV_ITEMS.filter((item) => item.href !== "/abonament")
+    : MOBILE_BOTTOM_NAV_ITEMS
 
   return (
     <nav
@@ -14,7 +20,7 @@ export function MobileBottomNav() {
       className="fixed inset-x-0 bottom-0 z-[300] bg-white pb-[env(safe-area-inset-bottom,0px)] burger:hidden"
     >
       <div className="flex h-[4.5rem] items-stretch">
-        {MOBILE_BOTTOM_NAV_ITEMS.map(({ href, label, icon: Icon, isActive }) => {
+        {navItems.map(({ href, label, icon: Icon, isActive }) => {
           const active = isActive(pathname)
 
           return (

@@ -38,6 +38,27 @@ export function isInvataHubRoute(pathname: string | null | undefined): boolean {
   return pathname === "/invata"
 }
 
+/** Hub /exerseaza and destinations opened from it (catalogs, grile, flashcards). */
+export function isExerseazaRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return (
+    pathname === "/exerseaza" ||
+    pathname.startsWith("/exerseaza/") ||
+    pathname.startsWith("/probleme") ||
+    pathname.startsWith("/matematica/probleme") ||
+    pathname.startsWith("/informatica/probleme") ||
+    pathname === "/grile" ||
+    pathname.startsWith("/grile/") ||
+    pathname === "/invata/flashcard-uri" ||
+    pathname.startsWith("/invata/flashcard-uri/")
+  )
+}
+
+export function isGrileRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/grile" || pathname.startsWith("/grile/")
+}
+
 export function isMobileAppShellRoute(
   pathname: string | null | undefined,
   isAuthenticated: boolean,
@@ -49,11 +70,21 @@ export function isMobileAppShellRoute(
     pathname === "/dashboard" ||
     pathname.startsWith("/dashboard/") ||
     pathname.startsWith("/invata") ||
+    pathname === "/exerseaza" ||
+    pathname.startsWith("/exerseaza/") ||
     pathname.startsWith("/probleme") ||
     pathname.startsWith("/abonament") ||
     pathname.startsWith("/profil") ||
-    pathname === "/grile"
+    isGrileRoute(pathname)
   )
+}
+
+/** Grile uses a full-screen quiz layout without the global bottom tab bar. */
+export function shouldShowMobileBottomNav(
+  pathname: string | null | undefined,
+  isAuthenticated: boolean,
+): boolean {
+  return isMobileAppShellRoute(pathname, isAuthenticated) && !isGrileRoute(pathname)
 }
 
 function formatMobileTopBarDate(): string {
@@ -84,6 +115,10 @@ export function getMobileTopBarContent(
 
   if (pathname?.startsWith("/invata")) {
     return { primary: "Invata" }
+  }
+
+  if (pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/")) {
+    return { primary: "Exerseaza" }
   }
 
   if (pathname?.startsWith("/probleme")) {
@@ -128,10 +163,10 @@ export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
       Boolean(pathname?.startsWith("/invata")) && !isLearningPathItemRoute(pathname),
   },
   {
-    href: "/probleme",
+    href: "/exerseaza",
     label: "Exerseaza",
     icon: Calculator,
-    isActive: (pathname) => Boolean(pathname?.startsWith("/probleme")),
+    isActive: (pathname) => isExerseazaRoute(pathname),
   },
   {
     href: "/abonament",

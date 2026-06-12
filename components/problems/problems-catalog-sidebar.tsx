@@ -30,6 +30,13 @@ export interface SidebarClassProgress extends SidebarProgress {
   chapters: Record<string, SidebarProgress>
 }
 
+export interface CatalogSidebarConfig {
+  classOptions: readonly string[]
+  chapterOptions: Record<string, string[]>
+  difficultyOptions: readonly string[]
+  showProgress?: boolean
+}
+
 interface ProblemsCatalogSidebarProps {
   filters: FilterState
   onFilterChange: (filters: FilterState) => void
@@ -37,15 +44,17 @@ interface ProblemsCatalogSidebarProps {
   totalProblems: number
   filteredCount: number
   lockedClass?: string | null
+  config?: CatalogSidebarConfig
 }
 
-const difficultyOptions = ["Inițiere", "Ușor", "Mediu", "Avansat"] as const
+const DEFAULT_DIFFICULTY_OPTIONS = ["Inițiere", "Ușor", "Mediu", "Avansat"] as const
 const progressOptions: FilterState["progress"][] = ["Nerezolvate", "Rezolvate"]
-const difficultyHoverClasses: Record<(typeof difficultyOptions)[number], string> = {
+const difficultyHoverClasses: Record<string, string> = {
   "Inițiere": "hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700",
   "Ușor": "hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700",
   "Mediu": "hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700",
   "Avansat": "hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700",
+  "Concurs": "hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700",
 }
 
 const hasActiveFilters = (filters: FilterState, defaultClass: string | null) =>
@@ -67,19 +76,22 @@ export function ProblemsCatalogSidebar({
   totalProblems,
   filteredCount,
   lockedClass = null,
+  config,
 }: ProblemsCatalogSidebarProps) {
-  const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({
-    "a 9-a": false,
-    "a 10-a": false,
-    "a 11-a": false,
-    "a 12-a": false,
-  })
+  const classOptions = config?.classOptions ?? CATALOG_CLASS_OPTIONS
+  const chapterOptions = config?.chapterOptions ?? CATALOG_CHAPTER_OPTIONS
+  const difficultyOptions = config?.difficultyOptions ?? DEFAULT_DIFFICULTY_OPTIONS
+  const showProgress = config?.showProgress ?? true
+
+  const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(classOptions.map((cls) => [cls, false])),
+  )
 
   useEffect(() => {
-    if (lockedClass && CATALOG_CLASS_OPTIONS.includes(lockedClass as (typeof CATALOG_CLASS_OPTIONS)[number])) {
+    if (lockedClass && classOptions.includes(lockedClass)) {
       setExpandedClasses((prev) => ({ ...prev, [lockedClass]: true }))
     }
-  }, [lockedClass])
+  }, [classOptions, lockedClass])
 
   const updateFilters = (next: Partial<FilterState>) => {
     onFilterChange({
@@ -136,7 +148,7 @@ export function ProblemsCatalogSidebar({
                     "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                     active
                       ? "border-[#0b0c0f] bg-[#0b0c0f] text-white"
-                      : cn("border-[#0b0c0f]/15 bg-white text-[#2c2f33]", difficultyHoverClasses[difficulty]),
+                      : cn("border-[#0b0c0f]/15 bg-white text-[#2c2f33]", difficultyHoverClasses[difficulty] ?? "hover:border-[#0b0c0f]/35"),
                   )}
                 >
                   {difficulty}
@@ -146,33 +158,36 @@ export function ProblemsCatalogSidebar({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c2f33]/70">Progres</label>
-          <div className="grid grid-cols-2 gap-2">
-            {progressOptions.map((progress) => {
-              const active = filters.progress === progress
-              return (
-                <button
-                  key={progress}
-                  type="button"
-                  onClick={() => updateFilters({ progress: active ? "Toate" : progress })}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
-                    active
-                      ? "border-[#0b0c0f] bg-[#0b0c0f] text-white"
-                      : "border-[#0b0c0f]/15 bg-white text-[#2c2f33] hover:border-[#0b0c0f]/35",
-                  )}
-                >
-                  {progress}
-                </button>
-              )
-            })}
+        {showProgress && (
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c2f33]/70">Progres</label>
+            <div className="grid grid-cols-2 gap-2">
+              {progressOptions.map((progress) => {
+                const active = filters.progress === progress
+                return (
+                  <button
+                    key={progress}
+                    type="button"
+                    onClick={() => updateFilters({ progress: active ? "Toate" : progress })}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                      active
+                        ? "border-[#0b0c0f] bg-[#0b0c0f] text-white"
+                        : "border-[#0b0c0f]/15 bg-white text-[#2c2f33] hover:border-[#0b0c0f]/35",
+                    )}
+                  >
+                    {progress}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-2 border-t border-[#0b0c0f]/10 pt-4">
-          {CATALOG_CLASS_OPTIONS.map((cls) => {
+          {classOptions.map((cls) => {
             const classProgress = progressByClass[cls]
+            const chapters = chapterOptions[cls] ?? []
             const isActiveClass = filters.class === cls
             const isOpen = expandedClasses[cls]
             return (
@@ -189,12 +204,14 @@ export function ProblemsCatalogSidebar({
                     {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     Clasa {cls}
                   </span>
-                  <span className="text-xs font-semibold text-[#2c2f33]/70">{progressLabel(classProgress)}</span>
+                  {showProgress && (
+                    <span className="text-xs font-semibold text-[#2c2f33]/70">{progressLabel(classProgress)}</span>
+                  )}
                 </button>
 
-                {isOpen && (
-                  <div className="space-y-1 border-t border-[#0b0c0f]/10 px-2 py-2">
-                    {CATALOG_CHAPTER_OPTIONS[cls].map((chapter) => {
+                {isOpen && chapters.length > 0 && (
+                  <div className="max-h-[320px] space-y-1 overflow-y-auto border-t border-[#0b0c0f]/10 px-2 py-2">
+                    {chapters.map((chapter) => {
                       const chapterProgress = classProgress?.chapters?.[chapter]
                       const isActiveChapter = isActiveClass && filters.chapter === chapter
                       return (
@@ -210,13 +227,21 @@ export function ProblemsCatalogSidebar({
                           )}
                         >
                           <span className="line-clamp-2 pr-2">{chapter}</span>
-                          <span className={cn("shrink-0 font-semibold", isActiveChapter ? "text-white/85" : "text-[#2c2f33]/65")}>
-                            {progressLabel(chapterProgress)}
-                          </span>
+                          {showProgress && (
+                            <span className={cn("shrink-0 font-semibold", isActiveChapter ? "text-white/85" : "text-[#2c2f33]/65")}>
+                              {progressLabel(chapterProgress)}
+                            </span>
+                          )}
                         </button>
                       )
                     })}
                   </div>
+                )}
+
+                {isOpen && chapters.length === 0 && (
+                  <p className="border-t border-[#0b0c0f]/10 px-3 py-2 text-xs text-[#2c2f33]/55">
+                    Capitolele vor apărea pe măsură ce sunt adăugate probleme.
+                  </p>
                 )}
               </div>
             )

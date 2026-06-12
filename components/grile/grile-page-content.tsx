@@ -9,25 +9,25 @@ import React, {
     useRef,
     useState,
 } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QuizProvider, useQuiz } from './quiz-context';
 import { GrileInsightChatProvider, useGrileInsightChat } from './grile-insight-chat-provider';
 import { ClassSelector } from './class-selector';
+import { GrileDesktopSidebar } from './grile-desktop-sidebar';
+import { useGrileClassSelect } from './use-grile-class-select';
 import { QuestionCard } from './question-card';
 import { AnswersList } from './answers-list';
 import { GrileQuizBottomBar } from './grile-quiz-bottom-bar';
-import { fetchAndShuffleQuestions, fetchQuizQuestionById } from '@/lib/supabase-quiz';
+import { fetchQuizQuestionById } from '@/lib/supabase-quiz';
 import { formatGrileCatalogInsightContext } from '@/lib/grile-insight-context';
-import type { GradeLevel, QuizQuestion, UserAnswer } from '@/lib/types/quiz-questions';
-import { Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import type { GradeLevel } from '@/lib/types/quiz-questions';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  MOBILE_BOTTOM_NAV_FAB_ABOVE_QUIZ_CLASS,
-  MOBILE_BOTTOM_NAV_PADDING_CLASS,
-  MOBILE_BOTTOM_NAV_QUIZ_PADDING_CLASS,
-} from '@/lib/mobile-app-nav';
 import { fireLearningPathCorrectConfetti } from '@/lib/learning-path-confetti';
 import { playGrileErrorSound, playGrileSuccessSound } from '@/lib/grile-quiz-audio';
+
+const GRILE_DESKTOP_EMPTY_ICON = `/images/icons/${encodeURIComponent("Untitled design (42).png")}`;
 
 type GrileShellFeedbackContextValue = {
     triggerWrongAnswerFeedback: () => void;
@@ -77,19 +77,21 @@ function QuizContent() {
         }
     }, [verifyAnswer, shellFeedback]);
 
-    const handleClassSelect = useCallback(async (level: GradeLevel) => {
-        setClassLevel(level);
-        setLoading(true);
+    const handleExplain = useCallback(() => {
+        if (!grileChat || !currentQuestion || !classLevel) return;
+        grileChat.openGrileChat({
+            problemStatement: formatGrileCatalogInsightContext({
+                question: currentQuestion,
+                userAnswer: currentAnswer,
+                classLevel,
+                questionIndex: currentIndex,
+                totalQuestions,
+            }),
+            problemId: `grile-catalog:${currentQuestion.id}:${currentIndex}`,
+        });
+    }, [grileChat, currentQuestion, currentAnswer, classLevel, currentIndex, totalQuestions]);
 
-        try {
-            const shuffledQuestions = await fetchAndShuffleQuestions(level);
-            setQuestions(shuffledQuestions);
-        } catch (error) {
-            console.error('Error fetching questions:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [setClassLevel, setLoading, setQuestions]);
+    const { handleClassSelect } = useGrileClassSelect();
 
     const searchParams = useSearchParams();
     const gradeParam = searchParams.get('grade');
@@ -172,9 +174,28 @@ function QuizContent() {
         );
     }
 
-    // Show class selector if no class selected
+    // Show class selector if no class selected (mobile only; desktop uses sidebar)
     if (!classLevel) {
-        return <ClassSelector onSelect={handleClassSelect} />;
+        return (
+            <>
+                <div className="w-full lg:hidden">
+                    <ClassSelector onSelect={handleClassSelect} />
+                </div>
+                <div className="hidden w-full max-w-md flex-col items-center px-6 text-center lg:flex">
+                    <Image
+                        src={GRILE_DESKTOP_EMPTY_ICON}
+                        alt=""
+                        width={176}
+                        height={176}
+                        className="mb-1 h-auto w-44 object-contain"
+                        priority
+                    />
+                    <p className="text-sm text-[#2c2f33]/75 sm:text-base">
+                        Selectează clasa din meniul din stânga pentru a începe grilele.
+                    </p>
+                </div>
+            </>
+        );
     }
 
     // Show loading state
@@ -218,7 +239,13 @@ function QuizContent() {
     }
 
     return (
-        <div className={cn("w-full max-w-4xl mx-auto px-4 lg:px-6", MOBILE_BOTTOM_NAV_QUIZ_PADDING_CLASS, "burger:pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]")}>
+        <div
+            className={cn(
+                "mx-auto w-full max-w-4xl px-4 lg:px-6",
+                "burger:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+                "lg:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+            )}
+        >
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-8">
                 <QuestionCard question={currentQuestion} />
 
@@ -230,7 +257,7 @@ function QuizContent() {
                 />
             </div>
 
-            <div className="mt-4 text-center lg:mt-5">
+            <div className="mt-4 text-center lg:mt-5 lg:hidden">
                 <button
                     type="button"
                     onClick={resetQuiz}
@@ -249,70 +276,18 @@ function QuizContent() {
                 onPrevious={goToPrevious}
                 onSkip={skipCurrentQuestion}
                 onReset={resetQuiz}
+                onExplain={handleExplain}
                 isLastQuestion={currentIndex === totalQuestions - 1}
                 insightDesktopOpen={insightDesktopOpen}
-            />
-
-            <GrileInsightFab
-                classLevel={classLevel}
-                currentQuestion={currentQuestion}
-                currentAnswer={currentAnswer}
-                currentIndex={currentIndex}
-                totalQuestions={totalQuestions}
             />
         </div>
     );
 }
 
-function GrileInsightFab({
-    classLevel,
-    currentQuestion,
-    currentAnswer,
-    currentIndex,
-    totalQuestions,
-}: {
-    classLevel: GradeLevel
-    currentQuestion: QuizQuestion
-    currentAnswer: UserAnswer | null
-    currentIndex: number
-    totalQuestions: number
-}) {
-    const grileChat = useGrileInsightChat()
-    const grileDesktopChat = Boolean(grileChat?.grileChatDocked && grileChat?.isDesktopViewport)
-
-    if (!grileChat) return null
-
-    return (
-        <button
-            type="button"
-            onClick={() => {
-                grileChat.openGrileChat({
-                    problemStatement: formatGrileCatalogInsightContext({
-                        question: currentQuestion,
-                        userAnswer: currentAnswer,
-                        classLevel,
-                        questionIndex: currentIndex,
-                        totalQuestions,
-                    }),
-                    problemId: `grile-catalog:${currentQuestion.id}:${currentIndex}`,
-                })
-            }}
-            className={cn(
-                'fixed z-[400] flex items-center gap-2 rounded-full border border-violet-500/40 bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-900/15 transition hover:from-violet-500 hover:to-purple-500',
-                MOBILE_BOTTOM_NAV_FAB_ABOVE_QUIZ_CLASS,
-                'max-lg:right-[max(1.5rem,env(safe-area-inset-right,0px))] lg:bottom-6',
-                grileDesktopChat ? 'lg:right-[calc(1.5rem+25vw)]' : 'lg:right-6',
-            )}
-        >
-            <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
-            Întreabă Insight
-        </button>
-    )
-}
-
 function GrilePageShell() {
     const chat = useGrileInsightChat()
     const insightDesktopOpen = Boolean(chat?.grileChatDocked && chat?.isDesktopViewport)
+    const { classLevel, isLoading, handleClassSelect } = useGrileClassSelect()
     const [wrongFlash, setWrongFlash] = useState(false)
     const wrongFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -336,8 +311,8 @@ function GrilePageShell() {
         <GrileShellFeedbackContext.Provider value={shellFeedbackValue}>
             <div
                 className={cn(
-                    'relative min-h-screen lg:h-screen lg:overflow-hidden bg-[#ffffff] pt-16 lg:pt-24 lg:pb-4 flex flex-col',
-                    MOBILE_BOTTOM_NAV_PADDING_CLASS,
+                    'relative flex min-h-screen flex-col bg-[#ffffff] pt-16',
+                    'lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden',
                     insightDesktopOpen && 'lg:mr-[25vw]',
                     wrongFlash && 'animate-grile-wrong-shake',
                 )}
@@ -349,8 +324,27 @@ function GrilePageShell() {
                     )}
                     aria-hidden
                 />
-                <div className="relative z-10 flex flex-1 items-start justify-center lg:items-center">
-                    <QuizContent />
+                <GrileDesktopSidebar
+                    selectedClass={classLevel}
+                    isLoading={isLoading}
+                    onSelectClass={handleClassSelect}
+                />
+                <div className="relative z-10 flex min-h-0 flex-1 flex-col lg:ml-[300px]">
+                    <div
+                        className={cn(
+                            'flex flex-1 items-start justify-center',
+                            'lg:absolute lg:inset-[3px] lg:top-0 lg:overflow-hidden lg:rounded-xl lg:bg-[#f5f4f2]',
+                        )}
+                    >
+                        <div
+                            className={cn(
+                                'w-full',
+                                'lg:catalog-problems-scroll lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-y-auto',
+                            )}
+                        >
+                            <QuizContent />
+                        </div>
+                    </div>
                 </div>
             </div>
         </GrileShellFeedbackContext.Provider>

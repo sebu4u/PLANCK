@@ -17,6 +17,7 @@ import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-c
 import { LearningPathTrail } from "@/components/invata/learning-path-trail"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
+import { LearningPathUpNextSection } from "@/components/invata/learning-path-up-next-section"
 import { cn } from "@/lib/utils"
 
 function scrollLearningPathItemIntoView(itemId: string, behavior: ScrollBehavior = "smooth") {
@@ -44,6 +45,7 @@ interface LearningPathLessonPageProps {
   chapter: LearningPathChapter
   lesson: LearningPathLesson
   items: LearningPathLessonItem[]
+  nextLesson?: LearningPathLesson | null
   initialSelectedItemId?: string | null
   completedItemIds?: string[]
   freeAccess?: FreeAccessState | null
@@ -111,6 +113,7 @@ export function LearningPathLessonPage({
   chapter,
   lesson,
   items,
+  nextLesson = null,
   initialSelectedItemId = null,
   completedItemIds = [],
   freeAccess = null,
@@ -119,6 +122,7 @@ export function LearningPathLessonPage({
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialSelectedItemId ?? items[0]?.id ?? null)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [isOpeningItem, setIsOpeningItem] = useState(false)
+  const [isOpeningNextLesson, setIsOpeningNextLesson] = useState(false)
   const [isSelectedItemInViewport, setIsSelectedItemInViewport] = useState(false)
   const [progressScrollDirection, setProgressScrollDirection] = useState<"up" | "down" | null>(null)
   const [progressButtonMounted, setProgressButtonMounted] = useState(false)
@@ -141,6 +145,13 @@ export function LearningPathLessonPage({
     return firstUncompleted?.id ?? items[0]?.id ?? null
   }, [items, completedItemIdSet])
   const isSelectedNextItem = selectedItem ? selectedItem.id === nextItemId : true
+  const isCurrentLessonComplete = useMemo(() => {
+    if (items.length === 0) return true
+    return items.every((item) => completedItemIdSet.has(item.id))
+  }, [items, completedItemIdSet])
+  const nextLessonHref = nextLesson ? getLearningPathLessonHref(chapter, nextLesson) : null
+  const nextLessonDescription =
+    nextLesson?.description?.trim() || "Continuă parcursul cu următoarea lecție."
 
   const handleOpenItem = () => {
     if (!selectedItemHref || isOpeningItem) return
@@ -184,6 +195,14 @@ export function LearningPathLessonPage({
     if (!nextItemId) return
     setSelectedItemId(nextItemId)
     scrollLearningPathItemIntoView(nextItemId)
+  }
+
+  const handleJumpToNextLesson = () => {
+    if (!nextLessonHref || isOpeningNextLesson || !isCurrentLessonComplete) return
+
+    setIsOpeningNextLesson(true)
+    router.prefetch(nextLessonHref)
+    router.push(nextLessonHref)
   }
 
   useEffect(() => {
@@ -533,6 +552,16 @@ export function LearningPathLessonPage({
               })}
 
               </LearningPathTrail>
+
+              {nextLesson ? (
+                <LearningPathUpNextSection
+                  title={nextLesson.title}
+                  description={nextLessonDescription}
+                  isCurrentLessonComplete={isCurrentLessonComplete}
+                  isOpening={isOpeningNextLesson}
+                  onJumpAhead={handleJumpToNextLesson}
+                />
+              ) : null}
 
               {items.length > 0 ? (
                 <>

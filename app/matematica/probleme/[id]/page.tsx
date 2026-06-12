@@ -1,10 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { notFound } from "next/navigation"
-import { MathProblemDetail } from "@/components/math-problems/math-problem-detail"
-import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
-import { CatalogThemeBackground } from "@/components/catalog-theme-background"
-import type { MathProblem } from "@/components/math-problems/types"
-import { MATH_PROBLEMS_PUBLIC_COLUMNS } from "@/data/math-problems"
+import ProblemDetailClient from "@/app/probleme/[id]/ProblemDetailClient"
+import { MATH_PROBLEMS_SOLVE_COLUMNS } from "@/data/math-problems"
+import { mathProblemRowToProblem } from "@/lib/math-problem-to-learning-path-problem"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
@@ -17,6 +15,16 @@ export const revalidate = 604800
 
 interface MathProblemDetailPageProps {
   params: Promise<{ id: string }>
+}
+
+const mathCategoryIcons: Record<string, string> = {
+  Matematică: "🧮",
+}
+
+const difficultyColors = {
+  Ușor: "border-green-500 text-green-600 bg-green-50",
+  Mediu: "border-yellow-500 text-yellow-600 bg-yellow-50",
+  Avansat: "border-red-500 text-red-600 bg-red-50",
 }
 
 function normalizeTags(raw: unknown): string[] {
@@ -33,7 +41,7 @@ async function fetchProblem(id: string) {
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
   const { data, error } = await supabase
     .from("math_problems")
-    .select(MATH_PROBLEMS_PUBLIC_COLUMNS)
+    .select(MATH_PROBLEMS_SOLVE_COLUMNS)
     .eq("id", id)
     .eq("is_active", true)
     .maybeSingle()
@@ -45,7 +53,7 @@ async function fetchProblem(id: string) {
   return {
     ...data,
     tags: normalizeTags(data.tags),
-  } as MathProblem
+  }
 }
 
 export async function generateMetadata(props: MathProblemDetailPageProps) {
@@ -75,11 +83,20 @@ export default async function MathProblemDetailPage(props: MathProblemDetailPage
     notFound()
   }
 
+  const detailProblem = mathProblemRowToProblem(problem)
+  const categoryIcons = {
+    ...mathCategoryIcons,
+    ...(problem.chapter?.trim() ? { [problem.chapter.trim()]: "🧮" } : {}),
+  }
+
   return (
-    <CatalogThemeProvider catalogType="info">
-      <CatalogThemeBackground defaultBackgroundClass="bg-[#070707]">
-        <MathProblemDetail problem={problem} />
-      </CatalogThemeBackground>
-    </CatalogThemeProvider>
+    <div className="bg-[#f6f5f4]">
+      <ProblemDetailClient
+        problem={detailProblem}
+        categoryIcons={categoryIcons}
+        difficultyColors={difficultyColors}
+        subject="math"
+      />
+    </div>
   )
 }

@@ -18,11 +18,18 @@ import { Problem } from "@/data/problems"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import {
+  getProblemDetailSubjectConfig,
+  type ProblemDetailSubject,
+} from "@/lib/problem-detail-subject"
+import { MATH_PROBLEMS_PUBLIC_COLUMNS } from "@/data/math-problems"
+import { mathProblemRowToProblem } from "@/lib/math-problem-to-learning-path-problem"
 
 interface ProblemsSidebarProps {
   isOpen: boolean
   onClose: () => void
   currentProblemId: string
+  subject?: ProblemDetailSubject
 }
 
 interface FilterState {
@@ -174,7 +181,13 @@ const difficultyColors = {
   Avansat: "border-rose-500/40 bg-rose-500/15 text-rose-200"
 }
 
-export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsSidebarProps) {
+export function ProblemsSidebar({
+  isOpen,
+  onClose,
+  currentProblemId,
+  subject = "physics",
+}: ProblemsSidebarProps) {
+  const subjectConfig = getProblemDetailSubjectConfig(subject)
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
@@ -184,12 +197,44 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
   })
   const router = useRouter()
 
+  useEffect(() => {
+    setProblems([])
+  }, [subject])
+
+  const effectiveChapterOptions = useMemo(() => {
+    if (subject === "physics") {
+      return chapterOptions
+    }
+
+    const byClass: Record<string, string[]> = {
+      "a 9-a": ["Toate"],
+      "a 10-a": ["Toate"],
+      "a 11-a": ["Toate"],
+      "a 12-a": ["Toate"],
+    }
+
+    for (const problem of problems) {
+      if (typeof problem.class !== "number") continue
+      const classKey = `a ${problem.class}-a`
+      const chapter = problem.category?.trim()
+      if (!chapter || chapter === "Matematică") continue
+      if (!byClass[classKey]) {
+        byClass[classKey] = ["Toate"]
+      }
+      if (!byClass[classKey].includes(chapter)) {
+        byClass[classKey].push(chapter)
+      }
+    }
+
+    return byClass
+  }, [subject, problems])
+
   // Fetch problems when sidebar opens
   useEffect(() => {
     if (isOpen && problems.length === 0) {
       fetchProblems()
     }
-  }, [isOpen])
+  }, [isOpen, subject])
 
   // Close sidebar on escape key
   useEffect(() => {
@@ -213,6 +258,26 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
   const fetchProblems = async () => {
     setLoading(true)
     try {
+      if (subject === "math") {
+        const { data, error } = await supabase
+          .from("math_problems")
+          .select(MATH_PROBLEMS_PUBLIC_COLUMNS)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+
+        if (!error && data) {
+          setProblems(
+            data.map((row) =>
+              mathProblemRowToProblem({
+                ...row,
+                tags: row.tags,
+              }),
+            ),
+          )
+        }
+        return
+      }
+
       const { data, error } = await supabase
         .from("problems")
         .select("*")
@@ -236,14 +301,14 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
       // Chapter filtering only applies when a specific class is selected
       const matchesChapter = filters.class === "Toate" || filters.chapter === "Toate" || problem.category === filters.chapter
       
-      const matchesClass = filters.class === "Toate" || problem.class.toString() === filters.class.replace("a ", "").replace("-a", "")
+      const matchesClass = filters.class === "Toate" || problem.class?.toString() === filters.class.replace("a ", "").replace("-a", "")
       
       return matchesSearch && matchesChapter && matchesClass
     })
   }, [problems, filters])
 
   const handleProblemClick = (problemId: string) => {
-    router.push(`/probleme/${problemId}`)
+    router.push(`${subjectConfig.problemHrefPrefix}/${encodeURIComponent(problemId)}`)
     onClose()
   }
 
@@ -344,7 +409,7 @@ export function ProblemsSidebar({ isOpen, onClose, currentProblemId }: ProblemsS
                     Toate
                   </SelectItem>
                 ) : (
-                  chapterOptions[filters.class]?.map((option) => (
+                  effectiveChapterOptions[filters.class]?.map((option) => (
                     <SelectItem key={option} value={option}>
                       {chapterIcons[option] || chapterIcons["Toate"]}
                       {option}

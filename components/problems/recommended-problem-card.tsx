@@ -6,6 +6,10 @@ import { ArrowRight } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
+import {
+  getProblemDetailSubjectConfig,
+  type ProblemDetailSubject,
+} from "@/lib/problem-detail-subject"
 
 type ProblemLite = {
   id: string
@@ -38,7 +42,14 @@ function hasSharedTag(currentTags: string[], candidateTags: string[]) {
   return candidateTags.some((tag) => currentSet.has(tag))
 }
 
-export function RecommendedProblemCard({ currentProblem }: { currentProblem: Problem }) {
+export function RecommendedProblemCard({
+  currentProblem,
+  subject = "physics",
+}: {
+  currentProblem: Problem
+  subject?: ProblemDetailSubject
+}) {
+  const subjectConfig = getProblemDetailSubjectConfig(subject)
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [recommended, setRecommended] = useState<ProblemLite | null>(null)
@@ -58,7 +69,7 @@ export function RecommendedProblemCard({ currentProblem }: { currentProblem: Pro
       setLoading(true)
 
       let solvedIds = new Set<string>()
-      if (user?.id) {
+      if (user?.id && subject === "physics") {
         const { data: solvedData } = await supabase
           .from("solved_problems")
           .select("problem_id")
@@ -67,11 +78,19 @@ export function RecommendedProblemCard({ currentProblem }: { currentProblem: Pro
         solvedIds = new Set((solvedData || []).map((item) => item.problem_id))
       }
 
-      const { data: problemsData, error } = await supabase
-        .from("problems")
-        .select("id, title, tags, difficulty, category")
+      const selectColumns =
+        subject === "math"
+          ? "id, title, tags, difficulty, chapter"
+          : "id, title, tags, difficulty, category"
+
+      const query = supabase
+        .from(subjectConfig.problemsTable)
+        .select(selectColumns)
         .order("created_at", { ascending: false })
         .limit(100)
+
+      const { data: problemsData, error } =
+        subject === "math" ? await query.eq("is_active", true) : await query
 
       if (error || !problemsData) {
         if (!isCancelled) {
@@ -81,11 +100,14 @@ export function RecommendedProblemCard({ currentProblem }: { currentProblem: Pro
         return
       }
 
-      const candidates = (problemsData as ProblemLite[]).filter((problem) => {
+      const candidates = (problemsData as Array<ProblemLite & { chapter?: string | null }>).filter((problem) => {
         if (problem.id === currentProblem.id) return false
         if (solvedIds.has(problem.id)) return false
         return hasSharedTag(currentTags, normalizeTags(problem.tags))
-      })
+      }).map((problem) => ({
+        ...problem,
+        category: problem.category ?? problem.chapter ?? null,
+      }))
 
       if (!isCancelled) {
         setRecommended(candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : null)
@@ -98,7 +120,7 @@ export function RecommendedProblemCard({ currentProblem }: { currentProblem: Pro
     return () => {
       isCancelled = true
     }
-  }, [currentProblem.id, currentTags, user?.id])
+  }, [currentProblem.id, currentTags, user?.id, subject, subjectConfig.problemsTable])
 
   return (
     <div className="rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)]">
@@ -123,7 +145,7 @@ export function RecommendedProblemCard({ currentProblem }: { currentProblem: Pro
             )}
           </div>
           <Link
-            href={`/probleme/${recommended.id}`}
+            href={`${subjectConfig.problemHrefPrefix}/${encodeURIComponent(recommended.id)}`}
             className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#2a2a2a] px-4 py-2 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] hover:bg-[#2a2a2a]"
           >
             Încearcă problema

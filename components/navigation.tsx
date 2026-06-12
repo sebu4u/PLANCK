@@ -23,9 +23,12 @@ import { InvataMobilePathNav } from "@/components/invata/invata-mobile-path-nav"
 import { useInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
 import {
   getMobileTopBarContent,
+  isExerseazaRoute,
+  isGrileRoute as matchGrileRoute,
   isInvataHubRoute,
   isMobileAppShellRoute,
   isMobileLessonItemsShellRoute,
+  shouldShowMobileBottomNav,
 } from "@/lib/mobile-app-nav"
 
 function isInsideMonacoEditor(element: EventTarget | null): boolean {
@@ -52,14 +55,16 @@ export function Navigation() {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Dashboard, /invata, /grile, /probleme catalog, /classrooms, and /profil share the same white navbar theme.
+  // Dashboard, /invata, /grile, /probleme catalog, /matematica/probleme, /classrooms, and /profil share the same white navbar theme.
   const isDashboard =
     pathname === "/dashboard" ||
     pathname?.startsWith("/dashboard/") === true ||
     pathname?.startsWith("/invata") === true
   const isProfileRoute = pathname?.startsWith("/profil") ?? false
-  const isGrileRoute = pathname === "/grile"
+  const isGrileRoute = matchGrileRoute(pathname)
   const isDashboardPage = pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
+  const isMatematicaProblemsCatalog = pathname === "/matematica/probleme"
+  const isMatematicaProblemDetail = Boolean(pathname?.match(/^\/matematica\/probleme\/[^/]+$/))
   // Desktop search state
   const [query, setQuery] = useState("")
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false)
@@ -386,7 +391,7 @@ export function Navigation() {
         handleSelect(results[highlightIndex].url)
       } else if (query.trim()) {
         // fallback: go to problems page with search? For now, open catalog
-        router.push('/probleme')
+        router.push('/exerseaza')
       }
     } else if (e.key === 'Escape') {
       setIsSearchDialogOpen(false)
@@ -406,12 +411,17 @@ export function Navigation() {
   const isTransparentRoute = isHomepage || isRegisterRoute
   const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
+  const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
+  const isExerseazaActive = isExerseazaRoute(pathname)
   const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
   const isClassroomsRoute = pathname?.startsWith("/classrooms") ?? false
   const useLightNav =
     isDashboard ||
+    isExerseazaHub ||
     isProblemsCatalog ||
     isProblemPage ||
+    isMatematicaProblemsCatalog ||
+    isMatematicaProblemDetail ||
     isClassroomsRoute ||
     isGrileRoute ||
     isProfileRoute
@@ -419,7 +429,10 @@ export function Navigation() {
   /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
   const isGuestProblemeOrCursuri =
     !user &&
-    ((pathname?.startsWith("/probleme") ?? false) || (pathname?.startsWith("/cursuri") ?? false))
+    ((pathname?.startsWith("/probleme") ?? false) ||
+      (pathname?.startsWith("/matematica/probleme") ?? false) ||
+      isExerseazaHub ||
+      (pathname?.startsWith("/cursuri") ?? false))
   const isBacSimulationsPage = pathname?.startsWith('/simulari-bac') ?? false
   // On mobile, navbar should never be transparent when at the top of the screen
   const isSpaceRoute = pathname === '/space'
@@ -484,21 +497,28 @@ export function Navigation() {
   const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const navDropShadowOnDesktop =
-    pathname?.startsWith('/invata') || isGrileRoute || (isProblemPage && !isProblemsCatalog)
+    pathname?.startsWith('/invata') ||
+    isGrileRoute ||
+    (isProblemPage && !isProblemsCatalog) ||
+    isMatematicaProblemDetail
   /** Single-problem page uses a fixed white outline under the bar; shadow is applied there so it sits below that outline */
   const isProblemDetailPage =
-    Boolean(pathname && /^\/probleme\/[^/]+$/.test(pathname) && !pathname.startsWith('/probleme/pagina'))
+    Boolean(pathname && /^\/probleme\/[^/]+$/.test(pathname) && !pathname.startsWith('/probleme/pagina')) ||
+    isMatematicaProblemDetail
   const showMobileLessonShell = Boolean(user && isMobileLessonItemsShellRoute(pathname, true))
+  const showMobileGrileShell = Boolean(user && isMobile && matchGrileRoute(pathname))
+  const showMobileFocusedShell = showMobileLessonShell || showMobileGrileShell
+  const isExerseazaHubPage = pathname === "/exerseaza"
   const navbarElevationClass =
     isProblemDetailPage
       ? "shadow-none"
-      : showMobileLessonShell
+      : showMobileFocusedShell
         ? "shadow-none burger:shadow-md"
-        : isDashboardPage
+        : isDashboardPage || isExerseazaHubPage
           ? "shadow-none burger:shadow-md"
           : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
-  const showMobileBottomNav = showMobileAppShell
+  const showMobileBottomNav = shouldShowMobileBottomNav(pathname, Boolean(user))
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
   const invataHubChapters = useInvataHubChapters()
@@ -513,7 +533,7 @@ export function Navigation() {
     }
     return () => document.body.classList.remove("mobile-app-shell")
   }, [showMobileAppShell])
-  const mobileShellNavSurfaceClass = showMobileLessonShell
+  const mobileShellNavSurfaceClass = showMobileFocusedShell
     ? "bg-[#ffffff] border-transparent"
     : showInvataHubMobileNav
       ? useLightNav
@@ -524,7 +544,7 @@ export function Navigation() {
         ? `${navTheme.background} ${navTheme.border}`
         : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
       : `${navTheme.background} ${navTheme.border}`
-  const navBackdropClass = showMobileLessonShell
+  const navBackdropClass = showMobileFocusedShell
     ? ""
     : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
 
@@ -583,6 +603,19 @@ export function Navigation() {
                       <NavbarTestBatteries useLightNav />
                     </div>
                   </>
+                ) : showMobileGrileShell ? (
+                  <>
+                    <Link
+                      href="/exerseaza"
+                      aria-label="Înapoi la Exersează"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                    >
+                      <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
+                    </Link>
+                    <div className="flex shrink-0 items-center">
+                      <NavbarTestBatteries useLightNav />
+                    </div>
+                  </>
                 ) : showMobileAppShell ? (
                   <>
                     <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
@@ -607,7 +640,7 @@ export function Navigation() {
                       <Link href="/invata" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                         <BookOpen className="h-5 w-5" />
                       </Link>
-                      <Link href="/probleme" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                      <Link href="/exerseaza" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isExerseazaActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                         <Calculator className="h-5 w-5" />
                       </Link>
                       <Link
@@ -706,8 +739,8 @@ export function Navigation() {
                     </Link>
 
                     <Link
-                      href="/probleme"
-                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isProblemsCatalog ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                      href="/exerseaza"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isExerseazaActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
                       <Calculator size={16} />
                       Exersează

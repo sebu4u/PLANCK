@@ -181,6 +181,28 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  exerseaza: {
+    title: "Exersează – Probleme, Grile, Teste și Flashcard | PLANCK",
+    description:
+      "Alege cum vrei să exersezi: catalog de probleme, grile, teste și flashcard-uri personalizate din traseele de învățare.",
+    keywords:
+      "exerseaza planck, probleme liceu, grile fizica, flashcard invatare, teste liceu, catalog probleme",
+    alternates: {
+      canonical: "/exerseaza",
+    },
+    openGraph: {
+      title: "Exersează – Probleme, Grile, Teste și Flashcard",
+      description:
+        "Hub central pentru exerciții: probleme, grile, teste și flashcard-uri pe Planck Academy.",
+      url: `${PLATFORM_SITE_URL}/exerseaza`,
+    },
+    twitter: {
+      title: "Exersează – Probleme, Grile, Teste și Flashcard",
+      description:
+        "Alege modul de exersare potrivit: probleme, grile, teste sau flashcard-uri.",
+    },
+  },
+
   problems: {
     title: "Probleme Rezolvate Video & Catalog – BAC, Admitere, Clasă | PLANCK",
     description: `Peste ${VIDEO_SOLUTIONS_COUNT} probleme cu soluții video explicate și catalog complet pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. ${TEACHER_VERIFICATION}.`,

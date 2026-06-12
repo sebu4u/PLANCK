@@ -38,6 +38,10 @@ import {
   getFreshPhysicsCatalogProblems,
   getPhysicsCatalogSkipGridSkeletonSessionKey,
 } from "@/lib/physics-catalog-problems-cache"
+import {
+  getProblemDetailSubjectConfig,
+  type ProblemDetailSubject,
+} from "@/lib/problem-detail-subject"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
 // Lazy load video player component
@@ -89,16 +93,33 @@ const difficultyAccentClasses: Record<string, string> = {
 
 const CATALOG_RETURN_HREF_STORAGE_KEY = "catalog:catalogReturnHref"
 
-function getStoredCatalogBackHref() {
+function getStoredCatalogBackHref(catalogHrefPrefix: string, fallbackHref: string) {
   try {
     const href = sessionStorage.getItem(CATALOG_RETURN_HREF_STORAGE_KEY)
-    if (href?.startsWith("/probleme")) {
+    if (href?.startsWith(catalogHrefPrefix)) {
       return href
     }
   } catch {
     // ignore
   }
-  return "/probleme"
+  return fallbackHref
+}
+
+function normalizeProblemTags(tags: Problem["tags"] | string[] | null | undefined): string[] {
+  if (Array.isArray(tags)) {
+    return tags
+      .map((tag) => (typeof tag === "string" ? tag.trim() : ""))
+      .filter(Boolean)
+  }
+
+  if (typeof tags === "string" && tags.trim()) {
+    return tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+  }
+
+  return []
 }
 
 // Loading skeleton for video content
@@ -154,6 +175,7 @@ export default function ProblemDetailClient({
   difficultyColors,
   embedVariant,
   classroomCatalogHref,
+  subject = "physics",
 }: {
   problem: Problem
   categoryIcons: any
@@ -162,7 +184,9 @@ export default function ProblemDetailClient({
   embedVariant?: "classroomAssignment"
   /** Link for "Înapoi la catalog" in classroom assignment flow. */
   classroomCatalogHref?: string
+  subject?: ProblemDetailSubject
 }) {
+  const subjectConfig = getProblemDetailSubjectConfig(subject)
   const isClassroomEmbed = embedVariant === "classroomAssignment"
   const [isSolved, setIsSolved] = useState(false)
   const [loadingSolved, setLoadingSolved] = useState(true)
@@ -183,7 +207,9 @@ export default function ProblemDetailClient({
   /** When set, overrides bubble text for the initial auto-sent message (e.g. bracketed label on card). */
   const [initialInsightDisplayOverride, setInitialInsightDisplayOverride] = useState<string | null>(null)
   const [showCongratulationCloseButton, setShowCongratulationCloseButton] = useState(false)
-  const [storedCatalogBackHref] = useState(getStoredCatalogBackHref)
+  const [storedCatalogBackHref] = useState(() =>
+    getStoredCatalogBackHref(subjectConfig.catalogHrefPrefix, subjectConfig.catalogBackHref),
+  )
   const router = useRouter()
   const [catalogBackLoading, setCatalogBackLoading] = useState(false)
   const [wrongAnswerPenalty, setWrongAnswerPenalty] = useState<ProblemWrongAnswerPenalty | null>(null)
@@ -251,6 +277,7 @@ export default function ProblemDetailClient({
     : typeof problem.class === 'number'
       ? `Clasa a ${problem.class}-a`
       : null
+  const problemTags = useMemo(() => normalizeProblemTags(problem.tags), [problem.tags])
 
   const renderProblemMetaBadges = (className?: string) => (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -292,6 +319,10 @@ export default function ProblemDetailClient({
 
   React.useEffect(() => {
     const checkSolved = async () => {
+      if (subject !== "physics") {
+        setLoadingSolved(false)
+        return
+      }
       if (!user) return setLoadingSolved(false);
       const { data } = await supabase
         .from('solved_problems')
@@ -303,12 +334,30 @@ export default function ProblemDetailClient({
       setLoadingSolved(false);
     };
     checkSolved();
-  }, [user, problem.id]);
+  }, [user, problem.id, subject]);
+
+  const showSolvedCelebration = () => {
+    const randomMessage = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
+    setCongratulationMessage(randomMessage);
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      zIndex: 1000,
+    });
+  };
 
   const handleMarkSolved = async () => {
     if (!user) return;
     if (isSolved) return; // Prevent duplicate submissions
     setLoadingSolved(true);
+
+    if (subject === "math") {
+      setIsSolved(true);
+      setLoadingSolved(false);
+      showSolvedCelebration();
+      return;
+    }
 
     // Marchează problema ca rezolvată
     // ELO-ul se acordă automat prin trigger on_problem_solved
@@ -351,18 +400,7 @@ export default function ProblemDetailClient({
 
     setIsSolved(true);
     setLoadingSolved(false);
-
-    // Afișează mesajul de felicitare
-    const randomMessage = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
-    setCongratulationMessage(randomMessage);
-
-    // Confetti effect
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      zIndex: 1000,
-    });
+    showSolvedCelebration();
   };
 
   const catalogBackHref = classroomCatalogHref ?? storedCatalogBackHref
@@ -372,15 +410,17 @@ export default function ProblemDetailClient({
     if (catalogBackLoading) return
     setCatalogBackLoading(true)
     try {
-      await ensurePhysicsCatalogProblemsCached()
-      if (getFreshPhysicsCatalogProblems()?.length) {
-        try {
-          sessionStorage.setItem(getPhysicsCatalogSkipGridSkeletonSessionKey(), "1")
-        } catch {
-          // ignore
+      if (subject === "physics") {
+        await ensurePhysicsCatalogProblemsCached()
+        if (getFreshPhysicsCatalogProblems()?.length) {
+          try {
+            sessionStorage.setItem(getPhysicsCatalogSkipGridSkeletonSessionKey(), "1")
+          } catch {
+            // ignore
+          }
         }
+        await import("@/components/problem-card")
       }
-      await import("@/components/problem-card")
       router.prefetch(catalogBackHref)
       router.push(catalogBackHref)
     } catch (err) {
@@ -508,14 +548,14 @@ export default function ProblemDetailClient({
                     </span>
                   </div>
 
-                  {problem.tags && Array.isArray(problem.tags) && problem.tags.length > 0 && (
+                  {problemTags.length > 0 && (
                     <div className="hidden sm:flex flex-wrap gap-2">
-                      {problem.tags.map((tag, idx) => (
+                      {problemTags.map((tag) => (
                         <span
-                          key={idx}
+                          key={tag}
                           className="rounded-full border border-[#0b0d10]/15 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-[#2C2F33]/75"
                         >
-                          {tag.trim()}
+                          {tag}
                         </span>
                       ))}
                     </div>
@@ -673,7 +713,7 @@ export default function ProblemDetailClient({
                           {renderProblemMetaBadges()}
                         </div>
                       )}
-                      <RecommendedProblemCard currentProblem={problem} />
+                      <RecommendedProblemCard currentProblem={problem} subject={subject} />
                     </div>
                   </div>
                 </div>
@@ -682,7 +722,7 @@ export default function ProblemDetailClient({
 
               {/* Pe mobil: card problema recomandată sub datele problemei, înainte de footer */}
               <div className="lg:hidden w-full">
-                <RecommendedProblemCard currentProblem={problem} />
+                <RecommendedProblemCard currentProblem={problem} subject={subject} />
               </div>
             </div>
           </div>
@@ -703,6 +743,7 @@ export default function ProblemDetailClient({
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentProblemId={problem.id}
+          subject={subject}
         />
       </Suspense>
 
