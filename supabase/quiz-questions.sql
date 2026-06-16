@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
   difficulty INTEGER NOT NULL CHECK (difficulty IN (1, 2, 3)),
   answers JSONB NOT NULL,
   correct_answer VARCHAR(1) NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D', 'E', 'F')),
+  materie TEXT CHECK (materie IS NULL OR materie IN ('fizica', 'biologie')),
+  title TEXT,
+  description TEXT,
+  tags TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  correct_answers TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  image_url TEXT,
+  video_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

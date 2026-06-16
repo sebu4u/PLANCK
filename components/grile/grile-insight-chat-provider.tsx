@@ -10,7 +10,7 @@ import React, {
   lazy,
   Suspense,
 } from "react"
-import { GRILE_INSIGHT_STARTER_CHIPS } from "@/lib/grile-insight-context"
+import { useGrileSubject } from "./grile-subject-context"
 
 const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
 
@@ -33,6 +33,7 @@ export function useGrileInsightChat(): GrileInsightChatContextValue | null {
 }
 
 export function GrileInsightChatProvider({ children }: { children: React.ReactNode }) {
+  const { insightStarterChips } = useGrileSubject()
   const [isDesktopViewport, setIsDesktopViewport] = useState(false)
   const [panelMounted, setPanelMounted] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -105,7 +106,7 @@ export function GrileInsightChatProvider({ children }: { children: React.ReactNo
             initialUserMessage={null}
             initialUserMessageDisplay={null}
             onExitAnimationComplete={finalizePanelClose}
-            starterQuestionChips={GRILE_INSIGHT_STARTER_CHIPS}
+            starterQuestionChips={insightStarterChips}
           />
         </Suspense>
       ) : null}

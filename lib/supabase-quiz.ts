@@ -2,17 +2,32 @@
 // Completely isolated from supabase-physics.ts
 
 import { supabase } from './supabaseClient';
-import type { QuizQuestion, GradeLevel } from './types/quiz-questions';
+import type { QuizQuestion, GradeLevel, QuizMaterie } from './types/quiz-questions';
+
+export type QuizFetchOptions = {
+    materie?: QuizMaterie;
+};
 
 /**
  * Fetch all quiz questions for a specific grade level
  */
-export async function fetchQuizQuestionsByClass(classLevel: GradeLevel): Promise<QuizQuestion[]> {
-    const { data, error } = await supabase
+export async function fetchQuizQuestionsByClass(
+    classLevel: GradeLevel,
+    options?: QuizFetchOptions,
+): Promise<QuizQuestion[]> {
+    let query = supabase
         .from('quiz_questions')
         .select('*')
         .eq('class', classLevel)
         .order('question_id', { ascending: true });
+
+    if (options?.materie === 'fizica') {
+        query = query.or('materie.eq.fizica,materie.is.null');
+    } else if (options?.materie) {
+        query = query.eq('materie', options.materie);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('Error fetching quiz questions:', error);
@@ -82,9 +97,12 @@ export async function markQuestionAsSolved(questionId: string) {
  * Fetch and shuffle quiz questions for a session
  * Excludes questions already solved by the user, unless all are solved
  */
-export async function fetchAndShuffleQuestions(classLevel: GradeLevel): Promise<QuizQuestion[]> {
+export async function fetchAndShuffleQuestions(
+    classLevel: GradeLevel,
+    options?: QuizFetchOptions,
+): Promise<QuizQuestion[]> {
     // 1. Fetch all questions for the level
-    const allQuestions = await fetchQuizQuestionsByClass(classLevel);
+    const allQuestions = await fetchQuizQuestionsByClass(classLevel, options);
 
     // 2. Fetch solved questions for current user
     const { data: { user } } = await supabase.auth.getUser();

@@ -11,6 +11,7 @@ import {
 import type { AnswerKey, QuizQuestion } from "@/lib/types/quiz-questions"
 import { markQuestionAsSolved } from "@/lib/supabase-quiz"
 import { playErrorSound } from "@/lib/platform-sounds"
+import { isMultiSelectQuizQuestion, verifyQuizSelection } from "@/lib/quiz-question-utils"
 
 function playSuccessSound() {
   try {
@@ -36,9 +37,11 @@ function playSuccessSound() {
   }
 }
 
+const ANSWER_KEYS_ORDER: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
+
 type GrilaLessonContextValue = {
-  selectedAnswer: AnswerKey | null
-  setSelectedAnswer: (key: AnswerKey | null) => void
+  selectedAnswers: AnswerKey[]
+  toggleAnswer: (key: AnswerKey) => void
   isVerified: boolean
   /** După verificare: true/false; înainte de verificare null */
   isCorrect: boolean | null
@@ -59,13 +62,34 @@ export function GrilaLessonProvider({
   question: QuizQuestion
   children: ReactNode
 }) {
-  const [selectedAnswer, setSelectedAnswer] = useState<AnswerKey | null>(null)
+  const multiSelect = isMultiSelectQuizQuestion(question)
+  const [selectedAnswers, setSelectedAnswers] = useState<AnswerKey[]>([])
   const [isVerified, setIsVerified] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
 
+  const toggleAnswer = useCallback(
+    (key: AnswerKey) => {
+      if (isVerified) return
+
+      setSelectedAnswers((prev) => {
+        if (!multiSelect) {
+          return [key]
+        }
+        const next = new Set(prev)
+        if (next.has(key)) {
+          next.delete(key)
+        } else {
+          next.add(key)
+        }
+        return ANSWER_KEYS_ORDER.filter((answerKey) => next.has(answerKey))
+      })
+    },
+    [isVerified, multiSelect],
+  )
+
   const verify = useCallback(async () => {
-    if (selectedAnswer === null || isVerified) return null
-    const correct = selectedAnswer === question.correct_answer
+    if (selectedAnswers.length === 0 || isVerified) return null
+    const correct = verifyQuizSelection(selectedAnswers, question)
     setIsVerified(true)
     setIsCorrect(correct)
     if (correct) {
@@ -75,24 +99,24 @@ export function GrilaLessonProvider({
       playErrorSound()
     }
     return correct
-  }, [selectedAnswer, isVerified, question.correct_answer, question.id])
+  }, [selectedAnswers, isVerified, question])
 
   const reset = useCallback(() => {
-    setSelectedAnswer(null)
+    setSelectedAnswers([])
     setIsVerified(false)
     setIsCorrect(null)
   }, [])
 
   const value = useMemo(
     () => ({
-      selectedAnswer,
-      setSelectedAnswer,
+      selectedAnswers,
+      toggleAnswer,
       isVerified,
       isCorrect,
       verify,
       reset,
     }),
-    [selectedAnswer, isVerified, isCorrect, verify, reset],
+    [selectedAnswers, isVerified, isCorrect, verify, reset, toggleAnswer],
   )
 
   return (

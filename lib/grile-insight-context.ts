@@ -1,4 +1,5 @@
 import type { QuizQuestion, AnswerKey, UserAnswer, GradeLevel } from "@/lib/types/quiz-questions"
+import { getCorrectAnswerKeys } from "@/lib/quiz-question-utils"
 
 const ANSWER_KEYS: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
 
@@ -26,16 +27,19 @@ export function formatGrileCatalogInsightContext(params: {
   classLevel: GradeLevel
   questionIndex: number
   totalQuestions: number
+  catalogPath?: string
 }): string {
-  const { question, userAnswer, classLevel, questionIndex, totalQuestions } = params
-  const selected = userAnswer?.selectedAnswer ?? null
+  const { question, userAnswer, classLevel, questionIndex, totalQuestions, catalogPath = "/grile" } = params
+  const selected = userAnswer?.selectedAnswers ?? []
   const verified = userAnswer?.isVerified ?? false
   const wasCorrect = verified ? (userAnswer?.isCorrect ?? null) : null
+  const correctKeys = getCorrectAnswerKeys(question)
   const parts = [
-    "Context: utilizatorul lucrează la pagina de teste grilă (/grile), mod catalog.",
+    `Context: utilizatorul lucrează la pagina de teste grilă (${catalogPath}), mod catalog.`,
     `Clasă selectată în UI: clasa a ${classLevel}-a.`,
     `Poziție în sesiunea curentă: întrebarea ${questionIndex + 1} din ${totalQuestions}.`,
     `ID întrebare: ${question.id}.`,
+    question.title?.trim() ? `Titlu: ${question.title.trim()}.` : "",
     "",
     "Enunț:",
     question.statement.trim(),
@@ -43,11 +47,11 @@ export function formatGrileCatalogInsightContext(params: {
     "Variante:",
     formatQuizAnswersBlock(question),
     "",
-    `Răspuns corect oficial: ${question.correct_answer}.`,
-    `Variantă selectată de utilizator: ${selected ?? "(încă neselectată)"}.`,
+    `Răspuns(uri) corect(e) oficial(e): ${correctKeys.join(", ")}.`,
+    `Variante selectate de utilizator: ${selected.length ? selected.join(", ") : "(încă neselectate)"}.`,
     verified
       ? `Verificare efectuată. Rezultat: ${wasCorrect === true ? "corect" : wasCorrect === false ? "incorect" : "necunoscut"}.`
       : "Verificarea nu a fost încă apăsată (utilizatorul poate discuta înainte sau după verificare).",
   ]
-  return parts.join("\n")
+  return parts.filter((line) => line !== "").join("\n")
 }

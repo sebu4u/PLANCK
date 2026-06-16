@@ -12,6 +12,7 @@ import {
 import { generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
 import { parseAllowedDevUserIdsInput } from "@/lib/dev-chapter-access"
+import { fetchAllTableRows } from "@/lib/supabase-fetch-all"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 
@@ -303,16 +304,23 @@ export async function GET(req: NextRequest) {
     if (action === "quiz-questions") {
       const search = (searchParams.get("search") || "").trim()
       const classParam = (searchParams.get("class") || "").trim()
+      const materieParam = (searchParams.get("materie") || "").trim()
 
       let query = supabase
         .from("quiz_questions")
-        .select("id, question_id, class, statement, difficulty, correct_answer, created_at")
+        .select("id, question_id, class, statement, title, difficulty, correct_answer, correct_answers, materie, created_at")
         .order("created_at", { ascending: false })
         .limit(60)
 
+      if (materieParam === "biologie") {
+        query = query.eq("materie", "biologie")
+      } else if (materieParam === "fizica") {
+        query = query.or("materie.eq.fizica,materie.is.null")
+      }
+
       if (search) {
         const escaped = search.replace(/[%_]/g, "")
-        query = query.or(`statement.ilike.%${escaped}%,question_id.ilike.%${escaped}%`)
+        query = query.or(`statement.ilike.%${escaped}%,question_id.ilike.%${escaped}%,title.ilike.%${escaped}%`)
       }
 
       if (classParam) {
@@ -331,30 +339,42 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ quizQuestions: quizQuestions || [] })
     }
 
-    const { data: chapters, error: chaptersErr } = await supabase
-      .from("learning_path_chapters")
-      .select("*")
-      .order("order_index")
+    const { data: chapters, error: chaptersErr } = await fetchAllTableRows(async (range) =>
+      supabase
+        .from("learning_path_chapters")
+        .select("*")
+        .order("order_index", { ascending: true })
+        .order("id", { ascending: true })
+        .range(range.from, range.to)
+    )
 
     if (chaptersErr) {
       logger.error("[admin/learning-paths] Failed to fetch chapters:", chaptersErr)
       return NextResponse.json({ error: "Nu am putut încărca capitolele de learning path." }, { status: 500 })
     }
 
-    const { data: lessons, error: lessonsErr } = await supabase
-      .from("learning_path_lessons")
-      .select("*")
-      .order("order_index")
+    const { data: lessons, error: lessonsErr } = await fetchAllTableRows(async (range) =>
+      supabase
+        .from("learning_path_lessons")
+        .select("*")
+        .order("order_index", { ascending: true })
+        .order("id", { ascending: true })
+        .range(range.from, range.to)
+    )
 
     if (lessonsErr) {
       logger.error("[admin/learning-paths] Failed to fetch lessons:", lessonsErr)
       return NextResponse.json({ error: "Nu am putut încărca lecțiile de learning path." }, { status: 500 })
     }
 
-    const { data: items, error: itemsErr } = await supabase
-      .from("learning_path_lesson_items")
-      .select("*")
-      .order("order_index")
+    const { data: items, error: itemsErr } = await fetchAllTableRows(async (range) =>
+      supabase
+        .from("learning_path_lesson_items")
+        .select("*")
+        .order("order_index", { ascending: true })
+        .order("id", { ascending: true })
+        .range(range.from, range.to)
+    )
 
     if (itemsErr) {
       logger.error("[admin/learning-paths] Failed to fetch lesson items:", itemsErr)
@@ -362,9 +382,9 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      chapters: chapters || [],
-      lessons: lessons || [],
-      items: items || [],
+      chapters,
+      lessons,
+      items,
     })
   } catch (err: any) {
     logger.error("[admin/learning-paths] GET error:", err)

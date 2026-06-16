@@ -7,10 +7,13 @@ import type { LearningPathItemPayload } from "@/lib/learning-path-item-loader"
 import {
   clearLearningPathItemCache,
   fetchLearningPathItemPayload,
-  prefetchLearningPathItem,
+  getCachedLearningPathItemPayload,
+  prefetchAllLearningPathItems,
   setCachedLearningPathItemPayload,
   type LearningPathItemFetchResult,
 } from "@/lib/learning-path-item-client-cache"
+import { appendFizicaMapItemQuery } from "@/lib/fizica-map-item-navigation"
+import type { FizicaMapAssignmentItemRoute } from "@/lib/supabase-fizica-learning-map"
 import { LearningPathItemView } from "@/components/invata/learning-path-item-view"
 import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
@@ -19,15 +22,32 @@ interface LearningPathItemExperienceProps {
   initialPayload: LearningPathItemPayload
 }
 
-function buildItemUrl(lessonBaseHref: string, itemIndex: number): string {
-  return `${lessonBaseHref}/${itemIndex}`
+function buildItemUrl(payload: LearningPathItemPayload): string {
+  const base = `${payload.lessonBaseHref}/${payload.itemIndex}`
+  if (payload.fizicaMapContext) {
+    return appendFizicaMapItemQuery(base, payload.fizicaMapContext)
+  }
+  return base
 }
 
-function parseItemIndexFromPathname(pathname: string): number | null {
-  const parts = pathname.split("/").filter(Boolean)
-  if (parts[0] !== "invata" || parts.length < 4) return null
-  const parsed = Number.parseInt(parts[3] ?? "", 10)
-  return Number.isFinite(parsed) && parsed >= 1 ? parsed : null
+function isSameItemRoute(
+  a: FizicaMapAssignmentItemRoute,
+  b: FizicaMapAssignmentItemRoute,
+): boolean {
+  return a.chapterSlug === b.chapterSlug && a.lessonSlug === b.lessonSlug && a.itemIndex === b.itemIndex
+}
+
+function findFizicaAssignmentIndex(
+  items: FizicaMapAssignmentItemRoute[],
+  payload: LearningPathItemPayload,
+): number {
+  return items.findIndex((item) =>
+    isSameItemRoute(item, {
+      chapterSlug: payload.chapterSlug,
+      lessonSlug: payload.lessonSlug,
+      itemIndex: payload.itemIndex,
+    }),
+  )
 }
 
 export function LearningPathItemExperience({ initialPayload }: LearningPathItemExperienceProps) {
@@ -40,18 +60,8 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const lastUserIdRef = useRef<string | null | undefined>(undefined)
   const isPopstateRef = useRef(false)
 
-  const prefetchAdjacent = useCallback((current: LearningPathItemPayload) => {
-    if (current.itemIndex < current.items.length) {
-      prefetchLearningPathItem(
-        current.chapterSlug,
-        current.lessonSlug,
-        current.itemIndex + 1
-      )
-    }
-  }, [])
-
   const syncUrl = useCallback((next: LearningPathItemPayload, mode: "replace" | "push" = "replace") => {
-    const url = buildItemUrl(next.lessonBaseHref, next.itemIndex)
+    const url = buildItemUrl(next)
     if (mode === "push") {
       window.history.pushState({ learningPathItemIndex: next.itemIndex }, "", url)
     } else {
@@ -67,36 +77,72 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         syncUrl(next, options?.urlMode ?? "replace")
       }
       if (!options?.skipPrefetch) {
-        prefetchAdjacent(next)
+        prefetchAllLearningPathItems(next)
       }
     },
-    [prefetchAdjacent, syncUrl]
+    [syncUrl],
   )
 
-  const loadItemAtIndex = useCallback(
-    async (targetIndex: number): Promise<LearningPathItemFetchResult> => {
-      return fetchLearningPathItemPayload(
-        payload.chapterSlug,
-        payload.lessonSlug,
-        targetIndex
-      )
-    },
-    [payload.chapterSlug, payload.lessonSlug]
-  )
-
-  const goToItemIndex = useCallback(
+  const loadItem = useCallback(
     async (
-      targetIndex: number,
-      options?: { urlMode?: "replace" | "push"; direction?: LearningPathSlideDirection }
+      chapterSlug: string,
+      lessonSlug: string,
+      itemIndex: number,
+      fizicaMapContext: LearningPathItemPayload["fizicaMapContext"],
+    ): Promise<LearningPathItemFetchResult> => {
+      return fetchLearningPathItemPayload(chapterSlug, lessonSlug, itemIndex, { fizicaMapContext })
+    },
+    [],
+  )
+
+  const goToItem = useCallback(
+    async (
+      target: FizicaMapAssignmentItemRoute,
+      options?: { urlMode?: "replace" | "push"; direction?: LearningPathSlideDirection },
     ) => {
-      if (targetIndex === payload.itemIndex) return
+      if (
+        target.chapterSlug === payload.chapterSlug &&
+        target.lessonSlug === payload.lessonSlug &&
+        target.itemIndex === payload.itemIndex
+      ) {
+        return
+      }
 
       setSlideDirection(
-        options?.direction ?? (targetIndex > payload.itemIndex ? "forward" : "backward")
+        options?.direction ??
+          (() => {
+            if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
+              const fromIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
+              const toIndex = payload.fizicaAssignmentItems.findIndex((item) =>
+                isSameItemRoute(item, target),
+              )
+              return toIndex > fromIndex ? "forward" : "backward"
+            }
+            return target.itemIndex > payload.itemIndex ? "forward" : "backward"
+          })(),
       )
+
+      const cached = getCachedLearningPathItemPayload(
+        target.chapterSlug,
+        target.lessonSlug,
+        target.itemIndex,
+        payload.fizicaMapContext,
+      )
+      if (cached) {
+        setFreePlanPaywall(null)
+        applyPayload(cached, { urlMode: options?.urlMode })
+        isPopstateRef.current = false
+        return
+      }
+
       setIsNavigating(true)
       try {
-        const result = await loadItemAtIndex(targetIndex)
+        const result = await loadItem(
+          target.chapterSlug,
+          target.lessonSlug,
+          target.itemIndex,
+          payload.fizicaMapContext,
+        )
         if (result.status === "ok") {
           setFreePlanPaywall(null)
           applyPayload(result.payload, { urlMode: options?.urlMode })
@@ -105,41 +151,88 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         if (result.status === "blocked") {
           setFreePlanPaywall({ lessonBaseHref: result.lessonBaseHref })
           if (!isPopstateRef.current) {
-            const url = buildItemUrl(payload.lessonBaseHref, targetIndex)
+            const blockedPayload = { ...payload, ...target }
+            const url = buildItemUrl(blockedPayload as LearningPathItemPayload)
             if (options?.urlMode === "push") {
-              window.history.pushState({ learningPathItemIndex: targetIndex }, "", url)
+              window.history.pushState({ learningPathItemIndex: target.itemIndex }, "", url)
             } else {
-              window.history.replaceState({ learningPathItemIndex: targetIndex }, "", url)
+              window.history.replaceState({ learningPathItemIndex: target.itemIndex }, "", url)
             }
           }
           return
         }
-        router.push(buildItemUrl(payload.lessonBaseHref, targetIndex))
+        const fallbackUrl = buildItemUrl({
+          ...payload,
+          chapterSlug: target.chapterSlug,
+          lessonSlug: target.lessonSlug,
+          itemIndex: target.itemIndex,
+          lessonBaseHref: `/invata/${target.chapterSlug}/${target.lessonSlug}`,
+        })
+        router.push(fallbackUrl)
       } finally {
         setIsNavigating(false)
         isPopstateRef.current = false
       }
     },
-    [applyPayload, loadItemAtIndex, payload.chapterSlug, payload.itemIndex, payload.lessonSlug, router]
+    [applyPayload, loadItem, payload, router],
+  )
+
+  const goToItemIndex = useCallback(
+    async (
+      targetIndex: number,
+      options?: { urlMode?: "replace" | "push"; direction?: LearningPathSlideDirection },
+    ) => {
+      await goToItem(
+        {
+          chapterSlug: payload.chapterSlug,
+          lessonSlug: payload.lessonSlug,
+          itemIndex: targetIndex,
+        },
+        options,
+      )
+    },
+    [goToItem, payload.chapterSlug, payload.lessonSlug],
   )
 
   const goToNextItem = useCallback(async () => {
+    if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
+      if (payload.isLastItem) {
+        router.push(payload.nextItemHref)
+        return
+      }
+      const currentIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
+      const nextItem = payload.fizicaAssignmentItems[currentIndex + 1]
+      if (nextItem) {
+        await goToItem(nextItem, { urlMode: "push", direction: "forward" })
+      }
+      return
+    }
+
     if (payload.isLastItem) {
       router.push(payload.lessonBaseHref)
       return
     }
     await goToItemIndex(payload.itemIndex + 1, { urlMode: "push", direction: "forward" })
-  }, [goToItemIndex, payload.isLastItem, payload.itemIndex, payload.lessonBaseHref, router])
+  }, [goToItem, goToItemIndex, payload, router])
 
   const goToPrevItem = useCallback(async () => {
+    if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
+      const currentIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
+      const prevItem = currentIndex > 0 ? payload.fizicaAssignmentItems[currentIndex - 1] : null
+      if (prevItem) {
+        await goToItem(prevItem, { urlMode: "push", direction: "backward" })
+      }
+      return
+    }
+
     if (payload.itemIndex <= 1) return
     await goToItemIndex(payload.itemIndex - 1, { urlMode: "push", direction: "backward" })
-  }, [goToItemIndex, payload.itemIndex])
+  }, [goToItem, goToItemIndex, payload])
 
   useEffect(() => {
     setCachedLearningPathItemPayload(initialPayload)
-    prefetchAdjacent(initialPayload)
-  }, [initialPayload, prefetchAdjacent])
+    prefetchAllLearningPathItems(initialPayload)
+  }, [initialPayload])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" })
@@ -156,21 +249,37 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     clearLearningPathItemCache()
     setFreePlanPaywall(null)
     void (async () => {
-      const refreshed = await fetchLearningPathItemPayload(
+      const refreshed = await loadItem(
         payload.chapterSlug,
         payload.lessonSlug,
-        payload.itemIndex
+        payload.itemIndex,
+        payload.fizicaMapContext,
       )
       if (refreshed.status === "ok") {
         applyPayload(refreshed.payload, { skipPrefetch: false })
       }
     })()
-  }, [applyPayload, payload.chapterSlug, payload.itemIndex, payload.lessonSlug, user?.id])
+  }, [applyPayload, loadItem, payload.chapterSlug, payload.fizicaMapContext, payload.itemIndex, payload.lessonSlug, user?.id])
 
   useEffect(() => {
     const handlePopState = () => {
-      const targetIndex = parseItemIndexFromPathname(window.location.pathname)
-      if (targetIndex == null) return
+      if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
+        const targetPath = window.location.pathname
+        const targetItem = payload.fizicaAssignmentItems.find((item) => {
+          const itemPath = `/invata/${item.chapterSlug}/${item.lessonSlug}/${item.itemIndex}`
+          return targetPath === itemPath
+        })
+        if (targetItem) {
+          isPopstateRef.current = true
+          void goToItem(targetItem, { urlMode: "replace" })
+        }
+        return
+      }
+
+      const parts = window.location.pathname.split("/").filter(Boolean)
+      if (parts[0] !== "invata" || parts.length < 4) return
+      const targetIndex = Number.parseInt(parts[3] ?? "", 10)
+      if (!Number.isFinite(targetIndex) || targetIndex < 1) return
 
       if (targetIndex === payload.itemIndex) {
         setFreePlanPaywall(null)
@@ -183,7 +292,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
 
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
-  }, [goToItemIndex, payload.itemIndex])
+  }, [goToItem, goToItemIndex, payload.fizicaAssignmentItems, payload.fizicaMapContext, payload.itemIndex])
 
   if (freePlanPaywall) {
     return (

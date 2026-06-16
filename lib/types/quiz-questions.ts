@@ -4,6 +4,7 @@
 export type AnswerKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 export type DifficultyLevel = 1 | 2 | 3;
 export type GradeLevel = 9 | 10 | 11 | 12;
+export type QuizMaterie = 'fizica' | 'biologie';
 
 export interface QuizAnswers {
     A: string;
@@ -23,12 +24,19 @@ export interface QuizQuestion {
     answers: QuizAnswers;
     correct_answer: AnswerKey;
     created_at: string;
+    materie?: QuizMaterie | null;
+    title?: string | null;
+    description?: string | null;
+    tags?: string[];
+    correct_answers?: AnswerKey[];
+    image_url?: string | null;
+    video_url?: string | null;
 }
 
 // User answer state for a single question
 export interface UserAnswer {
     questionId: string;
-    selectedAnswer: AnswerKey | null;
+    selectedAnswers: AnswerKey[];
     isVerified: boolean;
     isCorrect: boolean | null;
 }

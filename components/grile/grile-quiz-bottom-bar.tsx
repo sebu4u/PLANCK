@@ -35,7 +35,7 @@ export function GrileQuizBottomBar({
   isLastQuestion,
   insightDesktopOpen,
 }: GrileQuizBottomBarProps) {
-  const hasSelectedAnswer = currentAnswer?.selectedAnswer !== null
+  const hasSelectedAnswer = (currentAnswer?.selectedAnswers.length ?? 0) > 0
   const isVerified = currentAnswer?.isVerified ?? false
   const isCorrect = currentAnswer?.isCorrect === true
 

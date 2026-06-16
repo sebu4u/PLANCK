@@ -31,6 +31,11 @@ import {
   getGuestCompletedItemIdsForLesson,
   parseGuestLearningPathProgress,
 } from "@/lib/guest-learning-path-cookie"
+import type { FizicaMapItemContext } from "@/lib/fizica-map-item-navigation"
+import {
+  resolveFizicaMapItemNavigation,
+  type FizicaMapAssignmentItemRoute,
+} from "@/lib/supabase-fizica-learning-map"
 
 export interface LearningPathItemPayload {
   chapterSlug: string
@@ -55,6 +60,9 @@ export interface LearningPathItemPayload {
   sourceCodingExamples: CodingProblemExample[]
   sourceQuizQuestion: QuizQuestion | null
   isLastItem: boolean
+  prevItemHref?: string | null
+  fizicaMapContext?: FizicaMapItemContext | null
+  fizicaAssignmentItems?: FizicaMapAssignmentItemRoute[]
 }
 
 export type LearningPathItemLoadResult =
@@ -252,7 +260,8 @@ function isBlockedByFreePlan(
 export async function loadLearningPathItemPayload(
   chapterSlug: string,
   lessonSlug: string,
-  itemIndex: number
+  itemIndex: number,
+  options?: { fizicaMapContext?: FizicaMapItemContext | null },
 ): Promise<LearningPathItemLoadResult> {
   if (!Number.isFinite(itemIndex) || itemIndex < 1) {
     return { status: "invalid_index" }
@@ -296,8 +305,22 @@ export async function loadLearningPathItemPayload(
     await loadItemContent(item)
 
   const uiFlags = computeItemUiFlags(item, sourceProblem, sourceCodingProblem)
-  const nextItemHref =
+  let nextItemHref =
     itemIndex < items.length ? `${lessonBaseHref}/${itemIndex + 1}` : lessonBaseHref
+  let prevItemHref: string | null = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
+  let isLastItem = itemIndex >= items.length
+  const fizicaMapContext = options?.fizicaMapContext ?? null
+  let fizicaAssignmentItems: FizicaMapAssignmentItemRoute[] | undefined
+
+  if (fizicaMapContext) {
+    const fizicaNavigation = await resolveFizicaMapItemNavigation(item.id, fizicaMapContext)
+    if (fizicaNavigation) {
+      nextItemHref = fizicaNavigation.nextItemHref
+      prevItemHref = fizicaNavigation.prevItemHref
+      isLastItem = fizicaNavigation.isLastItemInAssignment
+      fizicaAssignmentItems = fizicaNavigation.assignmentItems
+    }
+  }
 
   return {
     status: "ok",
@@ -312,6 +335,9 @@ export async function loadLearningPathItemPayload(
       lessonId: lesson.id,
       lessonBaseHref,
       nextItemHref,
+      prevItemHref,
+      fizicaMapContext,
+      fizicaAssignmentItems,
       initialCurrentItemCompleted,
       completedItemIdsForLesson,
       sourceLesson,
@@ -319,7 +345,7 @@ export async function loadLearningPathItemPayload(
       sourceCodingProblem,
       sourceCodingExamples,
       sourceQuizQuestion,
-      isLastItem: itemIndex >= items.length,
+      isLastItem,
       ...uiFlags,
     },
   }

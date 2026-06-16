@@ -412,12 +412,14 @@ export function Navigation() {
   const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
+  const isInvataFizicaHub = pathname === "/invata/fizica"
   const isExerseazaActive = isExerseazaRoute(pathname)
   const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
   const isClassroomsRoute = pathname?.startsWith("/classrooms") ?? false
   const useLightNav =
     isDashboard ||
     isExerseazaHub ||
+    isInvataFizicaHub ||
     isProblemsCatalog ||
     isProblemPage ||
     isMatematicaProblemsCatalog ||
@@ -509,12 +511,13 @@ export function Navigation() {
   const showMobileGrileShell = Boolean(user && isMobile && matchGrileRoute(pathname))
   const showMobileFocusedShell = showMobileLessonShell || showMobileGrileShell
   const isExerseazaHubPage = pathname === "/exerseaza"
+  const isCatalogHubPage = isExerseazaHubPage || isInvataFizicaHub
   const navbarElevationClass =
     isProblemDetailPage
       ? "shadow-none"
       : showMobileFocusedShell
         ? "shadow-none burger:shadow-md"
-        : isDashboardPage || isExerseazaHubPage
+        : isDashboardPage || isCatalogHubPage
           ? "shadow-none burger:shadow-md"
           : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))

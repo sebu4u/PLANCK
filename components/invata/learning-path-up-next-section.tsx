@@ -17,6 +17,9 @@ interface LearningPathUpNextSectionProps {
   isOpening: boolean
   onJumpAhead: () => void
   className?: string
+  heading?: string
+  ariaLabel?: string
+  incompleteMessage?: string
 }
 
 export function LearningPathUpNextSection({
@@ -26,6 +29,9 @@ export function LearningPathUpNextSection({
   isOpening,
   onJumpAhead,
   className,
+  heading = "Următorul",
+  ariaLabel = "Următoarea lecție",
+  incompleteMessage = "Îți recomandăm să termini toată lecția curentă înainte să treci la următoarea.",
 }: LearningPathUpNextSectionProps) {
   const [showIncompleteDialog, setShowIncompleteDialog] = useState(false)
   const canJump = isCurrentLessonComplete
@@ -46,10 +52,10 @@ export function LearningPathUpNextSection({
           "mx-auto w-full max-w-md px-2 pt-16 pb-8 text-center sm:max-w-lg sm:px-4 sm:pb-12",
           className,
         )}
-        aria-label="Următoarea lecție"
+        aria-label={ariaLabel}
       >
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a9aa2] sm:text-sm">
-          Următorul
+          {heading}
         </p>
         <div className="mx-auto mt-3 h-px w-full max-w-[min(100%,20rem)] bg-[#e5e5e5]" />
 
@@ -94,7 +100,7 @@ export function LearningPathUpNextSection({
               </DialogTitle>
             </DialogHeader>
             <p className="mt-4 text-center text-sm leading-relaxed text-[#4d4d4d]">
-              Îți recomandăm să termini toată lecția curentă înainte să treci la următoarea.
+              {incompleteMessage}
             </p>
             <button
               type="button"

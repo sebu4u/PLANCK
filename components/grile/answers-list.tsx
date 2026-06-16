@@ -5,30 +5,37 @@ import type { QuizAnswers, AnswerKey, UserAnswer } from '@/lib/types/quiz-questi
 import { LatexContent } from './question-card';
 import { cn } from '@/lib/utils';
 import { Check, X } from 'lucide-react';
+import { getActiveAnswerEntries } from '@/lib/quiz-question-utils';
 
 interface AnswersListProps {
     answers: QuizAnswers;
-    correctAnswer: AnswerKey;
+    correctAnswers: AnswerKey[];
     userAnswer: UserAnswer | null;
     onSelect: (answer: AnswerKey) => void;
 }
 
-const answerKeys: AnswerKey[] = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: AnswersListProps) {
-    const selectedAnswer = userAnswer?.selectedAnswer;
+export function AnswersList({ answers, correctAnswers, userAnswer, onSelect }: AnswersListProps) {
+    const selectedAnswers = userAnswer?.selectedAnswers ?? [];
+    const selectedSet = new Set(selectedAnswers);
     const isVerified = userAnswer?.isVerified ?? false;
+    const correctSet = new Set(correctAnswers);
+    const answerEntries = getActiveAnswerEntries(answers);
 
     const getAnswerState = (key: AnswerKey) => {
         if (!isVerified) {
-            return selectedAnswer === key ? 'selected' : 'default';
+            return selectedSet.has(key) ? 'selected' : 'default';
         }
 
-        // After verification
-        if (key === correctAnswer) {
+        const isCorrectKey = correctSet.has(key);
+        const isSelected = selectedSet.has(key);
+
+        if (isCorrectKey && isSelected) {
             return 'correct';
         }
-        if (selectedAnswer === key && key !== correctAnswer) {
+        if (isCorrectKey && !isSelected) {
+            return 'correct';
+        }
+        if (!isCorrectKey && isSelected) {
             return 'incorrect';
         }
         return 'disabled';
@@ -36,9 +43,8 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
 
     return (
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-3 mt-6">
-            {answerKeys.map((key) => {
+            {answerEntries.map(([key, answerText]) => {
                 const state = getAnswerState(key);
-                const answerText = answers[key];
 
                 return (
                     <button
@@ -49,21 +55,14 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
                         disabled={isVerified}
                         className={cn(
                             'w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-200',
-                            // Default state
                             state === 'default' && 'border-gray-200 bg-gray-50/60 hover:border-gray-300 hover:bg-gray-100',
-                            // Selected (before verification)
                             state === 'selected' && 'border-violet-400 bg-violet-50 ring-1 ring-violet-200/60',
-                            // Correct answer (after verification)
                             state === 'correct' && 'border-emerald-300 bg-emerald-50',
-                            // Wrong answer selected (after verification)
                             state === 'incorrect' && 'border-rose-300 bg-rose-50',
-                            // Disabled (other answers after verification)
                             state === 'disabled' && 'border-gray-100 bg-gray-50/40 opacity-55',
-                            // Cursor states
                             isVerified ? 'cursor-default' : 'cursor-pointer'
                         )}
                     >
-                        {/* Answer letter badge */}
                         <div
                             className={cn(
                                 'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-semibold text-sm',
@@ -83,7 +82,6 @@ export function AnswersList({ answers, correctAnswer, userAnswer, onSelect }: An
                             )}
                         </div>
 
-                        {/* Answer text */}
                         <div
                             className={cn(
                                 'flex-1 pt-1 text-base leading-relaxed [&_.katex]:text-inherit',

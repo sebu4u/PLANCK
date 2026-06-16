@@ -113,6 +113,10 @@ export function getMobileTopBarContent(
     }
   }
 
+  if (pathname === "/invata/fizica") {
+    return { primary: "Fizica" }
+  }
+
   if (pathname?.startsWith("/invata")) {
     return { primary: "Invata" }
   }

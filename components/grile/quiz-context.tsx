@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import type { QuizQuestion, GradeLevel, AnswerKey, UserAnswer } from '@/lib/types/quiz-questions';
 import { markQuestionAsSolved } from '@/lib/supabase-quiz';
+import { verifyQuizSelection } from '@/lib/quiz-question-utils';
+import { useGrileSubject } from './grile-subject-context';
 
 interface QuizContextValue {
     // Session state
@@ -47,7 +49,17 @@ interface QuizProviderProps {
     children: React.ReactNode;
 }
 
+function createEmptyAnswer(questionId: string): UserAnswer {
+    return {
+        questionId,
+        selectedAnswers: [],
+        isVerified: false,
+        isCorrect: null,
+    };
+}
+
 export function QuizProvider({ children }: QuizProviderProps) {
+    const subjectConfig = useGrileSubject();
     const [classLevel, setClassLevel] = useState<GradeLevel | null>(null);
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -60,12 +72,7 @@ export function QuizProvider({ children }: QuizProviderProps) {
 
     const currentAnswer = useMemo(() => {
         if (!currentQuestion) return null;
-        return answers.get(currentQuestion.id) || {
-            questionId: currentQuestion.id,
-            selectedAnswer: null,
-            isVerified: false,
-            isCorrect: null,
-        };
+        return answers.get(currentQuestion.id) || createEmptyAnswer(currentQuestion.id);
     }, [currentQuestion, answers]);
 
     const totalQuestions = questions.length;
@@ -75,29 +82,43 @@ export function QuizProvider({ children }: QuizProviderProps) {
     const selectAnswer = useCallback((answer: AnswerKey) => {
         if (!currentQuestion) return;
 
-        // Don't allow changing answer after verification
         const existingAnswer = answers.get(currentQuestion.id);
         if (existingAnswer?.isVerified) return;
 
         setAnswers(prev => {
             const next = new Map(prev);
+            const current = existingAnswer || createEmptyAnswer(currentQuestion.id);
+            let selectedAnswers: AnswerKey[];
+
+            if (subjectConfig.multiSelect) {
+                const selectedSet = new Set(current.selectedAnswers);
+                if (selectedSet.has(answer)) {
+                    selectedSet.delete(answer);
+                } else {
+                    selectedSet.add(answer);
+                }
+                selectedAnswers = ANSWER_KEYS_ORDER.filter((key) => selectedSet.has(key));
+            } else {
+                selectedAnswers = [answer];
+            }
+
             next.set(currentQuestion.id, {
                 questionId: currentQuestion.id,
-                selectedAnswer: answer,
+                selectedAnswers,
                 isVerified: false,
                 isCorrect: null,
             });
             return next;
         });
-    }, [currentQuestion, answers]);
+    }, [currentQuestion, answers, subjectConfig.multiSelect]);
 
     const verifyAnswer = useCallback((): boolean | null => {
         if (!currentQuestion) return null;
 
         const userAnswer = answers.get(currentQuestion.id);
-        if (!userAnswer || userAnswer.selectedAnswer === null || userAnswer.isVerified) return null;
+        if (!userAnswer || userAnswer.selectedAnswers.length === 0 || userAnswer.isVerified) return null;
 
-        const isCorrect = userAnswer.selectedAnswer === currentQuestion.correct_answer;
+        const isCorrect = verifyQuizSelection(userAnswer.selectedAnswers, currentQuestion);
 
         if (isCorrect) {
             markQuestionAsSolved(currentQuestion.id).catch(console.error);
@@ -128,45 +149,14 @@ export function QuizProvider({ children }: QuizProviderProps) {
     }, [canGoPrevious]);
 
     const skipCurrentQuestion = useCallback(() => {
-        if (questions.length <= 1) return; // Can't skip if only 1 question
+        if (questions.length <= 1) return;
 
         setQuestions(prev => {
             const newQuestions = [...prev];
-            // Remove current question
             const [skipped] = newQuestions.splice(currentIndex, 1);
-            // Add to the end
             newQuestions.push(skipped);
             return newQuestions;
         });
-
-        // We don't change currentIndex, so the next question (which shifted into this spot) is shown.
-        // However, if we were at the last index, the shifted spot is now empty?
-        // Example: [A, B, C], index 2 (C). Splice C -> [A, B]. Push C -> [A, B, C].
-        // Index 2 is still C.
-        // This is fine for the "last text" case, but if user wants to skip the last one to go back to start?
-        // User just said "skip".
-        // If we are at the last index, and we want to "skip" to a new question, we probably need to wrap around or something.
-        // But if currentIndex points to the end, and we just moved the element to the end, we are still looking at it.
-        // Maybe we should decrement currentIndex if it's the last element? No, then we look at previous.
-        // Ideally we want to look at the *first* unsolved question?
-        // But we are just reordering.
-        // If we are at end, we are at end.
-
-        // Actually, if we are at the last index, and we skip, we probably want to go to index 0?
-        // Or if we move it, effectively it stays at last index.
-        // If the user wants to see *another* question, we should probably shuffle it better or move index.
-        // But if we only have 1 question left, we can't show another.
-        // If we have [Solved, Solved, Unsolved(Current)], and we skip.
-        // We want to see Solved? No.
-
-        // Let's assume the user hasn't solved previous ones?
-        // "skip" implies we haven't solved it.
-        // If we have mixed solved/unsolved in the history.
-
-        // Simpler logic:
-        // Move current to end.
-        // If we are at the end of the array, set currentIndex to 0?
-        // This ensures check all questions.
 
         if (currentIndex === questions.length - 1) {
             setCurrentIndex(0);
@@ -216,3 +206,5 @@ export function QuizProvider({ children }: QuizProviderProps) {
         </QuizContext.Provider>
     );
 }
+
+const ANSWER_KEYS_ORDER: AnswerKey[] = ['A', 'B', 'C', 'D', 'E', 'F'];

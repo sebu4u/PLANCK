@@ -22,6 +22,7 @@ import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
 import { generateUniqueChapterSlug, generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
+import { fetchAllTableRows } from "@/lib/supabase-fetch-all"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 type DevSubject = ApiDevSubject
@@ -379,16 +380,28 @@ export async function GET(req: NextRequest) {
     if (action === "quiz-questions") {
       const search = (searchParams.get("search") || "").trim()
       const classParam = (searchParams.get("class") || "").trim()
+      const materieParam =
+        subject === "biology"
+          ? "biologie"
+          : subject === "physics"
+            ? "fizica"
+            : (searchParams.get("materie") || "").trim()
 
       let query = supabase
         .from("quiz_questions")
-        .select("id, question_id, class, statement, difficulty, correct_answer, created_at")
+        .select("id, question_id, class, statement, title, difficulty, correct_answer, correct_answers, materie, created_at")
         .order("created_at", { ascending: false })
         .limit(60)
 
+      if (materieParam === "biologie") {
+        query = query.eq("materie", "biologie")
+      } else if (materieParam === "fizica") {
+        query = query.or("materie.eq.fizica,materie.is.null")
+      }
+
       if (search) {
         const escaped = search.replace(/[%_]/g, "")
-        query = query.or(`statement.ilike.%${escaped}%,question_id.ilike.%${escaped}%`)
+        query = query.or(`statement.ilike.%${escaped}%,question_id.ilike.%${escaped}%,title.ilike.%${escaped}%`)
       }
 
       if (classParam) {
@@ -407,10 +420,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ quizQuestions: quizQuestions || [] })
     }
 
-    const { data: allChapters, error: chaptersErr } = await supabase
-      .from("learning_path_chapters")
-      .select("*")
-      .order("order_index")
+    const { data: allChapters, error: chaptersErr } = await fetchAllTableRows(async (range) =>
+      supabase
+        .from("learning_path_chapters")
+        .select("*")
+        .order("order_index", { ascending: true })
+        .order("id", { ascending: true })
+        .range(range.from, range.to)
+    )
 
     if (chaptersErr) {
       logger.error("[dev/learning-paths] chapters:", chaptersErr)
@@ -422,10 +439,14 @@ export async function GET(req: NextRequest) {
     )
     const chapterIds = new Set(chapters.map((c) => c.id))
 
-    const { data: allLessons, error: lessonsErr } = await supabase
-      .from("learning_path_lessons")
-      .select("*")
-      .order("order_index")
+    const { data: allLessons, error: lessonsErr } = await fetchAllTableRows(async (range) =>
+      supabase
+        .from("learning_path_lessons")
+        .select("*")
+        .order("order_index", { ascending: true })
+        .order("id", { ascending: true })
+        .range(range.from, range.to)
+    )
 
     if (lessonsErr) {
       logger.error("[dev/learning-paths] lessons:", lessonsErr)
@@ -435,10 +456,14 @@ export async function GET(req: NextRequest) {
     const lessons = (allLessons || []).filter((l) => chapterIds.has(l.chapter_id))
     const lessonIds = new Set(lessons.map((l) => l.id))
 
-    const { data: allItems, error: itemsErr } = await supabase
-      .from("learning_path_lesson_items")
-      .select("*")
-      .order("order_index")
+    const { data: allItems, error: itemsErr } = await fetchAllTableRows(async (range) =>
+      supabase
+        .from("learning_path_lesson_items")
+        .select("*")
+        .order("order_index", { ascending: true })
+        .order("id", { ascending: true })
+        .range(range.from, range.to)
+    )
 
     if (itemsErr) {
       logger.error("[dev/learning-paths] items:", itemsErr)

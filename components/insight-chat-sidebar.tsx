@@ -80,19 +80,34 @@ interface InsightChatSidebarProps {
   onExitAnimationComplete?: () => void
   /** Replace default problem_tutor starter chips when opening empty chat (e.g. /grile). */
   starterQuestionChips?: string[] | null
+  /** Skip fade/slide-in on starter chips, context pill, and suggested questions. */
+  disableEntranceAnimations?: boolean
+  /** Override panel slide transition classes (embedded desktop / mobile slide-over). */
+  panelSlideTransitionClass?: string
 }
 
 interface SuggestedQuestionsProps {
   questions: string[]
   onSelect: (question: string) => void
   isLightTheme?: boolean
+  disableEntranceAnimations?: boolean
 }
 
-function SuggestedQuestions({ questions, onSelect, isLightTheme = false }: SuggestedQuestionsProps) {
+function SuggestedQuestions({
+  questions,
+  onSelect,
+  isLightTheme = false,
+  disableEntranceAnimations = false,
+}: SuggestedQuestionsProps) {
   if (!questions || questions.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-2 mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div
+      className={cn(
+        "flex flex-col gap-2 mt-4",
+        !disableEntranceAnimations && "animate-in fade-in slide-in-from-bottom-2 duration-300",
+      )}
+    >
       <p className={cn("text-xs font-semibold uppercase tracking-wider ml-1 mb-1", isLightTheme ? "text-[#4b5563]" : "text-white/40")}>
         Sugestii de întrebări
       </p>
@@ -220,6 +235,8 @@ export default function InsightChatSidebar({
   embedDesktopHeightClass,
   onExitAnimationComplete,
   starterQuestionChips,
+  disableEntranceAnimations = false,
+  panelSlideTransitionClass,
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -508,7 +525,7 @@ export default function InsightChatSidebar({
   const canShowStarterCards =
     persona === 'problem_tutor' &&
     userMessagesCount === 0 &&
-    !loadingSession &&
+    (disableEntranceAnimations || !loadingSession) &&
     !busy &&
     effectiveOpen &&
     !initialUserMessage?.trim() &&
@@ -1337,6 +1354,10 @@ export default function InsightChatSidebar({
 
   const send = () => submitMessage()
   const isInputDisabled = busy
+  const embeddedPanelSlideTransition =
+    panelSlideTransitionClass ?? "transition-transform duration-300 ease-out"
+  const slideOverPanelTransition =
+    panelSlideTransitionClass ?? "transition-transform duration-300 ease-in-out"
 
   const handlePanelTransitionEnd = useCallback(
     (e: React.TransitionEvent<HTMLDivElement>) => {
@@ -1400,7 +1421,7 @@ export default function InsightChatSidebar({
                   embedDesktopTopClass ?? "top-16",
                   embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
                   "bottom-0 w-[25vw] rounded-tl-xl rounded-bl-xl overflow-hidden",
-                  "transition-transform duration-300 ease-out",
+                  embeddedPanelSlideTransition,
                   isOpen ? "translate-x-0" : "translate-x-full",
                 )
               : cn(
@@ -1408,7 +1429,7 @@ export default function InsightChatSidebar({
                   embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
                   "bottom-0 w-[25vw] translate-x-0 transition-none rounded-tl-xl rounded-bl-xl overflow-hidden",
                 )
-            : `top-0 h-dvh lg:h-dvh w-[90vw] lg:w-[25vw] transition-transform duration-300 ease-in-out ${
+            : `top-0 h-dvh lg:h-dvh w-[90vw] lg:w-[25vw] ${slideOverPanelTransition} ${
                 isOpen ? 'translate-x-0' : 'translate-x-full'
               }`
         }`}
@@ -1485,7 +1506,7 @@ export default function InsightChatSidebar({
           onScroll={handleScroll}
           className="insight-chat-scroll flex-1 overflow-y-auto px-3 py-5 pb-36 sm:px-4 sm:py-6 sm:pb-40 lg:px-5 overscroll-contain"
         >
-          {loadingSession ? (
+          {loadingSession && !disableEntranceAnimations ? (
             <div className="flex h-full items-center justify-center">
               <div className={cn(
                 "flex flex-col items-center gap-3 rounded-2xl px-6 py-6",
@@ -1602,6 +1623,7 @@ export default function InsightChatSidebar({
                     questions={suggestedQuestions}
                     onSelect={handleSuggestionSelect}
                     isLightTheme={isProblemLightTheme}
+                    disableEntranceAnimations={disableEntranceAnimations}
                   />
                 )}
             </div>
@@ -1680,7 +1702,12 @@ export default function InsightChatSidebar({
                 )}
 
                 {canShowStarterCards && (
-                  <div className="mb-2 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div
+                    className={cn(
+                      "mb-2 flex flex-col gap-2",
+                      !disableEntranceAnimations && "animate-in fade-in slide-in-from-bottom-2 duration-300",
+                    )}
+                  >
                     {starterChipsToShow.map((cardText) => (
                       <button
                         key={cardText}
@@ -1701,7 +1728,8 @@ export default function InsightChatSidebar({
                 {/* Context Card */}
                 {problemContext && !busy && (
                   <div className={cn(
-                    "flex items-center justify-between border border-b-0 rounded-t-2xl p-3 text-sm animate-in fade-in slide-in-from-bottom-2 duration-200",
+                    "flex items-center justify-between border border-b-0 rounded-t-2xl p-3 text-sm",
+                    !disableEntranceAnimations && "animate-in fade-in slide-in-from-bottom-2 duration-200",
                     isProblemLightTheme
                       ? "bg-white border-[#0b0d10]/12 text-[#4b5563]"
                       : "bg-[#1a1a1a] border-white/10 text-gray-300"

@@ -21,11 +21,14 @@ import { AnswersList } from './answers-list';
 import { GrileQuizBottomBar } from './grile-quiz-bottom-bar';
 import { fetchQuizQuestionById } from '@/lib/supabase-quiz';
 import { formatGrileCatalogInsightContext } from '@/lib/grile-insight-context';
+import { getCorrectAnswerKeys } from '@/lib/quiz-question-utils';
 import type { GradeLevel } from '@/lib/types/quiz-questions';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fireLearningPathCorrectConfetti } from '@/lib/learning-path-confetti';
 import { playGrileErrorSound, playGrileSuccessSound } from '@/lib/grile-quiz-audio';
+import { GrileSubjectProvider, useGrileSubject } from './grile-subject-context';
+import { getGrileSubjectConfig, type GrileMaterie } from '@/lib/grile-subject-config';
 
 const GRILE_DESKTOP_EMPTY_ICON = `/images/icons/${encodeURIComponent("Untitled design (42).png")}`;
 
@@ -41,6 +44,7 @@ function useGrileShellFeedback() {
 
 function QuizContent() {
     const router = useRouter();
+    const { catalogPath, materie } = useGrileSubject();
     const grileChat = useGrileInsightChat();
     const insightDesktopOpen = Boolean(grileChat?.grileChatDocked && grileChat?.isDesktopViewport);
     const {
@@ -86,10 +90,11 @@ function QuizContent() {
                 classLevel,
                 questionIndex: currentIndex,
                 totalQuestions,
+                catalogPath,
             }),
             problemId: `grile-catalog:${currentQuestion.id}:${currentIndex}`,
         });
-    }, [grileChat, currentQuestion, currentAnswer, classLevel, currentIndex, totalQuestions]);
+    }, [grileChat, currentQuestion, currentAnswer, classLevel, currentIndex, totalQuestions, catalogPath]);
 
     const { handleClassSelect } = useGrileClassSelect();
 
@@ -115,6 +120,12 @@ function QuizContent() {
                     return;
                 }
 
+                const questionMaterie = question.materie ?? 'fizica';
+                if (questionMaterie !== materie) {
+                    setSingleQuestionNotFound(true);
+                    return;
+                }
+
                 setClassLevel(question.class);
                 setQuestions([question]);
             } catch (error) {
@@ -134,7 +145,7 @@ function QuizContent() {
         return () => {
             cancelled = true;
         };
-    }, [questionParam, classLevel, setClassLevel, setLoading, setQuestions]);
+    }, [questionParam, classLevel, materie, setClassLevel, setLoading, setQuestions]);
 
     useEffect(() => {
         if (questionParam || !gradeParam || classLevel) return;
@@ -165,7 +176,7 @@ function QuizContent() {
                     ID-ul trimis nu corespunde unei întrebări existente.
                 </p>
                 <button
-                    onClick={() => router.push('/grile')}
+                    onClick={() => router.push(catalogPath)}
                     className="text-violet-700 hover:text-violet-600 font-medium transition-colors"
                 >
                     Vezi toate grilele
@@ -251,7 +262,7 @@ function QuizContent() {
 
                 <AnswersList
                     answers={currentQuestion.answers}
-                    correctAnswer={currentQuestion.correct_answer}
+                    correctAnswers={getCorrectAnswerKeys(currentQuestion)}
                     userAnswer={currentAnswer}
                     onSelect={selectAnswer}
                 />
@@ -351,12 +362,19 @@ function GrilePageShell() {
     )
 }
 
-export function GrilePageContent() {
+export function GrilePageContent({
+    materie = "fizica",
+}: {
+    materie?: GrileMaterie;
+}) {
+    const subjectConfig = getGrileSubjectConfig(materie);
     return (
-        <QuizProvider>
-            <GrileInsightChatProvider>
-                <GrilePageShell />
-            </GrileInsightChatProvider>
-        </QuizProvider>
+        <GrileSubjectProvider config={subjectConfig}>
+            <QuizProvider>
+                <GrileInsightChatProvider>
+                    <GrilePageShell />
+                </GrileInsightChatProvider>
+            </QuizProvider>
+        </GrileSubjectProvider>
     )
 }

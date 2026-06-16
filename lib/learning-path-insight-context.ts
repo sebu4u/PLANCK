@@ -1,5 +1,6 @@
 import type { Problem } from "@/data/problems"
 import type { QuizQuestion, AnswerKey } from "@/lib/types/quiz-questions"
+import { getCorrectAnswerKeys } from "@/lib/quiz-question-utils"
 
 /** First user message sent when learner taps „De ce?” (full text goes to the model). */
 export const LEARNING_PATH_EXPLAIN_INITIAL_PROMPT =
@@ -20,11 +21,13 @@ function formatQuizAnswersBlock(q: QuizQuestion): string {
 
 export function formatGrilaLearningPathContext(
   question: QuizQuestion,
-  selectedAnswer: AnswerKey | null,
+  selectedAnswers: AnswerKey[],
   wasCorrect: boolean | null
 ): string {
+  const correctKeys = getCorrectAnswerKeys(question)
   const parts = [
     "Tip exercițiu: grilă (învățare — learning path).",
+    question.title?.trim() ? `Titlu: ${question.title.trim()}.` : "",
     "",
     "Enunț:",
     question.statement.trim(),
@@ -32,11 +35,11 @@ export function formatGrilaLearningPathContext(
     "Variante:",
     formatQuizAnswersBlock(question),
     "",
-    `Răspuns corect oficial: ${question.correct_answer}.`,
-    `Răspunsul selectat de utilizator: ${selectedAnswer ?? "(niciunul)"}.`,
+    `Răspuns(uri) corect(e) oficial(e): ${correctKeys.join(", ")}.`,
+    `Răspunsurile selectate de utilizator: ${selectedAnswers.length ? selectedAnswers.join(", ") : "(niciunul)"}.`,
     `Rezultat după verificare: ${wasCorrect === true ? "corect" : wasCorrect === false ? "incorect" : "necunoscut"}.`,
   ]
-  return parts.join("\n")
+  return parts.filter((line) => line !== "").join("\n")
 }
 
 export function formatPollLearningPathContext(params: {

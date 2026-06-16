@@ -15,6 +15,7 @@ import {
   loadLearningPathItemPayload,
   resolveLessonContext,
 } from "@/lib/learning-path-item-loader"
+import { parseFizicaMapItemContext, appendFizicaMapItemQuery } from "@/lib/fizica-map-item-navigation"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const dynamic = "force-dynamic"
@@ -57,11 +58,15 @@ export async function generateMetadata({
 
 export default async function InvataLessonItemPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ chapterSlug: string; lessonSlug: string; itemIndex: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { chapterSlug, lessonSlug, itemIndex } = await params
   const parsedIndex = Number.parseInt(itemIndex, 10)
+  const resolvedSearchParams = await searchParams
+  const fizicaMapContext = parseFizicaMapItemContext(resolvedSearchParams)
 
   const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
   if (chapter && lesson) {
@@ -73,11 +78,17 @@ export default async function InvataLessonItemPage({
       itemIndex
     )
     if (canonicalRedirect) {
-      redirect(canonicalRedirect)
+      redirect(
+        fizicaMapContext
+          ? appendFizicaMapItemQuery(canonicalRedirect, fizicaMapContext)
+          : canonicalRedirect,
+      )
     }
   }
 
-  const result = await loadLearningPathItemPayload(chapterSlug, lessonSlug, parsedIndex)
+  const result = await loadLearningPathItemPayload(chapterSlug, lessonSlug, parsedIndex, {
+    fizicaMapContext,
+  })
 
   if (result.status === "not_found" || result.status === "invalid_index") {
     notFound()

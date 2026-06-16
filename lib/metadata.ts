@@ -203,6 +203,28 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  invataFizica: {
+    title: "Învață Fizică – Harta Lecțiilor | PLANCK",
+    description:
+      "Parcurge lecțiile de fizică pas cu pas pe harta interactivă. Traseu structurat pentru liceu, de la mecanică la termodinamică.",
+    keywords:
+      "invata fizica, lectii fizica liceu, harta lectii, traseu invatare fizica, planck academy",
+    alternates: {
+      canonical: "/invata/fizica",
+    },
+    openGraph: {
+      title: "Învață Fizică – Harta Lecțiilor",
+      description:
+        "Harta lecțiilor de fizică pe Planck Academy: parcurge capitolele în ordine, lecție cu lecție.",
+      url: `${PLATFORM_SITE_URL}/invata/fizica`,
+    },
+    twitter: {
+      title: "Învață Fizică – Harta Lecțiilor",
+      description:
+        "Parcurge lecțiile de fizică pe harta interactivă Planck Academy.",
+    },
+  },
+
   problems: {
     title: "Probleme Rezolvate Video & Catalog – BAC, Admitere, Clasă | PLANCK",
     description: `Peste ${VIDEO_SOLUTIONS_COUNT} probleme cu soluții video explicate și catalog complet pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. ${TEACHER_VERIFICATION}.`,
@@ -576,6 +598,26 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: `Teste Grilă – ${QUIZ_COUNT} Grile Rezolvate`,
       description: `Grile rezolvate pentru liceu, integrate în traseele Planck.`,
+    },
+  },
+
+  "biologie-grile": {
+    title: "Teste Grilă Biologie – Catalog Grile Liceu | Planck Academy",
+    description:
+      "Catalog de grile de biologie pentru clasele 9–12. Întrebări cu răspunsuri multiple, imagini și rezolvări video pentru pregătire la clasă și BAC.",
+    keywords:
+      "grile biologie, teste grila biologie, grile liceu biologie, bac biologie, clasa 9 10 11 12, quiz biologie",
+    alternates: {
+      canonical: "/biologie/grile",
+    },
+    openGraph: {
+      title: "Teste Grilă Biologie – Catalog Grile Liceu",
+      description: "Grile de biologie pentru liceu, cu răspunsuri multiple și rezolvări video.",
+      url: `${PLATFORM_SITE_URL}/biologie/grile`,
+    },
+    twitter: {
+      title: "Teste Grilă Biologie – Catalog Grile Liceu",
+      description: "Grile de biologie integrate în traseele Planck.",
     },
   },
 

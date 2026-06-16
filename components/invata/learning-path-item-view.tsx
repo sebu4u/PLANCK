@@ -59,7 +59,8 @@ export function LearningPathItemView({
     chapterId: chapter.id,
   }
 
-  const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
+  const prevItemHref =
+    payload.prevItemHref ?? (itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null)
 
   const isPoll = item.item_type === "poll"
   const isProblem =

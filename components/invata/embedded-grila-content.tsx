@@ -1,19 +1,19 @@
 "use client"
 
 import React from "react"
+import Image from "next/image"
 import { BlockMath, InlineMath } from "react-katex"
 import "katex/dist/katex.min.css"
 import type { QuizQuestion, AnswerKey, QuizAnswers } from "@/lib/types/quiz-questions"
 import { useGrilaLesson } from "@/components/invata/grila-lesson-context"
-import { Check, X } from "lucide-react"
+import { Check, ExternalLink, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { hasMixedLatexDelimiters, splitMixedLatex } from "@/lib/parse-mixed-latex"
+import { getActiveAnswerEntries, getCorrectAnswerKeys } from "@/lib/quiz-question-utils"
 
 interface EmbeddedGrilaContentProps {
   question: QuizQuestion
 }
-
-const answerKeys: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
 
 function LatexContent({ content }: { content: string }) {
   if (!content) return null
@@ -37,45 +37,77 @@ function LatexContent({ content }: { content: string }) {
   )
 }
 
-function getAnswerEntries(answers: QuizAnswers): [AnswerKey, string][] {
-  return answerKeys
-    .map((key) => [key, answers[key]] as [AnswerKey, string])
-    .filter(([, text]) => text != null && String(text).trim() !== "")
-}
-
 export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
   const ctx = useGrilaLesson()
   if (!ctx) {
     throw new Error("EmbeddedGrilaContent must be used inside GrilaLessonProvider")
   }
 
-  const { selectedAnswer, setSelectedAnswer, isVerified } = ctx
-
-  const answerEntries = getAnswerEntries(question.answers)
+  const { selectedAnswers, toggleAnswer, isVerified } = ctx
+  const selectedSet = new Set(selectedAnswers)
+  const correctSet = new Set(getCorrectAnswerKeys(question))
+  const answerEntries = getActiveAnswerEntries(question.answers)
+  const displayTitle = question.title?.trim() || question.question_id
 
   return (
     <div className="space-y-8">
+      {question.title?.trim() ? (
+        <p className="text-sm font-semibold uppercase tracking-wide text-[#6d6d6d]">{displayTitle}</p>
+      ) : null}
+
+      {question.description?.trim() ? (
+        <p className="text-sm leading-relaxed text-[#6d6d6d]">{question.description.trim()}</p>
+      ) : null}
+
+      {question.image_url?.trim() ? (
+        <div className="overflow-hidden rounded-2xl border border-[#ececec] bg-[#fafafa]">
+          <Image
+            src={question.image_url.trim()}
+            alt={displayTitle}
+            width={960}
+            height={540}
+            className="h-auto w-full object-contain"
+            unoptimized
+          />
+        </div>
+      ) : null}
+
       <div className="text-lg font-bold leading-snug text-[#111111] md:text-xl md:leading-snug">
         <LatexContent content={question.statement} />
       </div>
 
+      {question.video_url?.trim() ? (
+        <a
+          href={question.video_url.trim()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 transition-colors hover:text-violet-600"
+        >
+          <ExternalLink className="h-4 w-4" aria-hidden />
+          Vezi rezolvarea video
+        </a>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {answerEntries.map(([key, text]) => {
+          const isSelected = selectedSet.has(key)
           const state = !isVerified
-            ? selectedAnswer === key
+            ? isSelected
               ? "selected"
               : "default"
-            : key === question.correct_answer
+            : correctSet.has(key) && isSelected
               ? "correct"
-              : selectedAnswer === key
-                ? "incorrect"
-                : "disabled"
+              : correctSet.has(key)
+                ? "correct"
+                : isSelected
+                  ? "incorrect"
+                  : "disabled"
 
           return (
             <button
               key={key}
               type="button"
-              onClick={() => !isVerified && setSelectedAnswer(key)}
+              onClick={() => !isVerified && toggleAnswer(key)}
               disabled={isVerified}
               className={cn(
                 "flex w-full items-start gap-3 rounded-2xl border border-[#ececec] bg-white p-4 text-left shadow-[0_1px_0_rgba(0,0,0,0.04)] transition-all",

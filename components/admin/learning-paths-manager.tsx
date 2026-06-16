@@ -34,6 +34,8 @@ import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
+import type { AnswerKey } from "@/lib/types/quiz-questions"
+import { validateBiologyQuizInput } from "@/lib/quiz-question-utils"
 import type { ApiDevSubject } from "@/lib/dev-subjects"
 import {
   AlertCircle,
@@ -53,6 +55,8 @@ import {
   Trash2,
   X,
 } from "lucide-react"
+
+type FormMode = "none" | "create-item" | "edit-item"
 
 type DevUserOption = {
   user_id: string
@@ -78,8 +82,41 @@ interface QuizQuestionResult {
   question_id: string
   class: number
   statement: string
+  title?: string | null
   difficulty: number
   correct_answer: string
+}
+
+interface BiologyGrilaDraft {
+  question_id: string
+  title: string
+  statement: string
+  description: string
+  tags: string
+  difficulty: number
+  class: number
+  answers: Record<AnswerKey, string>
+  correct_answers: AnswerKey[]
+  image_url: string
+  video_url: string
+}
+
+const BIOLOGY_ANSWER_KEYS: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
+
+function createDefaultBiologyGrilaDraft(): BiologyGrilaDraft {
+  return {
+    question_id: "",
+    title: "",
+    statement: "",
+    description: "",
+    tags: "",
+    difficulty: 1,
+    class: 9,
+    answers: { A: "", B: "", C: "", D: "", E: "", F: "" },
+    correct_answers: [],
+    image_url: "",
+    video_url: "",
+  }
 }
 
 interface PollOption {
@@ -561,6 +598,8 @@ export function LearningPathsManager({
   const [quizClass, setQuizClass] = useState<string>("")
   const [quizResults, setQuizResults] = useState<QuizQuestionResult[]>([])
   const [quizLoading, setQuizLoading] = useState(false)
+  const [biologyGrilaMode, setBiologyGrilaMode] = useState<"create" | "search">("create")
+  const [biologyGrilaDraft, setBiologyGrilaDraft] = useState<BiologyGrilaDraft>(createDefaultBiologyGrilaDraft)
   const [previewCustomText, setPreviewCustomText] = useState(false)
   const [previewSimulationIntro, setPreviewSimulationIntro] = useState(false)
 
@@ -724,6 +763,18 @@ export function LearningPathsManager({
 
   const selectedLesson = useMemo(() => lessons.find((lesson) => lesson.id === selectedLessonId) || null, [lessons, selectedLessonId])
 
+  const selectedChapter = useMemo(() => {
+    if (!selectedLesson) return null
+    return chapters.find((chapter) => chapter.id === selectedLesson.chapter_id) || null
+  }, [chapters, selectedLesson])
+
+  const isBiologyGrilaContext = useMemo(() => {
+    return (
+      selectedChapter?.problem_category === BIOLOGIE_LEARNING_PATH_MARKER ||
+      (isDev && devSubject === "biology")
+    )
+  }, [selectedChapter, isDev, devSubject])
+
   useEffect(() => {
     if (!selectedLesson) {
       setLessonImageUrlInput("")
@@ -774,10 +825,6 @@ export function LearningPathsManager({
     }
   }
 
-  const selectedChapter = useMemo(() => {
-    if (!selectedLesson) return null
-    return chapters.find((chapter) => chapter.id === selectedLesson.chapter_id) || null
-  }, [chapters, selectedLesson])
   const selectedLessonItems = useMemo(() => {
     if (!selectedLessonId) return []
     return getItemsForLesson(selectedLessonId)
@@ -788,12 +835,19 @@ export function LearningPathsManager({
     setOrderedItemIds(nextIds)
     orderedItemIdsRef.current = nextIds
     serverOrderedItemIdsRef.current = nextIds
-  }, [selectedLessonItems])
+  }, [selectedLessonId, selectedLessonItems])
 
   const selectedLessonItemsById = useMemo(
     () => new Map(selectedLessonItems.map((item) => [item.id, item])),
     [selectedLessonItems]
   )
+
+  const displayItemIds = useMemo(() => {
+    const fromOrder = orderedItemIds.filter((id) => selectedLessonItemsById.has(id))
+    const fromOrderSet = new Set(fromOrder)
+    const missing = selectedLessonItems.map((item) => item.id).filter((id) => !fromOrderSet.has(id))
+    return [...fromOrder, ...missing]
+  }, [orderedItemIds, selectedLessonItems, selectedLessonItemsById])
 
   const toggleChapter = (chapterId: string) => {
     setExpandedChapters((prev) => {
@@ -836,6 +890,8 @@ export function LearningPathsManager({
     setQuizSearch("")
     setQuizClass("")
     setQuizResults([])
+    setBiologyGrilaMode("create")
+    setBiologyGrilaDraft(createDefaultBiologyGrilaDraft())
     setPreviewCustomText(false)
     setPreviewSimulationIntro(false)
   }
@@ -902,7 +958,27 @@ export function LearningPathsManager({
         if (!currentForm.youtube_url.trim()) return "URL-ul YouTube este obligatoriu."
         break
       case "grila":
-        if (!currentForm.quiz_question_id.trim()) return "Selectează o întrebare grilă."
+        if (isBiologyGrilaContext && biologyGrilaMode === "create" && !currentForm.quiz_question_id.trim()) {
+          const validation = validateBiologyQuizInput({
+            question_id: biologyGrilaDraft.question_id,
+            title: biologyGrilaDraft.title,
+            statement: biologyGrilaDraft.statement,
+            description: biologyGrilaDraft.description,
+            tags: biologyGrilaDraft.tags
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+            difficulty: biologyGrilaDraft.difficulty,
+            class: biologyGrilaDraft.class,
+            answers: biologyGrilaDraft.answers,
+            correct_answers: biologyGrilaDraft.correct_answers,
+            image_url: biologyGrilaDraft.image_url,
+            video_url: biologyGrilaDraft.video_url,
+          })
+          if (!validation.ok) return validation.message
+        } else if (!currentForm.quiz_question_id.trim()) {
+          return "Selectează o întrebare grilă sau creează una nouă."
+        }
         break
       case "problem":
       case "math_problem":
@@ -1081,6 +1157,49 @@ export function LearningPathsManager({
     return payload
   }
 
+  const createBiologyGrilaQuestion = useCallback(async (): Promise<string> => {
+    const accessToken = await getAccessToken()
+    if (!accessToken) throw new Error("Sesiune expirată.")
+
+    const payload = {
+      question_id: biologyGrilaDraft.question_id,
+      title: biologyGrilaDraft.title,
+      statement: biologyGrilaDraft.statement,
+      description: biologyGrilaDraft.description,
+      tags: biologyGrilaDraft.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      difficulty: biologyGrilaDraft.difficulty,
+      class: biologyGrilaDraft.class,
+      answers: biologyGrilaDraft.answers,
+      correct_answers: biologyGrilaDraft.correct_answers,
+      image_url: biologyGrilaDraft.image_url,
+      video_url: biologyGrilaDraft.video_url,
+      ...(isDev && devSubject ? { subject: devSubject } : {}),
+    }
+
+    const endpoint = isDev ? "/api/dev/quiz-questions" : "/api/admin/quiz-questions"
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string }
+      throw new Error(data.error || "Nu am putut crea grila de biologie.")
+    }
+
+    const data = (await response.json()) as { quizQuestion?: { id: string } }
+    const createdId = data.quizQuestion?.id
+    if (!createdId) throw new Error("Grila a fost creată, dar nu am primit ID-ul.")
+    return createdId
+  }, [biologyGrilaDraft, getAccessToken, isDev, devSubject])
+
   const handleSaveItem = async () => {
     if (!form) return
 
@@ -1096,8 +1215,20 @@ export function LearningPathsManager({
       const accessToken = await getAccessToken()
       if (!accessToken) throw new Error("Sesiune expirată.")
 
-      const method = form.id ? "PUT" : "POST"
-      const payload = buildItemPayload(form)
+      let workingForm = form
+      if (
+        form.item_type === "grila" &&
+        isBiologyGrilaContext &&
+        biologyGrilaMode === "create" &&
+        !form.quiz_question_id.trim()
+      ) {
+        const createdQuizId = await createBiologyGrilaQuestion()
+        workingForm = { ...form, quiz_question_id: createdQuizId }
+        setForm(workingForm)
+      }
+
+      const method = workingForm.id ? "PUT" : "POST"
+      const payload = buildItemPayload(workingForm)
       if (isDev && devSubject) {
         ;(payload as Record<string, unknown>).subject = devSubject
       }
@@ -1118,9 +1249,9 @@ export function LearningPathsManager({
         throw new Error(msg || "Nu am putut salva itemul.")
       }
 
-      setSuccessMessage(form.id ? "Item actualizat cu succes." : "Item creat cu succes.")
+      setSuccessMessage(workingForm.id ? "Item actualizat cu succes." : "Item creat cu succes.")
       setTimeout(() => setSuccessMessage(null), 3000)
-      if (isDev && !form.id) {
+      if (isDev && !workingForm.id) {
         onDevCelebrate?.()
       }
       await fetchData()
@@ -1752,6 +1883,9 @@ export function LearningPathsManager({
       if (isDev && devSubject) {
         params.set("subject", devSubject)
       }
+      if (isBiologyGrilaContext) {
+        params.set("materie", "biologie")
+      }
       params.set("action", "quiz-questions")
       if (quizSearch.trim()) {
         params.set("search", quizSearch.trim())
@@ -1778,7 +1912,7 @@ export function LearningPathsManager({
     } finally {
       setQuizLoading(false)
     }
-  }, [form, getAccessToken, quizClass, quizSearch, isDev, devSubject, apiBase])
+  }, [form, getAccessToken, quizClass, quizSearch, isDev, devSubject, apiBase, isBiologyGrilaContext])
 
   useEffect(() => {
     if (
@@ -1979,13 +2113,13 @@ export function LearningPathsManager({
     }
 
     if (form.item_type === "grila") {
-      return (
-        <div className="space-y-3">
+      const renderQuizSearch = () => (
+        <>
           <div className="flex gap-2">
             <Input
               value={quizSearch}
               onChange={(e) => setQuizSearch(e.target.value)}
-              placeholder="Caută întrebare grilă după enunț sau question_id"
+              placeholder="Caută întrebare grilă după enunț, titlu sau question_id"
               className="bg-black/40 border-white/20 text-gray-100"
             />
             <select
@@ -2030,7 +2164,9 @@ export function LearningPathsManager({
                       : "border-white/10 bg-white/5 hover:bg-white/10"
                   }`}
                 >
-                  <p className="text-sm font-semibold text-white line-clamp-2">{question.statement}</p>
+                  <p className="text-sm font-semibold text-white line-clamp-2">
+                    {question.title?.trim() || question.statement}
+                  </p>
                   <p className="text-xs text-gray-400 mt-1">
                     ID: {question.id} | QID: {question.question_id} | Clasa: {question.class}
                   </p>
@@ -2038,6 +2174,181 @@ export function LearningPathsManager({
               ))
             )}
           </div>
+        </>
+      )
+
+      const renderBiologyCreateForm = () => (
+        <div className="space-y-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-sm font-semibold text-emerald-200">Creează grilă de biologie</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              value={biologyGrilaDraft.question_id}
+              onChange={(e) =>
+                setBiologyGrilaDraft((prev) => ({ ...prev, question_id: e.target.value }))
+              }
+              placeholder="ID grilă (ex: B001)"
+              className="bg-black/40 border-white/20 text-gray-100"
+            />
+            <Input
+              value={biologyGrilaDraft.title}
+              onChange={(e) => setBiologyGrilaDraft((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="Titlu"
+              className="bg-black/40 border-white/20 text-gray-100"
+            />
+          </div>
+          <Textarea
+            value={biologyGrilaDraft.statement}
+            onChange={(e) =>
+              setBiologyGrilaDraft((prev) => ({ ...prev, statement: e.target.value }))
+            }
+            rows={4}
+            placeholder="Enunț"
+            className="bg-black/40 border-white/20 text-gray-100"
+          />
+          <Textarea
+            value={biologyGrilaDraft.description}
+            onChange={(e) =>
+              setBiologyGrilaDraft((prev) => ({ ...prev, description: e.target.value }))
+            }
+            rows={2}
+            placeholder="Descriere (opțional)"
+            className="bg-black/40 border-white/20 text-gray-100"
+          />
+          <Input
+            value={biologyGrilaDraft.tags}
+            onChange={(e) => setBiologyGrilaDraft((prev) => ({ ...prev, tags: e.target.value }))}
+            placeholder="Tag-uri separate prin virgulă (ex: celulă, ADN)"
+            className="bg-black/40 border-white/20 text-gray-100"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <select
+              value={biologyGrilaDraft.class}
+              onChange={(e) =>
+                setBiologyGrilaDraft((prev) => ({ ...prev, class: Number(e.target.value) }))
+              }
+              className="rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"
+            >
+              <option value={9}>Clasa 9</option>
+              <option value={10}>Clasa 10</option>
+              <option value={11}>Clasa 11</option>
+              <option value={12}>Clasa 12</option>
+            </select>
+            <select
+              value={biologyGrilaDraft.difficulty}
+              onChange={(e) =>
+                setBiologyGrilaDraft((prev) => ({
+                  ...prev,
+                  difficulty: Number(e.target.value),
+                }))
+              }
+              className="rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"
+            >
+              <option value={1}>Dificultate: Ușor</option>
+              <option value={2}>Dificultate: Mediu</option>
+              <option value={3}>Dificultate: Greu</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-300">
+              Variante de răspuns (2–6)
+            </p>
+            {BIOLOGY_ANSWER_KEYS.map((key) => (
+              <div key={key} className="flex items-start gap-2">
+                <label className="mt-2 w-6 text-sm font-semibold text-gray-300">{key}</label>
+                <Input
+                  value={biologyGrilaDraft.answers[key]}
+                  onChange={(e) =>
+                    setBiologyGrilaDraft((prev) => ({
+                      ...prev,
+                      answers: { ...prev.answers, [key]: e.target.value },
+                    }))
+                  }
+                  placeholder={`Varianta ${key} (opțional pentru E/F)`}
+                  className="bg-black/40 border-white/20 text-gray-100"
+                />
+                <label className="mt-2 flex items-center gap-1 text-xs text-gray-300">
+                  <Checkbox
+                    checked={biologyGrilaDraft.correct_answers.includes(key)}
+                    onCheckedChange={(checked) => {
+                      setBiologyGrilaDraft((prev) => {
+                        const next = new Set(prev.correct_answers)
+                        if (checked) next.add(key)
+                        else next.delete(key)
+                        return {
+                          ...prev,
+                          correct_answers: BIOLOGY_ANSWER_KEYS.filter((answerKey) =>
+                            next.has(answerKey),
+                          ),
+                        }
+                      })
+                    }}
+                  />
+                  Corect
+                </label>
+              </div>
+            ))}
+          </div>
+          <Input
+            value={biologyGrilaDraft.image_url}
+            onChange={(e) =>
+              setBiologyGrilaDraft((prev) => ({ ...prev, image_url: e.target.value }))
+            }
+            placeholder="URL imagine (opțional)"
+            className="bg-black/40 border-white/20 text-gray-100"
+          />
+          <Input
+            value={biologyGrilaDraft.video_url}
+            onChange={(e) =>
+              setBiologyGrilaDraft((prev) => ({ ...prev, video_url: e.target.value }))
+            }
+            placeholder="Link rezolvare video (opțional)"
+            className="bg-black/40 border-white/20 text-gray-100"
+          />
+          <p className="text-xs text-gray-400">
+            La salvare, grila se creează în catalog și se atașează automat la acest item.
+          </p>
+        </div>
+      )
+
+      return (
+        <div className="space-y-3">
+          {isBiologyGrilaContext ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={biologyGrilaMode === "create" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setBiologyGrilaMode("create")
+                  updateForm("quiz_question_id", "")
+                }}
+                className={
+                  biologyGrilaMode === "create"
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                    : "border-white/20 bg-white/5 text-gray-200 hover:bg-white/10"
+                }
+              >
+                Creează grilă nouă
+              </Button>
+              <Button
+                type="button"
+                variant={biologyGrilaMode === "search" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setBiologyGrilaMode("search")}
+                className={
+                  biologyGrilaMode === "search"
+                    ? "bg-cyan-600 hover:bg-cyan-500 text-white"
+                    : "border-white/20 bg-white/5 text-gray-200 hover:bg-white/10"
+                }
+              >
+                Alege din catalog
+              </Button>
+            </div>
+          ) : null}
+
+          {isBiologyGrilaContext && biologyGrilaMode === "create"
+            ? renderBiologyCreateForm()
+            : renderQuizSearch()}
         </div>
       )
     }
@@ -3128,11 +3439,11 @@ export function LearningPathsManager({
                   <>
                     <Reorder.Group
                       axis="y"
-                      values={orderedItemIds}
+                      values={displayItemIds}
                       onReorder={saving ? () => {} : handleItemReorder}
                       className="space-y-0"
                     >
-                      {orderedItemIds.map((itemId, index) => {
+                      {displayItemIds.map((itemId, index) => {
                         const item = selectedLessonItemsById.get(itemId)
                         if (!item) return null
                         const insertTargetOrder = item.order_index
@@ -3145,7 +3456,7 @@ export function LearningPathsManager({
                             key={item.id}
                             item={item}
                             index={index}
-                            totalCount={orderedItemIds.length}
+                            totalCount={displayItemIds.length}
                             saving={saving}
                             isSelected={form?.id === item.id}
                             insertTargetOrder={insertTargetOrder}

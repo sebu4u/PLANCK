@@ -121,13 +121,13 @@ function LessonItemShellInner({
   const pushMomentum = useMomentumTrigger()
   useStreakTrigger({ enabled: Boolean(user?.id) })
 
-  const nextItemHref =
-    itemIndex < items.length
-      ? `${lessonBaseHref}/${itemIndex + 1}`
-      : lessonBaseHref
-
-  const prevItemHref = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
   const itemNavigation = useOptionalLearningPathItemNavigation()
+  const nextItemHref =
+    itemNavigation?.nextItemHref ??
+    (itemIndex < items.length ? `${lessonBaseHref}/${itemIndex + 1}` : lessonBaseHref)
+  const prevItemHref =
+    itemNavigation?.prevItemHref ?? (itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null)
+  const isLastItem = itemNavigation?.isLastItem ?? itemIndex >= items.length
   const chrome = useLearningPathItemChrome()
   const edgeToEdge = chrome?.edgeToEdge ?? false
   const flashcardFlow = useLearningPathFlashcardFlow()
@@ -152,7 +152,7 @@ function LessonItemShellInner({
   const markCurrentItemCompleted = useLearningPathItemCompletion({
     itemId: currentItemId,
     lessonId,
-    isLastItem: itemIndex >= items.length,
+    isLastItem,
   })
 
   const continueToNextItem = useCallback(async () => {
@@ -165,12 +165,12 @@ function LessonItemShellInner({
     })
     pushMomentum({
       nextHref: nextItemHref,
-      isLastItem: itemIndex >= items.length,
+      isLastItem,
       itemIndex,
       totalItems: items.length,
     })
     await navigateToNextItem()
-  }, [currentItemId, itemIndex, items.length, markCurrentItemCompleted, navigateToNextItem, nextItemHref, pushMomentum])
+  }, [currentItemId, isLastItem, itemIndex, items.length, markCurrentItemCompleted, navigateToNextItem, nextItemHref, pushMomentum])
 
   const markCompleteForContinue = useCallback(async () => {
     await markCurrentItemCompleted()
@@ -182,11 +182,11 @@ function LessonItemShellInner({
     })
     pushMomentum({
       nextHref: nextItemHref,
-      isLastItem: itemIndex >= items.length,
+      isLastItem,
       itemIndex,
       totalItems: items.length,
     })
-  }, [currentItemId, itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum])
+  }, [currentItemId, isLastItem, itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum])
 
   useEffect(() => {
     setCurrentItemCompleted(initialCurrentItemCompleted)
@@ -471,7 +471,7 @@ function LessonItemShellInner({
           onContinue={markCompleteForContinue}
           currentItemId={currentItemId}
           lessonId={lessonId}
-          isLastItem={itemIndex >= items.length}
+          isLastItem={isLastItem}
           chapterSlug={chapterSlug}
           lessonSlug={lessonSlug}
           chapterId={chapterId}
@@ -597,8 +597,8 @@ function GrilaLessonBottomCta({
   })
   if (!ctx) return null
 
-  const { selectedAnswer, isVerified, isCorrect, verify, reset } = ctx
-  const hasAnswer = selectedAnswer !== null
+  const { selectedAnswers, isVerified, isCorrect, verify, reset } = ctx
+  const hasAnswer = selectedAnswers.length > 0
   const barState = !isVerified ? "verify" : isCorrect ? "correct" : "incorrect"
 
   const flashcardBridge = useMemo<LearningPathFlashcardBridge>(
@@ -613,7 +613,7 @@ function GrilaLessonBottomCta({
         itemTitle,
       },
       getContext: () =>
-        formatGrilaLearningPathContext(grilaQuestion, selectedAnswer, isCorrect),
+        formatGrilaLearningPathContext(grilaQuestion, selectedAnswers, isCorrect),
       consumeStruggledBeforeSuccess,
     }),
     [
@@ -626,7 +626,7 @@ function GrilaLessonBottomCta({
       itemTitle,
       lessonId,
       lessonSlug,
-      selectedAnswer,
+      selectedAnswers,
     ]
   )
 
@@ -656,7 +656,7 @@ function GrilaLessonBottomCta({
         explainChat?.openExplainChat({
           problemStatement: formatGrilaLearningPathContext(
             grilaQuestion,
-            selectedAnswer,
+            selectedAnswers,
             isCorrect
           ),
           problemContextPreamble: "",

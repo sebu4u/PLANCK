@@ -1,26 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import type { LucideIcon } from "lucide-react"
-import { ArrowLeft, Atom, Beaker, BookOpen, GraduationCap, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { gradeLabels, type GradeLevel } from "@/lib/types/quiz-questions"
+import { useGrileSubject } from "./grile-subject-context"
 
 const GRADE_LEVELS: GradeLevel[] = [9, 10, 11, 12]
-
-const classIcons: Record<GradeLevel, LucideIcon> = {
-  9: Atom,
-  10: Beaker,
-  11: BookOpen,
-  12: GraduationCap,
-}
-
-const classDescriptions: Record<GradeLevel, string> = {
-  9: "Mecanică, Optică",
-  10: "Termodinamică, Electricitate",
-  11: "Electrodinamică, Oscilații",
-  12: "Fizică atomică, Fizică nucleară",
-}
 
 interface GrileDesktopSidebarProps {
   selectedClass: GradeLevel | null
@@ -33,15 +19,17 @@ export function GrileDesktopSidebar({
   isLoading,
   onSelectClass,
 }: GrileDesktopSidebarProps) {
+  const { backHref, backLabel, classDescriptions, classIcons } = useGrileSubject()
+
   return (
     <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] bg-white lg:block">
       <div className="catalog-sidebar-scroll flex h-full flex-col overflow-y-auto px-5 py-5">
         <Link
-          href="/exerseaza"
+          href={backHref}
           className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-[#2c2f33]/70 transition-colors hover:text-[#0b0c0f]"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
-          Înapoi la Exersează
+          {backLabel}
         </Link>
 
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#2c2f33]/55">
