@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react"
 import { DashboardPromoCardLayout } from "@/components/dashboard/dashboard-promo-card-layout"
 
 const PLUS_MONTHLY_PRICE = 29
-const PLUS_MONTHLY_ORIGINAL = 49
+const PLUS_MONTHLY_ORIGINAL = 129
 const PLUS_DISCOUNT_PERCENT = Math.round((1 - PLUS_MONTHLY_PRICE / PLUS_MONTHLY_ORIGINAL) * 100)
 
 /** Last day of the Romanian school year promo window (inclusive). */

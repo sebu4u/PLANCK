@@ -57,7 +57,7 @@ function plans(): PlanConfig[] {
       showValueBadge: true,
       priceDisplay: (
         <div className="flex flex-col items-start gap-1">
-          <span className="text-sm text-gray-400 line-through tabular-nums">49 RON/lună</span>
+          <span className="text-sm text-gray-400 line-through tabular-nums">129 RON/lună</span>
           <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-lg font-semibold text-gray-900 align-super">RON</span>
             <span className="text-4xl font-bold tracking-tight text-gray-900 tabular-nums">29</span>
@@ -91,7 +91,7 @@ function plans(): PlanConfig[] {
       highlighted: false,
       priceDisplay: (
         <div className="flex flex-col items-start gap-1">
-          <span className="text-sm text-gray-400 line-through tabular-nums">99 RON/lună</span>
+          <span className="text-sm text-gray-400 line-through tabular-nums">249 RON/lună</span>
           <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-lg font-semibold text-gray-900 align-super">RON</span>
             <span className="text-4xl font-bold tracking-tight text-gray-900 tabular-nums">59</span>
