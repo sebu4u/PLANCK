@@ -6,13 +6,9 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState,
-  lazy,
-  Suspense,
 } from "react"
 import { useGrileSubject } from "./grile-subject-context"
-
-const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
+import { useInsightGlobal } from "@/components/insight-global-provider"
 
 export type OpenGrileInsightChatArgs = {
   problemStatement: string
@@ -21,7 +17,7 @@ export type OpenGrileInsightChatArgs = {
 
 type GrileInsightChatContextValue = {
   openGrileChat: (args: OpenGrileInsightChatArgs) => void
-  /** True while panel is mounted (includes slide-out). */
+  /** Always false now; the global provider handles panel lifecycle. */
   grileChatDocked: boolean
   isDesktopViewport: boolean
 }
@@ -34,84 +30,52 @@ export function useGrileInsightChat(): GrileInsightChatContextValue | null {
 
 export function GrileInsightChatProvider({ children }: { children: React.ReactNode }) {
   const { insightStarterChips } = useGrileSubject()
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false)
-  const [panelMounted, setPanelMounted] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [problemStatement, setProblemStatement] = useState("")
-  const [problemContextPreamble, setProblemContextPreamble] = useState("")
-  const [problemId, setProblemId] = useState("grile-catalog")
+  const insightGlobal = useInsightGlobal()
+  const openInsight = insightGlobal?.openInsight
+  const setInsightPageContext = insightGlobal?.setPageContext
+  const clearInsightPageContext = insightGlobal?.clearPageContext
 
   useEffect(() => {
-    const sync = () => setIsDesktopViewport(typeof window !== "undefined" && window.innerWidth >= 1024)
-    sync()
-    window.addEventListener("resize", sync)
-    return () => window.removeEventListener("resize", sync)
-  }, [])
+    if (!setInsightPageContext) return
 
-  const finalizePanelClose = useCallback(() => {
-    // Keep the panel mounted so the in-progress chat session survives
-    // close/reopen cycles. Only slide it out; do not unmount (unmounting
-    // would reset sessionId/messages and lose the conversation).
-    setPanelOpen(false)
-  }, [])
-
-  const openGrileChat = useCallback((args: OpenGrileInsightChatArgs) => {
-    setProblemStatement(args.problemStatement)
-    setProblemContextPreamble("")
-    setProblemId(args.problemId)
-    if (panelMounted && panelOpen) {
-      return
-    }
-    setPanelMounted(true)
-    setPanelOpen(false)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setPanelOpen(true)
-      })
+    setInsightPageContext({
+      problemId: "grile-catalog",
+      problemStatement: "",
+      problemContextPreamble: "",
+      persona: "problem_tutor",
+      starterQuestionChips: insightStarterChips,
     })
-  }, [panelMounted, panelOpen])
 
-  const closeInsight = useCallback(() => {
-    setPanelOpen(false)
-  }, [])
+    return () => {
+      clearInsightPageContext?.()
+    }
+  }, [clearInsightPageContext, insightStarterChips, setInsightPageContext])
 
-  const embedOnDesktop = panelMounted && isDesktopViewport
-  const problemLightTheme = true
+  const openGrileChat = useCallback(
+    (args: OpenGrileInsightChatArgs) => {
+      openInsight?.({
+        problemId: args.problemId,
+        problemStatement: args.problemStatement,
+        problemContextPreamble: "",
+        persona: "problem_tutor",
+        starterQuestionChips: insightStarterChips,
+      })
+    },
+    [insightStarterChips, openInsight]
+  )
 
   const value = useMemo(
     () => ({
       openGrileChat,
-      grileChatDocked: panelMounted,
-      isDesktopViewport,
+      grileChatDocked: false,
+      isDesktopViewport: typeof window !== "undefined" && window.innerWidth >= 1024,
     }),
-    [openGrileChat, panelMounted, isDesktopViewport]
+    [openGrileChat]
   )
 
   return (
     <GrileInsightChatContext.Provider value={value}>
       {children}
-      {panelMounted ? (
-        <Suspense fallback={null}>
-          <InsightChatSidebar
-            isOpen={panelOpen}
-            onClose={closeInsight}
-            problemId={problemId}
-            problemStatement={problemStatement}
-            problemContextPreamble={problemContextPreamble}
-            persona="problem_tutor"
-            embedOnDesktop={embedOnDesktop}
-            problemLightTheme={problemLightTheme}
-            lightChromeWhenSlideOver={false}
-            showCloseWhenDesktopEmbedded={embedOnDesktop}
-            embedDesktopTopClass="top-16"
-            embedDesktopHeightClass="h-[calc(100dvh-4rem)]"
-            initialUserMessage={null}
-            initialUserMessageDisplay={null}
-            onExitAnimationComplete={finalizePanelClose}
-            starterQuestionChips={insightStarterChips}
-          />
-        </Suspense>
-      ) : null}
     </GrileInsightChatContext.Provider>
   )
 }

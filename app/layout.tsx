@@ -15,6 +15,7 @@ import { MobileViewportFix } from "@/components/mobile-viewport-fix"
 import { RealVHProvider } from "@/components/real-vh-provider"
 import { EngagementProvider } from "@/components/engagement/notification-provider"
 import { EngagementNotificationToaster } from "@/components/engagement/notification-toaster"
+import { InsightGlobalProvider } from "@/components/insight-global-provider"
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
@@ -122,7 +123,9 @@ export default function RootLayout({
             <AnalyticsProvider>
               <KatexProvider>
                 <EngagementProvider>
-                  <AuthSessionGate>{children}</AuthSessionGate>
+                  <InsightGlobalProvider>
+                    <AuthSessionGate>{children}</AuthSessionGate>
+                  </InsightGlobalProvider>
                 </EngagementProvider>
               </KatexProvider>
               <Toaster />

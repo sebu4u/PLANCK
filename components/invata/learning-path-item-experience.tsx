@@ -18,6 +18,7 @@ import { LearningPathItemView } from "@/components/invata/learning-path-item-vie
 import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
 import { FizicaLessonCompletionScreen } from "@/components/invata/fizica-lesson-completion-screen"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
+import { useInsightGlobal } from "@/components/insight-global-provider"
 
 interface LearningPathItemExperienceProps {
   initialPayload: LearningPathItemPayload
@@ -54,6 +55,7 @@ function findFizicaAssignmentIndex(
 export function LearningPathItemExperience({ initialPayload }: LearningPathItemExperienceProps) {
   const router = useRouter()
   const { user } = useAuth()
+  const closeInsight = useInsightGlobal()?.closeInsight
   const [payload, setPayload] = useState(initialPayload)
   const [isNavigating, setIsNavigating] = useState(false)
   const [freePlanPaywall, setFreePlanPaywall] = useState<{ lessonBaseHref: string } | null>(null)
@@ -124,6 +126,8 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         return
       }
 
+      closeInsight?.()
+
       setSlideDirection(
         options?.direction ??
           (() => {
@@ -190,7 +194,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         isPopstateRef.current = false
       }
     },
-    [applyPayload, loadItem, payload, router],
+    [applyPayload, closeInsight, loadItem, payload, router],
   )
 
   const goToItemIndex = useCallback(
@@ -225,11 +229,12 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     }
 
     if (payload.isLastItem) {
+      closeInsight?.()
       router.push(payload.lessonBaseHref)
       return
     }
     await goToItemIndex(payload.itemIndex + 1, { urlMode: "push", direction: "forward" })
-  }, [goToItem, goToItemIndex, payload, router])
+  }, [closeInsight, goToItem, goToItemIndex, payload, router])
 
   const dismissLessonCompletion = useCallback(() => {
     setShowLessonCompletion(false)

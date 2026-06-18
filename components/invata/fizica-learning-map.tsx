@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type RefObject } from "react"
-import InsightChatSidebar from "@/components/insight-chat-sidebar"
+import { useInsightGlobal } from "@/components/insight-global-provider"
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { BookOpen, Check, ChevronDown, Clock, Dumbbell, FastForward, Loader2, Map, PenLine, Play, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS, MOBILE_BOTTOM_NAV_OFFSET_CLASS, MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
+import { MOBILE_BOTTOM_NAV_OFFSET_CLASS, MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { FIZICA_MAP_COMPLETED_LESSON_PARAM } from "@/lib/fizica-map-item-navigation"
 import {
   FIZICA_CALENDAR_ENABLED,
@@ -1277,10 +1277,6 @@ export function FizicaLearningMap({
   const [isMapNavigating, startMapTransition] = useTransition()
   const [mapRevealKey, setMapRevealKey] = useState(0)
   const [isOpeningNextChapter, setIsOpeningNextChapter] = useState(false)
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false)
-  const [chatPanelMounted, setChatPanelMounted] = useState(false)
-  const [chatPanelOpen, setChatPanelOpen] = useState(false)
-  const [chatPanelVisible, setChatPanelVisible] = useState(false)
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState<Set<string>>(() => new Set())
   const processedCompletionRef = useRef<string | null>(null)
   const {
@@ -1414,14 +1410,6 @@ export function FizicaLearningMap({
     [displayLessons],
   )
 
-
-  useEffect(() => {
-    const sync = () => setIsDesktopViewport(typeof window !== "undefined" && window.innerWidth >= 1024)
-    sync()
-    window.addEventListener("resize", sync)
-    return () => window.removeEventListener("resize", sync)
-  }, [])
-
   const chatContext = useMemo(() => buildFizicaMapInsightContext(mapData), [mapData])
   const chatProblemId = useMemo(() => {
     const routeSlug = selectedRoute?.slug ?? "default"
@@ -1429,29 +1417,29 @@ export function FizicaLearningMap({
     return `invata-fizica-map:${routeSlug}:${chapterSlug}`
   }, [selectedChapter?.slug, selectedRoute?.slug])
 
-  const embedChatOnDesktop = chatPanelMounted && isDesktopViewport
+  const insightGlobal = useInsightGlobal()
+  const setInsightPageContext = insightGlobal?.setPageContext
+  const clearInsightPageContext = insightGlobal?.clearPageContext
 
-  const openChat = useCallback(() => {
-    setChatPanelMounted(true)
-    setChatPanelVisible(true)
-    setChatPanelOpen(false)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setChatPanelOpen(true)
-      })
+  useEffect(() => {
+    if (!setInsightPageContext) return
+
+    setInsightPageContext({
+      problemId: chatProblemId,
+      problemStatement: chatContext,
+      problemContextPreamble: "",
+      contextPreviewLabel: selectedChapter
+        ? `Capitol curent: ${selectedChapter.title}`
+        : 'Harta lecțiilor de fizică',
+      keepContextAfterSend: true,
+      persona: "problem_tutor",
+      starterQuestionChips: FIZICA_INSIGHT_STARTER_CHIPS,
     })
-  }, [])
 
-  const closeChat = useCallback(() => {
-    setChatPanelOpen(false)
-  }, [])
-
-  const finalizeChatClose = useCallback(() => {
-    // Keep the panel mounted so the chat session survives close/reopen
-    // cycles. Only mark it as not visible so the FAB can reappear; do not
-    // unmount (unmounting would reset sessionId/messages and lose the conversation).
-    setChatPanelVisible(false)
-  }, [])
+    return () => {
+      clearInsightPageContext?.()
+    }
+  }, [chatContext, chatProblemId, clearInsightPageContext, selectedChapter, setInsightPageContext])
 
   const handleJumpToNextChapter = useCallback(() => {
     if (!nextChapter || !selectedRoute || isOpeningNextChapter || !isCurrentChapterComplete) return
@@ -1497,7 +1485,6 @@ export function FizicaLearningMap({
       <div
         className={cn(
           "relative min-w-0 flex-1 lg:ml-[300px] h-full transition-[margin] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-          embedChatOnDesktop && "lg:mr-[25vw]",
         )}
       >
         <div className="absolute inset-0 top-0 overflow-hidden bg-white lg:inset-[3px] lg:rounded-xl lg:bg-[#f5f4f2]">
@@ -1588,55 +1575,6 @@ export function FizicaLearningMap({
           ) : null}
         </div>
       </div>
-
-      {!chatPanelVisible && !isMapNavigating ? (
-        <button
-          type="button"
-          onClick={openChat}
-          aria-label="Deschide asistent AI"
-          className={cn(
-            "fizica-ai-fab-enter fixed bottom-6 right-5 z-[90] flex h-24 w-24 items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95",
-            "lg:bottom-8 lg:right-8",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b0c0f]/20 focus-visible:ring-offset-2",
-            MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS,
-          )}
-        >
-          <img
-            src="/streak-icon.png"
-            alt=""
-            className="h-24 w-24 object-contain drop-shadow-[0_8px_24px_rgba(11,12,15,0.28)]"
-            width={96}
-            height={96}
-          />
-        </button>
-      ) : null}
-
-      {chatPanelMounted ? (
-        <InsightChatSidebar
-          isOpen={chatPanelOpen}
-          onClose={closeChat}
-          problemId={chatProblemId}
-          problemStatement={chatContext}
-          problemContextPreamble=""
-          contextPreviewLabel={
-            selectedChapter
-              ? `Capitol curent: ${selectedChapter.title}`
-              : 'Harta lecțiilor de fizică'
-          }
-          keepContextAfterSend
-          persona="problem_tutor"
-          embedOnDesktop={embedChatOnDesktop}
-          problemLightTheme
-          lightChromeWhenSlideOver={false}
-          showCloseWhenDesktopEmbedded={embedChatOnDesktop}
-          embedDesktopTopClass="top-16"
-          embedDesktopHeightClass="h-[calc(100dvh-4rem)]"
-          onExitAnimationComplete={finalizeChatClose}
-          starterQuestionChips={FIZICA_INSIGHT_STARTER_CHIPS}
-          disableEntranceAnimations
-          panelSlideTransitionClass="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
-        />
-      ) : null}
 
       <FizicaLessonIrisTransition active={isIrisActive} onComplete={handleIrisComplete} />
     </div>

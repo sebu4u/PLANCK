@@ -6,13 +6,10 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState,
-  lazy,
-  Suspense,
+  useRef,
 } from "react"
 import { LEARNING_PATH_EXPLAIN_INITIAL_PROMPT } from "@/lib/learning-path-insight-context"
-
-const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
+import { useInsightGlobal } from "@/components/insight-global-provider"
 
 export type OpenLearningPathExplainChatArgs = {
   problemStatement: string
@@ -27,7 +24,7 @@ export type OpenLearningPathExplainChatArgs = {
 
 type LearningPathExplainChatContextValue = {
   openExplainChat: (args: OpenLearningPathExplainChatArgs) => void
-  /** True while panel is mounted (includes slide-out so layout stays until exit ends). */
+  /** Always false now; the global provider handles panel lifecycle. */
   insightOpen: boolean
   isDesktopViewport: boolean
 }
@@ -47,101 +44,48 @@ export function LearningPathExplainChatProvider({
   currentItemId: string
   children: React.ReactNode
 }) {
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false)
-  const [panelMounted, setPanelMounted] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [problemStatement, setProblemStatement] = useState("")
-  const [problemContextPreamble, setProblemContextPreamble] = useState("")
-  const [problemId, setProblemId] = useState(`learning-path-item:${currentItemId}`)
-  const [initialUserMessage, setInitialUserMessage] = useState<string | null>(null)
-  const [initialUserMessageDisplay, setInitialUserMessageDisplay] = useState<string | null>(null)
+  const insightGlobal = useInsightGlobal()
+  const closeInsight = insightGlobal?.closeInsight
+  const previousItemIdRef = useRef(currentItemId)
 
   useEffect(() => {
-    const sync = () => setIsDesktopViewport(typeof window !== "undefined" && window.innerWidth >= 1024)
-    sync()
-    window.addEventListener("resize", sync)
-    return () => window.removeEventListener("resize", sync)
-  }, [])
+    if (previousItemIdRef.current === currentItemId) return
 
-  useEffect(() => {
-    setProblemId(`learning-path-item:${currentItemId}`)
-  }, [currentItemId])
+    previousItemIdRef.current = currentItemId
+    closeInsight?.()
+  }, [closeInsight, currentItemId])
 
-  const finalizePanelClose = useCallback(() => {
-    // Keep the panel mounted so the chat session survives close/reopen
-    // cycles. Only slide it out; do not unmount (unmounting would reset
-    // sessionId/messages and lose the conversation).
-    setPanelOpen(false)
-    setInitialUserMessage(null)
-    setInitialUserMessageDisplay(null)
-  }, [])
-
-  const openExplainChat = useCallback((args: OpenLearningPathExplainChatArgs) => {
-    setProblemStatement(args.problemStatement)
-    setProblemContextPreamble(args.problemContextPreamble ?? "")
-    setProblemId(args.problemId ?? `learning-path-item:${currentItemId}`)
-    const userMsg = (args.initialUserMessage ?? LEARNING_PATH_EXPLAIN_INITIAL_PROMPT).trim()
-    setInitialUserMessage(userMsg)
-    setInitialUserMessageDisplay(
-      args.initialUserMessageDisplay !== undefined
-        ? args.initialUserMessageDisplay
-        : userMsg
-    )
-    setPanelMounted(true)
-    setPanelOpen(false)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setPanelOpen(true)
+  const openExplainChat = useCallback(
+    (args: OpenLearningPathExplainChatArgs) => {
+      const userMsg = (args.initialUserMessage ?? LEARNING_PATH_EXPLAIN_INITIAL_PROMPT).trim()
+      insightGlobal?.openInsight({
+        problemStatement: args.problemStatement,
+        problemContextPreamble: args.problemContextPreamble ?? "",
+        problemId: args.problemId ?? `learning-path-item:${currentItemId}`,
+        initialUserMessage: userMsg,
+        initialUserMessageDisplay:
+          args.initialUserMessageDisplay !== undefined
+            ? args.initialUserMessageDisplay
+            : userMsg,
+        persona: "problem_tutor",
       })
-    })
-  }, [currentItemId])
-
-  const closeInsight = useCallback(() => {
-    setPanelOpen(false)
-  }, [])
-
-  const onInitialMessageSent = useCallback(() => {
-    setInitialUserMessage(null)
-    setInitialUserMessageDisplay(null)
-  }, [])
-
-  const embedOnDesktop = panelMounted && isDesktopViewport
-  const problemLightTheme = true
+    },
+    [insightGlobal, currentItemId]
+  )
 
   const value = useMemo(
     () => ({
       openExplainChat,
-      insightOpen: panelMounted,
-      isDesktopViewport,
+      insightOpen: false,
+      isDesktopViewport:
+        typeof window !== "undefined" && window.innerWidth >= 1024,
     }),
-    [openExplainChat, panelMounted, isDesktopViewport]
+    [openExplainChat]
   )
 
   return (
     <LearningPathExplainChatContext.Provider value={value}>
       {children}
-      {panelMounted ? (
-        <Suspense fallback={null}>
-          <InsightChatSidebar
-            isOpen={panelOpen}
-            onClose={closeInsight}
-            problemId={problemId}
-            problemStatement={problemStatement}
-            problemContextPreamble={problemContextPreamble}
-            persona="problem_tutor"
-            embedOnDesktop={embedOnDesktop}
-            problemLightTheme={problemLightTheme}
-            lightChromeWhenSlideOver={false}
-            showCloseWhenDesktopEmbedded={embedOnDesktop}
-            embedDesktopTopClass="top-14"
-            embedDesktopHeightClass="h-[calc(100dvh-3.5rem)]"
-            initialUserMessage={initialUserMessage}
-            initialUserMessageDisplay={initialUserMessageDisplay}
-            onInitialMessageSent={onInitialMessageSent}
-            onExitAnimationComplete={finalizePanelClose}
-          />
-        </Suspense>
-      ) : null}
     </LearningPathExplainChatContext.Provider>
   )
 }

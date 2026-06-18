@@ -662,16 +662,12 @@ export default function InsightChatSidebar({
       }
       return []
     })
-    // We don't necessarily set context here because the main effect will do it if isOpen is true
-    // or we can set it here if we want it ready before opening.
-    // But typically isOpen drives the flow.
-    if (problemStatement) {
-      // If the sidebar is open, this might conflict with the other effect, 
-      // but since we reset messages above, `hasMessages` becomes false, so the other effect will run and setup everything.
-      // So this reset is sufficient to trigger re-initialization in the main effect.
-      setProblemContext(null)
-    }
-  }, [problemId])
+    setProblemContext(
+      problemStatement
+        ? buildProblemContextFromStatement(problemStatement, problemContextPreamble)
+        : null
+    )
+  }, [problemContextPreamble, problemId, problemStatement])
 
   // Cleanup only on unmount
   useEffect(() => {
@@ -914,10 +910,19 @@ export default function InsightChatSidebar({
     [user, toast, revokePendingPreview]
   )
 
-  const submitMessage = async (textOverride?: string, displayContentOverride?: string) => {
+  const submitMessage = async (
+    textOverride?: string,
+    displayContentOverride?: string,
+    options?: { includeProblemContext?: boolean }
+  ) => {
     const textToSend = textOverride ?? input
+    const contextForSend = problemContext ?? (
+      options?.includeProblemContext
+        ? buildProblemContextFromStatement(problemStatement, problemContextPreamble)
+        : null
+    )
     const attachmentsSnapshot = [...pendingAttachments]
-    if ((!textToSend.trim() && !problemContext && attachmentsSnapshot.length === 0) || busy) return
+    if ((!textToSend.trim() && !contextForSend && attachmentsSnapshot.length === 0) || busy) return
 
     if (!user && attachmentsSnapshot.length > 0) {
       toast({
@@ -1036,8 +1041,8 @@ export default function InsightChatSidebar({
 
       // Combine context and input if context exists (this is what we send to the API)
       let finalContent = textToSend.trim()
-      if (problemContext) {
-        finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
+      if (contextForSend) {
+        finalContent = finalContent ? `${contextForSend}\n\n${finalContent}` : contextForSend
       }
 
       const priorForApi = messages
@@ -1333,12 +1338,16 @@ export default function InsightChatSidebar({
       initialMessageSentRef.current = false
       return
     }
-    if (!initialUserMessage?.trim() || loadingSession || busy || initialMessageSentRef.current) return
+    if (!initialUserMessage?.trim()) {
+      initialMessageSentRef.current = false
+      return
+    }
+    if (loadingSession || busy || initialMessageSentRef.current) return
     initialMessageSentRef.current = true
     const display = (initialUserMessageDisplay !== undefined && initialUserMessageDisplay !== null)
       ? initialUserMessageDisplay
       : initialUserMessage.trim()
-    submitMessage(initialUserMessage.trim(), display)
+    submitMessage(initialUserMessage.trim(), display, { includeProblemContext: true })
     onInitialMessageSent?.()
   }, [effectiveOpen, initialUserMessage, initialUserMessageDisplay, loadingSession, busy])
 
