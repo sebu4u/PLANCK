@@ -13,6 +13,8 @@ export interface LearningPathItemNavigationContextValue {
   slideDirection: LearningPathSlideDirection
   goToNextItem: () => Promise<void>
   goToPrevItem: () => Promise<void>
+  usesFizicaLessonCompletionScreen?: boolean
+  animateFirstItemEntry?: boolean
 }
 
 const LearningPathItemNavigationContext =

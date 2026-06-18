@@ -31,6 +31,7 @@ interface ProblemFeedbackBarProps {
   /** Etichetă buton după răspuns greșit (implicit: „Continuă”). */
   retryLabel?: string
   flashcardBridge?: LearningPathFlashcardBridge | null
+  containerClassName?: string
 }
 
 export function ProblemFeedbackBar({
@@ -45,6 +46,7 @@ export function ProblemFeedbackBar({
   answerSlot,
   retryLabel = "Continuă",
   flashcardBridge,
+  containerClassName,
 }: ProblemFeedbackBarProps) {
   const { proceedAfterCorrect } = useLearningPathContinueFlow({
     nextItemHref,
@@ -84,6 +86,7 @@ export function ProblemFeedbackBar({
           state === "verify" && "border-[#eee7f3] bg-white/95 backdrop-blur-sm",
           state === "incorrect" && "border-gray-200 bg-gray-100",
           state === "correct" && "border-emerald-200 bg-emerald-50",
+          containerClassName,
         )}
         style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))" }}
       >

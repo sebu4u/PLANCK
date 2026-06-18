@@ -16,6 +16,7 @@ import { appendFizicaMapItemQuery } from "@/lib/fizica-map-item-navigation"
 import type { FizicaMapAssignmentItemRoute } from "@/lib/supabase-fizica-learning-map"
 import { LearningPathItemView } from "@/components/invata/learning-path-item-view"
 import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
+import { FizicaLessonCompletionScreen } from "@/components/invata/fizica-lesson-completion-screen"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
 
 interface LearningPathItemExperienceProps {
@@ -57,8 +58,23 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const [isNavigating, setIsNavigating] = useState(false)
   const [freePlanPaywall, setFreePlanPaywall] = useState<{ lessonBaseHref: string } | null>(null)
   const [slideDirection, setSlideDirection] = useState<LearningPathSlideDirection>("forward")
+  const [showLessonCompletion, setShowLessonCompletion] = useState(false)
   const lastUserIdRef = useRef<string | null | undefined>(undefined)
   const isPopstateRef = useRef(false)
+  const eligibleForFirstItemEntryRef = useRef(initialPayload.itemIndex === 1)
+  const [firstItemEntryConsumed, setFirstItemEntryConsumed] = useState(false)
+  const usesFizicaLessonCompletionScreen = Boolean(payload.fizicaMapContext)
+
+  const animateFirstItemEntry =
+    eligibleForFirstItemEntryRef.current &&
+    !firstItemEntryConsumed &&
+    payload.itemIndex === 1
+
+  useEffect(() => {
+    if (payload.itemIndex !== 1 && eligibleForFirstItemEntryRef.current) {
+      setFirstItemEntryConsumed(true)
+    }
+  }, [payload.itemIndex])
 
   const syncUrl = useCallback((next: LearningPathItemPayload, mode: "replace" | "push" = "replace") => {
     const url = buildItemUrl(next)
@@ -197,7 +213,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const goToNextItem = useCallback(async () => {
     if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
       if (payload.isLastItem) {
-        router.push(payload.nextItemHref)
+        setShowLessonCompletion(true)
         return
       }
       const currentIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
@@ -214,6 +230,11 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     }
     await goToItemIndex(payload.itemIndex + 1, { urlMode: "push", direction: "forward" })
   }, [goToItem, goToItemIndex, payload, router])
+
+  const dismissLessonCompletion = useCallback(() => {
+    setShowLessonCompletion(false)
+    router.push(payload.nextItemHref)
+  }, [payload.nextItemHref, router])
 
   const goToPrevItem = useCallback(async () => {
     if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
@@ -303,12 +324,22 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   }
 
   return (
-    <LearningPathItemView
-      payload={payload}
-      goToNextItem={goToNextItem}
-      goToPrevItem={goToPrevItem}
-      isNavigating={isNavigating}
-      slideDirection={slideDirection}
-    />
+    <>
+      <LearningPathItemView
+        payload={payload}
+        goToNextItem={goToNextItem}
+        goToPrevItem={goToPrevItem}
+        isNavigating={isNavigating}
+        slideDirection={slideDirection}
+        usesFizicaLessonCompletionScreen={usesFizicaLessonCompletionScreen}
+        animateFirstItemEntry={animateFirstItemEntry}
+      />
+      {showLessonCompletion ? (
+        <FizicaLessonCompletionScreen
+          totalElo={payload.fizicaLessonTotalElo ?? 0}
+          onContinue={dismissLessonCompletion}
+        />
+      ) : null}
+    </>
   )
 }

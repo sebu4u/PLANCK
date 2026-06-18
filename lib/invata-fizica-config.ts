@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, Map, RotateCcw } from "lucide-react"
 
 export type FizicaLessonType = "invata" | "scrie" | "exerseaza"
 
-export type FizicaLessonStatus = "active" | "available" | "locked"
+export type FizicaLessonStatus = "active" | "available" | "completed" | "locked"
 
 export interface FizicaSidebarItem {
   id: string
@@ -65,7 +65,26 @@ export const FIZICA_SIDEBAR_ITEMS: FizicaSidebarItem[] = [
 ]
 
 /** Set to `true` to show the bottom hub cards strip on /invata/fizica */
-export const FIZICA_HUB_CARDS_ENABLED = true
+export const FIZICA_HUB_CARDS_ENABLED = false
+
+/** Set to `true` to show the calendar card on /invata/fizica */
+export const FIZICA_CALENDAR_ENABLED = true
+
+export type FizicaCalendarEventType = "pregatire" | "curs" | "workshop" | "simulare"
+
+export const FIZICA_CALENDAR_EVENT_TYPES: Record<
+  FizicaCalendarEventType,
+  { label: string; defaultColor: string }
+> = {
+  pregatire: { label: "Pregătire", defaultColor: "#2563eb" },
+  curs: { label: "Curs", defaultColor: "#16a34a" },
+  workshop: { label: "Workshop", defaultColor: "#9333ea" },
+  simulare: { label: "Simulare", defaultColor: "#ca8a04" },
+}
+
+export const FIZICA_CALENDAR_EVENT_TYPE_LIST = Object.keys(
+  FIZICA_CALENDAR_EVENT_TYPES,
+) as FizicaCalendarEventType[]
 
 /** Proba scrisă la alegere (Fizică) — sesiunea iunie-iulie 2026. */
 export const FIZICA_BAC_EXAM_DATE = new Date(2026, 6, 2, 23, 59, 59, 999)
@@ -85,7 +104,7 @@ export const FIZICA_INSIGHT_STARTER_CHIPS = [
 ]
 
 /** Vertical spacing between consecutive lessons on the same side */
-export const FIZICA_SAME_SIDE_GAP = 260
+export const FIZICA_SAME_SIDE_GAP = 300
 
 /** Vertical spacing when switching between left and right columns */
 export const FIZICA_CROSS_SIDE_GAP = 100

@@ -45,6 +45,7 @@ import {
 } from "@/components/invata/learning-path-item-navigation-context"
 import { LearningPathItemChromeProvider, useLearningPathItemChrome } from "@/components/invata/learning-path-item-chrome-context"
 import { LearningPathItemSlideContainer } from "@/components/invata/learning-path-item-slide-container"
+import { learningPathItemEnterUpClass } from "@/components/invata/learning-path-item-enter-up"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 import { useLearningPathFlashcardFlow } from "@/components/invata/learning-path-flashcard-flow-context"
 import {
@@ -71,6 +72,8 @@ interface LessonItemShellProps {
   initialCurrentItemCompleted?: boolean
   /** Itemii deja marcați ca finalizați în lecția curentă (SSR + API la navigare). */
   completedItemIdsForLesson?: string[]
+  /** Itemii din lecția Fizică (assignment), când utilizatorul vine de pe /invata/fizica. */
+  fizicaAssignmentItemIds?: string[]
   lessonBaseHref: string
   isTextLesson: boolean
   hideBottomCta?: boolean
@@ -92,6 +95,7 @@ function LessonItemShellInner({
   currentItemId,
   initialCurrentItemCompleted = false,
   completedItemIdsForLesson = [],
+  fizicaAssignmentItemIds,
   lessonBaseHref,
   isTextLesson,
   hideBottomCta = false,
@@ -113,8 +117,18 @@ function LessonItemShellInner({
   const [showPrevItemCue, setShowPrevItemCue] = useState(false)
   const [showNextItemCue, setShowNextItemCue] = useState(false)
   const [currentItemCompleted, setCurrentItemCompleted] = useState(initialCurrentItemCompleted)
+  const usesFizicaAssignmentProgress =
+    Boolean(fizicaAssignmentItemIds?.length)
+
+  const progressItemIds = usesFizicaAssignmentProgress
+    ? fizicaAssignmentItemIds!
+    : items.map((lessonItem) => lessonItem.id)
+
   const [completedItemIds, setCompletedItemIds] = useState(
-    () => new Set(completedItemIdsForLesson),
+    () => new Set(usesFizicaAssignmentProgress ? [] : completedItemIdsForLesson),
+  )
+  const [fizicaSessionCompletedIds, setFizicaSessionCompletedIds] = useState(
+    () => new Set<string>(),
   )
   const prevArrowHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nextArrowHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -128,6 +142,9 @@ function LessonItemShellInner({
   const prevItemHref =
     itemNavigation?.prevItemHref ?? (itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null)
   const isLastItem = itemNavigation?.isLastItem ?? itemIndex >= items.length
+  const shouldSkipMomentumToast = Boolean(
+    isLastItem && itemNavigation?.usesFizicaLessonCompletionScreen,
+  )
   const chrome = useLearningPathItemChrome()
   const edgeToEdge = chrome?.edgeToEdge ?? false
   const flashcardFlow = useLearningPathFlashcardFlow()
@@ -137,17 +154,44 @@ function LessonItemShellInner({
   const effectiveHideBottomCta = hideBottomCta || flashcardFlow.isActive
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const navigateToPrevItem = useNavigateToPrevLearningPathItem(prevItemHref)
+  const animateFirstItemEntry = itemNavigation?.animateFirstItemEntry ?? false
 
   const completedItemIdsKey = completedItemIdsForLesson.join(",")
   const lessonProgress = useMemo(() => {
-    if (items.length === 0) return 0
-    const lessonItemIds = new Set(items.map((lessonItem) => lessonItem.id))
+    if (usesFizicaAssignmentProgress && fizicaAssignmentItemIds?.length) {
+      const total = fizicaAssignmentItemIds.length
+      const index = fizicaAssignmentItemIds.indexOf(currentItemId)
+      if (index < 0) return 0
+      const passed =
+        index + (fizicaSessionCompletedIds.has(currentItemId) ? 1 : 0)
+      return passed / total
+    }
+
+    if (progressItemIds.length === 0) return 0
+    const scopedItemIds = new Set(progressItemIds)
     let completedCount = 0
     for (const itemId of completedItemIds) {
-      if (lessonItemIds.has(itemId)) completedCount++
+      if (scopedItemIds.has(itemId)) completedCount++
     }
-    return completedCount / items.length
-  }, [completedItemIds, items])
+    return completedCount / progressItemIds.length
+  }, [
+    completedItemIds,
+    currentItemId,
+    fizicaAssignmentItemIds,
+    fizicaSessionCompletedIds,
+    progressItemIds,
+    usesFizicaAssignmentProgress,
+  ])
+
+  const markFizicaSessionItemCompleted = useCallback(() => {
+    if (!usesFizicaAssignmentProgress) return
+    setFizicaSessionCompletedIds((previous) => {
+      if (previous.has(currentItemId)) return previous
+      const next = new Set(previous)
+      next.add(currentItemId)
+      return next
+    })
+  }, [currentItemId, usesFizicaAssignmentProgress])
 
   const markCurrentItemCompleted = useLearningPathItemCompletion({
     itemId: currentItemId,
@@ -157,46 +201,59 @@ function LessonItemShellInner({
 
   const continueToNextItem = useCallback(async () => {
     await markCurrentItemCompleted()
+    markFizicaSessionItemCompleted()
     setCompletedItemIds((previous) => {
       if (previous.has(currentItemId)) return previous
       const next = new Set(previous)
       next.add(currentItemId)
       return next
     })
-    pushMomentum({
-      nextHref: nextItemHref,
-      isLastItem,
-      itemIndex,
-      totalItems: items.length,
-    })
+    if (!shouldSkipMomentumToast) {
+      pushMomentum({
+        nextHref: nextItemHref,
+        isLastItem,
+        itemIndex,
+        totalItems: items.length,
+      })
+    }
     await navigateToNextItem()
-  }, [currentItemId, isLastItem, itemIndex, items.length, markCurrentItemCompleted, navigateToNextItem, nextItemHref, pushMomentum])
+  }, [currentItemId, isLastItem, itemIndex, items.length, markCurrentItemCompleted, markFizicaSessionItemCompleted, navigateToNextItem, nextItemHref, pushMomentum, shouldSkipMomentumToast])
 
   const markCompleteForContinue = useCallback(async () => {
     await markCurrentItemCompleted()
+    markFizicaSessionItemCompleted()
     setCompletedItemIds((previous) => {
       if (previous.has(currentItemId)) return previous
       const next = new Set(previous)
       next.add(currentItemId)
       return next
     })
-    pushMomentum({
-      nextHref: nextItemHref,
-      isLastItem,
-      itemIndex,
-      totalItems: items.length,
-    })
-  }, [currentItemId, isLastItem, itemIndex, items.length, markCurrentItemCompleted, nextItemHref, pushMomentum])
+    if (!shouldSkipMomentumToast) {
+      pushMomentum({
+        nextHref: nextItemHref,
+        isLastItem,
+        itemIndex,
+        totalItems: items.length,
+      })
+    }
+  }, [currentItemId, isLastItem, itemIndex, items.length, markCurrentItemCompleted, markFizicaSessionItemCompleted, nextItemHref, pushMomentum, shouldSkipMomentumToast])
 
   useEffect(() => {
     setCurrentItemCompleted(initialCurrentItemCompleted)
   }, [initialCurrentItemCompleted])
 
   useEffect(() => {
+    if (usesFizicaAssignmentProgress) return
     setCompletedItemIds(new Set(completedItemIdsForLesson))
-  }, [completedItemIdsKey, lessonId])
+  }, [completedItemIdsKey, lessonId, usesFizicaAssignmentProgress])
 
   useEffect(() => {
+    if (!usesFizicaAssignmentProgress) return
+    setFizicaSessionCompletedIds(new Set())
+  }, [fizicaAssignmentItemIds?.join(","), usesFizicaAssignmentProgress])
+
+  useEffect(() => {
+    if (usesFizicaAssignmentProgress) return
     if (!currentItemCompleted) return
     setCompletedItemIds((previous) => {
       if (previous.has(currentItemId)) return previous
@@ -334,7 +391,13 @@ function LessonItemShellInner({
 
   const shell = (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[300] flex h-14 items-center justify-between gap-3 border-b border-[#e5e5e5] bg-white px-4 shadow-sm sm:px-6">
+      <nav
+        className={learningPathItemEnterUpClass(
+          animateFirstItemEntry,
+          0,
+          "fixed top-0 left-0 right-0 z-[300] flex h-14 items-center justify-between gap-3 border-b border-[#e5e5e5] bg-white px-4 shadow-sm sm:px-6",
+        )}
+      >
         <button
           type="button"
           onClick={() => setShowQuitDialog(true)}
@@ -453,6 +516,7 @@ function LessonItemShellInner({
               itemKey={slideKey}
               direction={slideDirection}
               allowOverflowX={edgeToEdge}
+              entryAnimation={animateFirstItemEntry ? "none" : "slide"}
             >
               {flashcardFlow.phase === "offer" ? <LearningPathFlashcardOfferScreen /> : null}
               {flashcardFlow.phase === "session" ? <LearningPathFlashcardSessionScreen /> : null}
@@ -476,12 +540,17 @@ function LessonItemShellInner({
           lessonSlug={lessonSlug}
           chapterId={chapterId}
           itemTitle={itemTitle}
+          animateFirstItemEntry={animateFirstItemEntry}
         />
       ) : !effectiveHideBottomCta ? (
         <div
-          className={cn(
-            "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-            insightDesktopOpen && "lg:right-[25vw]",
+          className={learningPathItemEnterUpClass(
+            animateFirstItemEntry,
+            4,
+            cn(
+              "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
+              insightDesktopOpen && "lg:right-[25vw]",
+            ),
           )}
           style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
         >
@@ -573,6 +642,7 @@ function GrilaLessonBottomCta({
   lessonSlug,
   chapterId,
   itemTitle,
+  animateFirstItemEntry = false,
 }: {
   grilaQuestion: QuizQuestion
   nextItemHref: string
@@ -584,6 +654,7 @@ function GrilaLessonBottomCta({
   lessonSlug: string
   chapterId?: string | null
   itemTitle?: string | null
+  animateFirstItemEntry?: boolean
 }) {
   const explainChat = useLearningPathExplainChat()
   const ctx = useGrilaLesson()
@@ -665,6 +736,7 @@ function GrilaLessonBottomCta({
       }}
       eloAward={eloAward}
       flashcardBridge={flashcardBridge}
+      containerClassName={learningPathItemEnterUpClass(animateFirstItemEntry, 4)}
       answerSlot={
         <span className="text-sm font-medium text-[#6f657b]">
           Răspunsul se selectează în chenarele de mai sus.

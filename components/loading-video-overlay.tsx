@@ -12,12 +12,14 @@ interface LoadingVideoOverlayProps {
   zIndex?: number
   tipMessages?: string[]
   showTips?: boolean
+  animateEntry?: boolean
 }
 
 export function LoadingVideoOverlay({
   zIndex = 500,
   tipMessages = DEFAULT_LOADING_TIPS,
   showTips = true,
+  animateEntry = false,
 }: LoadingVideoOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [randomTip, setRandomTip] = useState<string | null>(null)
@@ -52,23 +54,25 @@ export function LoadingVideoOverlay({
         backgroundColor: "#ffffff",
       }}
     >
-      <video
-        ref={videoRef}
-        src="/videos/loading.webm"
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="auto"
-        style={{
-          display: "block",
-          width: "auto",
-          height: "auto",
-          maxWidth: "min(40vw, 140px)",
-          maxHeight: "22vh",
-          objectFit: "contain",
-        }}
-      />
+      <div className={animateEntry ? "loading-video-pop-in" : undefined}>
+        <video
+          ref={videoRef}
+          src="/videos/loading.webm"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          style={{
+            display: "block",
+            width: "auto",
+            height: "auto",
+            maxWidth: "min(40vw, 140px)",
+            maxHeight: "22vh",
+            objectFit: "contain",
+          }}
+        />
+      </div>
       {randomTip && (
         <p
           style={{

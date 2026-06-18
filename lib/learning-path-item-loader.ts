@@ -63,6 +63,9 @@ export interface LearningPathItemPayload {
   prevItemHref?: string | null
   fizicaMapContext?: FizicaMapItemContext | null
   fizicaAssignmentItems?: FizicaMapAssignmentItemRoute[]
+  fizicaAssignmentItemIds?: string[]
+  completedItemIdsForFizicaAssignment?: string[]
+  fizicaLessonTotalElo?: number
 }
 
 export type LearningPathItemLoadResult =
@@ -232,6 +235,8 @@ async function getProgressState(
     completedItemIdsForLesson,
     initialCurrentItemCompleted,
     itemsRemainingForFreePreview,
+    progressUser,
+    guestProgressMap,
   }
 }
 
@@ -285,8 +290,13 @@ export async function loadLearningPathItemPayload(
 
   const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
   const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
-  const { completedItemIdsForLesson, initialCurrentItemCompleted, itemsRemainingForFreePreview } =
-    await getProgressState(access, lesson.id, items, item.id)
+  const {
+    completedItemIdsForLesson,
+    initialCurrentItemCompleted,
+    itemsRemainingForFreePreview,
+    progressUser,
+    guestProgressMap,
+  } = await getProgressState(access, lesson.id, items, item.id)
 
   if (
     isBlockedByFreePlan(
@@ -311,6 +321,9 @@ export async function loadLearningPathItemPayload(
   let isLastItem = itemIndex >= items.length
   const fizicaMapContext = options?.fizicaMapContext ?? null
   let fizicaAssignmentItems: FizicaMapAssignmentItemRoute[] | undefined
+  let fizicaAssignmentItemIds: string[] | undefined
+  let completedItemIdsForFizicaAssignment: string[] | undefined
+  let fizicaLessonTotalElo: number | undefined
 
   if (fizicaMapContext) {
     const fizicaNavigation = await resolveFizicaMapItemNavigation(item.id, fizicaMapContext)
@@ -319,6 +332,31 @@ export async function loadLearningPathItemPayload(
       prevItemHref = fizicaNavigation.prevItemHref
       isLastItem = fizicaNavigation.isLastItemInAssignment
       fizicaAssignmentItems = fizicaNavigation.assignmentItems
+      fizicaAssignmentItemIds = fizicaNavigation.assignmentItemIds
+      fizicaLessonTotalElo = fizicaNavigation.fizicaLessonTotalElo
+
+      if (fizicaAssignmentItemIds.length > 0) {
+        if (progressUser) {
+          const supabaseForProgress = await createClient()
+          completedItemIdsForFizicaAssignment = await getCompletedLearningPathItemIdsForUser(
+            supabaseForProgress,
+            progressUser.id,
+            fizicaAssignmentItemIds,
+          )
+        } else if (access.mode === "free-preview") {
+          const scopedIds = new Set(fizicaAssignmentItemIds)
+          const completed = new Set<string>()
+          for (const ids of Object.values(guestProgressMap)) {
+            if (!Array.isArray(ids)) continue
+            for (const id of ids) {
+              if (typeof id === "string" && scopedIds.has(id)) completed.add(id)
+            }
+          }
+          completedItemIdsForFizicaAssignment = Array.from(completed)
+        } else {
+          completedItemIdsForFizicaAssignment = []
+        }
+      }
     }
   }
 
@@ -338,6 +376,9 @@ export async function loadLearningPathItemPayload(
       prevItemHref,
       fizicaMapContext,
       fizicaAssignmentItems,
+      fizicaAssignmentItemIds,
+      completedItemIdsForFizicaAssignment,
+      fizicaLessonTotalElo,
       initialCurrentItemCompleted,
       completedItemIdsForLesson,
       sourceLesson,

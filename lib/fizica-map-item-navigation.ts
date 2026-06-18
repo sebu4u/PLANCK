@@ -8,6 +8,7 @@ export const FIZICA_MAP_QUERY_FLAG = "fizica"
 export const FIZICA_MAP_ROUTE_PARAM = "traseu"
 export const FIZICA_MAP_CHAPTER_PARAM = "capitol"
 export const FIZICA_MAP_LESSON_PARAM = "fizicaLesson"
+export const FIZICA_MAP_COMPLETED_LESSON_PARAM = "lectieCompleta"
 
 type SearchParamSource =
   | URLSearchParams
@@ -58,4 +59,16 @@ export function appendFizicaMapItemQuery(href: string, context: FizicaMapItemCon
 export function getFizicaMapItemCacheSuffix(context: FizicaMapItemContext | null | undefined): string {
   if (!context) return ""
   return `?${buildFizicaMapItemQueryString(context)}`
+}
+
+export function buildFizicaMapReturnAfterLessonHref(
+  routeSlug: string,
+  chapterSlug: string,
+  completedFizicaLessonId: string,
+): string {
+  const params = new URLSearchParams()
+  params.set(FIZICA_MAP_ROUTE_PARAM, routeSlug)
+  params.set(FIZICA_MAP_CHAPTER_PARAM, chapterSlug)
+  params.set(FIZICA_MAP_COMPLETED_LESSON_PARAM, completedFizicaLessonId)
+  return `/invata/fizica?${params.toString()}`
 }

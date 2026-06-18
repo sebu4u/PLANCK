@@ -1,5 +1,6 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { FizicaLessonStatus, FizicaLessonType } from "@/lib/invata-fizica-config"
+import type { GuestLearningPathProgressMap } from "@/lib/guest-learning-path-cookie"
 import {
   buildFizicaMapLessonLayouts,
   type FizicaMapLessonLayout,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/fizica-map-layout"
 import {
   appendFizicaMapItemQuery,
+  buildFizicaMapReturnAfterLessonHref,
   type FizicaMapItemContext,
 } from "@/lib/fizica-map-item-navigation"
 import {
@@ -17,6 +19,7 @@ import {
   type LearningPathLesson,
   type LearningPathLessonItem,
 } from "@/lib/supabase-learning-paths"
+import { computeLearningPathLessonEloTotal } from "@/lib/learning-path-elo"
 
 export const FIZICA_ROUTE_SLUGS = ["mecanica", "termodinamica", "electricitate", "optica"] as const
 export type FizicaRouteSlug = (typeof FIZICA_ROUTE_SLUGS)[number]
@@ -256,7 +259,7 @@ function resolveLessonStatuses(
             })
           : baseHref
       if (allCompleted) {
-        status = "available"
+        status = "completed"
       } else if (!activeAssigned) {
         status = "active"
         activeAssigned = true
@@ -277,6 +280,25 @@ function resolveLessonStatuses(
   }
 
   return { layouts, completedCount }
+}
+
+function resolveCompletedItemIdsFromGuestProgress(
+  itemIds: string[],
+  guestProgressMap: GuestLearningPathProgressMap,
+): Set<string> {
+  const scopedIds = new Set(itemIds)
+  const completed = new Set<string>()
+
+  for (const ids of Object.values(guestProgressMap)) {
+    if (!Array.isArray(ids)) continue
+    for (const id of ids) {
+      if (typeof id === "string" && scopedIds.has(id)) {
+        completed.add(id)
+      }
+    }
+  }
+
+  return completed
 }
 
 function resolveNextChapter(
@@ -310,6 +332,8 @@ export async function fetchFizicaMapPageData(options: {
   routeSlug?: string | null
   chapterSlug?: string | null
   userId?: string | null
+  progressClient?: SupabaseClient | null
+  guestProgressMap?: GuestLearningPathProgressMap
 }): Promise<FizicaMapPageData> {
   const routes = await fetchRoutes()
   const selectedRoute =
@@ -349,10 +373,18 @@ export async function fetchFizicaMapPageData(options: {
   const itemContexts = await fetchLearningPathItemContexts(itemIds)
 
   let completedItemIds = new Set<string>()
-  const supabase = getSupabaseClient()
-  if (options.userId && supabase) {
+  if (options.userId && options.progressClient && itemIds.length > 0) {
     completedItemIds = new Set(
-      await getCompletedLearningPathItemIdsForUser(supabase, options.userId, itemIds),
+      await getCompletedLearningPathItemIdsForUser(
+        options.progressClient,
+        options.userId,
+        itemIds,
+      ),
+    )
+  } else if (options.guestProgressMap && itemIds.length > 0) {
+    completedItemIds = resolveCompletedItemIdsFromGuestProgress(
+      itemIds,
+      options.guestProgressMap,
     )
   }
 
@@ -443,6 +475,8 @@ export interface FizicaMapItemNavigation {
   prevItemHref: string | null
   isLastItemInAssignment: boolean
   assignmentItems: FizicaMapAssignmentItemRoute[]
+  assignmentItemIds: string[]
+  fizicaLessonTotalElo: number
 }
 
 async function resolveFizicaMapAssignmentData(
@@ -489,7 +523,11 @@ export async function resolveFizicaMapItemNavigation(
 
   const isLastItemInAssignment = currentIndex >= orderedContexts.length - 1
   const nextItemHref = isLastItemInAssignment
-    ? getFizicaMapHref(context.routeSlug, context.chapterSlug)
+    ? buildFizicaMapReturnAfterLessonHref(
+        context.routeSlug,
+        context.chapterSlug,
+        context.fizicaLessonId,
+      )
     : appendFizicaMapItemQuery(
         getLearningPathItemHref(
           orderedContexts[currentIndex + 1].chapter,
@@ -511,7 +549,16 @@ export async function resolveFizicaMapItemNavigation(
         )
       : null
 
-  return { nextItemHref, prevItemHref, isLastItemInAssignment, assignmentItems }
+  return {
+    nextItemHref,
+    prevItemHref,
+    isLastItemInAssignment,
+    assignmentItems,
+    assignmentItemIds: orderedContexts.map((entry) => entry.item.id),
+    fizicaLessonTotalElo: computeLearningPathLessonEloTotal(
+      orderedContexts.map((entry) => entry.item),
+    ),
+  }
 }
 
 export function getLearningPathItemLabel(

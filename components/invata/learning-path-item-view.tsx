@@ -12,6 +12,7 @@ import { LearningPathCodingProblemSection } from "@/components/invata/learning-p
 import { LearningPathItemNavigationProvider } from "@/components/invata/learning-path-item-navigation-context"
 import { LearningPathFlashcardFlowProvider } from "@/components/invata/learning-path-flashcard-flow-context"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
+import { LearningPathItemEnterUp } from "@/components/invata/learning-path-item-enter-up"
 
 interface LearningPathItemViewProps {
   payload: LearningPathItemPayload
@@ -19,6 +20,8 @@ interface LearningPathItemViewProps {
   goToPrevItem: () => Promise<void>
   isNavigating: boolean
   slideDirection: LearningPathSlideDirection
+  usesFizicaLessonCompletionScreen?: boolean
+  animateFirstItemEntry?: boolean
 }
 
 export function LearningPathItemView({
@@ -27,6 +30,8 @@ export function LearningPathItemView({
   goToPrevItem,
   isNavigating,
   slideDirection,
+  usesFizicaLessonCompletionScreen = false,
+  animateFirstItemEntry = false,
 }: LearningPathItemViewProps) {
   const {
     chapterSlug,
@@ -39,6 +44,7 @@ export function LearningPathItemView({
     nextItemHref,
     initialCurrentItemCompleted,
     completedItemIdsForLesson,
+    fizicaAssignmentItemIds,
     isTextLesson,
     hideBottomCta,
     overflowHidden,
@@ -94,6 +100,8 @@ export function LearningPathItemView({
     slideDirection,
     goToNextItem,
     goToPrevItem,
+    usesFizicaLessonCompletionScreen,
+    animateFirstItemEntry,
   }
 
   return (
@@ -111,6 +119,7 @@ export function LearningPathItemView({
         currentItemId={item.id}
         initialCurrentItemCompleted={initialCurrentItemCompleted}
         completedItemIdsForLesson={completedItemIdsForLesson}
+        fizicaAssignmentItemIds={fizicaAssignmentItemIds}
         lessonBaseHref={lessonBaseHref}
         isTextLesson={isTextLesson}
         hideBottomCta={hideBottomCta}
@@ -121,52 +130,7 @@ export function LearningPathItemView({
         itemTitle={item.title}
       >
         {isTest ? (
-          <LearningPathItemBody
-            item={item}
-            sourceLesson={sourceLesson}
-            sourceProblem={sourceProblem}
-            sourceQuizQuestion={sourceQuizQuestion}
-            nextItemHref={nextItemHref}
-            lessonId={lessonId}
-            isLastItem={isLastItem}
-            {...routeMeta}
-          />
-        ) : isPoll ? (
-          <LearningPathItemBody
-            item={item}
-            sourceLesson={sourceLesson}
-            sourceProblem={sourceProblem}
-            sourceQuizQuestion={sourceQuizQuestion}
-            nextItemHref={nextItemHref}
-            lessonId={lessonId}
-            isLastItem={isLastItem}
-            {...routeMeta}
-          />
-        ) : isProblem && sourceProblem ? (
-          <ProblemSection
-            problem={sourceProblem}
-            nextItemHref={nextItemHref}
-            itemIndex={itemIndex}
-            lessonId={lessonId}
-            currentItemId={item.id}
-            isLastItem={isLastItem}
-            itemType={item.item_type}
-            itemTitle={item.title}
-            {...routeMeta}
-          />
-        ) : isCodingProblem && sourceCodingProblem ? (
-          <LearningPathCodingProblemSection
-            problem={sourceCodingProblem}
-            examples={sourceCodingExamples}
-            itemIndex={itemIndex}
-            lessonId={lessonId}
-            currentItemId={item.id}
-            isLastItem={isLastItem}
-            nextItemHref={nextItemHref}
-            initialCompleted={initialCurrentItemCompleted}
-          />
-        ) : isCustomTextItem ? (
-          <div className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col justify-center py-6 sm:py-10">
+          <LearningPathItemEnterUp delayIndex={1}>
             <LearningPathItemBody
               item={item}
               sourceLesson={sourceLesson}
@@ -177,9 +141,68 @@ export function LearningPathItemView({
               isLastItem={isLastItem}
               {...routeMeta}
             />
-          </div>
+          </LearningPathItemEnterUp>
+        ) : isPoll ? (
+          <LearningPathItemEnterUp delayIndex={1}>
+            <LearningPathItemBody
+              item={item}
+              sourceLesson={sourceLesson}
+              sourceProblem={sourceProblem}
+              sourceQuizQuestion={sourceQuizQuestion}
+              nextItemHref={nextItemHref}
+              lessonId={lessonId}
+              isLastItem={isLastItem}
+              {...routeMeta}
+            />
+          </LearningPathItemEnterUp>
+        ) : isProblem && sourceProblem ? (
+          <LearningPathItemEnterUp delayIndex={1}>
+            <ProblemSection
+              problem={sourceProblem}
+              nextItemHref={nextItemHref}
+              itemIndex={itemIndex}
+              lessonId={lessonId}
+              currentItemId={item.id}
+              isLastItem={isLastItem}
+              itemType={item.item_type}
+              itemTitle={item.title}
+              {...routeMeta}
+            />
+          </LearningPathItemEnterUp>
+        ) : isCodingProblem && sourceCodingProblem ? (
+          <LearningPathItemEnterUp delayIndex={1}>
+            <LearningPathCodingProblemSection
+              problem={sourceCodingProblem}
+              examples={sourceCodingExamples}
+              itemIndex={itemIndex}
+              lessonId={lessonId}
+              currentItemId={item.id}
+              isLastItem={isLastItem}
+              nextItemHref={nextItemHref}
+              initialCompleted={initialCurrentItemCompleted}
+            />
+          </LearningPathItemEnterUp>
+        ) : isCustomTextItem ? (
+          <LearningPathItemEnterUp
+            delayIndex={1}
+            className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col justify-center py-6 sm:py-10"
+          >
+            <LearningPathItemBody
+              item={item}
+              sourceLesson={sourceLesson}
+              sourceProblem={sourceProblem}
+              sourceQuizQuestion={sourceQuizQuestion}
+              nextItemHref={nextItemHref}
+              lessonId={lessonId}
+              isLastItem={isLastItem}
+              {...routeMeta}
+            />
+          </LearningPathItemEnterUp>
         ) : item.item_type === "grila" ? (
-          <div className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10">
+          <LearningPathItemEnterUp
+            delayIndex={1}
+            className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10"
+          >
             <div className="w-full max-w-3xl">
               <LearningPathItemBody
                 item={item}
@@ -192,9 +215,13 @@ export function LearningPathItemView({
                 {...routeMeta}
               />
             </div>
-          </div>
+          </LearningPathItemEnterUp>
         ) : isSimulation ? (
-          <section className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10">
+          <LearningPathItemEnterUp
+            as="section"
+            delayIndex={1}
+            className="flex min-h-[calc(100svh-3.5rem-6.5rem)] w-full flex-col items-center justify-center py-6 sm:py-10"
+          >
             <LearningPathItemBody
               item={item}
               sourceLesson={sourceLesson}
@@ -205,9 +232,9 @@ export function LearningPathItemView({
               isLastItem={isLastItem}
               {...routeMeta}
             />
-          </section>
+          </LearningPathItemEnterUp>
         ) : isBareInteractiveItem ? (
-          <section className="mt-6 pb-2 sm:mt-8">
+          <LearningPathItemEnterUp as="section" delayIndex={1} className="mt-6 pb-2 sm:mt-8">
             <LearningPathItemBody
               item={item}
               sourceLesson={sourceLesson}
@@ -218,11 +245,15 @@ export function LearningPathItemView({
               isLastItem={isLastItem}
               {...routeMeta}
             />
-          </section>
+          </LearningPathItemEnterUp>
         ) : (
-          <section className="mt-6 overflow-hidden rounded-[30px] border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
+          <LearningPathItemEnterUp
+            as="section"
+            delayIndex={1}
+            className="mt-6 overflow-hidden rounded-[30px] border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)]"
+          >
             <header className="border-b border-[#eee7f3] bg-[linear-gradient(180deg,#fcfbfe_0%,#f7f4fb_100%)] px-5 py-5 sm:px-7">
-              <div className="flex items-start gap-4">
+              <LearningPathItemEnterUp delayIndex={2} className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_8px_16px_rgba(124,58,237,0.24)]">
                   <ItemIcon className="h-5 w-5" />
                 </div>
@@ -238,10 +269,10 @@ export function LearningPathItemView({
                     {ITEM_TYPE_LABEL[item.item_type]} din lecția {lesson.title}
                   </p>
                 </div>
-              </div>
+              </LearningPathItemEnterUp>
             </header>
 
-            <div className="px-5 py-6 sm:px-7">
+            <LearningPathItemEnterUp delayIndex={3} className="px-5 py-6 sm:px-7">
               <LearningPathItemBody
                 item={item}
                 sourceLesson={sourceLesson}
@@ -252,8 +283,8 @@ export function LearningPathItemView({
                 isLastItem={isLastItem}
                 {...routeMeta}
               />
-            </div>
-          </section>
+            </LearningPathItemEnterUp>
+          </LearningPathItemEnterUp>
         )}
       </LessonItemShell>
       </LearningPathItemNavigationProvider>

@@ -161,7 +161,7 @@ function StartContinueButton({
       type="button"
       aria-busy={isLoading}
       className={cn(
-        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,opacity] hover:translate-y-1 hover:shadow-[0_1px_0_var(--lp-accent-dark)] active:translate-y-1 active:shadow-[0_1px_0_var(--lp-accent-dark)]",
+        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_0_var(--lp-accent-dark)] transition-[transform,box-shadow,opacity] hover:translate-y-0.5 hover:shadow-[0_2px_0_var(--lp-accent-dark)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--lp-accent-dark)]",
         isLoading && "pointer-events-none opacity-70",
         className
       )}
@@ -172,7 +172,6 @@ function StartContinueButton({
           "--lp-accent-dark": colors.accentDark,
           "--start-glow-tint": colors.buttonGlowTint,
           backgroundImage: "linear-gradient(to right, var(--lp-accent-light), var(--lp-accent))",
-          boxShadow: "0 4px 0 var(--lp-accent-dark)",
         } as CSSProperties
       }
       onPointerDown={(e) => e.stopPropagation()}

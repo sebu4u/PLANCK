@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 import Image from "next/image"
 import Link from "next/link"
 import { useLearningPathEdgeToEdge } from "@/components/invata/learning-path-item-chrome-context"
-import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
+import { useNavigateToNextLearningPathItem, useOptionalLearningPathItemNavigation } from "@/components/invata/learning-path-item-navigation-context"
 import {
   AlertCircle,
   ArrowRight,
@@ -373,6 +373,10 @@ export function LearningPathTestSection({
   isLastItem,
 }: LearningPathTestSectionProps) {
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
+  const itemNavigation = useOptionalLearningPathItemNavigation()
+  const shouldSkipMomentumToast = Boolean(
+    isLastItem && itemNavigation?.usesFizicaLessonCompletionScreen,
+  )
   const { user } = useAuth()
   const pushProgress = useProgressTrigger()
   const pushMomentum = useMomentumTrigger()
@@ -522,14 +526,16 @@ export function LearningPathTestSection({
   }, [refreshBattery])
 
   const handleContinueAfterPass = useCallback(async () => {
-    pushMomentum({
-      nextHref: nextItemHref,
-      isLastItem,
-      itemIndex: 0,
-      totalItems: 0,
-    })
+    if (!shouldSkipMomentumToast) {
+      pushMomentum({
+        nextHref: nextItemHref,
+        isLastItem,
+        itemIndex: 0,
+        totalItems: 0,
+      })
+    }
     await navigateToNextItem()
-  }, [isLastItem, navigateToNextItem, nextItemHref, pushMomentum])
+  }, [isLastItem, navigateToNextItem, nextItemHref, pushMomentum, shouldSkipMomentumToast])
 
   const totalProblems = content.problems.length
   const answeredCount = useMemo(() => {

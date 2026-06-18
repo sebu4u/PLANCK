@@ -7,8 +7,12 @@ import { useAuth } from "@/components/auth-provider"
 import { useAdmin } from "@/hooks/use-admin"
 import { Navigation } from "@/components/navigation"
 import { FizicaMapManager } from "@/components/admin/fizica-map-manager"
+import { FizicaCalendarManager } from "@/components/admin/fizica-calendar-manager"
 import { Button } from "@/components/ui/button"
 import { Loader2, AlertCircle, ArrowLeft } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+type AdminTab = "harta" | "calendar"
 
 export default function AdminFizicaPage() {
   const { user, loading: authLoading } = useAuth()
@@ -17,6 +21,7 @@ export default function AdminFizicaPage() {
   const [checkingAdmin, setCheckingAdmin] = useState(true)
   const [isVerifiedAdmin, setIsVerifiedAdmin] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<AdminTab>("harta")
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -122,13 +127,40 @@ export default function AdminFizicaPage() {
               Learning paths
             </Button>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Administrare Hartă Fizică</h1>
+          <h1 className="text-3xl font-bold mb-2">Administrare Fizică</h1>
           <p className="text-gray-400">
-            Gestionează traseele, capitolele, lecțiile și asignarea itemilor existenți din learning paths.
+            Gestionează harta lecțiilor și evenimentele din calendar.
           </p>
         </div>
 
-        <FizicaMapManager />
+        <div className="mb-8 flex gap-2">
+          <Button
+            type="button"
+            variant={activeTab === "harta" ? "default" : "outline"}
+            onClick={() => setActiveTab("harta")}
+            className={cn(
+              activeTab === "harta"
+                ? "bg-white text-black hover:bg-gray-200"
+                : "border-white/20 bg-transparent text-gray-200 hover:bg-white/10",
+            )}
+          >
+            Hartă
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === "calendar" ? "default" : "outline"}
+            onClick={() => setActiveTab("calendar")}
+            className={cn(
+              activeTab === "calendar"
+                ? "bg-white text-black hover:bg-gray-200"
+                : "border-white/20 bg-transparent text-gray-200 hover:bg-white/10",
+            )}
+          >
+            Calendar
+          </Button>
+        </div>
+
+        {activeTab === "harta" ? <FizicaMapManager /> : <FizicaCalendarManager />}
       </div>
     </div>
   )
