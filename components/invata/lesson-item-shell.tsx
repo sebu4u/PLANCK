@@ -43,7 +43,7 @@ import {
   useNavigateToPrevLearningPathItem,
   useOptionalLearningPathItemNavigation,
 } from "@/components/invata/learning-path-item-navigation-context"
-import { LearningPathItemChromeProvider, useLearningPathItemChrome } from "@/components/invata/learning-path-item-chrome-context"
+import { LearningPathItemChromeProvider, useLearningPathItemChrome, useRegisterLearningPathAiContext } from "@/components/invata/learning-path-item-chrome-context"
 import { LearningPathItemSlideContainer } from "@/components/invata/learning-path-item-slide-container"
 import { learningPathItemEnterUpClass } from "@/components/invata/learning-path-item-enter-up"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
@@ -52,6 +52,7 @@ import {
   LearningPathFlashcardOfferScreen,
   LearningPathFlashcardSessionScreen,
 } from "@/components/invata/learning-path-flashcard-item-screens"
+import { lpAiChatDesktopMargin, lpAiChatDesktopRightInset } from "@/lib/learning-path-ai-chat-layout"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -85,6 +86,8 @@ interface LessonItemShellProps {
   grilaQuestion?: QuizQuestion | null
   chapterId?: string | null
   itemTitle?: string | null
+  isTest?: boolean
+  baseAiContext?: string
   children: React.ReactNode
 }
 
@@ -467,6 +470,7 @@ function LessonItemShellInner({
         <div
           className={cn(
             "pointer-events-none fixed right-0 top-14 z-[250] hidden w-[min(100vw,7rem)] items-center justify-end md:flex",
+            lpAiChatDesktopRightInset(insightDesktopOpen),
             hideBottomCta
               ? "h-[calc(100dvh-3.5rem)]"
               : "h-[calc(100dvh-3.5rem-6rem)]",
@@ -499,7 +503,7 @@ function LessonItemShellInner({
         className={cn(
           "relative z-10 min-h-screen bg-[#ffffff] pt-14",
           overflowHidden && "overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden",
-          insightDesktopOpen && "lg:mr-[25vw]",
+          lpAiChatDesktopMargin(insightDesktopOpen),
         )}
         style={{
           paddingBottom: effectiveHideBottomCta
@@ -553,7 +557,7 @@ function LessonItemShellInner({
             4,
             cn(
               "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-              insightDesktopOpen && "lg:right-[25vw]",
+              lpAiChatDesktopRightInset(insightDesktopOpen),
             ),
           )}
           style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
@@ -627,11 +631,15 @@ function LessonItemShellInner({
 
 export function LessonItemShell(props: LessonItemShellProps) {
   return (
-    <LearningPathExplainChatProvider currentItemId={props.currentItemId}>
-      <LearningPathItemChromeProvider>
+    <LearningPathItemChromeProvider>
+      <LearningPathExplainChatProvider
+        currentItemId={props.currentItemId}
+        baseAiContext={props.baseAiContext ?? ""}
+        isTest={props.isTest}
+      >
         <LessonItemShellInner {...props} />
-      </LearningPathItemChromeProvider>
-    </LearningPathExplainChatProvider>
+      </LearningPathExplainChatProvider>
+    </LearningPathItemChromeProvider>
   )
 }
 
@@ -703,6 +711,11 @@ function GrilaLessonBottomCta({
       lessonSlug,
       selectedAnswers,
     ]
+  )
+
+  useRegisterLearningPathAiContext(
+    () => formatGrilaLearningPathContext(grilaQuestion, selectedAnswers, isCorrect),
+    [grilaQuestion, selectedAnswers, isCorrect],
   )
 
   return (

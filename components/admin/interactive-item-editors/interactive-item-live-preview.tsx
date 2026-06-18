@@ -68,8 +68,8 @@ function InteractiveItemPreviewRuntime({
   }
 
   return (
-    <LearningPathExplainChatProvider currentItemId="preview">
-      <LearningPathItemChromeProvider>
+    <LearningPathItemChromeProvider>
+      <LearningPathExplainChatProvider currentItemId="preview" baseAiContext="">
         <LearningPathFlashcardFlowProvider currentItemId="preview" goToNextItem={noop}>
           <PreviewChromeBody>
             <div className="bg-[#faf8fc] px-2 py-4 sm:px-4">
@@ -87,8 +87,8 @@ function InteractiveItemPreviewRuntime({
             </div>
           </PreviewChromeBody>
         </LearningPathFlashcardFlowProvider>
-      </LearningPathItemChromeProvider>
-    </LearningPathExplainChatProvider>
+      </LearningPathExplainChatProvider>
+    </LearningPathItemChromeProvider>
   )
 }
 

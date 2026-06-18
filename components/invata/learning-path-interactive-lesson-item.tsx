@@ -46,7 +46,8 @@ import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
 import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
-import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import { useRegisterLearningPathFixedBottomBar, useRegisterLearningPathAiContext } from "@/components/invata/learning-path-item-chrome-context"
+import { lpAiChatDesktopRightInset } from "@/lib/learning-path-ai-chat-layout"
 import { FillSlotFormula, FillSlotLatex } from "@/components/invata/fill-slot-formula"
 import {
   buildFillSlotLatex,
@@ -186,6 +187,21 @@ function CardSortView({
       initialUserMessage: LEARNING_PATH_CARD_SORT_EXPLAIN_INITIAL_PROMPT,
     })
   }
+
+  useRegisterLearningPathAiContext(
+    () => {
+      const wasLastVerifyCorrect =
+        checkPhase === "correct" ? true : checkPhase === "wrong" ? false : null
+      return formatCardSortLearningPathContext({
+        instructions: data.instructions,
+        cards: data.cards,
+        currentOrderIds: order,
+        correctOrderIds: data.correctOrder,
+        wasLastVerifyCorrect,
+      })
+    },
+    [checkPhase, data.cards, data.correctOrder, data.instructions, order],
+  )
 
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -340,7 +356,7 @@ function InteractiveBottomChrome({
       <div
         className={cn(
           "fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6",
-          insightDesktopOpen && "lg:right-[25vw]",
+          lpAiChatDesktopRightInset(insightDesktopOpen),
         )}
         style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
       >
@@ -526,6 +542,26 @@ function FillSlotView({
       lessonSlug,
       verifyResult,
     ]
+  )
+
+  useRegisterLearningPathAiContext(
+    () =>
+      formatFillSlotLearningPathContext({
+        instructions: data.instructions,
+        latexTemplate: data.latexTemplate,
+        slots: data.slots,
+        assign,
+        chips: data.chips,
+        autoResult: verifyResult,
+      }),
+    [
+      assign,
+      data.chips,
+      data.instructions,
+      data.latexTemplate,
+      data.slots,
+      verifyResult,
+    ],
   )
 
   useRegisterLearningPathFixedBottomBar(
@@ -2220,6 +2256,30 @@ function RevealStepsView({
       initialUserMessage: LEARNING_PATH_REVEAL_STEPS_QUIZ_EXPLAIN_INITIAL_PROMPT,
     })
   }
+
+  useRegisterLearningPathAiContext(
+    () => {
+      if (block?.kind !== "quiz") return null
+      const wasLastVerifyCorrect =
+        quizChecked && quizChoice === block.correctIndex
+          ? !quizErr
+          : quizChecked && quizErr
+            ? false
+            : null
+      return formatRevealStepsQuizLearningPathContext({
+        instructions: data.instructions,
+        stepIndex: visible + 1,
+        totalSteps: total,
+        priorSteps: steps.slice(0, visible),
+        quizContent: block.content,
+        options: block.options,
+        correctIndex: block.correctIndex,
+        selectedIndex: quizChoice,
+        wasLastVerifyCorrect,
+      })
+    },
+    [block, data.instructions, quizChecked, quizChoice, quizErr, steps, total, visible],
+  )
 
   const stepCardPast =
     "rounded-xl border-[3px] border-[#cfc3dc] bg-white px-4 py-4 shadow-[0_4px_0_#9d8ab3] sm:px-5 sm:py-5"

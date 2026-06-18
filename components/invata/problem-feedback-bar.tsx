@@ -4,6 +4,7 @@ import { useState, type MouseEvent } from "react"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { lpAiChatDesktopRightInset } from "@/lib/learning-path-ai-chat-layout"
 import { EloGainCard } from "@/components/invata/elo-gain-card"
 import { useLearningPathExplainChat } from "@/components/invata/learning-path-explain-chat-context"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
@@ -82,7 +83,7 @@ export function ProblemFeedbackBar({
       <div
         className={cn(
           "fixed bottom-0 left-0 right-0 z-[300] flex items-center justify-between gap-3 border-t px-4 py-2.5 sm:gap-4 sm:px-6 sm:py-4",
-          bottomBarDesktopInset && "lg:right-[25vw]",
+          lpAiChatDesktopRightInset(bottomBarDesktopInset),
           state === "verify" && "border-[#eee7f3] bg-white/95 backdrop-blur-sm",
           state === "incorrect" && "border-gray-200 bg-gray-100",
           state === "correct" && "border-emerald-200 bg-emerald-50",

@@ -14,7 +14,7 @@ import {
   formatPollLearningPathContext,
   LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
-import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import { useRegisterLearningPathFixedBottomBar, useRegisterLearningPathAiContext } from "@/components/invata/learning-path-item-chrome-context"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { cn } from "@/lib/utils"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
@@ -182,6 +182,26 @@ export function PollSection({
       question,
       selectedId,
     ]
+  )
+
+  useRegisterLearningPathAiContext(
+    () =>
+      formatPollLearningPathContext({
+        question,
+        options: options.map((o) => ({ id: o.id, label: o.label })),
+        selectedId,
+        correctAnswerId,
+        displayTextAfterVerify: displayText,
+        wasCorrect: isCorrect,
+      }),
+    [
+      correctAnswerId,
+      displayText,
+      isCorrect,
+      options,
+      question,
+      selectedId,
+    ],
   )
 
   useRegisterLearningPathFixedBottomBar(

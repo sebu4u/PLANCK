@@ -20,7 +20,7 @@ import {
   formatProblemLearningPathContext,
   LEARNING_PATH_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
-import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import { useRegisterLearningPathFixedBottomBar, useRegisterLearningPathAiContext } from "@/components/invata/learning-path-item-chrome-context"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
 function normalizeTags(tags: unknown): string[] {
@@ -348,6 +348,18 @@ export function ProblemSection({
       wasCorrect: isCorrect,
     })
   }, [
+    answerType,
+    currentSubpoint,
+    grilaCorrectIndex,
+    grilaOptions,
+    grilaSelected,
+    hasGrilaAnswer,
+    isCorrect,
+    problem,
+    valueInput,
+  ])
+
+  useRegisterLearningPathAiContext(() => buildProblemContext(), [
     answerType,
     currentSubpoint,
     grilaCorrectIndex,

@@ -1,6 +1,8 @@
 "use client"
 
+import { useMemo } from "react"
 import type { LearningPathItemPayload } from "@/lib/learning-path-item-loader"
+import { buildLearningPathItemBaseAiContext } from "@/lib/learning-path-item-ai-context"
 import { LessonItemShell } from "@/components/invata/lesson-item-shell"
 import {
   ITEM_TYPE_LABEL,
@@ -109,6 +111,8 @@ export function LearningPathItemView({
     animateFirstItemEntry,
   }
 
+  const baseAiContext = useMemo(() => buildLearningPathItemBaseAiContext(payload), [payload])
+
   return (
     <LearningPathFlashcardFlowProvider
       currentItemId={item.id}
@@ -134,6 +138,8 @@ export function LearningPathItemView({
         grilaQuestion={item.item_type === "grila" ? sourceQuizQuestion : undefined}
         chapterId={chapter.id}
         itemTitle={item.title}
+        isTest={isTest}
+        baseAiContext={baseAiContext}
       >
         {isTest ? (
           <LearningPathItemEnterUp delayIndex={1}>
