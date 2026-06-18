@@ -19,6 +19,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { NavbarTestBatteries } from "@/components/navbar-test-batteries"
 import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { GoogleSignInButton } from "@/components/google-sign-in-button"
+import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { InvataMobilePathNav } from "@/components/invata/invata-mobile-path-nav"
 import { useInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
 import {
@@ -50,7 +52,7 @@ export function Navigation() {
   const lastScrollY = useRef(0)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
-  const { user, logout, loading, profile, loginWithGoogle, loginWithGitHub, subscriptionPlan, userElo } = useAuth()
+  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
@@ -341,17 +343,21 @@ export function Navigation() {
     inputRef.current?.focus()
   }, [])
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLoginStart = () => {
     setLoginLoading("google")
-    const { error, popupBlocked } = await loginWithGoogle()
+  }
+
+  const handleGoogleLoginResult = (result: OAuthPopupResult) => {
     setLoginLoading(null)
 
-    if (error) {
+    if (result.cancelled) return
+
+    if (result.error) {
       toast({
         title: "Eroare la autentificare cu Google",
-        description: popupBlocked
+        description: result.popupBlocked
           ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
-          : error.message,
+          : result.error.message,
         variant: "destructive",
       })
     }
@@ -853,10 +859,11 @@ export function Navigation() {
                 <p className="text-gray-400 text-sm mb-6">Continuă cu unul dintre conturile tale</p>
 
                 <div className="space-y-3">
-                  <Button
-                    onClick={handleGoogleLogin}
+                  <GoogleSignInButton
+                    onStart={handleGoogleLoginStart}
+                    onResult={handleGoogleLoginResult}
                     disabled={loginLoading !== null}
-                    className="w-full h-12 bg-white/10 hover:bg-white/15 text-white border border-white/20 hover:border-white/30 transition-all duration-200"
+                    className="inline-flex w-full h-12 items-center justify-center rounded-md bg-white/10 hover:bg-white/15 text-white border border-white/20 hover:border-white/30 transition-all duration-200 disabled:opacity-60"
                   >
                     {loginLoading === "google" ? (
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
@@ -866,7 +873,7 @@ export function Navigation() {
                     <span className="font-semibold">
                       {loginLoading === "google" ? "Se conectează..." : "Continuă cu Google"}
                     </span>
-                  </Button>
+                  </GoogleSignInButton>
 
                   <Button
                     onClick={handleGitHubLogin}

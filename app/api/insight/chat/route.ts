@@ -18,6 +18,19 @@ import { logger } from '@/lib/logger';
 import { resolvePlanForRequest } from '@/lib/subscription-plan-server';
 import { reserveAuthenticatedInsightUsage } from '@/lib/insight-usage-reserve';
 import { handleAnonymousInsightChat } from '@/lib/insight-chat-anonymous';
+import { resolveInsightAgentIntent } from '@/lib/insight/agent/intent-router';
+import {
+  buildInsightAgentProfileAppendix,
+  buildInsightAgentResourceAppendix,
+  buildInsightAgentSystemAppendix,
+  persistInsightAgentArtifacts,
+} from '@/lib/insight/agent/actions';
+import {
+  buildResourceFoundText,
+  getPlanckCatalogRequestPolicy,
+  searchPlanckContentCatalog,
+} from '@/lib/insight/agent/content-catalog';
+import { ensureInsightAgentProfile, loadInsightAgentProfile } from '@/lib/insight/agent/profile';
 import {
   buildInsightAttachmentRecords,
   createSignedUrlsForInsightPaths,
@@ -179,6 +192,10 @@ export async function POST(req: NextRequest) {
     const userPlan = await resolvePlanForRequest(supabase, accessToken);
 
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
+    const rawVisibleInput =
+      typeof (body as Record<string, unknown>).visibleInput === 'string'
+        ? String((body as Record<string, unknown>).visibleInput).trim()
+        : '';
 
     const rawAttachmentPaths = Array.isArray((body as Record<string, unknown>).attachmentPaths)
       ? ((body as Record<string, unknown>).attachmentPaths as unknown[])
@@ -202,6 +219,7 @@ export async function POST(req: NextRequest) {
 
     // Support legacy format (messages array) for backward compatibility
     let userInput: string;
+    let visibleUserInput: string;
     let resolvedSessionId: string | undefined =
       typeof sessionId === 'string' && sessionId.trim() ? sessionId.trim() : undefined;
 
@@ -212,6 +230,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Mesaje lipsă.' }, { status: 400 });
       }
       userInput = String(lastUserMsg.content ?? '');
+      visibleUserInput = userInput;
       if (rawAttachmentPaths.length > 0) {
         return NextResponse.json(
           { error: 'Formatul cu imagini nu este suportat în modul vechi de mesaje.' },
@@ -221,6 +240,7 @@ export async function POST(req: NextRequest) {
     } else if (typeof input === 'string' && (input.trim() || rawAttachmentPaths.length > 0)) {
       // New format: sessionId + input (input may be empty when only images are sent)
       userInput = input.trim();
+      visibleUserInput = rawVisibleInput || userInput;
     } else {
       return NextResponse.json({ error: 'Mesajul utilizatorului este necesar.' }, { status: 400 });
     }
@@ -243,7 +263,7 @@ export async function POST(req: NextRequest) {
       if (!resolvedSessionId) {
         // Create new session with auto-generated title from first message
         const autoTitle =
-          userInput.slice(0, 60) || (rawAttachmentPaths.length ? 'Insight — imagini' : 'Insight');
+          visibleUserInput.slice(0, 60) || (rawAttachmentPaths.length ? 'Insight — imagini' : 'Insight');
         const { data: newSession, error: sessErr } = await supabase
           .from('insight_chat_sessions')
           .insert({
@@ -299,7 +319,7 @@ export async function POST(req: NextRequest) {
         session_id: resolvedSessionId,
         user_id: user.id,
         role: 'user',
-        content: userInput,
+        content: visibleUserInput,
         attachments: attachmentsPayload,
       });
 
@@ -332,6 +352,110 @@ export async function POST(req: NextRequest) {
           ? (row.attachments as InsightMessageAttachment[])
           : null,
       }));
+    }
+
+    const insightAgentIntent = resolveInsightAgentIntent(`${visibleUserInput}\n${userInput}`);
+    if (!isIdeRequest) {
+      await ensureInsightAgentProfile(supabase, user.id);
+    }
+    const insightAgentProfile = !isIdeRequest ? await loadInsightAgentProfile(supabase, user.id) : {};
+    const catalogPolicy = getPlanckCatalogRequestPolicy({
+      intent: insightAgentIntent,
+      userInput: visibleUserInput,
+    });
+    const insightAgentResources = !isIdeRequest
+      ? await searchPlanckContentCatalog(supabase, {
+          intent: insightAgentIntent,
+          userInput,
+          requestText: visibleUserInput,
+          limit: catalogPolicy.artifactLimit,
+        })
+      : [];
+
+    if (!isIdeRequest && resolvedSessionId && catalogPolicy.resourceOnlyAnswer && insightAgentResources[0]) {
+      const resourcesForAnswer = catalogPolicy.directResourceAnswer
+        ? insightAgentResources.slice(0, 1)
+        : insightAgentResources;
+      const directText = buildResourceFoundText(resourcesForAnswer);
+      const agentPersistenceResult = await persistInsightAgentArtifacts(supabase, {
+        userId: user.id,
+        sessionId: resolvedSessionId,
+        userInput: visibleUserInput,
+        assistantText: directText,
+        intent: insightAgentIntent,
+        resources: resourcesForAnswer,
+        messageArtifactTitle: null,
+      });
+
+      let { error: directSaveErr } = await supabase
+        .from('insight_chat_messages')
+        .insert({
+          session_id: resolvedSessionId,
+          user_id: user.id,
+          role: 'assistant',
+          content: directText,
+          input_tokens: null,
+          output_tokens: null,
+          agent_artifacts: agentPersistenceResult.messageArtifacts,
+        });
+
+      if (directSaveErr && (directSaveErr.code === '42703' || /agent_artifacts/i.test(directSaveErr.message ?? ''))) {
+        const fallback = await supabase
+          .from('insight_chat_messages')
+          .insert({
+            session_id: resolvedSessionId,
+            user_id: user.id,
+            role: 'assistant',
+            content: directText,
+            input_tokens: null,
+            output_tokens: null,
+          });
+        directSaveErr = fallback.error;
+      }
+
+      if (directSaveErr) {
+        logger.error('Failed to save direct agent assistant message:', directSaveErr);
+      }
+
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'session', sessionId: resolvedSessionId })}\n\n`
+            )
+          );
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'text', content: directText })}\n\n`)
+          );
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: 'done',
+                sessionId: resolvedSessionId,
+                metrics: {
+                  latencyMs: 0,
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  totalTokens: 0,
+                  costUSD: 0,
+                  monthlyTotal: null,
+                },
+                agentArtifacts: agentPersistenceResult.messageArtifacts,
+              })}\n\n`
+            )
+          );
+          controller.close();
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
     }
 
     // Build messages array for OpenAI (include system message + history)
@@ -442,6 +566,18 @@ Asigură-te că JSON-ul este valid.`;
       }
     }
 
+    const agentAppendix = buildInsightAgentSystemAppendix(insightAgentIntent);
+    if (agentAppendix) {
+      systemMessage.content += agentAppendix;
+    }
+    if (!isIdeRequest) {
+      systemMessage.content += buildInsightAgentProfileAppendix(insightAgentProfile);
+      systemMessage.content += buildInsightAgentResourceAppendix(
+        insightAgentResources,
+        catalogPolicy.responseInstruction
+      );
+    }
+
     const sanitizedContextMessages = Array.isArray(contextMessages)
       ? contextMessages
         .filter(
@@ -460,12 +596,22 @@ Asigură-te că JSON-ul este valid.`;
 
     const lastHistoryMessage = history.length > 0 ? history[history.length - 1] : null;
     const isLastMessageCurrentUser =
-      lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === userInput;
+      lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === visibleUserInput;
+    const historyForOpenAI = isLastMessageCurrentUser
+      ? history.map((row, index) =>
+          index === history.length - 1
+            ? {
+                ...row,
+                content: userInput,
+              }
+            : row
+        )
+      : history;
 
     let historyOpenAI: ChatCompletionMessageParam[] = [];
     let trailingUser: ChatCompletionMessageParam[] = [];
     try {
-      historyOpenAI = await insightHistoryToOpenAIMessages(supabase, history);
+      historyOpenAI = await insightHistoryToOpenAIMessages(supabase, historyForOpenAI);
       if (!isLastMessageCurrentUser) {
         const trailingAttachments =
           rawAttachmentPaths.length > 0 ? buildInsightAttachmentRecords(rawAttachmentPaths) : null;
@@ -518,12 +664,7 @@ Asigură-te că JSON-ul este valid.`;
     if (modelToUseParam === 'deep-thinking') {
       const deepBlock =
         '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
-      if (personaKey === 'problem_tutor') {
-        systemMessage.content += deepBlock;
-      } else {
-        systemContent += deepBlock;
-        systemMessage.content = systemContent;
-      }
+      systemMessage.content += deepBlock;
     }
 
     // Prepare parameters for OpenAI (standard models only, o1 removed)
@@ -660,9 +801,25 @@ Asigură-te că JSON-ul este valid.`;
           const totalTokens = usage?.total_tokens ?? 0;
           const latencyMs = Date.now() - t0;
 
+          let agentPersistenceResult: Awaited<ReturnType<typeof persistInsightAgentArtifacts>> | null = null;
+          if (!isIdeRequest && resolvedSessionId && fullText.trim()) {
+            try {
+              agentPersistenceResult = await persistInsightAgentArtifacts(supabase, {
+                userId: user.id,
+                sessionId: resolvedSessionId,
+                userInput: visibleUserInput,
+                assistantText: fullText,
+                intent: insightAgentIntent,
+                resources: insightAgentResources,
+              });
+            } catch (agentErr) {
+              logger.warn('Insight Agent artifact persistence failed before assistant save:', agentErr);
+            }
+          }
+
           // Save assistant message to database (only for non-IDE requests)
           if (!isIdeRequest && resolvedSessionId) {
-            const { error: insAsstMsgErr } = await supabase
+            let { error: insAsstMsgErr } = await supabase
               .from('insight_chat_messages')
               .insert({
                 session_id: resolvedSessionId,
@@ -671,7 +828,22 @@ Asigură-te că JSON-ul este valid.`;
                 content: fullText || 'Nu am primit răspuns.',
                 input_tokens: inputTokens || null,
                 output_tokens: outputTokens || null,
+                agent_artifacts: agentPersistenceResult?.messageArtifacts ?? [],
               });
+
+            if (insAsstMsgErr && (insAsstMsgErr.code === '42703' || /agent_artifacts/i.test(insAsstMsgErr.message ?? ''))) {
+              const fallback = await supabase
+                .from('insight_chat_messages')
+                .insert({
+                  session_id: resolvedSessionId,
+                  user_id: user.id,
+                  role: 'assistant',
+                  content: fullText || 'Nu am primit răspuns.',
+                  input_tokens: inputTokens || null,
+                  output_tokens: outputTokens || null,
+                });
+              insAsstMsgErr = fallback.error;
+            }
 
             if (insAsstMsgErr) {
               logger.error('Failed to save assistant message:', insAsstMsgErr);
@@ -741,6 +913,7 @@ Asigură-te că JSON-ul este valid.`;
                     costUSD,
                     monthlyTotal,
                   },
+                  agentArtifacts: agentPersistenceResult?.messageArtifacts ?? [],
                 })}\n\n`
               )
             )
@@ -840,4 +1013,3 @@ Asigură-te că JSON-ul este valid.`;
     );
   }
 }
-

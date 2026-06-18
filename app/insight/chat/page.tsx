@@ -39,14 +39,18 @@ import {
   Send,
   Plus,
   Home,
+  PanelRightOpen,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import InsightActionButtons from '@/components/insight-action-buttons';
 import InsightProblemsDialog from '@/components/insight-problems-dialog';
+import InsightAgentPanel, { type InsightAgentPanelData } from '@/components/insight-agent-panel';
+import InsightMessageArtifacts from '@/components/insight-message-artifacts';
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay';
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content';
 import { BlockMath, InlineMath } from 'react-katex';
 import { INSIGHT_ATTACHMENTS_BUCKET } from '@/lib/insight-attachments';
+import type { InsightMessageArtifact } from '@/lib/insight/agent/types';
 
 type InsightChatImageRef = {
   storagePath: string
@@ -59,6 +63,7 @@ type ChatMessage = {
   /** Vizitatori fără cont: răspuns simulat blur-at după limită zilnică */
   anonLimitLocked?: boolean;
   attachments?: InsightChatImageRef[];
+  agentArtifacts?: InsightMessageArtifact[];
 };
 
 type Session = {
@@ -351,6 +356,9 @@ function InsightChatPageContent() {
   const [plusPlanPopupType, setPlusPlanPopupType] = useState<'think' | 'teach' | null>(null);
   const [problemsDialogOpen, setProblemsDialogOpen] = useState(false);
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [agentPanelData, setAgentPanelData] = useState<InsightAgentPanelData | null>(null);
+  const [agentPanelLoading, setAgentPanelLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -460,6 +468,52 @@ function InsightChatPageContent() {
     }
   };
 
+  const loadAgentPanelData = useCallback(
+    async (sessionIdToLoad: string | null = sessionId, accessTokenOverride?: string | null) => {
+      if (!user) {
+        setAgentPanelData(null);
+        return null;
+      }
+
+      setAgentPanelLoading(true);
+      try {
+        let accessToken = accessTokenOverride ?? null;
+        if (!accessToken) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData.session?.access_token ?? null;
+        }
+        if (!accessToken) {
+          setAgentPanelData(null);
+          return null;
+        }
+
+        const query = sessionIdToLoad
+          ? `?sessionId=${encodeURIComponent(sessionIdToLoad)}`
+          : '';
+        const res = await fetch(`/api/insight/agent${query}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error('Nu am putut încărca datele Insight Agent.');
+        }
+
+        const data = (await res.json()) as InsightAgentPanelData;
+        setAgentPanelData(data);
+        return data;
+      } catch (e) {
+        console.error('Failed to load Insight Agent data:', e);
+        setAgentPanelData(null);
+        return null;
+      } finally {
+        setAgentPanelLoading(false);
+      }
+    },
+    [sessionId, user]
+  );
+
   // Load session messages
   const loadSessionMessages = async (sessionIdToLoad: string, accessToken: string) => {
     try {
@@ -478,7 +532,10 @@ function InsightChatPageContent() {
         (data.messages || []).map(async (m: Record<string, unknown>) => {
           const role = m.role as 'user' | 'assistant' | 'system';
           const content = String(m.content ?? '');
-          const base: ChatMessage = { role, content };
+          const artifacts = Array.isArray(m.agent_artifacts)
+            ? (m.agent_artifacts as InsightMessageArtifact[])
+            : [];
+          const base: ChatMessage = { role, content, agentArtifacts: artifacts };
           if (
             role === 'user' &&
             Array.isArray(m.attachments) &&
@@ -528,8 +585,15 @@ function InsightChatPageContent() {
       setLoadingSession(false);
       setSessions([]);
       setSessionId(null);
+      setAgentPanelData(null);
+      setAgentPanelOpen(false);
     }
   }, [user, authLoading]);
+
+  useEffect(() => {
+    if (authLoading || loadingSession || !user) return;
+    void loadAgentPanelData(sessionId);
+  }, [authLoading, loadingSession, loadAgentPanelData, sessionId, user]);
 
   // Initialize: load sessions and restore or create session
   useEffect(() => {
@@ -761,6 +825,7 @@ function InsightChatPageContent() {
       },
     ]);
     setInput('');
+    void loadAgentPanelData(null);
     // Clear sessionStorage for new chat
     sessionStorage.removeItem('insight-current-session');
     if (isMobile) {
@@ -779,6 +844,7 @@ function InsightChatPageContent() {
 
       setSessionId(clickedSessionId);
       await loadSessionMessages(clickedSessionId, accessToken);
+      await loadAgentPanelData(clickedSessionId, accessToken);
       // Save to sessionStorage so refresh will restore this session
       sessionStorage.setItem('insight-current-session', clickedSessionId);
       if (isMobile) {
@@ -862,6 +928,7 @@ function InsightChatPageContent() {
             },
           ]);
           setInput('');
+          await loadAgentPanelData(null, accessToken);
           // Clear sessionStorage since current session was deleted
           sessionStorage.removeItem('insight-current-session');
         }
@@ -910,6 +977,19 @@ function InsightChatPageContent() {
     setTimeout(() => {
       textareaRef.current?.focus();
       // Scroll textarea to end
+      if (textareaRef.current) {
+        textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+      }
+    }, 100);
+  };
+
+  const handleAgentPromptSelect = (prompt: string) => {
+    setInput(prompt);
+    if (isMobile) {
+      setAgentPanelOpen(false);
+    }
+    setTimeout(() => {
+      textareaRef.current?.focus();
       if (textareaRef.current) {
         textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
       }
@@ -1154,8 +1234,24 @@ function InsightChatPageContent() {
                     setSessionId(data.sessionId);
                     sessionStorage.setItem('insight-current-session', data.sessionId);
                   }
+                  if (Array.isArray(data.agentArtifacts) && data.agentArtifacts.length > 0) {
+                    setMessages((prev) => {
+                      const next = [...prev];
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i].role === 'assistant') {
+                          next[i] = {
+                            ...next[i],
+                            agentArtifacts: data.agentArtifacts as InsightMessageArtifact[],
+                          };
+                          break;
+                        }
+                      }
+                      return next;
+                    });
+                  }
                   if (accessToken) {
                     await loadSessions(accessToken);
+                    await loadAgentPanelData(currentSessionId, accessToken);
                   }
                   sessionInitialized = true;
                 } else if (data.type === 'error') {
@@ -1185,6 +1281,7 @@ function InsightChatPageContent() {
         
         if (accessToken) {
           await loadSessions(accessToken);
+          await loadAgentPanelData(currentSessionId, accessToken);
         }
         if (data.sessionId && accessToken) {
           currentSessionId = data.sessionId;
@@ -1604,6 +1701,7 @@ function InsightChatPageContent() {
         </div>
       </div>
 
+      <div className="flex min-w-0 flex-1 overflow-hidden bg-[#141414]">
       {/* Chat Area */}
       <div className="flex-1 flex flex-col bg-[#141414] overflow-hidden relative" style={{ position: 'relative', height: '100%' }}>
         {isMobile && (
@@ -1616,15 +1714,30 @@ function InsightChatPageContent() {
           </button>
         )}
 
-        {/* Back Home Button */}
-        <button
-          onClick={() => router.push('/')}
-          className="absolute top-4 right-8 max-[600px]:right-4 z-10 flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white transition-colors"
-          title="Înapoi acasă"
-        >
-          <Home className="w-4 h-4" />
-          <span className="text-sm font-medium">Înapoi acasă</span>
-        </button>
+        <div className="absolute top-4 right-8 max-[600px]:right-4 z-10 flex items-center gap-2">
+          {user ? (
+            <button
+              onClick={() => setAgentPanelOpen((open) => !open)}
+              className={`flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                agentPanelOpen
+                  ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100'
+                  : 'border-gray-700 bg-[#1b1b1b] text-gray-300 hover:bg-[#242424] hover:text-white'
+              }`}
+              title="Insight Agent"
+            >
+              <PanelRightOpen className="w-4 h-4" />
+              <span className="max-[600px]:hidden">Agent</span>
+            </button>
+          ) : null}
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white transition-colors"
+            title="Înapoi acasă"
+          >
+            <Home className="w-4 h-4" />
+            <span className="text-sm font-medium max-[600px]:hidden">Înapoi acasă</span>
+          </button>
+        </div>
 
         {/* Mobile fade gradient at top when messages exist */}
         {isMobile && hasMessages && (
@@ -1677,6 +1790,7 @@ function InsightChatPageContent() {
                               <MessageContent content={m.content} />
                             </AnonLimitLockedContent>
                           )}
+                          <InsightMessageArtifacts artifacts={m.agentArtifacts} />
                         </div>
                       ) : (
                         <div className="max-w-[70%] rounded-3xl bg-[#212121] text-white px-4 py-3 shadow-sm">
@@ -1944,6 +2058,37 @@ function InsightChatPageContent() {
 
       {premiumUpgradeOpen ? (
         <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
+      </div>
+
+      {user && !isMobile && agentPanelOpen ? (
+        <InsightAgentPanel
+          data={agentPanelData}
+          loading={agentPanelLoading}
+          sessionScoped={Boolean(sessionId)}
+          className="w-80 shrink-0 border-l border-[#2f2f2f]"
+          onClose={() => setAgentPanelOpen(false)}
+          onRefresh={() => void loadAgentPanelData(sessionId)}
+          onPromptSelect={handleAgentPromptSelect}
+        />
+      ) : null}
+
+      {user && isMobile && agentPanelOpen ? (
+        <div className="fixed inset-0 z-[60]">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setAgentPanelOpen(false)}
+          />
+          <InsightAgentPanel
+            data={agentPanelData}
+            loading={agentPanelLoading}
+            sessionScoped={Boolean(sessionId)}
+            className="absolute inset-y-0 right-0 w-[88vw] max-w-sm border-l border-[#2f2f2f]"
+            onClose={() => setAgentPanelOpen(false)}
+            onRefresh={() => void loadAgentPanelData(sessionId)}
+            onPromptSelect={handleAgentPromptSelect}
+          />
+        </div>
       ) : null}
     </div>
   );

@@ -1613,6 +1613,13 @@ export function FizicaLearningMap({
           onClose={closeChat}
           problemId={chatProblemId}
           problemStatement={chatContext}
+          problemContextPreamble=""
+          contextPreviewLabel={
+            selectedChapter
+              ? `Capitol curent: ${selectedChapter.title}`
+              : 'Harta lecțiilor de fizică'
+          }
+          keepContextAfterSend
           persona="problem_tutor"
           embedOnDesktop={embedChatOnDesktop}
           problemLightTheme

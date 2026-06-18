@@ -15,6 +15,8 @@ import 'katex/dist/katex.min.css'
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content'
 import { cn } from '@/lib/utils'
+import InsightMessageArtifacts from '@/components/insight-message-artifacts'
+import type { InsightMessageArtifact } from '@/lib/insight/agent/types'
 import {
   INSIGHT_ATTACHMENTS_BUCKET,
   MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE,
@@ -36,6 +38,7 @@ type ChatMessage = {
   /** Vizitatori fără cont: placeholder blur-at după limită */
   anonLimitLocked?: boolean
   attachments?: InsightChatImageRef[]
+  agentArtifacts?: InsightMessageArtifact[]
 }
 
 type PendingInsightImage = {
@@ -84,6 +87,10 @@ interface InsightChatSidebarProps {
   disableEntranceAnimations?: boolean
   /** Override panel slide transition classes (embedded desktop / mobile slide-over). */
   panelSlideTransitionClass?: string
+  /** User-facing label for the hidden context attached to the next message. */
+  contextPreviewLabel?: string
+  /** Keep page context attached to each message instead of consuming it once. */
+  keepContextAfterSend?: boolean
 }
 
 interface SuggestedQuestionsProps {
@@ -237,6 +244,8 @@ export default function InsightChatSidebar({
   starterQuestionChips,
   disableEntranceAnimations = false,
   panelSlideTransitionClass,
+  contextPreviewLabel,
+  keepContextAfterSend = false,
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -468,7 +477,10 @@ export default function InsightChatSidebar({
         (data.messages || []).map(async (m: Record<string, unknown>) => {
           const role = m.role as 'user' | 'assistant' | 'system'
           const content = String(m.content ?? '')
-          const base: ChatMessage = { role, content }
+          const artifacts = Array.isArray(m.agent_artifacts)
+            ? (m.agent_artifacts as InsightMessageArtifact[])
+            : []
+          const base: ChatMessage = { role, content, agentArtifacts: artifacts }
           if (
             role === 'user' &&
             Array.isArray(m.attachments) &&
@@ -1031,7 +1043,7 @@ export default function InsightChatSidebar({
       const displayContent =
         displayContentOverride !== undefined && displayContentOverride !== null
           ? displayContentOverride
-          : finalContent
+          : textToSend.trim()
 
       const attachmentRefs: InsightChatImageRef[] =
         uploadedPaths.length > 0
@@ -1050,7 +1062,9 @@ export default function InsightChatSidebar({
       setMessages((prev) => [...prev, newUserMsg])
       if (!textOverride) setInput('')
       setPendingAttachments([])
-      setProblemContext(null) // Clear context after it's sent
+      if (!keepContextAfterSend) {
+        setProblemContext(null)
+      }
       setShouldAutoScroll(true)
       setFollowStreamToLatest(false)
 
@@ -1082,6 +1096,7 @@ export default function InsightChatSidebar({
             : {
                 sessionId: currentSessionId,
                 input: finalContent,
+                visibleInput: displayContent,
                 persona,
                 ...(uploadedPaths.length ? { attachmentPaths: uploadedPaths } : {}),
               }
@@ -1193,6 +1208,7 @@ export default function InsightChatSidebar({
                     for (let i = newMessages.length - 1; i >= 0; i--) {
                       if (newMessages[i]?.role === 'assistant') {
                         newMessages[i] = {
+                          ...newMessages[i],
                           role: 'assistant',
                           content: displayContent,
                         }
@@ -1208,6 +1224,21 @@ export default function InsightChatSidebar({
                       for (let i = next.length - 1; i >= 0; i--) {
                         if (next[i].role === 'assistant') {
                           next[i] = { ...next[i], anonLimitLocked: true }
+                          break
+                        }
+                      }
+                      return next
+                    })
+                  }
+                  if (Array.isArray(data.agentArtifacts) && data.agentArtifacts.length > 0) {
+                    setMessages((prev) => {
+                      const next = [...prev]
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i].role === 'assistant') {
+                          next[i] = {
+                            ...next[i],
+                            agentArtifacts: data.agentArtifacts as InsightMessageArtifact[],
+                          }
                           break
                         }
                       }
@@ -1235,8 +1266,12 @@ export default function InsightChatSidebar({
           const lastIndex = newMessages.length - 1
           if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
             newMessages[lastIndex] = {
+              ...newMessages[lastIndex],
               role: 'assistant',
               content: data.output || 'Nu am primit răspuns.',
+              agentArtifacts: Array.isArray(data.agentArtifacts)
+                ? (data.agentArtifacts as InsightMessageArtifact[])
+                : newMessages[lastIndex]?.agentArtifacts,
             }
           }
           return newMessages
@@ -1562,6 +1597,11 @@ export default function InsightChatSidebar({
                             </ReactMarkdown>
                           </AnonLimitLockedContent>
                         )}
+                        <InsightMessageArtifacts
+                          artifacts={m.agentArtifacts}
+                          light={isProblemLightTheme}
+                          singleColumn
+                        />
                       </div>
                     ) : (
                       <div
@@ -1737,7 +1777,7 @@ export default function InsightChatSidebar({
                     <div className="flex items-center gap-2 overflow-hidden">
                       <span className={cn("text-xs font-medium uppercase flex-shrink-0", isProblemLightTheme ? "text-[#2563eb]" : "text-blue-400")}>Context:</span>
                       <p className="truncate opacity-80 text-xs">
-                        {problemContext.slice(0, 50)}...
+                        {(contextPreviewLabel ?? problemContext).slice(0, 70)}...
                       </p>
                     </div>
                     <button
@@ -1898,6 +1938,7 @@ export default function InsightChatSidebar({
                   {busy && isStreaming ? (
                     <button
                       onClick={stopGeneration}
+                      aria-label="Oprește răspunsul"
                       className="h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Oprește răspunsul"
                     >
@@ -1910,6 +1951,7 @@ export default function InsightChatSidebar({
                   ) : (
                     <button
                       onClick={send}
+                      aria-label="Trimite mesajul"
                       disabled={
                         isInputDisabled ||
                         uploadingAttachments ||
@@ -1943,4 +1985,3 @@ export default function InsightChatSidebar({
     </>
   )
 }
-

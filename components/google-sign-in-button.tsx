@@ -57,6 +57,7 @@ function GoogleSignInButtonInner({
   const popupRecoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const removePopupRecoveryListenersRef = useRef<(() => void) | null>(null)
   const pendingNonceRef = useRef<string | null>(null)
+  const activeNonceRef = useRef<string | null>(null)
   const [noncePair, setNoncePair] = useState<GoogleSignInNonce | null>(null)
   const [googleButtonReady, setGoogleButtonReady] = useState(false)
 
@@ -118,6 +119,7 @@ function GoogleSignInButtonInner({
       clearPopupRecovery()
       activeRef.current = false
       pendingNonceRef.current = null
+      activeNonceRef.current = null
       onResult(result)
       void refreshNonce()
     },
@@ -140,7 +142,7 @@ function GoogleSignInButtonInner({
       popupRecoveryTimeoutRef.current = setTimeout(() => {
         popupRecoveryTimeoutRef.current = null
         finishCancelled()
-      }, 800)
+      }, 5_000)
     }
 
     const onWindowFocus = () => {
@@ -163,14 +165,22 @@ function GoogleSignInButtonInner({
 
   const start = useCallback(() => {
     if (activeRef.current) return
+    const activeNonce = pendingNonceRef.current ?? noncePair?.nonce ?? null
+    if (!activeNonce) {
+      onResult({
+        error: new Error("Nonce-ul de autentificare Google lipsește. Încearcă din nou."),
+      })
+      return
+    }
     activeRef.current = true
+    activeNonceRef.current = activeNonce
     credentialReceivedRef.current = false
     onStart?.()
     attachPopupRecovery()
     timeoutRef.current = setTimeout(() => {
       finish({ error: new Error("Autentificarea cu Google a expirat. Încearcă din nou.") })
     }, 60_000)
-  }, [attachPopupRecovery, finish, onStart])
+  }, [attachPopupRecovery, finish, noncePair, onResult, onStart])
 
   const triggerGoogleButton = useCallback(() => {
     const googleTarget = containerRef.current?.querySelector<HTMLElement>("iframe, div[role='button']")
@@ -199,6 +209,7 @@ function GoogleSignInButtonInner({
     start()
     if (!triggerGoogleButton()) {
       activeRef.current = false
+      activeNonceRef.current = null
       clearPendingTimeout()
       clearPopupRecovery()
       onResult({
@@ -223,7 +234,7 @@ function GoogleSignInButtonInner({
     async (credentialResponse: CredentialResponse) => {
       credentialReceivedRef.current = true
       const credential = credentialResponse.credential
-      const nonce = pendingNonceRef.current
+      const nonce = activeNonceRef.current
 
       if (!credential) {
         finish({ error: new Error("Nu s-a primit token-ul Google pentru autentificare.") })

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       .from('insight_chat_sessions')
       .select('id, title, created_at, updated_at, last_message_at')
       .eq('user_id', user.id)
-      .order('last_message_at', { ascending: false, nullsLast: true })
+      .order('last_message_at', { ascending: false, nullsFirst: false })
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -177,4 +177,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }
-

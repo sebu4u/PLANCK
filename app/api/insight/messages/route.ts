@@ -29,11 +29,21 @@ export async function GET(req: NextRequest) {
     }
 
     // RLS will ensure user can only access their own sessions
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('insight_chat_messages')
-      .select('role, content, attachments, created_at')
+      .select('role, content, attachments, agent_artifacts, created_at')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
+
+    if (error && (error.code === '42703' || /agent_artifacts/i.test(error.message ?? ''))) {
+      const fallback = await supabase
+        .from('insight_chat_messages')
+        .select('role, content, attachments, created_at')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+      data = fallback.data?.map((row) => ({ ...row, agent_artifacts: [] })) ?? null;
+      error = fallback.error;
+    }
 
     if (error) {
       logger.error('Failed to fetch messages:', error);
@@ -46,4 +56,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });
   }
 }
-

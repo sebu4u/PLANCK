@@ -6,10 +6,12 @@ import { Navigation } from '@/components/navigation'
 import { Footer } from '@/components/footer'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth-provider'
+import { GoogleSignInButton } from '@/components/google-sign-in-button'
 import { useToast } from '@/hooks/use-toast'
 import { Lock, Chrome, Github, ArrowLeft, Brain, Check, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import type { OAuthPopupResult } from '@/lib/oauth-popup'
 import {
   consumePostOnboardingRedirect,
   REGISTER_ONBOARDING_PATH,
@@ -22,7 +24,6 @@ function InsightUnauthorizedContent() {
   const {
     user,
     loading: authLoading,
-    loginWithGoogle,
     loginWithGitHub,
     needsOnboarding,
     profileSyncedUserId,
@@ -79,17 +80,25 @@ function InsightUnauthorizedContent() {
     }
   }, [user, authLoading, needsOnboarding, profileSyncedUserId, router, redirectUrl])
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLoginStart = () => {
     setLoading("google")
     savePostOnboardingRedirect(redirectUrl)
-    const { error, popupBlocked } = await loginWithGoogle()
-    if (error) {
+  }
+
+  const handleGoogleLoginResult = (result: OAuthPopupResult) => {
+    if (result.cancelled) {
+      consumePostOnboardingRedirect()
+      setLoading(null)
+      return
+    }
+
+    if (result.error) {
       consumePostOnboardingRedirect()
       toast({
         title: "Eroare la autentificare cu Google",
-        description: popupBlocked
+        description: result.popupBlocked
           ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
-          : error.message,
+          : result.error.message,
         variant: "destructive",
       })
     }
@@ -195,11 +204,12 @@ function InsightUnauthorizedContent() {
           {/* Right Side - Auth Buttons */}
           <div className="flex-1 space-y-4 md:space-y-6 flex flex-col justify-center md:justify-center">
             <div className="space-y-3 md:space-y-4">
-              <Button
-                onClick={handleGoogleLogin}
+              <GoogleSignInButton
+                onStart={handleGoogleLoginStart}
+                onResult={handleGoogleLoginResult}
                 disabled={loading !== null}
                 className={cn(
-                  "w-full h-12 sm:h-14 text-sm sm:text-base bg-white hover:bg-gray-50 text-gray-700 transition-all duration-200 shadow-lg shadow-white/10 touch-manipulation",
+                  "inline-flex w-full h-12 sm:h-14 items-center justify-center rounded-md text-sm sm:text-base bg-white hover:bg-gray-50 text-gray-700 transition-all duration-200 shadow-lg shadow-white/10 touch-manipulation disabled:opacity-60",
                   loading === "google" && "opacity-70 cursor-not-allowed"
                 )}
               >
@@ -214,7 +224,7 @@ function InsightUnauthorizedContent() {
                     <span>Continuă cu Google</span>
                   </>
                 )}
-              </Button>
+              </GoogleSignInButton>
 
               <Button
                 onClick={handleGitHubLogin}
@@ -346,4 +356,3 @@ export default function InsightUnauthorizedPage() {
     </div>
   )
 }
-
