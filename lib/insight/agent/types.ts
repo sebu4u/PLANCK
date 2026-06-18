@@ -40,6 +40,13 @@ export type InsightMessageArtifact =
       status: 'planned' | 'completed' | 'failed' | 'needs_confirmation';
       action: string;
       metadata?: Record<string, unknown>;
+    }
+  | {
+      type: 'agent_question';
+      question: string;
+      options: string[];
+      allowCustom: boolean;
+      placeholder?: string;
     };
 
 export interface InsightAgentIntent {

@@ -203,19 +203,35 @@ export async function persistInsightAgentArtifacts(
     intent: InsightAgentIntent;
     resources?: PlanckResourceReference[];
     messageArtifactTitle?: string | null;
+    /** Extra message artifacts to merge (e.g. agent_question from the ask_user skill). */
+    extraMessageArtifacts?: InsightMessageArtifact[];
   }
 ) {
   const { userId, sessionId, userInput, assistantText, intent } = params;
-  const resources =
+  // Message artifacts (shown in chat UI): only use explicitly provided resources.
+  // The old auto-catalog-search that showed "Resurse Planck recomandate" on
+  // every response is removed. The agent now discovers resources through
+  // skill tool-calls; if it didn't find any, no resource cards are shown.
+  const messageResources = params.resources ?? [];
+  const messageArtifacts: InsightMessageArtifact[] = [
+    ...buildMessageArtifacts(messageResources, params.messageArtifactTitle),
+    ...(params.extraMessageArtifacts ?? []),
+  ];
+
+  // Structured artifacts (plans/diagnoses/recommendations → dedicated tables):
+  // still search the catalog internally for plan/recommendation intents since
+  // those need resources to build steps/links.
+  const structuredResources =
     params.resources ??
-    (await searchPlanckContentCatalog(supabase, {
-      intent,
-      userInput,
-      limit: intent.type === 'plan' ? 6 : 4,
-    }));
-  const artifacts = buildInsightAgentArtifacts(intent, userInput, assistantText, resources);
-  const messageArtifacts = buildMessageArtifacts(resources, params.messageArtifactTitle);
-  const resourceIds = resources.map((resource) => `${resource.type}:${resource.id}`);
+    (intent.type === 'plan' || intent.type === 'recommendation'
+      ? await searchPlanckContentCatalog(supabase, {
+          intent,
+          userInput,
+          limit: intent.type === 'plan' ? 6 : 4,
+        })
+      : []);
+  const artifacts = buildInsightAgentArtifacts(intent, userInput, assistantText, structuredResources);
+  const resourceIds = structuredResources.map((resource) => `${resource.type}:${resource.id}`);
 
   const writes: Array<PromiseLike<unknown>> = [
     supabase.from('insight_agent_states').upsert(
@@ -230,7 +246,7 @@ export async function persistInsightAgentArtifacts(
           confidence: intent.confidence,
           reasons: intent.reasons,
           learner_profile_updated: true,
-          recommended_resources: resources,
+          recommended_resources: structuredResources,
           last_user_input_excerpt: userInput.slice(0, 500),
           last_assistant_excerpt: assistantText.slice(0, 500),
         },
@@ -269,7 +285,7 @@ export async function persistInsightAgentArtifacts(
               : 'recommend_next_action',
       status: 'completed',
       input_json: { intent, user_input_excerpt: userInput.slice(0, 500) },
-      result_json: { resources, artifacts },
+      result_json: { resources: structuredResources, artifacts },
       requires_confirmation: false,
     }),
   ];
@@ -335,5 +351,5 @@ export async function persistInsightAgentArtifacts(
     }
   });
 
-  return { artifacts, resources, messageArtifacts };
+  return { artifacts, resources: structuredResources, messageArtifacts };
 }

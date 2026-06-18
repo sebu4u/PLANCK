@@ -1280,6 +1280,7 @@ export function FizicaLearningMap({
   const [isDesktopViewport, setIsDesktopViewport] = useState(false)
   const [chatPanelMounted, setChatPanelMounted] = useState(false)
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
+  const [chatPanelVisible, setChatPanelVisible] = useState(false)
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState<Set<string>>(() => new Set())
   const processedCompletionRef = useRef<string | null>(null)
   const {
@@ -1432,6 +1433,7 @@ export function FizicaLearningMap({
 
   const openChat = useCallback(() => {
     setChatPanelMounted(true)
+    setChatPanelVisible(true)
     setChatPanelOpen(false)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -1445,8 +1447,10 @@ export function FizicaLearningMap({
   }, [])
 
   const finalizeChatClose = useCallback(() => {
-    setChatPanelMounted(false)
-    setChatPanelOpen(false)
+    // Keep the panel mounted so the chat session survives close/reopen
+    // cycles. Only mark it as not visible so the FAB can reappear; do not
+    // unmount (unmounting would reset sessionId/messages and lose the conversation).
+    setChatPanelVisible(false)
   }, [])
 
   const handleJumpToNextChapter = useCallback(() => {
@@ -1585,7 +1589,7 @@ export function FizicaLearningMap({
         </div>
       </div>
 
-      {!chatPanelMounted && !isMapNavigating ? (
+      {!chatPanelVisible && !isMapNavigating ? (
         <button
           type="button"
           onClick={openChat}

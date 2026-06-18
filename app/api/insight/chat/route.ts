@@ -21,16 +21,19 @@ import { handleAnonymousInsightChat } from '@/lib/insight-chat-anonymous';
 import { resolveInsightAgentIntent } from '@/lib/insight/agent/intent-router';
 import {
   buildInsightAgentProfileAppendix,
-  buildInsightAgentResourceAppendix,
   buildInsightAgentSystemAppendix,
   persistInsightAgentArtifacts,
 } from '@/lib/insight/agent/actions';
-import {
-  buildResourceFoundText,
-  getPlanckCatalogRequestPolicy,
-  searchPlanckContentCatalog,
-} from '@/lib/insight/agent/content-catalog';
 import { ensureInsightAgentProfile, loadInsightAgentProfile } from '@/lib/insight/agent/profile';
+import {
+  drainPendingQuestionArtifacts,
+  drainPendingResourceArtifacts,
+  executeSkill,
+  MAX_SKILL_ITERATIONS,
+  resetPendingQuestionArtifacts,
+  resetPendingResourceArtifacts,
+  skillsToOpenAITools,
+} from '@/lib/insight/agent/skills';
 import {
   buildInsightAttachmentRecords,
   createSignedUrlsForInsightPaths,
@@ -359,104 +362,13 @@ export async function POST(req: NextRequest) {
       await ensureInsightAgentProfile(supabase, user.id);
     }
     const insightAgentProfile = !isIdeRequest ? await loadInsightAgentProfile(supabase, user.id) : {};
-    const catalogPolicy = getPlanckCatalogRequestPolicy({
-      intent: insightAgentIntent,
-      userInput: visibleUserInput,
-    });
-    const insightAgentResources = !isIdeRequest
-      ? await searchPlanckContentCatalog(supabase, {
-          intent: insightAgentIntent,
-          userInput,
-          requestText: visibleUserInput,
-          limit: catalogPolicy.artifactLimit,
-        })
-      : [];
 
-    if (!isIdeRequest && resolvedSessionId && catalogPolicy.resourceOnlyAnswer && insightAgentResources[0]) {
-      const resourcesForAnswer = catalogPolicy.directResourceAnswer
-        ? insightAgentResources.slice(0, 1)
-        : insightAgentResources;
-      const directText = buildResourceFoundText(resourcesForAnswer);
-      const agentPersistenceResult = await persistInsightAgentArtifacts(supabase, {
-        userId: user.id,
-        sessionId: resolvedSessionId,
-        userInput: visibleUserInput,
-        assistantText: directText,
-        intent: insightAgentIntent,
-        resources: resourcesForAnswer,
-        messageArtifactTitle: null,
-      });
-
-      let { error: directSaveErr } = await supabase
-        .from('insight_chat_messages')
-        .insert({
-          session_id: resolvedSessionId,
-          user_id: user.id,
-          role: 'assistant',
-          content: directText,
-          input_tokens: null,
-          output_tokens: null,
-          agent_artifacts: agentPersistenceResult.messageArtifacts,
-        });
-
-      if (directSaveErr && (directSaveErr.code === '42703' || /agent_artifacts/i.test(directSaveErr.message ?? ''))) {
-        const fallback = await supabase
-          .from('insight_chat_messages')
-          .insert({
-            session_id: resolvedSessionId,
-            user_id: user.id,
-            role: 'assistant',
-            content: directText,
-            input_tokens: null,
-            output_tokens: null,
-          });
-        directSaveErr = fallback.error;
-      }
-
-      if (directSaveErr) {
-        logger.error('Failed to save direct agent assistant message:', directSaveErr);
-      }
-
-      const encoder = new TextEncoder();
-      const readable = new ReadableStream({
-        start(controller) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: 'session', sessionId: resolvedSessionId })}\n\n`
-            )
-          );
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'text', content: directText })}\n\n`)
-          );
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: 'done',
-                sessionId: resolvedSessionId,
-                metrics: {
-                  latencyMs: 0,
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  totalTokens: 0,
-                  costUSD: 0,
-                  monthlyTotal: null,
-                },
-                agentArtifacts: agentPersistenceResult.messageArtifacts,
-              })}\n\n`
-            )
-          );
-          controller.close();
-        },
-      });
-
-      return new Response(readable, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        },
-      });
-    }
+    // NOTE: The old pre-computed catalog search (searchPlanckContentCatalog) and
+    // the "fast-path" canned answer have been removed. The agent now uses
+    // OpenAI tool-calling skills (lib/insight/agent/skills.ts) to browse the
+    // site's content on demand. Resource persistence is handled by
+    // persistInsightAgentArtifacts which searches the catalog internally if
+    // needed (fire-and-forget).
 
     // Build messages array for OpenAI (include system message + history)
     const personaKey = typeof persona === 'string' ? persona : null;
@@ -572,10 +484,8 @@ Asigură-te că JSON-ul este valid.`;
     }
     if (!isIdeRequest) {
       systemMessage.content += buildInsightAgentProfileAppendix(insightAgentProfile);
-      systemMessage.content += buildInsightAgentResourceAppendix(
-        insightAgentResources,
-        catalogPolicy.responseInstruction
-      );
+      systemMessage.content +=
+        '\n\nTOOLURI PLANCK (SKILLS):\nAveți acces la următoarele tool-uri:\n\nExplorare conținut site:\n- browse_catalog: listează capitolele disponibile pe materie\n- search_problems: caută probleme (fizică/matemetică/informatică) după clasă, dificultate, capitol sau text. Căutarea după capitol este fuzzy — folosește cuvintele cheie din titlu.\n- get_problem: returnează enunțul complet al unei probleme\n- list_lessons: listează lecțiile pentru o materie sau capitol\n- get_lesson: returnează conținutul (itemii) unei lecții\n- search_quizzes: caută întrebări de tip grilă\n\nCunoașterea utilizatorului:\n- ask_user: pune o întrebare cu opțiuni multiple choice pentru a afla detalii despre utilizator (nivel, preferințe, obiective). Opțiunile apar ca butoane interactive. Folosește-l când ai nevoie de informații pentru a personaliza răspunsul, dar nu întreba dacă poți deduce din context.\n\nREGULI IMPORTANTE:\n- Nu inventa URL-uri sau resurse. Dacă vă trebuie informații despre conținutul site-ului, folosiți tool-urile.\n- Dacă aveți deja suficiente informații din context, nu e nevoie să apelați tool-uri.\n- Când folosiți search_problems, get_problem, list_lessons sau search_quizzes, rezultatele vor fi afișate AUTOMAT ca carduri interactive sub răspuns. NU scrieți titlurile problemelor, enunțurile, URL-urile sau "Vezi problema" în text — cardurile apar singure. Menționați doar pe scurt ce ați găsit (ex: "Am găsit 5 probleme relevante pentru acest capitol").\n- Când folosiți ask_user, nu repetați întrebarea în text — butoanele vor fi afișate automat sub răspuns.';
     }
 
     const sanitizedContextMessages = Array.isArray(contextMessages)
@@ -627,7 +537,7 @@ Asigură-te că JSON-ul este valid.`;
       );
     }
 
-    const finalMessages: ChatCompletionMessageParam[] = [
+    let finalMessages: ChatCompletionMessageParam[] = [
       systemMessage,
       ...toChatCompletionsMessages(sanitizedContextMessages),
       ...historyOpenAI,
@@ -652,8 +562,96 @@ Asigură-te că JSON-ul este valid.`;
       );
     }
 
+    // --- Skill tool-call loop (non-streaming) ---
+    // Before the streaming response, let the model call read-only "skills"
+    // (browse_catalog, search_problems, get_problem, list_lessons, get_lesson,
+    // search_quizzes) to explore the site's content. Each iteration is a
+    // non-streaming completion; the final text answer is then streamed below.
+    // Skipped for IDE requests and when the thread has vision attachments
+    // (the model needs to focus on the image, not call tools).
     const hasAnyImagesInContext =
       threadHasVisionAttachments(history) || rawAttachmentPaths.length > 0;
+
+    if (!isIdeRequest && !hasAnyImagesInContext) {
+      const openai = getOpenAIClient();
+      const skillTools = skillsToOpenAITools();
+      let skillMessages = [...finalMessages];
+      // Use the same model resolution as the final streaming call. For
+      // deep-thinking we still use gpt-4o for tool calls.
+      const activeModelForSkills =
+        modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
+
+      // Reset the artifact collectors before the loop starts.
+      resetPendingQuestionArtifacts();
+      resetPendingResourceArtifacts();
+
+      for (let iter = 0; iter < MAX_SKILL_ITERATIONS; iter++) {
+        let skillResponse: OpenAI.Chat.Completions.ChatCompletion;
+        try {
+          skillResponse = await openai.chat.completions.create({
+            model: activeModelForSkills,
+            messages: skillMessages,
+            tools: skillTools,
+            tool_choice: 'auto',
+            max_tokens: 800,
+          });
+        } catch (skillErr: any) {
+          logger.warn('Insight skill loop error (non-fatal, skipping):', skillErr?.message);
+          break;
+        }
+
+        const choice = skillResponse.choices[0];
+        if (!choice?.message?.tool_calls?.length) {
+          // No tool calls — the model is ready to answer. If it produced
+          // content in this non-streaming call, we could use it, but we
+          // prefer to let the streaming call below generate the final
+          // answer with the enriched context. Just break.
+          break;
+        }
+
+        // Push the assistant message with tool_calls into the conversation.
+        skillMessages.push(choice.message as ChatCompletionMessageParam);
+
+        // Execute each requested skill and add the tool result.
+        const toolCalls = (choice.message as any).tool_calls || [];
+        for (const toolCall of toolCalls) {
+          const skillName: string = toolCall.function?.name ?? '';
+          let parsedArgs: Record<string, unknown> = {};
+          try {
+            parsedArgs = JSON.parse(toolCall.function?.arguments || '{}');
+          } catch {
+            parsedArgs = {};
+          }
+
+          const toolResult = await executeSkill(skillName, parsedArgs, supabase);
+
+          skillMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: toolResult,
+          } as ChatCompletionMessageParam);
+        }
+      }
+
+      // Replace finalMessages with the enriched conversation (includes tool
+      // results). The streaming call below will NOT pass `tools`, so the
+      // model just generates the final text answer from all the context.
+      finalMessages = skillMessages;
+    }
+
+    // Collect artifacts produced by skills during the loop:
+    // - agent_question artifacts from ask_user → interactive buttons
+    // - resource_references artifacts from search_problems/get_problem/etc.
+    //   → clickable PlanckResourceCard components
+    // Both are merged into the message artifacts so the UI renders them
+    // below the response automatically.
+    const skillQuestionArtifacts = !isIdeRequest
+      ? drainPendingQuestionArtifacts()
+      : [];
+    const skillResourceArtifacts = !isIdeRequest
+      ? drainPendingResourceArtifacts()
+      : [];
+    const skillArtifacts = [...skillResourceArtifacts, ...skillQuestionArtifacts];
 
     let activeModel = modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
     if (hasAnyImagesInContext && !isIdeRequest) {
@@ -810,7 +808,7 @@ Asigură-te că JSON-ul este valid.`;
                 userInput: visibleUserInput,
                 assistantText: fullText,
                 intent: insightAgentIntent,
-                resources: insightAgentResources,
+                extraMessageArtifacts: skillArtifacts,
               });
             } catch (agentErr) {
               logger.warn('Insight Agent artifact persistence failed before assistant save:', agentErr);

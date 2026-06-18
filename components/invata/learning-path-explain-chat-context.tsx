@@ -68,7 +68,9 @@ export function LearningPathExplainChatProvider({
   }, [currentItemId])
 
   const finalizePanelClose = useCallback(() => {
-    setPanelMounted(false)
+    // Keep the panel mounted so the chat session survives close/reopen
+    // cycles. Only slide it out; do not unmount (unmounting would reset
+    // sessionId/messages and lose the conversation).
     setPanelOpen(false)
     setInitialUserMessage(null)
     setInitialUserMessageDisplay(null)

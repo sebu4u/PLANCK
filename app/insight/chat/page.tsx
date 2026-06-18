@@ -1765,7 +1765,7 @@ function InsightChatPageContent() {
                       key={i}
                       className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
                       style={{
-                        ...(isLastAssistantMessage ? { paddingBottom: '70px' } : {}),
+                        ...(isLastAssistantMessage ? { paddingBottom: '120px' } : {}),
                         ...(isFirstMessage ? { paddingTop: '64px' } : {})
                       }}
                     >
@@ -1790,7 +1790,10 @@ function InsightChatPageContent() {
                               <MessageContent content={m.content} />
                             </AnonLimitLockedContent>
                           )}
-                          <InsightMessageArtifacts artifacts={m.agentArtifacts} />
+                          <InsightMessageArtifacts
+                            artifacts={m.agentArtifacts}
+                            onAnswerSelect={(answer) => void send(answer)}
+                          />
                         </div>
                       ) : (
                         <div className="max-w-[70%] rounded-3xl bg-[#212121] text-white px-4 py-3 shadow-sm">

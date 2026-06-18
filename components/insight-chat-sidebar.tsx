@@ -294,7 +294,11 @@ export default function InsightChatSidebar({
   }, [])
 
   const isDesktopEmbedded = embedOnDesktop && viewportModeResolved && !isMobile
-  const effectiveOpen = isOpen || isDesktopEmbedded
+  // When the desktop panel can be closed (showCloseWhenDesktopEmbedded), effectiveOpen
+  // follows isOpen so the panel does not initialize/stream while slid out but still mounted.
+  // Otherwise (e.g. catalog problem page where the panel is always visible on desktop),
+  // keep the previous behaviour so the panel stays active while embedded.
+  const effectiveOpen = showCloseWhenDesktopEmbedded ? isOpen : (isOpen || isDesktopEmbedded)
   const isProblemLightTheme = Boolean(
     problemLightTheme && (isDesktopEmbedded || (lightChromeWhenSlideOver && !isMobile))
   )
@@ -1539,7 +1543,7 @@ export default function InsightChatSidebar({
         <div
           ref={messagesContainerRef}
           onScroll={handleScroll}
-          className="insight-chat-scroll flex-1 overflow-y-auto px-3 py-5 pb-36 sm:px-4 sm:py-6 sm:pb-40 lg:px-5 overscroll-contain"
+          className="insight-chat-scroll flex-1 overflow-y-auto px-3 py-5 pb-48 sm:px-4 sm:py-6 sm:pb-52 lg:px-5 overscroll-contain"
         >
           {loadingSession && !disableEntranceAnimations ? (
             <div className="flex h-full items-center justify-center">
@@ -1601,6 +1605,7 @@ export default function InsightChatSidebar({
                           artifacts={m.agentArtifacts}
                           light={isProblemLightTheme}
                           singleColumn
+                          onAnswerSelect={(answer) => void submitMessage(answer, answer)}
                         />
                       </div>
                     ) : (
