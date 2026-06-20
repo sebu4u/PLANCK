@@ -37,13 +37,13 @@ const planItemSchema = z.object({
 const planLessonSchema = z.object({
   title: z.string().min(2).max(120),
   description: z.string().max(500).nullable().optional(),
-  items: z.array(planItemSchema).min(2).max(10),
+  items: z.array(planItemSchema).min(1).max(10),
 })
 
 const planSchema = z.object({
   title: z.string().min(2).max(120),
   description: z.string().min(10).max(900),
-  lessons: z.array(planLessonSchema).min(2).max(8),
+  lessons: z.array(planLessonSchema).min(1).max(8),
 })
 
 function getOpenAIClient() {
@@ -192,8 +192,37 @@ function normalizePlan(
 
   if (lessons.length >= 2) {
     const finalPlan = { title: plan.title.trim(), description: plan.description.trim(), lessons }
-    // Post-process: inject any real candidates the AI missed
     return injectMissedCandidates(finalPlan, candidates, userPrompt)
+  }
+
+  // AI returned only 1 lesson — add a second from real candidates
+  if (lessons.length === 1 && candidates.length >= 2) {
+    const usedKeys = new Set<string>()
+    for (const item of lessons[0].items) {
+      if (item.source_key) usedKeys.add(item.source_key)
+    }
+    const unused = candidates.filter((c) => !usedKeys.has(c.key))
+    const secondLessonItems = unused.slice(0, 5).map((c) => ({
+      title: c.title,
+      item_type: c.item_type,
+      source_key: c.key,
+      content_json: null as Record<string, unknown> | null,
+    }))
+    if (secondLessonItems.length >= 1) {
+      const finalPlan = {
+        title: plan.title.trim(),
+        description: plan.description.trim(),
+        lessons: [
+          ...lessons,
+          {
+            title: "Aplicare și aprofundare",
+            description: "Continuăm cu restul conținutului Planck relevant.",
+            items: secondLessonItems,
+          },
+        ],
+      }
+      return injectMissedCandidates(finalPlan, candidates, userPrompt)
+    }
   }
 
   // Fallback: build entirely from real candidates if AI failed
