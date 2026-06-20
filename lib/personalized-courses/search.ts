@@ -126,7 +126,7 @@ async function fetchLearningPathCandidates(
       .select("id, slug, title, description, problem_category, materie")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},description.ilike.${pattern},problem_category.ilike.${pattern}`)
-      .limit(8)
+      .limit(20)
     for (const row of chapters ?? []) {
       candidates.push({
         key: `chapter:${row.id}`,
@@ -150,7 +150,7 @@ async function fetchLearningPathCandidates(
       .select("id, slug, chapter_id, title, description, lesson_type, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},description.ilike.${pattern}`)
-      .limit(10)
+      .limit(25)
     for (const row of lessons ?? []) {
       const itemType = (row.lesson_type || "custom_text") as LearningPathLessonType
       candidates.push({
@@ -180,7 +180,7 @@ async function fetchLearningPathCandidates(
       .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},cursuri_lesson_slug.ilike.${pattern}`)
-      .limit(12)
+      .limit(30)
     for (const row of items ?? []) {
       candidates.push({
         key: `learning_path_item:${row.id}`,
@@ -214,7 +214,7 @@ async function fetchProblemCandidates(
       .from("problems")
       .select("id, title, description, statement, difficulty, category, tags, class")
       .or(`title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},category.ilike.${pattern},tags.ilike.${pattern}`)
-      .limit(15)
+      .limit(30)
     for (const row of data ?? []) {
       candidates.push({
         key: `problem:${row.id}`,
@@ -243,7 +243,7 @@ async function fetchQuizCandidates(
       .from("quiz_questions")
       .select("id, question_id, title, description, statement, difficulty, class, materie, tags")
       .or(`title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},question_id.ilike.${pattern}`)
-      .limit(15)
+      .limit(30)
     for (const row of data ?? []) {
       candidates.push({
         key: `quiz_question:${row.id}`,
@@ -273,7 +273,7 @@ async function fetchMathCandidates(
       .select("id, title, description, statement, tags, class, difficulty, chapter, is_active")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},chapter.ilike.${pattern}`)
-      .limit(15)
+      .limit(30)
     for (const row of data ?? []) {
       candidates.push({
         key: `math_problem:${row.id}`,
@@ -303,7 +303,7 @@ async function fetchCodingCandidates(
       .select("id, slug, title, statement_markdown, difficulty, class, chapter, tags, is_active, language")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},statement_markdown.ilike.${pattern},chapter.ilike.${pattern},slug.ilike.${pattern}`)
-      .limit(15)
+      .limit(30)
     for (const row of data ?? []) {
       candidates.push({
         key: `coding_problem:${row.id}`,
@@ -324,7 +324,7 @@ async function fetchCodingCandidates(
 export async function searchPlanckContentForPrompt(
   supabase: SupabaseAnyClient,
   prompt: string,
-  limit = 48,
+  limit = 80,
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
   const terms = extractTerms(prompt)
   if (!terms.length) return []

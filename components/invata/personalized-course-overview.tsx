@@ -49,7 +49,6 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
   const completedItems = course.lessons
     .flatMap((lesson) => lesson.items)
     .filter((item) => completedSet.has(item.id)).length
-  const allComplete = totalItems > 0 && completedItems >= totalItems
   const resumeTarget = resolveResumeTarget(course)
 
   return (
@@ -62,62 +61,66 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
         Înapoi la trasee
       </Link>
 
-      <section className="mt-5">
-        <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
-          <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
-              <Sparkles className="h-12 w-12 sm:h-14 sm:w-14" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-semibold text-[#111111]">{course.title}</h2>
-              {course.description ? (
-                <p className="mt-0.5 text-sm text-[#707070]">{course.description}</p>
-              ) : null}
-              {course.original_prompt ? (
-                <p className="mt-1 text-xs text-[#9a9a9a]">Obiectiv: „{course.original_prompt}"</p>
-              ) : null}
-              {totalItems > 0 ? (
-                <p className="mt-1 text-xs text-[#8a8a8a]">
-                  {completedItems} / {totalItems} itemi completați
-                </p>
-              ) : null}
-            </div>
+      {/* Chapter header — same as InvataChapterSection */}
+      <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
+        <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
+            <Sparkles className="h-12 w-12 sm:h-14 sm:w-14" aria-hidden="true" />
           </div>
-          {resumeTarget ? (
-            <Link
-              href={resumeTarget.href}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#1f1f1f] px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              <PlayCircle className="h-4 w-4" />
-              {resumeTarget.label}
-            </Link>
-          ) : null}
-        </div>
-
-        <div className="relative mb-5 sm:hidden">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold text-[#111111]">{course.title}</h2>
-              {course.description ? (
-                <p className="mt-1 text-sm text-[#707070]">{course.description}</p>
-              ) : null}
-            </div>
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]">
-              <Sparkles className="h-10 w-10" aria-hidden="true" />
-            </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-[#111111]">{course.title}</h2>
+            {course.description ? (
+              <p className="mt-0.5 text-sm text-[#707070]">{course.description}</p>
+            ) : null}
+            {course.original_prompt ? (
+              <p className="mt-1 text-xs text-[#9a9a9a]">Obiectiv: „{course.original_prompt}"</p>
+            ) : null}
+            {totalItems > 0 ? (
+              <div className="mt-2 flex items-center gap-3">
+                <div className="h-2.5 w-32 overflow-hidden rounded-full bg-[#e6e6e6]">
+                  <div
+                    className="h-full rounded-full bg-[#1f1f1f] transition-all"
+                    style={{ width: `${totalItems > 0 ? (completedItems / totalItems) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-[#8a8a8a]">
+                  {completedItems} / {totalItems} itemi
+                </span>
+              </div>
+            ) : null}
           </div>
-          {resumeTarget ? (
-            <Link
-              href={resumeTarget.href}
-              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#1f1f1f] px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              <PlayCircle className="h-4 w-4" />
-              {resumeTarget.label}
-            </Link>
-          ) : null}
         </div>
-      </section>
+        {resumeTarget ? (
+          <Link
+            href={resumeTarget.href}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#1f1f1f] px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <PlayCircle className="h-4 w-4" />
+            {resumeTarget.label}
+          </Link>
+        ) : null}
+      </div>
 
+      {/* Mobile header */}
+      <div className="relative mb-5 sm:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-bold text-[#111111]">{course.title}</h2>
+            {course.description ? <p className="mt-1 text-sm text-[#707070]">{course.description}</p> : null}
+          </div>
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]">
+            <Sparkles className="h-10 w-10" aria-hidden="true" />
+          </div>
+        </div>
+        {resumeTarget ? (
+          <Link href={resumeTarget.href} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#1f1f1f] px-4 py-2.5 text-sm font-semibold text-white">
+            <PlayCircle className="h-4 w-4" />
+            {resumeTarget.label}
+          </Link>
+        ) : null}
+      </div>
+
+      {/* Lessons — same as InvataChapterSection: horizontal scroll cards */}
       <div className="space-y-12 sm:space-y-10">
         {course.lessons.map((lesson, lessonIndex) => {
           const total = lesson.items.length
@@ -133,6 +136,7 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
 
           return (
             <section key={lesson.id} className={lessonIndex === 0 ? "relative" : "relative border-t border-[#ececec] pt-10"}>
+              {/* Lesson header — same as chapter header */}
               <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
                 <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
                   <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
@@ -144,36 +148,36 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="text-lg font-semibold text-[#111111]">{lesson.title}</h3>
-                    {lesson.description ? (
-                      <p className="mt-0.5 text-sm text-[#707070]">{lesson.description}</p>
-                    ) : null}
+                    {lesson.description ? <p className="mt-0.5 text-sm text-[#707070]">{lesson.description}</p> : null}
                     {total > 0 ? (
-                      <p className="mt-1 text-xs text-[#8a8a8a]">
-                        {completed} / {total} itemi · {total} item{total === 1 ? "" : "i"}
-                      </p>
+                      <div className="mt-2 flex items-center gap-3">
+                        <div className="h-2.5 w-24 overflow-hidden rounded-full bg-[#e6e6e6]">
+                          <div
+                            className="h-full rounded-full bg-[#1f1f1f]"
+                            style={{ width: `${(completed / total) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-[#8a8a8a]">{completed} / {total} itemi</span>
+                      </div>
                     ) : null}
                   </div>
                 </div>
               </div>
 
+              {/* Mobile lesson header */}
               <div className="relative mb-5 sm:hidden">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h3 className="text-xl font-bold text-[#111111]">{lesson.title}</h3>
-                    {lesson.description ? (
-                      <p className="mt-1 text-sm text-[#707070]">{lesson.description}</p>
-                    ) : null}
+                    {lesson.description ? <p className="mt-1 text-sm text-[#707070]">{lesson.description}</p> : null}
                   </div>
                   <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]">
-                    {isLessonComplete ? (
-                      <CheckCircle2 className="h-10 w-10 text-[#059669]" />
-                    ) : (
-                      <BookOpen className="h-10 w-10" />
-                    )}
+                    {isLessonComplete ? <CheckCircle2 className="h-10 w-10 text-[#059669]" /> : <BookOpen className="h-10 w-10" />}
                   </div>
                 </div>
               </div>
 
+              {/* Item cards — exact same as ElasticLessonsScroller */}
               <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
                 {total > 0 ? (
                   <div className="overflow-x-auto scrollbar-hide -mx-1 px-1 pb-2">
@@ -214,11 +218,8 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
               </div>
 
               <div className="mt-4 flex items-center justify-between">
-                <Link
-                  href={lessonHref}
-                  className="text-sm font-medium text-[#1f1f1f] hover:text-[#7c3aed]"
-                >
-                  {total > 0 ? "Vezi toți itemii" : "Deschide lecția"}
+                <Link href={lessonHref} className="text-sm font-medium text-[#1f1f1f] hover:text-[#7c3aed]">
+                  {total > 0 ? `Vezi toți cei ${total} itemi` : "Deschide lecția"}
                 </Link>
                 {total > 0 ? (
                   <Link

@@ -184,7 +184,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const candidates = await searchPlanckContentForPrompt(supabase, prompt, 32)
+    const candidates = await searchPlanckContentForPrompt(supabase, prompt, 80)
     const plan = await planPersonalizedCourse(prompt, candidates)
     const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
     const generationMetadata = {
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
         title: plan.title,
         description: plan.description,
         status: "creating",
-        source_summary: candidates.slice(0, 16).map((candidate) => ({
+        source_summary: candidates.slice(0, 40).map((candidate) => ({
           key: candidate.key,
           source_type: candidate.source_type,
           source_table: candidate.source_table,

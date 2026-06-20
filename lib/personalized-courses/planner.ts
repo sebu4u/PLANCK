@@ -37,7 +37,7 @@ const planItemSchema = z.object({
 const planLessonSchema = z.object({
   title: z.string().min(2).max(120),
   description: z.string().max(500).nullable().optional(),
-  items: z.array(planItemSchema).min(1).max(10),
+  items: z.array(planItemSchema).min(1).max(30),
 })
 
 const planSchema = z.object({
@@ -132,10 +132,10 @@ function injectMissedCandidates(
     byType.set(c.item_type, bucket)
   }
 
-  // Inject up to 2 unused real items per lesson (replace generated custom_text items)
+  // Inject up to 10 unused real items per lesson (replace generated custom_text items)
   const lessons = plan.lessons.map((lesson) => {
     let injected = 0
-    const maxInject = Math.min(2, Math.ceil(unused.length / plan.lessons.length))
+    const maxInject = Math.min(10, Math.ceil(unused.length / plan.lessons.length))
     const items = lesson.items.map((item) => {
       if (injected >= maxInject) return item
       // Only replace generated custom_text items (connectors), not real content
@@ -175,7 +175,7 @@ function normalizePlan(
   const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
 
   const lessons: PersonalizedCourseGeneratedPlanLesson[] = plan.lessons.slice(0, 8).map((lesson) => {
-    const items = lesson.items.slice(0, 10).map((item) => coerceItem(item, validSourceKeys, candidatesByKey, userPrompt))
+    const items = lesson.items.slice(0, 30).map((item) => coerceItem(item, validSourceKeys, candidatesByKey, userPrompt))
     if (items.length >= 2) {
       return { ...lesson, title: lesson.title.trim(), description: lesson.description?.trim() || null, items }
     }
@@ -227,32 +227,37 @@ function normalizePlan(
 
   // Fallback: build entirely from real candidates if AI failed
   if (candidates.length >= 2) {
-    const realItems = candidates.slice(0, 8).map((c) => ({
+    // Distribute all candidates across 3 lessons
+    const allItems = candidates.map((c) => ({
       title: c.title,
       item_type: c.item_type,
       source_key: c.key,
       content_json: null as Record<string, unknown> | null,
     }))
+
+    // Pad with custom_text connectors to reach 15+ per lesson
+    const lessons: PersonalizedCourseGeneratedPlanLesson[] = []
+    const itemsPerLesson = Math.max(15, Math.ceil(allItems.length / 3))
+    for (let i = 0; i < 3; i++) {
+      const slice: PersonalizedCourseGeneratedPlanItem[] = allItems.slice(i * Math.ceil(allItems.length / 3), (i + 1) * Math.ceil(allItems.length / 3))
+      // Pad with connectors
+      while (slice.length < itemsPerLesson) {
+        slice.push(coerceItem(
+          { title: `Recapitulare ${i + 1}`, item_type: "custom_text" },
+          validSourceKeys, candidatesByKey, userPrompt,
+        ))
+      }
+      lessons.push({
+        title: i === 0 ? "Baze și introducere" : i === 1 ? "Aprofundare" : "Aplicare și probleme",
+        description: i === 0 ? "Noțiuni fundamentale și intuiție." : i === 1 ? "Aprofundare și exemple." : "Probleme și aplicare.",
+        items: slice.slice(0, 30),
+      })
+    }
+
     return {
       title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
       description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
-      lessons: [
-        {
-          title: "Conținut Planck relevant",
-          description: "Lecții și exerciții din baza de date Planck.",
-          items: realItems.slice(0, 4),
-        },
-        {
-          title: "Aplicare și verificare",
-          description: "Continuăm cu restul conținutului găsit.",
-          items: realItems.slice(4).length >= 2
-            ? realItems.slice(4)
-            : [
-                ...realItems.slice(4),
-                coerceItem({ title: "Recapitulare", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt),
-              ],
-        },
-      ],
+      lessons,
     }
   }
 
@@ -293,7 +298,11 @@ Pentru itemele fără source_key (doar custom_text de legătură), folosește: {
 
 Nu inventa source_key-uri. Folosește doar cheile din lista de mai jos sau null.
 
-Preferă 3-5 lecții, fiecare cu 3-6 iteme. Minim 60% din itemi trebuie să aibă source_key valid când există conținut relevant.`
+Creează un traseu complet, cu 3-5 lecții, FIECARE cu 15-25 itemi. Folosește TOATE itemele relevante din listă. Dacă sunt mai puține iteme reale, repetă/combina itemii reali disponibili și adaugă custom_text scurt ca legături pentru a ajunge la minim 15 itemi per lecție.
+
+Distribuie itemii pe lecții în ordine logică: prima lecție = introducere/baze, ultimele = aplicare/probleme.
+
+Minim 60% din itemi trebuie să aibă source_key valid când există conținut relevant.`
 
 export async function planPersonalizedCourse(
   userPrompt: string,
@@ -337,7 +346,7 @@ export async function planPersonalizedCourse(
     ],
     response_format: { type: "json_object" },
     temperature: 0.3,
-    max_tokens: 3600,
+    max_tokens: 8000,
   })
 
   const rawContent = completion.choices[0]?.message?.content
