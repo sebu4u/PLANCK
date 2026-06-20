@@ -121,8 +121,13 @@ function countRequestedKind(normalized: string, singular: string, plural: string
   if (value === '5' || value === 'cinci') return 5;
   if (value === '6' || value === 'sase' || value === 'șase') return 6;
   if (value === '1' || value === 'un' || value === 'o' || value === 'una' || value === 'unu') return 1;
-  if (new RegExp(`\\b(o|un|una|unu)\\s+${singular}\\b`).test(normalized)) return 1;
-  if (new RegExp(`\\b(${singular}|${plural})\\b`).test(normalized)) return 1;
+  if (
+    new RegExp(
+      `\\b(da-mi|dami|vreau|trimite-mi|gaseste-mi|gasește-mi|recomanda-mi|recomandă-mi|sugereaza-mi|sugerează-mi)\\s+(?:\\w+\\s+){0,4}(?:\\d+|un|o|una|unu|doi|doua|două|trei|patru|cinci|sase|șase\\s+)?(${singular}|${plural})\\b`
+    ).test(normalized)
+  ) {
+    return 1;
+  }
   return 0;
 }
 
@@ -181,15 +186,6 @@ function inferPreferences(input: SearchInput): SearchPreferences {
       countRequestedKind(requestNormalized, 'quiz', 'quizuri')
     ),
   };
-  if (/\bpractica|antrenament\b/.test(requestNormalized) && requestedCounts.problem === 0) {
-    requestedCounts.problem = 1;
-  }
-  if (/\btraseu|explicatie\b/.test(requestNormalized) && requestedCounts.lesson === 0) {
-    requestedCounts.lesson = 1;
-  }
-  if (/\btest\b/.test(requestNormalized) && requestedCounts.quiz === 0) {
-    requestedCounts.quiz = 1;
-  }
   const requestedKinds = (Object.entries(requestedCounts) as Array<[Exclude<RequestedResourceKind, 'any'>, number]>)
     .filter(([, count]) => count > 0)
     .map(([kind]) => kind);
@@ -255,7 +251,7 @@ export function getPlanckCatalogRequestPolicy(input: SearchInput): PlanckCatalog
       ? 'Utilizatorul cere o singură resursă Planck. Răspunde cu o singură propoziție scurtă că ai găsit resursa. Nu descrie enunțul, nu copia titlul, nu lista alternative și nu scrie link markdown; cardul de resursă va fi afișat separat sub mesaj.'
       : resourceOnlyAnswer
         ? 'Utilizatorul cere resurse Planck concrete. Răspunde cu o singură propoziție scurtă că ai găsit resurse potrivite. Nu descrie enunțurile, nu lista alternative și nu scrie linkuri; cardurile de resursă vor fi afișate separat sub mesaj.'
-      : 'Poți recomanda mai multe resurse validate dacă ajută cererea utilizatorului.',
+      : 'NU recomanda probleme, lecții, cursuri sau alte resurse Planck decât dacă utilizatorul le cere explicit. Răspunde la întrebare fără a propune resurse din platformă.',
   };
 }
 
@@ -477,14 +473,18 @@ function limitText(value: unknown, max = 160) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+/** Max rows fetched per table before in-memory scoring (keeps Active CPU low on Vercel). */
+const CATALOG_QUERY_LIMIT = 40;
+
 async function readTable<T = any>(
   supabase: SupabaseClient,
   table: string,
   select: string,
-  configure: (query: any) => any
+  configure: (query: any) => any,
+  limit = CATALOG_QUERY_LIMIT
 ): Promise<T[]> {
   try {
-    const { data, error } = await configure(supabase.from(table).select(select));
+    const { data, error } = await configure(supabase.from(table).select(select)).limit(limit);
     if (error) return [];
     return (data || []) as T[];
   } catch {
@@ -492,28 +492,36 @@ async function readTable<T = any>(
   }
 }
 
-async function readAllTable<T = any>(
+function escapeIlikeTerm(term: string): string {
+  return term.replace(/[%_,]/g, '');
+}
+
+async function readFilteredTable<T = any>(
   supabase: SupabaseClient,
   table: string,
   select: string,
   configure: (query: any) => any,
-  maxRows = 5000
+  terms: string[],
+  searchColumns: string[],
+  limit = CATALOG_QUERY_LIMIT
 ): Promise<T[]> {
-  const rows: T[] = [];
-  const pageSize = 1000;
+  const sanitizedTerms = terms.map(escapeIlikeTerm).filter((term) => term.length >= 3).slice(0, 4);
 
-  for (let from = 0; from < maxRows; from += pageSize) {
-    try {
-      const { data, error } = await configure(supabase.from(table).select(select)).range(from, from + pageSize - 1);
-      if (error || !data?.length) break;
-      rows.push(...(data as T[]));
-      if (data.length < pageSize) break;
-    } catch {
-      break;
+  if (sanitizedTerms.length > 0 && searchColumns.length > 0) {
+    for (const term of sanitizedTerms) {
+      const orClause = searchColumns.map((col) => `${col}.ilike.%${term}%`).join(',');
+      try {
+        const { data, error } = await configure(supabase.from(table).select(select).or(orClause)).limit(limit);
+        if (!error && data?.length) {
+          return data as T[];
+        }
+      } catch {
+        // try next term
+      }
     }
   }
 
-  return rows;
+  return readTable<T>(supabase, table, select, configure, limit);
 }
 
 export async function searchPlanckContentCatalog(
@@ -526,6 +534,8 @@ export async function searchPlanckContentCatalog(
   if ((input.limit ?? 6) <= 0) return [];
   const limit = Math.max(1, Math.min(input.limit ?? 6, 12));
 
+  const catalogStartedAt = Date.now();
+
   const [
     physicsProblems,
     mathProblems,
@@ -537,44 +547,75 @@ export async function searchPlanckContentCatalog(
     learningPathLessons,
     courseLessons,
   ] = await Promise.all([
-    readAllTable<any>(supabase, 'problems', 'id,title,description,statement,difficulty,category,tags,class,created_at', (query) =>
-      query.order('created_at', { ascending: false })
+    readFilteredTable<any>(
+      supabase,
+      'problems',
+      'id,title,description,statement,difficulty,category,tags,class,created_at',
+      (query) => query.order('created_at', { ascending: false }),
+      terms,
+      ['title', 'description', 'category']
     ),
-    readAllTable<any>(supabase, 'math_problems', 'id,title,description,statement,tags,class,difficulty,chapter,created_at', (query) =>
-      query.eq('is_active', true).order('created_at', { ascending: false })
+    readFilteredTable<any>(
+      supabase,
+      'math_problems',
+      'id,title,description,statement,tags,class,difficulty,chapter,created_at',
+      (query) => query.eq('is_active', true).order('created_at', { ascending: false }),
+      terms,
+      ['title', 'description', 'chapter']
     ),
-    readAllTable<any>(supabase, 'coding_problems', 'id,slug,title,statement_markdown,difficulty,class,chapter,tags,created_at', (query) =>
-      query.eq('is_active', true).order('created_at', { ascending: false })
+    readFilteredTable<any>(
+      supabase,
+      'coding_problems',
+      'id,slug,title,statement_markdown,difficulty,class,chapter,tags,created_at',
+      (query) => query.eq('is_active', true).order('created_at', { ascending: false }),
+      terms,
+      ['title', 'chapter']
     ),
-    readAllTable<any>(supabase, 'quiz_questions', 'id,question_id,class,statement,difficulty,materie,title,description,tags,created_at', (query) =>
-      query.order('created_at', { ascending: false })
+    readFilteredTable<any>(
+      supabase,
+      'quiz_questions',
+      'id,question_id,class,statement,difficulty,materie,title,description,tags,created_at',
+      (query) => query.order('created_at', { ascending: false }),
+      terms,
+      ['title', 'description']
     ),
-    readAllTable<any>(
+    readTable<any>(
       supabase,
       'fizica_routes',
       'id,slug,title,order_index,is_active',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true })
+      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+      50
     ),
-    readAllTable<any>(
+    readTable<any>(
       supabase,
       'fizica_chapters',
       'id,route_id,slug,title,order_index,is_active',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true })
+      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+      200
     ),
-    readAllTable<any>(
+    readFilteredTable<any>(
       supabase,
       'fizica_lessons',
       'id,chapter_id,title,duration_minutes,lesson_type,order_index,is_active',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true })
+      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+      terms,
+      ['title']
     ),
-    readAllTable<any>(
+    readFilteredTable<any>(
       supabase,
       'learning_path_lessons',
       'id,slug,title,description,lesson_type,order_index,chapter_id,learning_path_chapters(id,slug,title,description,problem_category)',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true })
+      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+      terms,
+      ['title', 'description']
     ),
-    readAllTable<any>(supabase, 'lessons', 'id,title,content,difficulty_level,estimated_duration,chapter_id,chapters(id,title,description)', (query) =>
-      query.eq('is_active', true).order('order_index', { ascending: true })
+    readFilteredTable<any>(
+      supabase,
+      'lessons',
+      'id,title,content,difficulty_level,estimated_duration,chapter_id,chapters(id,title,description)',
+      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+      terms,
+      ['title']
     ),
   ]);
 
@@ -739,5 +780,21 @@ export async function searchPlanckContentCatalog(
       return resource;
     });
 
-  return selectRequestedBlend(uniqByTypeId(ranked), preferences, limit);
+  const results = selectRequestedBlend(uniqByTypeId(ranked), preferences, limit);
+
+  if (process.env.NODE_ENV !== 'test') {
+    const candidateCount =
+      physicsProblems.length +
+      mathProblems.length +
+      codingProblems.length +
+      quizQuestions.length +
+      fizicaLessons.length +
+      learningPathLessons.length +
+      courseLessons.length;
+    console.info(
+      `[insight.catalog] ${Date.now() - catalogStartedAt}ms terms=${terms.length} candidates=${candidateCount} results=${results.length}`
+    );
+  }
+
+  return results;
 }

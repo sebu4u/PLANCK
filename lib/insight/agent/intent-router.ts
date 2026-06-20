@@ -23,6 +23,18 @@ function detectTopic(input: string): string | null {
   return TOPIC_HINTS.find(([, pattern]) => pattern.test(input))?.[0] ?? null;
 }
 
+export function userExplicitlyRequestsPlanckResources(input: string): boolean {
+  const normalized = input.trim();
+  return (
+    /\b(recomand[ăa](?:-mi)?|sugereaz[ăa](?:-mi)?|ce curs|curs potrivit|lec[țt]ie potrivit[ăa]|ce ar trebui s[ăa] fac|urm[ăa]torul pas)\b/i.test(
+      normalized
+    ) ||
+    /\b(da-mi|dami|vreau|trimite-mi|g[ăa]se[sș]te-mi|gaseste-mi)\s+(?:\w+\s+){0,4}(probleme|problem[ăa]|exerci[țt]ii|lec[țt]ii|lec[țt]ie|cursuri|curs|grile|gril[ăa])\b/i.test(
+      normalized
+    )
+  );
+}
+
 export function resolveInsightAgentIntent(input: string): InsightAgentIntent {
   const normalized = input.trim();
   const reasons: string[] = [];
@@ -30,8 +42,11 @@ export function resolveInsightAgentIntent(input: string): InsightAgentIntent {
   const topic = detectTopic(normalized);
 
   const wantsPlan = /\b(plan|program|calendar|strategie|înva[țt]|inv[aă][țt]|preg[aă]te[sș]te|recapitulare|test|bac|examen|olimpiad[ăa])\b/i.test(normalized);
-  const feelsLost = /\b(nu [șs]tiu de unde|pierdut|sunt praf|nu [îi]n[țt]eleg nimic|unde (s[ăa] )?[îi]ncep)\b/i.test(normalized);
-  const wantsRecommendation = /\b(recomand[ăa]|ce curs|curs potrivit|lec[țt]ie potrivit[ăa]|ce ar trebui s[ăa] fac|urm[ăa]torul pas|probleme|problem[ăa]|exerci[țt]ii|practic[ăa]|antrenament)\b/i.test(normalized);
+  const feelsLost =
+    /\b(nu [șs]tiu de unde|pierdut|sunt praf|nu [îi]n[țt]eleg nimic|nu [șs]tiu unde (s[ăa] )?[îi]ncep)\b/i.test(
+      normalized
+    );
+  const wantsRecommendation = userExplicitlyRequestsPlanckResources(normalized);
   const wantsParent = /\b(p[aă]rinte|p[aă]rin[țt]i|mama|tata|raport|rezumat progres|trimite.*progres)\b/i.test(normalized);
 
   if (wantsParent) {

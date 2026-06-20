@@ -224,6 +224,7 @@ function areFiltersEqual(a?: FilterState | null, b?: FilterState | null) {
 interface ProblemsClientProps {
   initialProblems: Problem[]
   initialPage?: number
+  initialCatalogTotalCount?: number
   initialMonthlyFreeSet?: string[]
   initialChapter?: string
   layoutVariant?: "fullPage" | "embedded"
@@ -239,6 +240,7 @@ interface ProblemsClientProps {
 export default function ProblemsCatalogClient({
   initialProblems,
   initialPage = 1,
+  initialCatalogTotalCount = 0,
   initialMonthlyFreeSet = [],
   initialChapter,
   layoutVariant = "fullPage",
@@ -334,7 +336,7 @@ export default function ProblemsCatalogClient({
   const catalogReady = !requiresClassSelection || Boolean(selectedClassGate)
   const effectiveUserClass = profileClass ?? selectedClassGate ?? CATALOG_CLASS_OPTIONS[0]
 
-  const fetchProblems = useCallback(async () => {
+  const fetchProblems = useCallback(async (options?: { background?: boolean }) => {
     const cached = physicsCatalogProblemsCache.get(PHYSICS_CATALOG_LIST_CACHE_KEY)
 
     if (cached && Date.now() - cached.timestamp < PHYSICS_CATALOG_CACHE_DURATION_MS) {
@@ -343,7 +345,9 @@ export default function ProblemsCatalogClient({
       return
     }
 
-    setLoading(true)
+    if (!options?.background) {
+      setLoading(true)
+    }
     try {
       const { data, error } = await supabase
         .from("problems")
@@ -362,25 +366,39 @@ export default function ProblemsCatalogClient({
     } catch (error) {
       console.error("Error fetching problems:", error)
     } finally {
-      setLoading(false)
+      if (!options?.background) {
+        setLoading(false)
+      }
     }
   }, [])
 
   useEffect(() => {
-    if ((!initialProblems || initialProblems.length === 0) && problems.length === 0) {
-      fetchProblems()
-      return
+    const normalized = normalizePhysicsCatalogProblems(initialProblems || [])
+    const hasPartialSnapshot =
+      initialCatalogTotalCount > 0 &&
+      normalized.length > 0 &&
+      normalized.length < initialCatalogTotalCount
+
+    if (normalized.length > 0) {
+      setProblems(normalized)
+      setLoading(false)
+      if (!hasPartialSnapshot) {
+        physicsCatalogProblemsCache.set(PHYSICS_CATALOG_LIST_CACHE_KEY, {
+          data: normalized,
+          timestamp: Date.now(),
+        })
+      }
     }
-    if (!initialProblems || initialProblems.length === 0) {
+
+    if (normalized.length === 0) {
+      void fetchProblems()
       return
     }
 
-    const normalized = normalizePhysicsCatalogProblems(initialProblems)
-    const timestamp = Date.now()
-    setProblems(normalized)
-    setLoading(false)
-    physicsCatalogProblemsCache.set(PHYSICS_CATALOG_LIST_CACHE_KEY, { data: normalized, timestamp })
-  }, [fetchProblems, initialProblems, problems.length])
+    if (hasPartialSnapshot) {
+      void fetchProblems({ background: true })
+    }
+  }, [fetchProblems, initialCatalogTotalCount, initialProblems])
 
   const fetchSolvedProblems = useCallback(async () => {
     if (!user) {

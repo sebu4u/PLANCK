@@ -39,6 +39,8 @@ type ChatMessage = {
   anonLimitLocked?: boolean
   attachments?: InsightChatImageRef[]
   agentArtifacts?: InsightMessageArtifact[]
+  /** Sugestii de follow-up afișate sub răspuns (problem_tutor). */
+  suggestions?: string[]
 }
 
 type PendingInsightImage = {
@@ -177,6 +179,64 @@ const starterInsightCards = [
   'Arată-mi rezolvarea completă',
 ]
 
+const SUGGESTIONS_MARKER = '---SUGGESTIONS---'
+
+const DEFAULT_PROBLEM_TUTOR_SUGGESTIONS = [
+  'Care e următorul pas?',
+  'Ce formulă trebuie să aplic?',
+]
+
+function parseAssistantSuggestions(rawContent: string): {
+  displayContent: string
+  suggestions: string[] | null
+} {
+  if (!rawContent.includes(SUGGESTIONS_MARKER)) {
+    return { displayContent: rawContent, suggestions: null }
+  }
+
+  const parts = rawContent.split(SUGGESTIONS_MARKER)
+  const displayContent = parts[0]?.trim() ?? ''
+  const rawSuggestions = (parts[1] ?? '').trim()
+  const jsonStartIndex = rawSuggestions.indexOf('[')
+  const jsonEndIndex = rawSuggestions.lastIndexOf(']')
+
+  if (jsonStartIndex === -1 || jsonEndIndex === -1 || jsonEndIndex <= jsonStartIndex) {
+    return { displayContent, suggestions: null }
+  }
+
+  try {
+    const parsed = JSON.parse(rawSuggestions.substring(jsonStartIndex, jsonEndIndex + 1))
+    if (Array.isArray(parsed)) {
+      const cleaned = parsed
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      return { displayContent, suggestions: cleaned.length > 0 ? cleaned : null }
+    }
+  } catch {
+    // Incomplete or invalid JSON while streaming
+  }
+
+  return { displayContent, suggestions: null }
+}
+
+function resolveProblemTutorSuggestions(
+  rawContent: string,
+  options?: { skipFallback?: boolean }
+): { displayContent: string; suggestions?: string[] } {
+  const { displayContent, suggestions } = parseAssistantSuggestions(rawContent)
+
+  if (options?.skipFallback) {
+    return { displayContent, suggestions: suggestions ?? undefined }
+  }
+
+  if (suggestions && suggestions.length > 0) {
+    return { displayContent, suggestions: suggestions.slice(0, 2) }
+  }
+
+  return { displayContent, suggestions: DEFAULT_PROBLEM_TUTOR_SUGGESTIONS }
+}
+
 const fullSolutionRequests = [
   'Vreau să văd soluția completă.',
   'Arată-mi rezolvarea completă',
@@ -187,6 +247,26 @@ const getRandomLoadingMessage = () => {
 }
 
 const normalizeUserPrompt = (text: string) => text.trim().toLocaleLowerCase().replace(/[.!?]+$/g, '')
+
+function conversationHasSolutionRequest(messages: ChatMessage[]): boolean {
+  const normalized = new Set(fullSolutionRequests.map(normalizeUserPrompt))
+  return messages.some(
+    (message) => message.role === 'user' && normalized.has(normalizeUserPrompt(message.content))
+  )
+}
+
+function finalizeProblemTutorAssistantMessage(
+  message: ChatMessage,
+  rawContent: string,
+  skipSuggestions: boolean
+): ChatMessage {
+  const resolved = resolveProblemTutorSuggestions(rawContent, { skipFallback: skipSuggestions })
+  return {
+    ...message,
+    content: resolved.displayContent || message.content,
+    suggestions: skipSuggestions ? undefined : resolved.suggestions,
+  }
+}
 
 // Keep $$...$$ as primary format, but also accept \[...\] and \(...\).
 const normalizeLatexDelimiters = (text: string): string => {
@@ -274,7 +354,6 @@ export default function InsightChatSidebar({
   const [followStreamToLatest, setFollowStreamToLatest] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
   const [problemContext, setProblemContext] = useState<string | null>(null)
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [viewportModeResolved, setViewportModeResolved] = useState(false)
@@ -450,9 +529,6 @@ export default function InsightChatSidebar({
             : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
         },
       ])
-      // Also clear suggestions on session reset if any
-      setSuggestedQuestions([])
-      return null
     } catch (e: any) {
       console.error('Failed to load problem session:', e)
       return null
@@ -505,6 +581,17 @@ export default function InsightChatSidebar({
         })
       )
 
+      const skipSuggestions = conversationHasSolutionRequest(loadedMessages)
+      const normalizedLoadedMessages =
+        persona === 'problem_tutor'
+          ? loadedMessages.map((message) => {
+              if (message.role !== 'assistant' || !(message.content || '').trim()) {
+                return message
+              }
+              return finalizeProblemTutorAssistantMessage(message, message.content, skipSuggestions)
+            })
+          : loadedMessages
+
       setMessages([
         {
           role: 'system',
@@ -512,13 +599,8 @@ export default function InsightChatSidebar({
             ? 'Ești Insight, un profesor de fizică răbdător.'
             : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
         },
-        ...loadedMessages,
+        ...normalizedLoadedMessages,
       ])
-
-      // If the last message is from assistant, we might want to check for suggestions
-      // But usually history doesn't persist the raw suggestions format if we strip it?
-      // For now we assume history is just content.
-      setSuggestedQuestions([])
     } catch (e: any) {
       console.error('Failed to load session messages:', e)
     }
@@ -542,25 +624,12 @@ export default function InsightChatSidebar({
     effectiveOpen &&
     !initialUserMessage?.trim() &&
     starterChipsToShow.length > 0
-  const lastVisibleMessage = visibleMessages.length > 0
-    ? visibleMessages[visibleMessages.length - 1]
-    : null
   const lastAssistantMessageIndex = useMemo(() => {
     for (let i = visibleMessages.length - 1; i >= 0; i--) {
       if (visibleMessages[i]?.role === 'assistant') return i
     }
     return -1
   }, [visibleMessages])
-  const canShowSuggestions =
-    !busy &&
-    suggestedQuestions.length > 0 &&
-    lastVisibleMessage?.role === 'assistant' &&
-    !hasSolutionRequest
-  const canShowSolutionButton =
-    persona === 'problem_tutor' &&
-    userMessagesCount >= 3 &&
-    !hasSolutionRequest &&
-    !busy
   const shouldShowJumpToLatest =
     hasMessages &&
     ((isStreaming && !followStreamToLatest) || (!isStreaming && !shouldAutoScroll))
@@ -928,7 +997,6 @@ export default function InsightChatSidebar({
     setError(null)
     setPremiumUpgradeOpen(false)
     setIsStreaming(true)
-    setSuggestedQuestions([]) // Clear suggestions when new message starts
 
     // Show upgrade banner logic
     const isFreePlan = !profile?.plan || profile.plan === 'free'
@@ -1175,31 +1243,7 @@ export default function InsightChatSidebar({
                   setLoadingMessage(null)
                   fullAssistantContent += data.content
 
-                  // Parsing for suggestions
-                  let displayContent = fullAssistantContent
-                  const suggestionsMarker = '---SUGGESTIONS---'
-
-                  if (fullAssistantContent.includes(suggestionsMarker)) {
-                    const parts = fullAssistantContent.split(suggestionsMarker)
-                    displayContent = parts[0].trim()
-
-                    // Robust JSON extraction
-                    const rawSuggestions = parts[1].trim()
-                    const jsonStartIndex = rawSuggestions.indexOf('[')
-                    const jsonEndIndex = rawSuggestions.lastIndexOf(']')
-
-                    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
-                      const potentialJson = rawSuggestions.substring(jsonStartIndex, jsonEndIndex + 1)
-                      try {
-                        const parsedSuggestions = JSON.parse(potentialJson)
-                        if (Array.isArray(parsedSuggestions)) {
-                          setSuggestedQuestions(parsedSuggestions)
-                        }
-                      } catch (e) {
-                        // Incomplete JSON, ignore for now
-                      }
-                    }
-                  }
+                  const { displayContent } = parseAssistantSuggestions(fullAssistantContent)
 
                   // Update assistant message incrementally
                   setMessages((prev) => {
@@ -1258,6 +1302,31 @@ export default function InsightChatSidebar({
             }
           }
         }
+
+        if (fullAssistantContent.trim()) {
+          setMessages((prev) => {
+            const skipSuggestions = conversationHasSolutionRequest(prev)
+            const newMessages = [...prev]
+            for (let i = newMessages.length - 1; i >= 0; i--) {
+              if (newMessages[i]?.role !== 'assistant') continue
+              if (persona === 'problem_tutor') {
+                newMessages[i] = finalizeProblemTutorAssistantMessage(
+                  newMessages[i],
+                  fullAssistantContent,
+                  skipSuggestions
+                )
+              } else {
+                const { displayContent } = parseAssistantSuggestions(fullAssistantContent)
+                newMessages[i] = {
+                  ...newMessages[i],
+                  content: displayContent || newMessages[i].content,
+                }
+              }
+              break
+            }
+            return newMessages
+          })
+        }
       } else {
         // Fallback for non-streaming responses (shouldn't happen, but handle gracefully)
         const data = await res.json()
@@ -1265,13 +1334,25 @@ export default function InsightChatSidebar({
           const newMessages = [...prev]
           const lastIndex = newMessages.length - 1
           if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
-            newMessages[lastIndex] = {
-              ...newMessages[lastIndex],
-              role: 'assistant',
-              content: data.output || 'Nu am primit răspuns.',
-              agentArtifacts: Array.isArray(data.agentArtifacts)
-                ? (data.agentArtifacts as InsightMessageArtifact[])
-                : newMessages[lastIndex]?.agentArtifacts,
+            const rawOutput = data.output || 'Nu am primit răspuns.'
+            const skipSuggestions = conversationHasSolutionRequest(newMessages)
+            if (persona === 'problem_tutor') {
+              newMessages[lastIndex] = {
+                ...finalizeProblemTutorAssistantMessage(newMessages[lastIndex], rawOutput, skipSuggestions),
+                agentArtifacts: Array.isArray(data.agentArtifacts)
+                  ? (data.agentArtifacts as InsightMessageArtifact[])
+                  : newMessages[lastIndex]?.agentArtifacts,
+              }
+            } else {
+              const { displayContent } = parseAssistantSuggestions(rawOutput)
+              newMessages[lastIndex] = {
+                ...newMessages[lastIndex],
+                role: 'assistant',
+                content: displayContent || rawOutput,
+                agentArtifacts: Array.isArray(data.agentArtifacts)
+                  ? (data.agentArtifacts as InsightMessageArtifact[])
+                  : newMessages[lastIndex]?.agentArtifacts,
+              }
             }
           }
           return newMessages
@@ -1602,6 +1683,19 @@ export default function InsightChatSidebar({
                           light={isProblemLightTheme}
                           singleColumn
                         />
+                        {persona === 'problem_tutor' &&
+                          !hasSolutionRequest &&
+                          m.suggestions &&
+                          m.suggestions.length > 0 &&
+                          (m.content || '').trim() &&
+                          !(isStreamingAssistant && busy) && (
+                            <SuggestedQuestions
+                              questions={m.suggestions}
+                              onSelect={handleSuggestionSelect}
+                              isLightTheme={isProblemLightTheme}
+                              disableEntranceAnimations={disableEntranceAnimations}
+                            />
+                          )}
                       </div>
                     ) : (
                       <div
@@ -1656,16 +1750,6 @@ export default function InsightChatSidebar({
                 )
               })}
               <div ref={endRef} />
-
-              {/* Show suggestions if available and not busy */}
-              {canShowSuggestions && (
-                  <SuggestedQuestions
-                    questions={suggestedQuestions}
-                    onSelect={handleSuggestionSelect}
-                    isLightTheme={isProblemLightTheme}
-                    disableEntranceAnimations={disableEntranceAnimations}
-                  />
-                )}
             </div>
           ) : (
             <div className="flex h-full min-h-0 flex-col px-4">
@@ -1793,23 +1877,6 @@ export default function InsightChatSidebar({
                   </div>
                 )}
 
-                {/* Solution Request Button */}
-                {canShowSolutionButton && (
-                    <div className="flex justify-end mb-0">
-                      <button
-                        onClick={() => submitMessage("Vreau să văd soluția completă.")}
-                        className={cn(
-                          "border border-b-0 rounded-t-xl px-4 py-1.5 text-xs font-semibold transition-all ml-auto mr-0 shadow-lg translate-y-[1px] z-10",
-                          isProblemLightTheme
-                            ? "bg-white border-[#0b0d10]/12 text-[#b45309] hover:text-[#92400e] hover:bg-[#f8fafc]"
-                            : "bg-[#212121] border-white/10 text-orange-500 hover:text-orange-400 hover:bg-[#2a2a2a]"
-                        )}
-                      >
-                        Vezi soluția
-                      </button>
-                    </div>
-                  )}
-
                 {/* Pending image attachments */}
                 {pendingAttachments.length > 0 && !busy && (
                   <div className="mb-2 flex flex-wrap gap-2">
@@ -1842,9 +1909,7 @@ export default function InsightChatSidebar({
                 {/* Input Area */}
                 <div className={`relative flex items-end gap-2 ${isProblemLightTheme ? "bg-white border border-[#0b0d10]/12" : "bg-[#212121] border border-white/10"} p-2.5 sm:p-3 shadow-lg transition-all duration-200 ${problemContext
                   ? 'rounded-b-2xl rounded-t-none border-t-0'
-                  : canShowSolutionButton
-                    ? 'rounded-b-2xl rounded-tr-none rounded-tl-2xl border-t-0'
-                    : 'rounded-2xl'
+                  : 'rounded-2xl'
                   }`}>
                   <input
                     ref={attachmentInputRef}

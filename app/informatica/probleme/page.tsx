@@ -9,6 +9,10 @@ import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
 import type { Metadata } from "next"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
+import {
+  fetchInformaticaCatalogSeoTitles,
+  fetchInformaticaCatalogSsrSnapshot,
+} from "@/lib/informatica-catalog-server"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
@@ -32,25 +36,25 @@ export default async function CodingProblemsPage({
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   let initialProblems: CodingProblem[] = []
+  let catalogTotalCount = 0
   let monthlyFreeSet = new Set<string>()
+  let seoTitles: Array<{ id: string; title: string }> = []
 
   try {
-    const [{ data }, freeSet] = await Promise.all([
-      supabase
-        .from("coding_problems")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false }),
+    const [{ problems, totalCount }, freeSet, titles] = await Promise.all([
+      fetchInformaticaCatalogSsrSnapshot(supabase),
       getMonthlyFreeProblemSet(supabase),
+      fetchInformaticaCatalogSeoTitles(supabase),
     ])
 
-    initialProblems = (data ?? []).map((item) => ({
+    initialProblems = problems.map((item) => ({
       ...item,
-      tags: Array.isArray(item.tags) ? item.tags : [],
       isFreeMonthly: freeSet.has(item.id),
       canAccess: freeSet.has(item.id),
     })) as CodingProblem[]
+    catalogTotalCount = totalCount
     monthlyFreeSet = freeSet
+    seoTitles = titles
   } catch (error) {
     console.error("[informatica/probleme] Failed to load initial problems:", error)
   }
@@ -72,7 +76,7 @@ export default async function CodingProblemsPage({
             data={{
               "@context": "https://schema.org",
               "@type": "ItemList",
-              itemListElement: initialProblems.slice(0, 24).map((problem, idx) => ({
+              itemListElement: seoTitles.map((problem, idx) => ({
                 "@type": "ListItem",
                 position: idx + 1,
                 name: problem.title,
@@ -81,6 +85,7 @@ export default async function CodingProblemsPage({
           />
           <InformaticaCatalogClient
             initialProblems={initialProblems}
+            initialCatalogTotalCount={catalogTotalCount}
             initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
             initialChapter={initialChapter}
           />

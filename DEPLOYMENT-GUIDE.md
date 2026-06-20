@@ -179,6 +179,26 @@ Pe Vercel, poți verifica în **Settings** → **Environment Variables**.
 **Pe Netlify:**
 - Mergi la **Functions** → **Function logs**
 
+## 📈 Monitorizare Active CPU (Vercel Fluid Compute)
+
+După deploy, compară metricile din **Vercel → Observability → Functions** (sau Usage → Active CPU) înainte vs. după ~24–48h:
+
+| Rută / zonă | Ce urmărești | Țintă după optimizări |
+|-------------|--------------|------------------------|
+| `middleware` | Invocări + Active CPU total | Scădere semnificativă (mai puține request-uri trec prin auth refresh) |
+| `api/insight/chat` | Active CPU per invocare | Scădere pe mesaje fără resurse (catalog oprit când `artifactLimit = 0`) |
+| `probleme`, `informatica/probleme` (SSR) | Active CPU la render | Scădere (payload inițial limitat, fără `select` pe tot catalogul) |
+| `api/run` | Active CPU per Run | Scădere când codul nu folosește `ofstream` |
+| `api/coding-problems/*/submit` | Durată invocare | Scădere (Judge0 în batch paralel) |
+
+**Loguri utile în Function Logs** (prefixe):
+
+- `[insight.catalog]` — timp căutare catalog, nr. candidați/rezultate
+- `[run]` — durată execuție + bytes sursă
+- `[judge0.submit]` — durată + nr. teste rulate
+
+**Alertă Hobby**: planul include ~4h Active CPU/lună; dacă depășești, verifică top 5 funcții după Active CPU în dashboard.
+
 ## 🚨 Probleme Comune
 
 ### "Configurare API invalidă. Contactează administratorul."

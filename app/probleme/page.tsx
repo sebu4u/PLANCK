@@ -10,6 +10,10 @@ import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
+import {
+  fetchPhysicsCatalogSeoTitles,
+  fetchPhysicsCatalogSsrSnapshot,
+} from "@/lib/physics-catalog-server"
 
 export const revalidate = 21600
 
@@ -29,17 +33,19 @@ export default async function ProblemsPage({
   const serverSupabase = createClient(supabaseUrl, supabaseAnonKey)
 
   let initialProblems: Problem[] = []
+  let catalogTotalCount = 0
   let monthlyFreeSet = new Set<string>()
+  let seoTitles: Array<{ id: string; title: string }> = []
   try {
-    const [{ data }, freeSet] = await Promise.all([
-      serverSupabase
-        .from("problems")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      getMonthlyFreeProblemSet(serverSupabase)
+    const [{ problems, totalCount }, freeSet, titles] = await Promise.all([
+      fetchPhysicsCatalogSsrSnapshot(serverSupabase),
+      getMonthlyFreeProblemSet(serverSupabase),
+      fetchPhysicsCatalogSeoTitles(serverSupabase),
     ])
-    initialProblems = (data || []) as any
+    initialProblems = problems
+    catalogTotalCount = totalCount
     monthlyFreeSet = freeSet
+    seoTitles = titles
   } catch (e) {
     initialProblems = []
   }
@@ -61,7 +67,7 @@ export default async function ProblemsPage({
             data={{
               "@context": "https://schema.org",
               "@type": "ItemList",
-              itemListElement: initialProblems.slice(0, 24).map((p, idx) => ({
+              itemListElement: seoTitles.map((p, idx) => ({
                 "@type": "ListItem",
                 position: idx + 1,
                 name: p.title,
@@ -70,6 +76,7 @@ export default async function ProblemsPage({
           />
           <ProblemsClient
             initialProblems={initialProblems as any}
+            initialCatalogTotalCount={catalogTotalCount}
             initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
             initialChapter={initialChapter}
             topSlot={<ProblemsPwaInstallBanner />}

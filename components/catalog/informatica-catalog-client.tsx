@@ -40,6 +40,8 @@ import {
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 const STORAGE_PREFIX = "informaticaCatalog"
+const CODING_PROBLEM_LIST_COLUMNS =
+  "id,slug,title,statement_markdown,difficulty,class,chapter,points,time_limit_ms,memory_limit_kb,tags,language,created_at,updated_at"
 
 function getStorageKey(key: string) {
   return `${STORAGE_PREFIX}:${key}`
@@ -47,12 +49,14 @@ function getStorageKey(key: string) {
 
 interface InformaticaCatalogClientProps {
   initialProblems: CodingProblem[]
+  initialCatalogTotalCount?: number
   initialMonthlyFreeSet?: string[]
   initialChapter?: string
 }
 
 export function InformaticaCatalogClient({
   initialProblems,
+  initialCatalogTotalCount = 0,
   initialMonthlyFreeSet = [],
   initialChapter,
 }: InformaticaCatalogClientProps) {
@@ -106,12 +110,14 @@ export function InformaticaCatalogClient({
     [chapterOptions],
   )
 
-  const fetchProblems = useCallback(async () => {
-    setLoading(true)
+  const fetchProblems = useCallback(async (options?: { background?: boolean }) => {
+    if (!options?.background) {
+      setLoading(true)
+    }
     try {
       const { data, error } = await supabase
         .from("coding_problems")
-        .select("*")
+        .select(CODING_PROBLEM_LIST_COLUMNS)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
 
@@ -126,15 +132,27 @@ export function InformaticaCatalogClient({
     } catch (error) {
       console.error("[informatica-catalog] Failed to fetch problems:", error)
     } finally {
-      setLoading(false)
+      if (!options?.background) {
+        setLoading(false)
+      }
     }
   }, [])
 
   useEffect(() => {
+    const hasPartialSnapshot =
+      initialCatalogTotalCount > 0 &&
+      initialProblems.length > 0 &&
+      initialProblems.length < initialCatalogTotalCount
+
     if (initialProblems.length === 0) {
       void fetchProblems()
+      return
     }
-  }, [fetchProblems, initialProblems.length])
+
+    if (hasPartialSnapshot) {
+      void fetchProblems({ background: true })
+    }
+  }, [fetchProblems, initialCatalogTotalCount, initialProblems.length])
 
   const fetchSolvedProblems = useCallback(async () => {
     if (!user) {

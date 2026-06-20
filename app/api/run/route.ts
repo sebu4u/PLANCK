@@ -12,6 +12,13 @@ interface RunCodeRequest {
   stdin?: string;
 }
 
+/** Total source bytes across all files (prevents ZIP/base64 CPU spikes). */
+const MAX_TOTAL_SOURCE_BYTES = 512 * 1024;
+
+function mayHaveOutputFiles(content: string): boolean {
+  return /\bofstream\b/.test(content) || /\bfstream\b/.test(content);
+}
+
 interface Judge0Response {
   stdout: string | null;
   stderr: string | null;
@@ -270,6 +277,7 @@ function injectOutputFileReading(mainContent: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const runStartedAt = Date.now();
   logger.log('=== Run Code API Called ===');
   
   try {
@@ -282,6 +290,14 @@ export async function POST(request: NextRequest) {
       logger.log('Invalid files input');
       return NextResponse.json(
         { error: 'At least one file is required' },
+        { status: 400 }
+      );
+    }
+
+    const totalSourceBytes = files.reduce((sum, file) => sum + (file.content?.length ?? 0), 0);
+    if (totalSourceBytes > MAX_TOTAL_SOURCE_BYTES) {
+      return NextResponse.json(
+        { error: `Total source size exceeds ${MAX_TOTAL_SOURCE_BYTES / 1024}KB limit` },
         { status: 400 }
       );
     }
@@ -303,8 +319,10 @@ export async function POST(request: NextRequest) {
     // Get all other files (including .txt files and other .cpp files)
     const otherFiles = files.filter(f => f.name !== mainFile!.name);
     
-    // Inject code to auto-display output files created with ofstream
-    const modifiedMainContent = injectOutputFileReading(mainFile.content);
+    // Inject code to auto-display output files created with ofstream (skip when none detected)
+    const modifiedMainContent = mayHaveOutputFiles(mainFile.content)
+      ? injectOutputFileReading(mainFile.content)
+      : mainFile.content;
     if (modifiedMainContent !== mainFile.content) {
       logger.log('Injected output file reading code');
     }
@@ -440,6 +458,7 @@ export async function POST(request: NextRequest) {
     };
     
     logger.log('Returning decoded response to client');
+    logger.log(`[run] completed in ${Date.now() - runStartedAt}ms files=${files.length} bytes=${totalSourceBytes}`);
     return NextResponse.json(responseData);
   } catch (error) {
     logger.error('Error running code:', error);

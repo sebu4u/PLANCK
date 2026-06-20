@@ -14,6 +14,9 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 
+/** Parallel Judge0 runs per batch (reduces wall time without overloading CE). */
+const JUDGE0_SUBMIT_CONCURRENCY = 4
+
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables")
 }
@@ -182,19 +185,37 @@ export async function POST(
   }> = []
 
   let stoppedOnCompile = false
+  const submitStartedAt = Date.now()
 
-  for (const test of typedTests) {
+  const runSingleTest = async (test: TestRow) => {
     const tCpu = test.time_limit_ms != null ? Math.max(1, Math.ceil(test.time_limit_ms / 1000)) : defaultCpuSec
     const tMem = test.memory_limit_kb ?? defaultMemKb
+    const j = await runJudge0PythonSubmission({
+      sourceCode,
+      stdin: test.stdin ?? "",
+      cpuTimeSeconds: tCpu,
+      memoryLimitKb: tMem,
+    })
+    const sid = j.status?.id ?? 0
+    const accepted = sid === 3
+    const outOk = accepted && judgeOutputMatches(test.expected_stdout ?? "", j.stdout)
+    return {
+      test,
+      passed: outOk,
+      judgeStatusId: sid,
+      stdout: j.stdout,
+      stderr: j.stderr,
+      compile_output: j.compile_output,
+    }
+  }
 
-    let j: Awaited<ReturnType<typeof runJudge0PythonSubmission>>
+  for (let offset = 0; offset < typedTests.length; offset += JUDGE0_SUBMIT_CONCURRENCY) {
+    if (stoppedOnCompile) break
+
+    const batch = typedTests.slice(offset, offset + JUDGE0_SUBMIT_CONCURRENCY)
+    let batchResults: Awaited<ReturnType<typeof runSingleTest>>[]
     try {
-      j = await runJudge0PythonSubmission({
-        sourceCode,
-        stdin: test.stdin ?? "",
-        cpuTimeSeconds: tCpu,
-        memoryLimitKb: tMem,
-      })
+      batchResults = await Promise.all(batch.map((test) => runSingleTest(test)))
     } catch (e) {
       logger.error("[coding-submit] Judge0", e)
       return NextResponse.json(
@@ -203,32 +224,18 @@ export async function POST(
       )
     }
 
-    const sid = j.status?.id ?? 0
-
-    if (sid === 6) {
-      perTest.push({
-        test,
-        passed: false,
-        judgeStatusId: sid,
-        stdout: j.stdout,
-        stderr: j.stderr,
-        compile_output: j.compile_output,
-      })
-      stoppedOnCompile = true
-      break
+    for (const result of batchResults) {
+      perTest.push(result)
+      if (result.judgeStatusId === 6) {
+        stoppedOnCompile = true
+        break
+      }
     }
-
-    const accepted = sid === 3
-    const outOk = accepted && judgeOutputMatches(test.expected_stdout ?? "", j.stdout)
-    perTest.push({
-      test,
-      passed: outOk,
-      judgeStatusId: sid,
-      stdout: j.stdout,
-      stderr: j.stderr,
-      compile_output: j.compile_output,
-    })
   }
+
+  logger.info(
+    `[judge0.submit] ${Date.now() - submitStartedAt}ms tests=${typedTests.length} ran=${perTest.length} compileError=${stoppedOnCompile}`
+  )
 
   const passedWeight = perTest
     .filter((p) => p.passed)

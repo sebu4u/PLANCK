@@ -13,18 +13,20 @@ import type {
 export function buildInsightAgentSystemAppendix(intent: InsightAgentIntent): string {
   if (intent.type === 'tutor') {
     return `\n\nREGULĂ PLANCK AGENT:
-- Insight trăiește în Planck și trebuie să recomande doar resurse reale din platformă când menționează probleme, lecții, cursuri, grile sau trasee.
-- Nu inventa probleme, lecții, linkuri, cursuri sau resurse Planck. Dacă utilizatorul cere practică, nu crea un enunț nou ca și cum ar fi din Planck; orientează-l către resurse existente sau cere context.`;
+- NU recomanda proactive probleme, lecții, cursuri, grile sau trasee Planck decât dacă utilizatorul cere explicit resurse sau recomandări din platformă.
+- Dacă utilizatorul pune întrebări, cere explicații sau ajutor la o problemă, răspunde la subiect fără a sugera resurse Planck la final.
+- Nu inventa probleme, lecții, linkuri, cursuri sau resurse Planck. Dacă utilizatorul cere practică sau resurse, orientează-l doar către conținut existent din catalog sau cere context.`;
   }
 
   return `\n\nMOD INSIGHT AGENT ACTIVAT:
 - Insight este interfața unică pentru tutorat, diagnostic, planuri personalizate, recomandări și rezumate de progres.
 - Intenție detectată: ${intent.type}. Materie: ${intent.subject}. Topic: ${intent.topic ?? 'necunoscut'}.
 - Ai memorie de utilizator și trebuie să tratezi interacțiunea ca parte din profilul educațional al elevului.
-- Nu inventa probleme, lecții, linkuri, cursuri sau resurse Planck. Recomandă doar conținut existent în catalogul Planck disponibil server-side. Dacă nu există o resursă potrivită, spune explicit că nu ai găsit una și recomandă cea mai apropiată alternativă existentă.
+- NU recomanda proactive probleme, lecții sau cursuri Planck decât când utilizatorul cere explicit un plan, o recomandare sau resurse concrete din platformă.
+- Nu inventa probleme, lecții, linkuri, cursuri sau resurse Planck. Când utilizatorul cere resurse, recomandă doar conținut existent în catalogul Planck disponibil server-side. Dacă nu există o resursă potrivită, spune explicit că nu ai găsit una.
 - Dacă lipsesc informații importante, pune cel mult 2 întrebări clare înainte de a concluziona.
-- Când faci un plan, oferă pași concreți, scurți, cu exerciții/lecții recomandate pe zile sau etape.
-- Când recomanzi un curs sau o lecție, explică motivul educațional și evită tonul agresiv de vânzare.
+- Când utilizatorul cere un plan, oferă pași concreți, scurți, cu exerciții/lecții recomandate pe zile sau etape.
+- Când recomanzi la cerere un curs sau o lecție, explică motivul educațional și evită tonul agresiv de vânzare.
 - Pentru raport către părinți, redactează un rezumat calm, factual, bazat pe progres și următorul pas; cere confirmare înainte de trimitere.
 - Răspunde în română, prietenos și practic.`;
 }
@@ -33,8 +35,8 @@ export function buildInsightAgentResourceAppendix(resources: PlanckResourceRefer
   const instruction = responseInstruction ? `\n${responseInstruction}` : '';
   if (!resources.length) {
     return `\n\nCATALOG PLANCK:
-- Nu am găsit încă resurse Planck validate pentru mesajul curent înainte de răspuns.
-- Nu inventa resurse. Dacă ai nevoie de conținut Planck, spune că nu ai găsit o potrivire exactă și cere mai mult context.${instruction}`;
+- Nu am găsit resurse Planck validate pentru mesajul curent și utilizatorul nu a cerut explicit recomandări.
+- NU propune probleme, lecții sau cursuri Planck din proprie inițiativă. Nu inventa resurse.${instruction}`;
   }
 
   const lines = resources.slice(0, 8).map((resource, index) => {

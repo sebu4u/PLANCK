@@ -10,8 +10,11 @@ import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
+import {
+  fetchPhysicsCatalogSeoTitles,
+  fetchPhysicsCatalogSsrSnapshot,
+} from "@/lib/physics-catalog-server"
 
-const PROBLEMS_PER_PAGE = 8
 const PREGENERATED_PAGES = 10
 
 export const revalidate = 21600
@@ -43,16 +46,15 @@ export default async function ProblemsPaginatedPage({ params }: { params: Promis
   const serverSupabase = createClient(supabaseUrl, supabaseAnonKey)
 
   let initialProblems: Problem[] = []
+  let catalogTotalCount = 0
   let monthlyFreeSet = new Set<string>()
   try {
-    const [{ data }, freeSet] = await Promise.all([
-      serverSupabase
-        .from("problems")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      getMonthlyFreeProblemSet(serverSupabase)
+    const [{ problems, totalCount }, freeSet] = await Promise.all([
+      fetchPhysicsCatalogSsrSnapshot(serverSupabase),
+      getMonthlyFreeProblemSet(serverSupabase),
     ])
-    initialProblems = (data || []) as any
+    initialProblems = problems
+    catalogTotalCount = totalCount
     monthlyFreeSet = freeSet
   } catch (e) {
     initialProblems = []
@@ -73,6 +75,7 @@ export default async function ProblemsPaginatedPage({ params }: { params: Promis
           <ProblemsClient
             initialProblems={initialProblems as any}
             initialPage={pageNum}
+            initialCatalogTotalCount={catalogTotalCount}
             initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
             topSlot={<ProblemsPwaInstallBanner />}
           />

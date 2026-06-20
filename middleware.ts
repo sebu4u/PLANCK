@@ -55,13 +55,12 @@ export async function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Match all request paths except for the ones starting with:
+         * Match all request paths except:
          * - api/stripe/webhook (Stripe must hit raw webhook route directly)
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * Feel free to modify this pattern to include more paths.
+         * - Public read-only APIs (cached; no session refresh needed)
+         * - ISR catalog/marketing pages (client fetches auth state when needed)
+         * - _next/static, _next/image, favicon, static images
          */
-        '/((?!api/stripe/webhook|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!api/stripe/webhook|api/search(?:/|$)|api/physics(?:/|$)|probleme(?:/|$)|informatica/probleme(?:/|$)|matematica/probleme(?:/|$)|invata(?:/|$)|cursuri(?:/|$)|exerseaza(?:/|$)|simulari-bac(?:/|$)|grile(?:/|$)|biologie/grile(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }

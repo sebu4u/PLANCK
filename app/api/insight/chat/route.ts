@@ -18,7 +18,7 @@ import { logger } from '@/lib/logger';
 import { resolvePlanForRequest } from '@/lib/subscription-plan-server';
 import { reserveAuthenticatedInsightUsage } from '@/lib/insight-usage-reserve';
 import { handleAnonymousInsightChat } from '@/lib/insight-chat-anonymous';
-import { resolveInsightAgentIntent } from '@/lib/insight/agent/intent-router';
+import { resolveInsightAgentIntent, userExplicitlyRequestsPlanckResources } from '@/lib/insight/agent/intent-router';
 import {
   buildInsightAgentProfileAppendix,
   buildInsightAgentResourceAppendix,
@@ -206,6 +206,8 @@ export async function POST(req: NextRequest) {
 
     // Check if this is from IDE - IDE messages should not be saved to chat history
     const isIdeRequest = persona === 'ide';
+    const personaKey = typeof persona === 'string' ? persona : null;
+    const isFocusedTutorPersona = personaKey === 'problem_tutor' || personaKey === 'lesson_tutor';
 
     if (isIdeRequest && rawAttachmentPaths.length > 0) {
       return NextResponse.json(
@@ -354,23 +356,35 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    const insightAgentIntent = resolveInsightAgentIntent(`${visibleUserInput}\n${userInput}`);
+    const intentSource = isFocusedTutorPersona ? visibleUserInput : `${visibleUserInput}\n${userInput}`;
+    const insightAgentIntent = resolveInsightAgentIntent(intentSource);
+    const shouldUseAgentCatalog =
+      !isFocusedTutorPersona || userExplicitlyRequestsPlanckResources(visibleUserInput);
     if (!isIdeRequest) {
       await ensureInsightAgentProfile(supabase, user.id);
     }
     const insightAgentProfile = !isIdeRequest ? await loadInsightAgentProfile(supabase, user.id) : {};
-    const catalogPolicy = getPlanckCatalogRequestPolicy({
-      intent: insightAgentIntent,
-      userInput: visibleUserInput,
-    });
-    const insightAgentResources = !isIdeRequest
-      ? await searchPlanckContentCatalog(supabase, {
+    const catalogPolicy = shouldUseAgentCatalog
+      ? getPlanckCatalogRequestPolicy({
           intent: insightAgentIntent,
-          userInput,
-          requestText: visibleUserInput,
-          limit: catalogPolicy.artifactLimit,
+          userInput: visibleUserInput,
         })
-      : [];
+      : {
+          directResourceAnswer: false,
+          resourceOnlyAnswer: false,
+          artifactLimit: 0,
+          responseInstruction:
+            'NU recomanda alte exerciții, probleme, lecții sau resurse Planck. Răspunde doar despre problema curentă.',
+        };
+    const insightAgentResources =
+      !isIdeRequest && catalogPolicy.artifactLimit > 0
+        ? await searchPlanckContentCatalog(supabase, {
+            intent: insightAgentIntent,
+            userInput,
+            requestText: visibleUserInput,
+            limit: catalogPolicy.artifactLimit,
+          })
+        : [];
 
     if (!isIdeRequest && resolvedSessionId && catalogPolicy.resourceOnlyAnswer && insightAgentResources[0]) {
       const resourcesForAnswer = catalogPolicy.directResourceAnswer
@@ -459,7 +473,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Build messages array for OpenAI (include system message + history)
-    const personaKey = typeof persona === 'string' ? persona : null;
     let systemContent =
       'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.\n\nIMPORTANT:\n- OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu (ex: nu scrie "t_1 = 0,5", scrie "$t_1 = 0,5$").\n- Răspunde DOAR la întrebări care țin de fizică, informatică sau matematică. Dacă utilizatorul întreabă despre altceva (istorie, literatură, sport, etc.), refuză politicos explicând că ești specializat doar în domeniile științifice menționate.';
 
@@ -492,6 +505,12 @@ REGULĂ GENERALĂ DE STIL:
 - OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu.
 - Dacă este natural, poți adăuga o scurtă notă de încurajare, dar fără să devii repetitiv sau robotic.
 
+REGULĂ PAGINĂ PROBLEMĂ:
+- Utilizatorul lucrează deja la o problemă specifică din Planck. Concentrează-te exclusiv pe această problemă.
+- NU recomanda alte exerciții, probleme, lecții, cursuri sau resurse Planck decât dacă utilizatorul cere explicit asta.
+- NU încheia răspunsul cu sugestii de tip „poți exersa și cu...”, „îți recomand și...” sau linkuri către alte resurse.
+- Explică, ghidează sau verifică doar în contextul problemei curente.
+
 ALEGE MODUL DE RĂSPUNS ÎN FUNCȚIE DE MESAJ:
 
 1. MOD GHIDARE SOCRATICĂ:
@@ -510,8 +529,6 @@ Folosește acest mod doar când utilizatorul cere clar ajutor pentru a rezolva p
 - Dacă elevul se blochează, dă un indiciu mic sau verifică direcția, nu oferi imediat toată rezolvarea.
 - Poți pune întrebări de ghidaj în răspuns dacă ajută conversația.
 
-IMPORTANT: DOAR în acest mod trebuie să generezi la final blocul ---SUGGESTIONS--- cu 2-3 întrebări propuse.
-
 2. MOD VERIFICARE RAPIDĂ:
 Folosește acest mod când utilizatorul vrea doar să verifice un rezultat, un pas sau o sub-concluzie, de tipul:
 - "am obținut $12\\,N$, e corect?"
@@ -524,7 +541,6 @@ Folosește acest mod când utilizatorul vrea doar să verifice un rezultat, un p
 - Confirmă dacă este corect sau corectează punctual.
 - Dacă este util, spune într-o propoziție de ce.
 - NU forța flow-ul socratic.
-- NU genera blocul ---SUGGESTIONS---.
 
 3. MOD RĂSPUNS LIBER / ÎNTREBARE LATERALĂ:
 Folosește acest mod când utilizatorul pune o întrebare care nu cere ghidare pas cu pas pe problema curentă, de exemplu:
@@ -537,7 +553,6 @@ Folosește acest mod când utilizatorul pune o întrebare care nu cere ghidare p
 - Dacă întrebarea este despre un concept, oferă o explicație clară și suficientă, fără să o lungești artificial.
 - Dacă este relevant, poți menționa la final, într-o singură propoziție naturală, că poți reveni și la problema curentă.
 - NU forța întoarcerea la problemă.
-- NU genera blocul ---SUGGESTIONS---.
 
 EXCEPTIE - SOLUȚIA COMPLETĂ:
 Dacă utilizatorul cere explicit "Vreau să văd soluția completă", "Arată-mi rezolvarea completă" sau ceva similar:
@@ -546,15 +561,15 @@ Dacă utilizatorul cere explicit "Vreau să văd soluția completă", "Arată-mi
 3. NU mai genera blocul ---SUGGESTIONS--- la final.
 
 GENERARE ÎNTREBĂRI SUGERATE:
-Generează blocul ---SUGGESTIONS--- doar în MODUL GHIDARE SOCRATICĂ.
-În toate celelalte cazuri, NU genera acest bloc.
-Întrebările trebuie să fie pertinente pentru stadiul curent al discuției și să ajute elevul să avanseze.
+După fiecare răspuns, generează la final blocul ---SUGGESTIONS--- cu exact 2 întrebări scurte despre problema curentă.
+Excepție: NU genera acest bloc doar când oferi soluția completă (EXCEPTIE - SOLUȚIA COMPLETĂ).
+Întrebările trebuie să fie pertinente pentru stadiul curent al discuției și să ajute elevul să avanseze pe problema curentă.
 IMPORTANT: Dacă generezi acest bloc, nu pune întrebări în zona de sugestii în alt format și nu adăuga text după el.
 
 Formatul TREBUIE să fie exact acesta la finalul mesajului, PRECEDAT DOAR DE LINII GOALE (fără alte texte înainte sau după acest bloc în zona de sugestii) și FĂRĂ markdown (nu pune în \`\`\`json ... \`\`\`):
 
 ---SUGGESTIONS---
-["Întrebare scurtă 1?", "Întrebare scurtă 2?", "Ce fac mai departe?"]
+["Întrebare scurtă 1?", "Întrebare scurtă 2?"]
 
 Exemplu de întrebări: "Cum calculez forța?", "Ce formulă folosesc?", "E corect raționamentul?", "Care e următorul pas?".
 Asigură-te că JSON-ul este valid.`;
@@ -566,11 +581,13 @@ Asigură-te că JSON-ul este valid.`;
       }
     }
 
-    const agentAppendix = buildInsightAgentSystemAppendix(insightAgentIntent);
-    if (agentAppendix) {
-      systemMessage.content += agentAppendix;
+    if (!isFocusedTutorPersona) {
+      const agentAppendix = buildInsightAgentSystemAppendix(insightAgentIntent);
+      if (agentAppendix) {
+        systemMessage.content += agentAppendix;
+      }
     }
-    if (!isIdeRequest) {
+    if (!isIdeRequest && !isFocusedTutorPersona) {
       systemMessage.content += buildInsightAgentProfileAppendix(insightAgentProfile);
       systemMessage.content += buildInsightAgentResourceAppendix(
         insightAgentResources,
@@ -802,7 +819,7 @@ Asigură-te că JSON-ul este valid.`;
           const latencyMs = Date.now() - t0;
 
           let agentPersistenceResult: Awaited<ReturnType<typeof persistInsightAgentArtifacts>> | null = null;
-          if (!isIdeRequest && resolvedSessionId && fullText.trim()) {
+          if (!isIdeRequest && !isFocusedTutorPersona && resolvedSessionId && fullText.trim()) {
             try {
               agentPersistenceResult = await persistInsightAgentArtifacts(supabase, {
                 userId: user.id,
