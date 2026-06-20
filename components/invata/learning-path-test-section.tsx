@@ -30,6 +30,8 @@ import {
   type TestPublicContent,
   type TestPublicProblem,
 } from "@/lib/learning-path-test"
+import { recordLearningMistake } from "@/lib/learning-mistakes/client"
+import { normalizeLearningMistakeTags } from "@/lib/learning-mistakes/context"
 
 const TEST_START_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -445,6 +447,45 @@ export function LearningPathTestSection({
       setResult(parsed)
       setScreen("result")
 
+      if (user?.id) {
+        const problemById = new Map(content.problems.map((problem) => [problem.id, problem]))
+        void Promise.allSettled(
+          parsed.results
+            .filter((entry) => !entry.isCorrect)
+            .map((entry) => {
+              const problem = problemById.get(entry.problemId)
+              return recordLearningMistake({
+                surface: "learning_path_test",
+                itemId,
+                lessonId,
+                problemId: entry.problemId,
+                itemType: "test",
+                conceptTags: normalizeLearningMistakeTags([
+                  title,
+                  problem?.statement,
+                  `dificultate-${content.difficulty}`,
+                ]),
+                submittedAnswer: {
+                  selectedOptionId: entry.selectedOptionId,
+                  selectedOption: problem?.options.find((option) => option.id === entry.selectedOptionId)?.label ?? null,
+                },
+                correctAnswer: {
+                  correctOptionId: entry.correctOptionId,
+                  correctOption: problem?.options.find((option) => option.id === entry.correctOptionId)?.label ?? null,
+                },
+                promptContext: {
+                  title,
+                  testDescription: content.description,
+                  statement: problem?.statement ?? null,
+                  options: problem?.options ?? [],
+                  difficulty: content.difficulty,
+                },
+                severity: parsed.passed ? 2 : 4,
+              })
+            }),
+        )
+      }
+
       if (parsed.passed && user?.id) {
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent(PLANCK_STREAK_UPDATED_EVENT))
@@ -474,7 +515,7 @@ export function LearningPathTestSection({
     } finally {
       setSubmitting(false)
     }
-  }, [answers, isLastItem, itemId, lessonId, pushProgress, submitting, user?.id])
+  }, [answers, content.description, content.difficulty, content.problems, isLastItem, itemId, lessonId, pushProgress, submitting, title, user?.id])
 
   useEffect(() => {
     if (autoSubmitArmed && screen === "test" && !submitting) {

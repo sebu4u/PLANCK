@@ -12,6 +12,13 @@ import type { AnswerKey, QuizQuestion } from "@/lib/types/quiz-questions"
 import { markQuestionAsSolved } from "@/lib/supabase-quiz"
 import { playErrorSound } from "@/lib/platform-sounds"
 import { isMultiSelectQuizQuestion, verifyQuizSelection } from "@/lib/quiz-question-utils"
+import { recordLearningMistake } from "@/lib/learning-mistakes/client"
+import {
+  buildQuizQuestionMistakeContext,
+  getCorrectQuizAnswers,
+  getQuizQuestionMistakeTags,
+} from "@/lib/learning-mistakes/context"
+import type { LearningMistakeRecordInput } from "@/lib/learning-mistakes/types"
 
 function playSuccessSound() {
   try {
@@ -39,6 +46,11 @@ function playSuccessSound() {
 
 const ANSWER_KEYS_ORDER: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
 
+type GrilaLessonMistakeContext = Omit<
+  LearningMistakeRecordInput,
+  "surface" | "quizQuestionId" | "submittedAnswer" | "correctAnswer" | "promptContext"
+>
+
 type GrilaLessonContextValue = {
   selectedAnswers: AnswerKey[]
   toggleAnswer: (key: AnswerKey) => void
@@ -57,9 +69,11 @@ export function useGrilaLesson() {
 
 export function GrilaLessonProvider({
   question,
+  mistakeContext,
   children,
 }: {
   question: QuizQuestion
+  mistakeContext?: GrilaLessonMistakeContext
   children: ReactNode
 }) {
   const multiSelect = isMultiSelectQuizQuestion(question)
@@ -97,9 +111,22 @@ export function GrilaLessonProvider({
       await markQuestionAsSolved(question.id)
     } else {
       playErrorSound()
+      void recordLearningMistake({
+        ...mistakeContext,
+        surface: "learning_path_grila",
+        quizQuestionId: question.id,
+        itemType: mistakeContext?.itemType ?? "grila",
+        subject: mistakeContext?.subject ?? question.materie ?? null,
+        conceptTags: mistakeContext?.conceptTags?.length
+          ? mistakeContext.conceptTags
+          : getQuizQuestionMistakeTags(question),
+        submittedAnswer: { selectedAnswers },
+        correctAnswer: { correctAnswers: getCorrectQuizAnswers(question) },
+        promptContext: buildQuizQuestionMistakeContext(question),
+      })
     }
     return correct
-  }, [selectedAnswers, isVerified, question])
+  }, [selectedAnswers, isVerified, question, mistakeContext])
 
   const reset = useCallback(() => {
     setSelectedAnswers([])

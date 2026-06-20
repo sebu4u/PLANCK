@@ -22,6 +22,8 @@ import {
 } from "@/lib/learning-path-insight-context"
 import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
+import { recordLearningMistake } from "@/lib/learning-mistakes/client"
+import { buildProblemMistakeContext, getProblemMistakeTags } from "@/lib/learning-mistakes/context"
 
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
@@ -211,6 +213,23 @@ export function ProblemSection({
         setVerified(true)
         setIsCorrect(false)
         registerFailure()
+        void recordLearningMistake({
+          surface: "learning_path_problem",
+          itemId: currentItemId,
+          lessonId,
+          chapterId,
+          problemId: problem.id,
+          itemType,
+          subject: problem.category ?? null,
+          conceptTags: getProblemMistakeTags(problem),
+          submittedAnswer: {
+            type: "value",
+            value: parsed,
+            subpointLabel: currentSubpoint.label,
+          },
+          correctAnswer: { value: currentSubpoint.correct_value },
+          promptContext: buildProblemMistakeContext(problem),
+        })
       }
       return
     }
@@ -226,6 +245,26 @@ export function ProblemSection({
       } else {
         playErrorSound()
         registerFailure()
+        void recordLearningMistake({
+          surface: "learning_path_problem",
+          itemId: currentItemId,
+          lessonId,
+          chapterId,
+          problemId: problem.id,
+          itemType,
+          subject: problem.category ?? null,
+          conceptTags: getProblemMistakeTags(problem),
+          submittedAnswer: {
+            type: "grila",
+            selectedIndex,
+            selectedLabel: grilaOptions[selectedIndex] ?? null,
+          },
+          correctAnswer: {
+            correctIndex: grilaCorrectIndex,
+            correctLabel: grilaOptions[grilaCorrectIndex] ?? null,
+          },
+          promptContext: buildProblemMistakeContext(problem),
+        })
       }
       setVerified(true)
       setIsCorrect(correct)
@@ -240,6 +279,12 @@ export function ProblemSection({
     valueSubpointIndex,
     valueSubpoints.length,
     grilaCorrectIndex,
+    grilaOptions,
+    currentItemId,
+    lessonId,
+    chapterId,
+    itemType,
+    problem,
     awardCorrectAnswerElo,
     registerFailure,
     resetFailures,

@@ -122,13 +122,22 @@ export default async function InvataPage() {
               </div>
               <div className="flex flex-col items-start gap-3 sm:items-end">
                 {user ? (
-                  <Link
-                    href="/invata/flashcard-uri"
-                    className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100"
-                  >
-                    <Layers className="h-4 w-4" />
-                    Flashcard-urile mele
-                  </Link>
+                  <div className="flex flex-col items-start gap-2 sm:items-end">
+                    <Link
+                      href="/invata/trasee-personalizate"
+                      className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-50"
+                    >
+                      <Layers className="h-4 w-4" />
+                      Trasee personalizate
+                    </Link>
+                    <Link
+                      href="/invata/flashcard-uri"
+                      className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                    >
+                      <Layers className="h-4 w-4" />
+                      Flashcard-urile mele
+                    </Link>
+                  </div>
                 ) : null}
                 <InvataAdminLearningPathsLink />
               </div>

@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
-import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
+import { ProblemAnswerCard, type ProblemAnswerWrongAnswerDetails } from "@/components/problems/problem-answer-card"
 import {
   ProblemWrongAnswerEloCard,
   type ProblemWrongAnswerPenalty,
@@ -44,6 +44,8 @@ import {
 } from "@/lib/problem-detail-subject"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
+import { recordLearningMistake } from "@/lib/learning-mistakes/client"
+import { buildProblemMistakeContext, getProblemMistakeTags } from "@/lib/learning-mistakes/context"
 // Lazy load video player component
 const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
 
@@ -226,6 +228,22 @@ export default function ProblemDetailClient({
   const handleWrongAnswerPenalty = useCallback((penalty: ProblemWrongAnswerPenalty) => {
     setWrongAnswerPenalty(penalty)
   }, [])
+
+  const handleCatalogWrongAnswer = useCallback(
+    (details: ProblemAnswerWrongAnswerDetails) => {
+      void recordLearningMistake({
+        surface: "catalog_problem",
+        problemId: problem.id,
+        itemType: problem.answer_type ?? details.answerType,
+        subject,
+        conceptTags: getProblemMistakeTags(problem),
+        submittedAnswer: details.submittedAnswer,
+        correctAnswer: details.correctAnswer,
+        promptContext: buildProblemMistakeContext(problem),
+      })
+    },
+    [problem, subject],
+  )
 
   const hasVideo = useMemo(() => {
     return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
@@ -575,6 +593,7 @@ export default function ProblemDetailClient({
                           isSolved={isSolved}
                           userId={user?.id ?? null}
                           onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                          onWrongAnswer={handleCatalogWrongAnswer}
                           showHintButton={!isClassroomEmbed}
                           onHintClick={
                             !isClassroomEmbed
@@ -635,6 +654,7 @@ export default function ProblemDetailClient({
                               isSolved={isSolved}
                               userId={user?.id ?? null}
                               onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                              onWrongAnswer={handleCatalogWrongAnswer}
                             />
                           ) : (
                             <NoAnswerCard />
@@ -706,6 +726,7 @@ export default function ProblemDetailClient({
                               isSolved={isSolved}
                               userId={user?.id ?? null}
                               onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                              onWrongAnswer={handleCatalogWrongAnswer}
                             />
                           ) : (
                             <NoAnswerCard />

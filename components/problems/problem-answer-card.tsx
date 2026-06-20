@@ -11,6 +11,12 @@ import { InlineMath } from "react-katex"
 import { supabase } from "@/lib/supabaseClient"
 import type { ProblemWrongAnswerPenalty } from "@/components/problems/problem-wrong-answer-elo-card"
 
+export interface ProblemAnswerWrongAnswerDetails {
+  answerType: "value" | "grila"
+  submittedAnswer: Record<string, unknown>
+  correctAnswer: Record<string, unknown>
+}
+
 interface ProblemAnswerCardProps {
   problem: Problem
   onCanMarkSolvedChange: (canMarkSolved: boolean) => void
@@ -22,6 +28,7 @@ interface ProblemAnswerCardProps {
   userId?: string | null
   /** Wrong substantive answer after „Verifică răspunsul” (not invalid empty/format). */
   onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
+  onWrongAnswer?: (details: ProblemAnswerWrongAnswerDetails) => void
 }
 
 async function fetchWrongAnswerPenalty(userId: string | null | undefined): Promise<ProblemWrongAnswerPenalty> {
@@ -130,6 +137,7 @@ function ValueAnswerCard({
   onHintClick,
   userId,
   onWrongAnswerPenalty,
+  onWrongAnswer,
 }: {
   subpoints: ProblemValueSubpoint[]
   onCanMarkSolvedChange: (canMarkSolved: boolean) => void
@@ -140,6 +148,7 @@ function ValueAnswerCard({
   onHintClick?: () => void
   userId?: string | null
   onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
+  onWrongAnswer?: (details: ProblemAnswerWrongAnswerDetails) => void
 }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [inputValue, setInputValue] = useState("")
@@ -166,6 +175,21 @@ function ValueAnswerCard({
 
     const isCorrect = isWithinTolerance(parsedValue, currentSubpoint.correct_value)
     if (!isCorrect) {
+      onWrongAnswer?.({
+        answerType: "value",
+        submittedAnswer: {
+          type: "value",
+          value: parsedValue,
+          rawValue: inputValue,
+          subpointIndex: currentIndex,
+          subpointLabel: currentSubpoint.label,
+        },
+        correctAnswer: {
+          value: currentSubpoint.correct_value,
+          subpointIndex: currentIndex,
+          subpointLabel: currentSubpoint.label,
+        },
+      })
       void fetchWrongAnswerPenalty(userId).then((penalty) => {
         onWrongAnswerPenalty?.(penalty)
       })
@@ -311,6 +335,7 @@ function GrilaAnswerCard({
   onHintClick,
   userId,
   onWrongAnswerPenalty,
+  onWrongAnswer,
 }: {
   options: string[]
   correctIndex: number
@@ -322,6 +347,7 @@ function GrilaAnswerCard({
   onHintClick?: () => void
   userId?: string | null
   onWrongAnswerPenalty?: (penalty: ProblemWrongAnswerPenalty) => void
+  onWrongAnswer?: (details: ProblemAnswerWrongAnswerDetails) => void
 }) {
   const [selectedValue, setSelectedValue] = useState<string>("")
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -345,6 +371,18 @@ function GrilaAnswerCard({
     setIsError(!solved)
     setFeedback(solved ? "Corect! Poți marca problema ca rezolvată." : "Răspuns incorect. Încearcă din nou.")
     if (!solved) {
+      onWrongAnswer?.({
+        answerType: "grila",
+        submittedAnswer: {
+          type: "grila",
+          selectedIndex,
+          selectedLabel: options[selectedIndex] ?? null,
+        },
+        correctAnswer: {
+          correctIndex,
+          correctLabel: options[correctIndex] ?? null,
+        },
+      })
       void fetchWrongAnswerPenalty(userId).then((penalty) => {
         onWrongAnswerPenalty?.(penalty)
       })
@@ -446,6 +484,7 @@ export function ProblemAnswerCard({
   onHintClick,
   userId,
   onWrongAnswerPenalty,
+  onWrongAnswer,
 }: ProblemAnswerCardProps) {
   const normalizedType = problem.answer_type ?? null
 
@@ -466,6 +505,7 @@ export function ProblemAnswerCard({
         onHintClick={onHintClick}
         userId={userId}
         onWrongAnswerPenalty={onWrongAnswerPenalty}
+        onWrongAnswer={onWrongAnswer}
       />
     )
   }
@@ -483,6 +523,7 @@ export function ProblemAnswerCard({
         onHintClick={onHintClick}
         userId={userId}
         onWrongAnswerPenalty={onWrongAnswerPenalty}
+        onWrongAnswer={onWrongAnswer}
       />
     )
   }

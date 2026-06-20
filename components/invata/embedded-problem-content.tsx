@@ -4,10 +4,12 @@ import React, { useEffect, useState } from "react"
 import { InlineMath } from "react-katex"
 import "katex/dist/katex.min.css"
 import type { Problem } from "@/data/problems"
-import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
+import { ProblemAnswerCard, type ProblemAnswerWrongAnswerDetails } from "@/components/problems/problem-answer-card"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { toYoutubeEmbedUrl } from "@/lib/youtube-utils"
+import { recordLearningMistake } from "@/lib/learning-mistakes/client"
+import { buildProblemMistakeContext, getProblemMistakeTags } from "@/lib/learning-mistakes/context"
 
 interface EmbeddedProblemContentProps {
   problem: Problem
@@ -65,6 +67,19 @@ export function EmbeddedProblemContent({ problem }: EmbeddedProblemContentProps)
     setLoadingSolved(false)
   }
 
+  const handleWrongAnswer = (details: ProblemAnswerWrongAnswerDetails) => {
+    void recordLearningMistake({
+      surface: "catalog_problem",
+      problemId: problem.id,
+      itemType: problem.answer_type ?? details.answerType,
+      subject: problem.category ?? null,
+      conceptTags: getProblemMistakeTags(problem),
+      submittedAnswer: details.submittedAnswer,
+      correctAnswer: details.correctAnswer,
+      promptContext: buildProblemMistakeContext(problem),
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[#e8e8e8] bg-[#fafafa] p-5 sm:p-6">
@@ -105,6 +120,7 @@ export function EmbeddedProblemContent({ problem }: EmbeddedProblemContentProps)
             onCanMarkSolvedChange={() => {}}
             onSolvedCorrectly={handleMarkSolved}
             isSolved={isSolved}
+            onWrongAnswer={handleWrongAnswer}
           />
         </div>
       ) : (

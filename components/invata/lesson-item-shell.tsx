@@ -619,7 +619,17 @@ function LessonItemShellInner({
   )
 
   return grilaQuestion ? (
-    <GrilaLessonProvider question={grilaQuestion}>{shell}</GrilaLessonProvider>
+    <GrilaLessonProvider
+      question={grilaQuestion}
+      mistakeContext={{
+        itemId: currentItemId,
+        lessonId,
+        chapterId,
+        itemType: "grila",
+      }}
+    >
+      {shell}
+    </GrilaLessonProvider>
   ) : (
     shell
   )
