@@ -27,7 +27,7 @@ import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
-import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-plan"
+import { isFreePreviewLearningPathChapterSlug, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
@@ -100,12 +100,19 @@ export default async function InvataPage() {
         .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
         .map((chapter) => chapter.id)
 
+  const visibleChapters = hasFullAccess
+    ? chapters
+    : chapters.slice(0, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT)
+  const archivedChapters = hasFullAccess
+    ? []
+    : chapters.slice(FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT)
+
   return (
-    <InvataHubNavProvider chapters={chapters}>
-      <InvataChapterImageLoadProvider chapterCount={chapters.length}>
+    <InvataHubNavProvider chapters={visibleChapters}>
+      <InvataChapterImageLoadProvider chapterCount={visibleChapters.length}>
         <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
         <Navigation />
-        {chapters.length > 0 ? <InvataHubTopGlow /> : null}
+        {visibleChapters.length > 0 ? <InvataHubTopGlow /> : null}
 
         <main
           className={`relative min-h-screen max-sm:bg-transparent bg-[#ffffff] max-sm:pt-[calc(5.875rem+3rem)] pt-16 burger:pt-28 burger:pb-10 sm:pt-16 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}
@@ -135,7 +142,8 @@ export default async function InvataPage() {
             </header>
 
             <LearningPathsList
-              chapters={chapters}
+              chapters={visibleChapters}
+              archivedChapters={archivedChapters}
               lessonsByChapter={lessonsByChapter}
               lockedChapterIds={lockedChapterIds}
               completedLessonIds={completedLessonIds}

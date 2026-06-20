@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowRight, BookOpen } from "lucide-react"
+import { ArrowRight, BookOpen, ChevronDown } from "lucide-react"
 import {
   getLearningPathLessonHref,
   type LearningPathChapter,
@@ -28,6 +28,7 @@ export type LessonProgressByLessonId = Record<string, { completed: number; total
 
 interface LearningPathsListProps {
   chapters: LearningPathChapter[]
+  archivedChapters?: LearningPathChapter[]
   lessonsByChapter: Record<string, LearningPathLesson[]>
   lockedChapterIds?: string[]
   completedLessonIds?: string[]
@@ -539,8 +540,77 @@ function InvataChapterSection({
   )
 }
 
+function InvataArchivedLearningPathsSection({
+  chapters,
+}: {
+  chapters: LearningPathChapter[]
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  if (!chapters.length) return null
+
+  return (
+    <section
+      className="border-t border-[#ececec] pt-8 sm:pt-10"
+      aria-label="Arhivă trasee de învățare"
+    >
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#e6e6e6] bg-[#f7f7f7] px-4 py-3.5 text-left transition-colors hover:bg-[#f0f0f0] sm:px-5"
+      >
+        <div>
+          <p className="text-sm font-semibold text-[#6b6b6b]">Arhivă trasee</p>
+          <p className="mt-0.5 text-xs text-[#9a9a9a]">
+            {chapters.length} trase{chapters.length === 1 ? "" : "e"} disponibile cu planul Plus
+          </p>
+        </div>
+        <ChevronDown
+          className={`h-5 w-5 shrink-0 text-[#8a8a8a] transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {isOpen ? (
+        <div className="mt-4 overflow-x-auto scrollbar-hide -mx-5 px-5 sm:mx-0 sm:px-0">
+          <div className="flex min-w-max items-start gap-5 pb-2 sm:gap-6">
+            {chapters.map((chapter) => (
+              <div
+                key={chapter.id}
+                className="flex w-[108px] shrink-0 flex-col items-center opacity-55 sm:w-[120px]"
+                aria-hidden="true"
+              >
+                {chapter.icon_url ? (
+                  <img
+                    src={chapter.icon_url}
+                    alt=""
+                    className="h-[72px] w-[72px] object-contain grayscale sm:h-20 sm:w-20"
+                    loading="lazy"
+                    draggable={false}
+                  />
+                ) : (
+                  <div className="flex h-[72px] w-[72px] items-center justify-center rounded-xl bg-[#ececec] text-[#a8a8a8] grayscale sm:h-20 sm:w-20">
+                    <BookOpen className="h-9 w-9 sm:h-10 sm:w-10" aria-hidden="true" />
+                  </div>
+                )}
+                <p className="mt-2.5 line-clamp-3 text-center text-xs font-medium leading-snug text-[#9a9a9a] sm:text-sm">
+                  {chapter.title}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 export function LearningPathsList({
   chapters,
+  archivedChapters = [],
   lessonsByChapter,
   lockedChapterIds = [],
   completedLessonIds = [],
@@ -576,6 +646,8 @@ export function LearningPathsList({
           />
         ))}
       </div>
+
+      <InvataArchivedLearningPathsSection chapters={archivedChapters} />
     </div>
   )
 }

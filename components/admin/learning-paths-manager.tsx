@@ -1263,6 +1263,54 @@ export function LearningPathsManager({
     }
   }
 
+  const deleteLesson = async (lessonId: string) => {
+    if (isDev) {
+      setError("În modul dev nu poți șterge lecții. Folosește panoul admin pentru asta.")
+      return
+    }
+
+    const lesson = lessons.find((entry) => entry.id === lessonId)
+    const itemCount = getItemsForLesson(lessonId).length
+    const confirmed = window.confirm(
+      `Sigur vrei să ștergi definitiv lecția „${lesson?.title ?? "această lecție"}”?` +
+        (itemCount > 0 ? ` Se vor șterge și ${itemCount} itemi asociați.` : "")
+    )
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error("Sesiune expirată.")
+
+      const response = await fetch("/api/admin/learning-paths", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ type: "lesson", id: lessonId }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut șterge lecția.")
+      }
+
+      setSuccessMessage("Lecție ștearsă definitiv.")
+      setTimeout(() => setSuccessMessage(null), 3000)
+      if (selectedLessonId === lessonId) {
+        setSelectedLessonId(null)
+        resetForm()
+      }
+      await fetchData()
+    } catch (err: any) {
+      setError(err.message || "Eroare la ștergerea lecției.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const deleteItem = async (itemId: string, hardDelete = false) => {
     if (isDev) {
       setError("În modul dev nu poți șterge sau dezactiva itemi. Folosește panoul admin pentru asta.")
@@ -2826,7 +2874,7 @@ export function LearningPathsManager({
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           <strong>Mod dev:</strong> același editor ca la admin; vezi <strong>toate</strong> capitolele și lecțiile (fizică, informatică,
           matematică, biologie). Validarea tipurilor de item/lecție ține cont de capitol.{" "}
-          <strong>Nu poți șterge sau dezactiva</strong> itemi din această interfață.
+          <strong>Nu poți șterge</strong> lecții sau <strong>dezactiva/șterge</strong> itemi din această interfață.
         </div>
       ) : null}
       <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-12rem)]">
@@ -3137,6 +3185,21 @@ export function LearningPathsManager({
                                 >
                                   <Plus className="w-3 h-3" />
                                 </Button>
+                                {!isDev ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 text-red-300 hover:bg-red-500/10 hover:text-red-200 opacity-0 group-hover:opacity-100"
+                                    disabled={saving}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      void deleteLesson(lesson.id)
+                                    }}
+                                    title="Șterge lecția"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                ) : null}
                               </div>
                             )
                           })
@@ -3360,14 +3423,28 @@ export function LearningPathsManager({
                     pentru a-l muta între altele, sau treci cu mouse-ul între itemi pentru „Inserează aici”.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  onClick={() => openCreateItem(selectedLesson.id)}
-                  className="bg-violet-600 hover:bg-violet-500 text-white"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adaugă item
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => openCreateItem(selectedLesson.id)}
+                    className="bg-violet-600 hover:bg-violet-500 text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adaugă item
+                  </Button>
+                  {!isDev ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => void deleteLesson(selectedLesson.id)}
+                      className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Șterge lecția
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="rounded-md border border-white/10 bg-black/20 p-4 space-y-2">
