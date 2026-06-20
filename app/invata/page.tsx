@@ -26,6 +26,9 @@ import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context
 import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
+import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
+import { PersonalizedCoursesSection } from "@/components/invata/personalized-courses-section"
+import { getPersonalizedCoursesForUser } from "@/lib/personalized-courses/data"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import { isFreePreviewLearningPathChapterSlug, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
@@ -50,6 +53,10 @@ export default async function InvataPage() {
     data: { user },
   } = await supabase.auth.getUser()
   const allLessonIds = Object.values(lessonsByChapter).flatMap((lessons) => lessons.map((l) => l.id))
+
+  const personalizedCourses = user
+    ? await getPersonalizedCoursesForUser(supabase, user.id, 12).catch(() => [])
+    : []
   const completedLessonIds = user
     ? await getCompletedLearningPathLessonIdsForUser(supabase, user.id, allLessonIds)
     : []
@@ -140,6 +147,15 @@ export default async function InvataPage() {
                 <InvataAdminLearningPathsLink />
               </div>
             </header>
+
+            <div className="mb-10 sm:mb-12">
+              <PersonalizedCourseGenerator isAuthenticated={Boolean(user)} />
+              {personalizedCourses.length > 0 ? (
+                <div className="mt-6 sm:mt-8">
+                  <PersonalizedCoursesSection courses={personalizedCourses} />
+                </div>
+              ) : null}
+            </div>
 
             <LearningPathsList
               chapters={visibleChapters}
