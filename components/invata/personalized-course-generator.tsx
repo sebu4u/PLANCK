@@ -150,27 +150,25 @@ export function PersonalizedCourseGenerator({
   return (
     <section
       aria-label="Generează curs personalizat"
-      className="relative overflow-hidden rounded-3xl border border-violet-200/70 bg-gradient-to-br from-[#faf8ff] via-white to-[#f5f0ff] p-5 shadow-[0_18px_50px_rgba(124,58,237,0.10)] sm:p-7"
+      className="relative rounded-2xl border border-[#e6e6e6] bg-[#f7f7f7] p-5 sm:p-6"
     >
-      <div className="pointer-events-none absolute -right-16 -top-16 hidden h-48 w-48 rounded-full bg-violet-300/20 blur-3xl sm:block" aria-hidden />
-
       <div className="relative flex items-start gap-3">
-        <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_8px_18px_rgba(124,58,237,0.30)] sm:flex">
+        <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e6e6e6] text-[#5f5f5f] sm:flex">
           <Sparkles className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
             Ce dorești să înveți azi?
           </h2>
-          <p className="mt-1 text-sm text-[#6f657b] sm:text-base">
-            Scrie un obiectiv liber (ex. „să înțeleg derivata și să rezolv probleme de BAC”) și
+          <p className="mt-1 text-sm text-[#707070] sm:text-base">
+            Scrie un obiectiv liber (ex. „să înțeleg derivata și să rezolv probleme de BAC") și
             Planck îți compune un curs personalizat din conținutul existent.
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="relative mt-5">
-        <div className="rounded-2xl border border-[#e6def0] bg-white p-2.5 shadow-sm transition-colors focus-within:border-[#8b5cf6]/60 sm:p-3">
+        <div className="rounded-xl border border-[#e6e6e6] bg-white p-2.5 transition-colors focus-within:border-[#cfcfcf] sm:p-3">
           <textarea
             value={prompt}
             onChange={(event) => {
@@ -190,17 +188,17 @@ export function PersonalizedCourseGenerator({
             maxLength={MAX_PROMPT_LENGTH}
             disabled={isDisabled}
             aria-label="Obiectiv de învățare"
-            className="block w-full resize-none rounded-xl bg-transparent px-3 py-2.5 text-base leading-relaxed text-[#111111] placeholder:text-[#9a8fb0] focus:outline-none disabled:opacity-60 sm:text-[15px]"
+            className="block w-full resize-none rounded-lg bg-transparent px-3 py-2.5 text-base leading-relaxed text-[#111111] placeholder:text-[#9a9a9a] focus:outline-none disabled:opacity-60 sm:text-[15px]"
           />
           <div className="mt-1.5 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-xs text-[#9a8fb0]">
+            <span className="text-xs text-[#9a9a9a]">
               {remainingChars < 80 ? `${remainingChars} caractere rămase` : "Enter + Ctrl/⌘ pentru a trimite"}
             </span>
             <button
               type="submit"
               disabled={isDisabled}
               className={cn(
-                "inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6] disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto",
+                "inline-flex items-center justify-center gap-2 rounded-xl bg-[#1f1f1f] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto",
               )}
             >
               {status === "loading" ? (
@@ -230,19 +228,19 @@ export function PersonalizedCourseGenerator({
                 className={cn(
                   "flex items-start gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-colors",
                   isActive
-                    ? "border-violet-200 bg-violet-50/70 text-[#3a2a55]"
+                    ? "border-[#cfcfcf] bg-white text-[#1f1f1f]"
                     : isDone
-                      ? "border-emerald-200/70 bg-emerald-50/60 text-emerald-800"
-                      : "border-[#ece6f3] bg-white text-[#9a8fb0]",
+                      ? "border-[#e6e6e6] bg-[#f7f7f7] text-[#059669]"
+                      : "border-[#e6e6e6] bg-white text-[#9a9a9a]",
                 )}
               >
                 <span className="mt-0.5 shrink-0">
                   {isDone ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <CheckCircle2 className="h-4 w-4 text-[#059669]" />
                   ) : isActive ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-[#7c3aed]" />
+                    <Loader2 className="h-4 w-4 animate-spin text-[#1f1f1f]" />
                   ) : (
-                    <span className="block h-4 w-4 rounded-full border-2 border-[#d9cfe6]" />
+                    <span className="block h-4 w-4 rounded-full border-2 border-[#d4d4d4]" />
                   )}
                 </span>
                 <span className="leading-relaxed">{stage.label}</span>
@@ -253,11 +251,11 @@ export function PersonalizedCourseGenerator({
       ) : null}
 
       {status === "done" && createdHref ? (
-        <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 text-sm text-emerald-800">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+        <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-[#e6e6e6] bg-white px-3.5 py-3 text-sm text-[#1f1f1f]">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#059669]" />
           <div className="min-w-0 flex-1">
             <p className="font-medium">Cursul tău personalizat este gata.</p>
-            <Link href={createdHref} className="mt-1 inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-900">
+            <Link href={createdHref} className="mt-1 inline-flex items-center gap-1 font-semibold text-[#1f1f1f] hover:underline">
               Deschide cursul <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -265,21 +263,21 @@ export function PersonalizedCourseGenerator({
       ) : null}
 
       {status === "error" && errorMessage ? (
-        <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50/70 px-3.5 py-3 text-sm text-rose-800">
+        <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-[#e6e6e6] bg-white px-3.5 py-3 text-sm text-[#1f1f1f]">
           {isAuthenticated ? (
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#9a9a9a]" />
           ) : (
-            <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+            <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-[#9a9a9a]" />
           )}
           <div className="min-w-0 flex-1">
             <p className="font-medium">{errorMessage}</p>
             {!isAuthenticated ? (
-              <p className="mt-1 text-rose-700">
-                <Link href={loginHref} className="font-semibold underline underline-offset-2 hover:text-rose-900">
+              <p className="mt-1 text-[#707070]">
+                <Link href={loginHref} className="font-semibold underline underline-offset-2 hover:text-[#1f1f1f]">
                   Autentifică-te
                 </Link>{" "}
                 sau{" "}
-                <Link href="/register?next=/invata" className="font-semibold underline underline-offset-2 hover:text-rose-900">
+                <Link href="/register?next=/invata" className="font-semibold underline underline-offset-2 hover:text-[#1f1f1f]">
                   creează un cont
                 </Link>{" "}
                 ca să-ți salvez cursurile personalizate.

@@ -3,13 +3,10 @@
 import { useCallback, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, CheckCircle2, Loader2, X, AlertCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, CheckCircle2, Loader2, X, AlertCircle, BookOpen } from "lucide-react"
 import type { PersonalizedCourseItemPayload } from "@/lib/personalized-courses/types"
 import type { LearningPathLessonType } from "@/lib/supabase-learning-paths"
-import {
-  ITEM_TYPE_LABEL,
-  getItemIcon,
-} from "@/components/invata/learning-path-item-body"
+import { ITEM_TYPE_LABEL, getItemIcon } from "@/components/invata/learning-path-item-body"
 import { PersonalizedItemContent } from "@/components/invata/personalized-item-content"
 import { cn } from "@/lib/utils"
 
@@ -33,9 +30,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
     isLastItem,
   } = payload
 
-  const [completedIds, setCompletedIds] = useState<Set<string>>(
-    () => new Set(completedItemIdsForLesson),
-  )
+  const [completedIds, setCompletedIds] = useState<Set<string>>(() => new Set(completedItemIdsForLesson))
   const [currentCompleted, setCurrentCompleted] = useState(initialCurrentItemCompleted)
   const [isMarking, setIsMarking] = useState(false)
   const [markError, setMarkError] = useState<string | null>(null)
@@ -63,9 +58,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
       })
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { error?: string }
-        setMarkError(
-          data?.error?.trim() || "Nu am putut salva progresul. Încearcă din nou.",
-        )
+        setMarkError(data?.error?.trim() || "Nu am putut salva progresul. Încearcă din nou.")
         return false
       }
       setCompletedIds((prev) => {
@@ -108,7 +101,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
           <div className="w-full max-w-[260px] sm:max-w-[360px]">
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e5e5e5]">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] transition-all duration-300"
+                className="h-full rounded-full bg-[#1f1f1f] transition-all duration-300"
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
@@ -116,9 +109,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
         </div>
 
         <div className="shrink-0 text-sm font-medium text-[#4d4d4d]">
-          <span className="tabular-nums">
-            {itemIndex}/{items.length}
-          </span>
+          <span className="tabular-nums">{itemIndex}/{items.length}</span>
         </div>
       </nav>
 
@@ -127,7 +118,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
           href={prevItemHref}
           aria-label="Pasul anterior"
           scroll
-          className="fixed left-2 top-1/2 z-[250] hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8e2ee] bg-white text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] transition-transform hover:scale-110 md:flex"
+          className="fixed left-2 top-1/2 z-[250] hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8e8e8] bg-white text-[#4d4d4d] shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-transform hover:scale-110 md:flex"
         >
           <ChevronLeft className="h-6 w-6" strokeWidth={2.25} />
         </Link>
@@ -138,7 +129,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
           href={nextItemHref}
           aria-label={isLastItem ? "Înapoi la lecție" : "Pasul următor"}
           scroll
-          className="fixed right-2 top-1/2 z-[250] hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8e2ee] bg-white text-[#7c3aed] shadow-[0_8px_24px_rgba(82,44,111,0.12)] transition-transform hover:scale-110 md:flex"
+          className="fixed right-2 top-1/2 z-[250] hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8e8e8] bg-white text-[#4d4d4d] shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-transform hover:scale-110 md:flex"
         >
           <ChevronRight className="h-6 w-6" strokeWidth={2.25} />
         </Link>
@@ -149,21 +140,21 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
         style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="mx-auto w-full max-w-5xl px-5 sm:px-8 lg:px-12">
-          <div className="mt-5 overflow-hidden rounded-[30px] border border-[#ebe4f1] bg-white shadow-[0_18px_50px_rgba(76,44,114,0.08)]">
-            <header className="border-b border-[#eee7f3] bg-[linear-gradient(180deg,#fcfbfe_0%,#f7f4fb_100%)] px-5 py-5 sm:px-7">
+          <div className="mt-5 overflow-hidden rounded-2xl border border-[#e6e6e6] bg-white shadow-sm">
+            <header className="border-b border-[#ececec] bg-[#f7f7f7] px-5 py-5 sm:px-7">
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white shadow-[0_8px_16px_rgba(124,58,237,0.24)]">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e6e6e6] text-[#5f5f5f]">
                   <ItemIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6fac]">
+                  <p className="text-xs font-medium text-[#8a8a8a]">
                     Pasul {itemIndex} din {items.length} · {typeLabel}
                   </p>
                   <h1 className="mt-2 text-2xl font-bold leading-tight text-[#111111] sm:text-3xl">
                     {displayTitle}
                   </h1>
-                  <p className="mt-2 text-sm text-[#6f657b]">
-                    Lecția {lesson.title} · {course.title}
+                  <p className="mt-2 text-sm text-[#707070]">
+                    {lesson.title} · {course.title}
                   </p>
                 </div>
               </div>
@@ -175,7 +166,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
           </div>
 
           {currentCompleted ? (
-            <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm font-medium text-emerald-700">
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-[#e6e6e6] bg-[#f7f7f7] px-4 py-2.5 text-sm font-medium text-[#059669]">
               <CheckCircle2 className="h-4 w-4" />
               Pas marcat ca finalizat.
             </div>
@@ -184,12 +175,12 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
       </main>
 
       <div
-        className="fixed bottom-0 left-0 right-0 z-[300] border-t-2 border-[#eee7f3] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
+        className="fixed bottom-0 left-0 right-0 z-[300] border-t border-[#ececec] bg-white/95 px-4 pt-4 backdrop-blur-sm sm:px-6"
         style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}
       >
         {markError ? (
-          <div className="mx-auto mb-3 flex max-w-5xl items-start gap-2 rounded-xl border border-rose-200 bg-rose-50/70 px-3.5 py-2.5 text-sm text-rose-800">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+          <div className="mx-auto mb-3 flex max-w-5xl items-start gap-2 rounded-xl border border-[#e6e6e6] bg-[#f7f7f7] px-3.5 py-2.5 text-sm text-[#1f1f1f]">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#9a9a9a]" />
             <span>{markError}</span>
           </div>
         ) : null}
@@ -198,7 +189,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
             <Link
               href={prevItemHref}
               scroll
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ececec] bg-white text-[#4d4d4d] transition-colors hover:border-violet-200 hover:text-[#7c3aed]"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#e6e6e6] bg-white text-[#4d4d4d] transition-colors hover:border-[#cfcfcf] hover:text-[#111111]"
               aria-label="Pasul anterior"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -209,7 +200,7 @@ export function PersonalizedItemView({ payload }: PersonalizedItemViewProps) {
             onClick={() => void handleContinue()}
             disabled={isMarking}
             className={cn(
-              "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6] disabled:cursor-not-allowed disabled:opacity-70 sm:flex-none sm:px-8",
+              "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#1f1f1f] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70 sm:flex-none sm:px-8",
             )}
           >
             {isMarking ? (

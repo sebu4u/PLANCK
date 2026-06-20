@@ -1,12 +1,11 @@
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Circle, PlayCircle, Sparkles } from "lucide-react"
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, PlayCircle, Sparkles } from "lucide-react"
 import type { PersonalizedCourseWithStructure } from "@/lib/personalized-courses/types"
 import {
   getPersonalizedCourseHref,
   getPersonalizedCourseLessonHref,
   getPersonalizedCourseItemHref,
 } from "@/lib/personalized-courses/data"
-import { LessonItemProgressBar } from "@/components/invata/lesson-item-progress-bar"
 
 interface PersonalizedCourseOverviewProps {
   course: PersonalizedCourseWithStructure
@@ -52,44 +51,42 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
     .filter((item) => completedSet.has(item.id)).length
   const allComplete = totalItems > 0 && completedItems >= totalItems
   const resumeTarget = resolveResumeTarget(course)
-  const courseHref = getPersonalizedCourseHref(course.id)
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-5 pb-16 sm:px-8 lg:px-12">
+    <div className="mx-auto w-full max-w-7xl px-5 pb-14 sm:px-8 lg:px-12">
       <Link
         href="/invata"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7c3aed] transition-colors hover:text-[#5b21b6]"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1f1f1f] transition-colors hover:text-[#7c3aed]"
       >
         <ArrowLeft className="h-4 w-4" />
         Înapoi la trasee
       </Link>
 
-      <section className="mt-5 overflow-hidden rounded-3xl border border-violet-200/70 bg-gradient-to-br from-[#faf8ff] via-white to-[#f5f0ff] p-6 shadow-[0_18px_50px_rgba(124,58,237,0.10)] sm:p-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#7c3aed]">
-              <Sparkles className="h-3.5 w-3.5" />
-              Curs personalizat
-            </span>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#111111] sm:text-3xl">
-              {course.title}
-            </h1>
-            {course.description ? (
-              <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-[#4d4d4d] sm:text-base">
-                {course.description}
-              </p>
-            ) : null}
-            {course.original_prompt ? (
-              <p className="mt-3 rounded-xl border border-violet-100 bg-white/70 px-3.5 py-2 text-xs italic text-[#8a7da0]">
-                Obiectiv: “{course.original_prompt}”
-              </p>
-            ) : null}
+      <section className="mt-5">
+        <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
+          <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
+              <Sparkles className="h-12 w-12 sm:h-14 sm:w-14" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold text-[#111111]">{course.title}</h2>
+              {course.description ? (
+                <p className="mt-0.5 text-sm text-[#707070]">{course.description}</p>
+              ) : null}
+              {course.original_prompt ? (
+                <p className="mt-1 text-xs text-[#9a9a9a]">Obiectiv: „{course.original_prompt}"</p>
+              ) : null}
+              {totalItems > 0 ? (
+                <p className="mt-1 text-xs text-[#8a8a8a]">
+                  {completedItems} / {totalItems} itemi completați
+                </p>
+              ) : null}
+            </div>
           </div>
-
           {resumeTarget ? (
             <Link
               href={resumeTarget.href}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-5 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6] sm:self-center"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#1f1f1f] px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             >
               <PlayCircle className="h-4 w-4" />
               {resumeTarget.label}
@@ -97,127 +94,152 @@ export function PersonalizedCourseOverview({ course }: PersonalizedCourseOvervie
           ) : null}
         </div>
 
-        {totalItems > 0 ? (
-          <div className="mt-6 rounded-2xl border border-violet-100 bg-white/80 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-[#111111]">
-                {allComplete ? "Curs completat" : "Progres curs"}
-              </p>
-              <p className="text-sm font-medium text-[#6f657b]">
-                {completedItems} / {totalItems} itemi
-              </p>
+        <div className="relative mb-5 sm:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-bold text-[#111111]">{course.title}</h2>
+              {course.description ? (
+                <p className="mt-1 text-sm text-[#707070]">{course.description}</p>
+              ) : null}
             </div>
-            <div className="mt-3">
-              <LessonItemProgressBar completed={completedItems} total={totalItems} />
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]">
+              <Sparkles className="h-10 w-10" aria-hidden="true" />
             </div>
           </div>
-        ) : null}
+          {resumeTarget ? (
+            <Link
+              href={resumeTarget.href}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#1f1f1f] px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              <PlayCircle className="h-4 w-4" />
+              {resumeTarget.label}
+            </Link>
+          ) : null}
+        </div>
       </section>
 
-      <section className="mt-8" aria-label="Lecții curs">
-        <h2 className="mb-4 text-lg font-bold text-[#111111] sm:text-xl">Lecții</h2>
+      <div className="space-y-12 sm:space-y-10">
+        {course.lessons.map((lesson, lessonIndex) => {
+          const total = lesson.items.length
+          const completed = lesson.items.filter((item) => completedSet.has(item.id)).length
+          const isLessonComplete = total > 0 && completed >= total
+          const lessonHref = getPersonalizedCourseLessonHref(course.id, lesson.id)
+          const firstIncomplete = lesson.items.find((item) => !completedSet.has(item.id))
+          const ctaHref = firstIncomplete
+            ? getPersonalizedCourseItemHref(course.id, lesson.id, lesson.items.indexOf(firstIncomplete) + 1)
+            : total > 0
+              ? getPersonalizedCourseItemHref(course.id, lesson.id, 1)
+              : lessonHref
 
-        {!course.lessons.length ? (
-          <div className="rounded-2xl border border-[#ececec] bg-[#fafafa] p-6 text-center text-sm text-[#7a7a7a]">
-            Acest curs personalizat nu are încă lecții.
-          </div>
-        ) : (
-          <ol className="space-y-3 sm:space-y-4">
-            {course.lessons.map((lesson, lessonIndex) => {
-              const total = lesson.items.length
-              const completed = lesson.items.filter((item) => completedSet.has(item.id)).length
-              const isLessonComplete = total > 0 && completed >= total
-              const lessonHref = getPersonalizedCourseLessonHref(course.id, lesson.id)
-              const firstIncomplete = lesson.items.find((item) => !completedSet.has(item.id))
-              const ctaHref = firstIncomplete
-                ? getPersonalizedCourseItemHref(
-                    course.id,
-                    lesson.id,
-                    lesson.items.indexOf(firstIncomplete) + 1,
-                  )
-                : total > 0
-                  ? getPersonalizedCourseItemHref(course.id, lesson.id, 1)
-                  : lessonHref
-              const ctaLabel = !total
-                ? "Deschide lecția"
-                : isLessonComplete
-                  ? "Revizuiește"
-                  : completed === 0
-                    ? "Începe lecția"
-                    : "Continuă"
+          return (
+            <section key={lesson.id} className={lessonIndex === 0 ? "relative" : "relative border-t border-[#ececec] pt-10"}>
+              <div className="mb-5 hidden sm:flex sm:items-center sm:justify-between sm:gap-5">
+                <div className="flex min-w-0 flex-1 items-start gap-5 sm:items-center">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
+                    {isLessonComplete ? (
+                      <CheckCircle2 className="h-12 w-12 text-[#059669] sm:h-14 sm:w-14" />
+                    ) : (
+                      <BookOpen className="h-12 w-12 sm:h-14 sm:w-14" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg font-semibold text-[#111111]">{lesson.title}</h3>
+                    {lesson.description ? (
+                      <p className="mt-0.5 text-sm text-[#707070]">{lesson.description}</p>
+                    ) : null}
+                    {total > 0 ? (
+                      <p className="mt-1 text-xs text-[#8a8a8a]">
+                        {completed} / {total} itemi · {total} item{total === 1 ? "" : "i"}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
 
-              return (
-                <li key={lesson.id}>
-                  <Link
-                    href={lessonHref}
-                    className="group flex flex-col gap-4 rounded-2xl border border-[#ececec] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_12px_28px_rgba(124,58,237,0.08)] sm:flex-row sm:items-center sm:p-5"
-                  >
-                    <div className="flex items-center gap-3 sm:flex-1">
-                      <div
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ${
-                          isLessonComplete
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-violet-100 text-[#7c3aed]"
-                        }`}
-                      >
-                        {isLessonComplete ? <CheckCircle2 className="h-5 w-5" /> : lessonIndex + 1}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-base font-semibold text-[#111111] sm:text-lg">
-                          {lesson.title}
-                        </p>
-                        {lesson.description ? (
-                          <p className="mt-1 line-clamp-2 text-sm text-[#6f657b]">
-                            {lesson.description}
-                          </p>
-                        ) : null}
-                        <div className="mt-2 flex items-center gap-3 text-xs font-medium text-[#9a8a8a]">
-                          <span className="inline-flex items-center gap-1">
-                            <BookOpen className="h-3.5 w-3.5" />
-                            {total} item{total === 1 ? "" : "i"}
-                          </span>
-                          {total > 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                              {isLessonComplete ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                              ) : (
-                                <Circle className="h-3.5 w-3.5" />
-                              )}
-                              {completed}/{total} completați
-                            </span>
-                          ) : null}
-                        </div>
-                        {total > 0 ? (
-                          <div className="mt-2.5 max-w-xs">
-                            <LessonItemProgressBar completed={completed} total={total} />
-                          </div>
-                        ) : null}
-                      </div>
+              <div className="relative mb-5 sm:hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xl font-bold text-[#111111]">{lesson.title}</h3>
+                    {lesson.description ? (
+                      <p className="mt-1 text-sm text-[#707070]">{lesson.description}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]">
+                    {isLessonComplete ? (
+                      <CheckCircle2 className="h-10 w-10 text-[#059669]" />
+                    ) : (
+                      <BookOpen className="h-10 w-10" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
+                {total > 0 ? (
+                  <div className="overflow-x-auto scrollbar-hide -mx-1 px-1 pb-2">
+                    <div className="flex min-w-max items-start gap-4 sm:gap-5">
+                      {lesson.items.map((item, itemIndex) => {
+                        const isDone = completedSet.has(item.id)
+                        const itemHref = getPersonalizedCourseItemHref(course.id, lesson.id, itemIndex + 1)
+                        return (
+                          <Link key={item.id} href={itemHref} className="block shrink-0">
+                            <div className="relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]">
+                              <div className="flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]">
+                                <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                                  {isDone ? (
+                                    <CheckCircle2 className="h-10 w-10 text-[#059669] sm:h-12 sm:w-12" />
+                                  ) : (
+                                    <BookOpen className="h-8 w-8 text-[#9a9a9a] sm:h-10 sm:w-10" />
+                                  )}
+                                  <span className="text-[10px] font-medium text-[#8a8a8a]">
+                                    Pas {itemIndex + 1}
+                                  </span>
+                                </div>
+                              </div>
+                              {itemIndex < lesson.items.length - 1 ? (
+                                <div className="pointer-events-none absolute left-[155px] top-[71px] h-[5px] w-[42px] bg-[#e6e6e6] sm:left-[176px] sm:top-[81px] sm:w-[48px]" />
+                              ) : null}
+                              <p className="mt-3 line-clamp-2 text-center text-base font-medium text-[#1f1f1f]">
+                                {item.title?.trim() || `Pas ${itemIndex + 1}`}
+                              </p>
+                            </div>
+                          </Link>
+                        )
+                      })}
                     </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#7a7a7a]">Această lecție nu are încă itemi.</p>
+                )}
+              </div>
 
-                    <span className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-[#7c3aed] transition-colors group-hover:bg-violet-100 sm:self-center">
-                      {ctaLabel}
-                      <ArrowRight className="h-4 w-4" />
-                    </span>
+              <div className="mt-4 flex items-center justify-between">
+                <Link
+                  href={lessonHref}
+                  className="text-sm font-medium text-[#1f1f1f] hover:text-[#7c3aed]"
+                >
+                  {total > 0 ? "Vezi toți itemii" : "Deschide lecția"}
+                </Link>
+                {total > 0 ? (
+                  <Link
+                    href={ctaHref}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#1f1f1f] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    {isLessonComplete ? "Revizuiește" : completed === 0 ? "Începe" : "Continuă"}
+                    <ChevronRight className="h-4 w-4" />
                   </Link>
-                </li>
-              )
-            })}
-          </ol>
-        )}
-      </section>
+                ) : null}
+              </div>
+            </section>
+          )
+        })}
+      </div>
 
       <div className="mt-10 flex items-center justify-between gap-3 border-t border-[#ececec] pt-6">
-        <Link
-          href="/invata"
-          className="text-sm font-medium text-[#6f657b] transition-colors hover:text-[#111111]"
-        >
+        <Link href="/invata" className="text-sm font-medium text-[#707070] hover:text-[#111111]">
           Toate traseele
         </Link>
-        <Link
-          href={courseHref}
-          className="text-sm font-medium text-[#9a8a8a] hover:text-[#111111]"
-        >
+        <Link href={getPersonalizedCourseHref(course.id)} className="text-sm font-medium text-[#9a9a9a] hover:text-[#111111]">
           Sus
         </Link>
       </div>
