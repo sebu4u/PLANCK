@@ -27,8 +27,6 @@ import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
-import { PersonalizedCoursesSection } from "@/components/invata/personalized-courses-section"
-import { getPersonalizedCoursesForUser } from "@/lib/personalized-courses/data"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import { isFreePreviewLearningPathChapterSlug, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
@@ -39,30 +37,27 @@ export const revalidate = 21600
 export default async function InvataPage() {
   const access = await getLearningPathAccess(null)
   const hasFullAccess = access.mode === "full"
-  const chapters = await getLearningPathChapters()
-  const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
-
-  await Promise.all(
-    chapters.map(async (chapter) => {
-      lessonsByChapter[chapter.id] = await getLearningPathLessonsByChapterId(chapter.id)
-    })
-  )
-
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  const chapters = await getLearningPathChapters(supabase)
+  const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
+
+  await Promise.all(
+    chapters.map(async (chapter) => {
+      lessonsByChapter[chapter.id] = await getLearningPathLessonsByChapterId(chapter.id, supabase)
+    })
+  )
   const allLessonIds = Object.values(lessonsByChapter).flatMap((lessons) => lessons.map((l) => l.id))
 
-  const personalizedCourses = user
-    ? await getPersonalizedCoursesForUser(supabase, user.id, 12).catch(() => [])
-    : []
   const completedLessonIds = user
     ? await getCompletedLearningPathLessonIdsForUser(supabase, user.id, allLessonIds)
     : []
 
   const { counts: itemCountsByLessonId, itemIdsByLessonId } =
-    await getLearningPathLessonItemAggregates(allLessonIds)
+    await getLearningPathLessonItemAggregates(allLessonIds, supabase)
   const allItemIds = Object.values(itemIdsByLessonId).flat()
 
   let completedItemIdSet = new Set<string>()
@@ -150,11 +145,6 @@ export default async function InvataPage() {
 
             <div className="mb-10 sm:mb-12">
               <PersonalizedCourseGenerator isAuthenticated={Boolean(user)} />
-              {personalizedCourses.length > 0 ? (
-                <div className="mt-6 sm:mt-8">
-                  <PersonalizedCoursesSection courses={personalizedCourses} />
-                </div>
-              ) : null}
             </div>
 
             <LearningPathsList

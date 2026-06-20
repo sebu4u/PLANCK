@@ -3,10 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 import type { PersonalizedCourseCatalogCandidate, PersonalizedCourseGeneratedPlanItem, SupabaseAnyClient } from "@/lib/personalized-courses/types"
-import { getPersonalizedCourseHref, getPersonalizedCoursesForUser } from "@/lib/personalized-courses/data"
 import { searchPlanckContentForPrompt } from "@/lib/personalized-courses/search"
 import { planPersonalizedCourse } from "@/lib/personalized-courses/planner"
 import { sanitizeContentJson } from "@/lib/personalized-courses/sanitize"
+import { slugify } from "@/lib/slug"
 
 const MIN_PROMPT_LENGTH = 3
 const MAX_PROMPT_LENGTH = 500
@@ -16,8 +16,7 @@ const MAX_COURSES_TOTAL = 20
 function normalizePrompt(value: unknown): string | null {
   if (typeof value !== "string") return null
   const prompt = value.replace(/\s+/g, " ").trim()
-  if (!prompt) return null
-  return prompt
+  return prompt || null
 }
 
 function validatePrompt(prompt: string): string | null {
@@ -35,23 +34,25 @@ function validatePrompt(prompt: string): string | null {
   return null
 }
 
+function makeUniqueSlug(prefix: string, title: string, userId: string, suffix = ""): string {
+  const base = slugify(title).slice(0, 52) || "curs-personalizat"
+  const userPart = userId.replace(/-/g, "").slice(0, 8)
+  const timePart = Date.now().toString(36)
+  const tail = suffix ? `-${suffix}` : ""
+  return `${prefix}-${userPart}-${base}-${timePart}${tail}`.slice(0, 120)
+}
+
 function sourceFallbackContent(candidate: PersonalizedCourseCatalogCandidate | undefined, title: string): Record<string, unknown> {
   if (!candidate) return {}
-  if (candidate.source_type === "lesson") {
-    return {
-      body: `## ${title}\n\nAm găsit conținut Planck relevant: **${candidate.title}**.\n\n${candidate.summary || "Folosește această etapă ca bază pentru cursul personalizat."}`,
-      sourceSummary: candidate.summary,
-      sourceUrl: candidate.url ?? null,
-    }
-  }
   return {
+    body: `## ${title}\n\nConținut Planck relevant: **${candidate.title}**.\n\n${candidate.summary || "Acest pas folosește material existent din Planck."}`,
     sourceSummary: candidate.summary,
     sourceUrl: candidate.url ?? null,
+    sourceKey: candidate.key,
   }
 }
 
-function getItemInsertPayload(
-  courseId: string,
+function getOfficialItemInsertPayload(
   lessonId: string,
   item: PersonalizedCourseGeneratedPlanItem,
   orderIndex: number,
@@ -59,48 +60,73 @@ function getItemInsertPayload(
 ) {
   const sourceKey = item.source_key?.trim() || ""
   const candidate = sourceKey ? candidatesByKey.get(sourceKey) : undefined
-  const rawContentJson =
+  const itemType =
+    (candidate?.item_type ?? item.item_type) === "text" &&
+    typeof candidate?.metadata?.cursuri_lesson_slug !== "string"
+      ? "custom_text"
+      : candidate?.item_type ?? item.item_type
+  const contentJson = sanitizeContentJson(
     item.content_json && typeof item.content_json === "object" && !Array.isArray(item.content_json)
       ? item.content_json
-      : sourceFallbackContent(candidate, item.title)
+      : sourceFallbackContent(candidate, item.title),
+  )
 
-  // Sanitize all generated content before storage to prevent stored XSS
-  const contentJson = sanitizeContentJson(rawContentJson)
-
-  return {
-    course_id: courseId,
+  const row: Record<string, unknown> = {
     lesson_id: lessonId,
-    item_type: candidate?.item_type ?? item.item_type,
+    item_type: itemType,
     title: item.title,
-    source_type: candidate?.source_type ?? "generated",
-    source_id: candidate?.source_id ?? null,
-    source_table: candidate?.source_table ?? null,
-    source_title: candidate?.title ?? null,
-    content_json: contentJson,
     order_index: orderIndex,
+    is_active: true,
+    content_json: {
+      ...contentJson,
+      personalized_source_key: candidate?.key ?? null,
+      personalized_source_type: candidate?.source_type ?? "generated",
+      personalized_source_table: candidate?.source_table ?? null,
+      personalized_source_id: candidate?.source_id ?? null,
+    },
   }
+
+  const cursuriLessonSlug = candidate?.metadata?.cursuri_lesson_slug
+  const youtubeUrl = candidate?.metadata?.youtube_url
+  if (typeof cursuriLessonSlug === "string" && cursuriLessonSlug) row.cursuri_lesson_slug = cursuriLessonSlug
+  if (typeof youtubeUrl === "string" && youtubeUrl) row.youtube_url = youtubeUrl
+
+  if (candidate?.source_type === "quiz_question") {
+    row.quiz_question_id = candidate.source_id
+  } else if (candidate?.source_type === "problem") {
+    row.problem_id = candidate.source_id
+  } else if (candidate?.source_type === "math_problem" || candidate?.source_type === "coding_problem") {
+    row.problem_id = candidate.source_id
+  } else if (candidate?.source_type === "learning_path_item") {
+    const quizQuestionId = candidate.metadata?.quiz_question_id
+    const problemId = candidate.metadata?.problem_id
+    if (typeof quizQuestionId === "string" && quizQuestionId) row.quiz_question_id = quizQuestionId
+    if (typeof problemId === "string" && problemId) row.problem_id = problemId
+  }
+
+  return row
 }
 
-async function markCourseFailed(admin: SupabaseAnyClient, courseId: string, reason: string) {
-  const safeReason = reason.slice(0, 500)
+async function markChapterFailed(admin: SupabaseAnyClient, chapterId: string, reason: string) {
   await admin
-    .from("personalized_courses")
+    .from("learning_path_chapters")
     .update({
-      status: "failed",
+      generation_status: "failed",
       generation_metadata: {
         failedAt: new Date().toISOString(),
-        reason: safeReason,
+        reason: reason.slice(0, 500),
       },
     })
-    .eq("id", courseId)
+    .eq("id", chapterId)
 }
 
 async function checkRateLimit(admin: SupabaseAnyClient, userId: string): Promise<string | null> {
   const { count: totalCourses } = await admin
-    .from("personalized_courses")
+    .from("learning_path_chapters")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .neq("status", "failed")
+    .eq("generated_by_user_id", userId)
+    .eq("is_personalized", true)
+    .neq("generation_status", "failed")
 
   if ((totalCourses ?? 0) >= MAX_COURSES_TOTAL) {
     return `Ai atins limita de ${MAX_COURSES_TOTAL} cursuri personalizate. Șterge unul vechi pentru a genera unul nou.`
@@ -108,10 +134,11 @@ async function checkRateLimit(admin: SupabaseAnyClient, userId: string): Promise
 
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { count: todayCount } = await admin
-    .from("personalized_courses")
+    .from("learning_path_chapters")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .neq("status", "failed")
+    .eq("generated_by_user_id", userId)
+    .eq("is_personalized", true)
+    .neq("generation_status", "failed")
     .gte("created_at", oneDayAgo)
 
   if ((todayCount ?? 0) >= MAX_COURSES_PER_DAY) {
@@ -122,18 +149,7 @@ async function checkRateLimit(admin: SupabaseAnyClient, userId: string): Promise
 }
 
 export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    return NextResponse.json({ error: "Necesită autentificare." }, { status: 401 })
-  }
-
-  const courses = await getPersonalizedCoursesForUser(supabase, user.id, 12)
-  return NextResponse.json({ courses })
+  return NextResponse.json({ courses: [] })
 }
 
 export async function POST(request: Request) {
@@ -147,7 +163,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Necesită autentificare." }, { status: 401 })
   }
 
-  // Entitlement check: only full-access users (admin/paid) can generate courses
   const access = await getLearningPathAccess(null)
   if (access.mode !== "full") {
     return NextResponse.json(
@@ -164,24 +179,14 @@ export async function POST(request: Request) {
   }
 
   const prompt = normalizePrompt((body as { prompt?: unknown })?.prompt)
-  if (!prompt) {
-    return NextResponse.json({ error: "Promptul este obligatoriu." }, { status: 400 })
-  }
+  if (!prompt) return NextResponse.json({ error: "Promptul este obligatoriu." }, { status: 400 })
 
   const promptError = validatePrompt(prompt)
-  if (promptError) {
-    return NextResponse.json({ error: promptError }, { status: 400 })
-  }
+  if (promptError) return NextResponse.json({ error: promptError }, { status: 400 })
 
-  // Use service-role admin client for all course/lesson/item writes
-  // (RLS only allows SELECT for authenticated on those tables)
   const admin = createAdminClient()
-
-  // Rate limit check
   const rateLimitError = await checkRateLimit(admin, user.id)
-  if (rateLimitError) {
-    return NextResponse.json({ error: rateLimitError }, { status: 429 })
-  }
+  if (rateLimitError) return NextResponse.json({ error: rateLimitError }, { status: 429 })
 
   try {
     const candidates = await searchPlanckContentForPrompt(supabase, prompt, 80)
@@ -192,16 +197,26 @@ export async function POST(request: Request) {
       itemCount: plan.lessons.reduce((total, lesson) => total + lesson.items.length, 0),
       model: process.env.PERSONALIZED_COURSE_OPENAI_MODEL || "gpt-4o-mini",
       generatedAt: new Date().toISOString(),
+      backend: "learning_path",
     }
 
-    const { data: course, error: courseError } = await admin
-      .from("personalized_courses")
+    const chapterSlug = makeUniqueSlug("ai", plan.title, user.id)
+    const { data: chapter, error: chapterError } = await admin
+      .from("learning_path_chapters")
       .insert({
-        user_id: user.id,
+        generated_by_user_id: user.id,
+        is_personalized: true,
         original_prompt: prompt,
+        generation_status: "creating",
+        slug: chapterSlug,
         title: plan.title,
+        nav_title: plan.title.slice(0, 32),
         description: plan.description,
-        status: "creating",
+        icon_url: null,
+        accent_color: "#1f1f1f",
+        problem_category: "ai",
+        order_index: 900000 + Math.floor(Date.now() / 1000),
+        is_active: true,
         source_summary: candidates.slice(0, 40).map((candidate) => ({
           key: candidate.key,
           source_type: candidate.source_type,
@@ -216,75 +231,73 @@ export async function POST(request: Request) {
       .select("*")
       .single()
 
-    if (courseError || !course) {
-      console.error("personalized course insert:", courseError)
+    if (chapterError || !chapter) {
+      console.error("learning path chapter insert:", chapterError)
       return NextResponse.json({ error: "Nu am putut salva cursul personalizat." }, { status: 500 })
     }
 
+    let firstLessonSlug: string | null = null
+
     for (let lessonIndex = 0; lessonIndex < plan.lessons.length; lessonIndex += 1) {
       const lesson = plan.lessons[lessonIndex]
+      const lessonSlug = makeUniqueSlug("lectie", lesson.title, user.id, String(lessonIndex + 1))
+      if (!firstLessonSlug) firstLessonSlug = lessonSlug
+
       const { data: insertedLesson, error: lessonError } = await admin
-        .from("personalized_course_lessons")
+        .from("learning_path_lessons")
         .insert({
-          course_id: course.id,
+          chapter_id: chapter.id,
+          slug: lessonSlug,
           title: lesson.title,
           description: lesson.description ?? null,
+          image_url: null,
+          lesson_type: "text",
           order_index: lessonIndex,
+          is_active: true,
         })
         .select("*")
         .single()
 
       if (lessonError || !insertedLesson) {
-        console.error("personalized lesson insert:", lessonError)
-        await markCourseFailed(admin, course.id, lessonError?.message ?? "lesson insert failed")
+        console.error("learning path lesson insert:", lessonError)
+        await markChapterFailed(admin, chapter.id, lessonError?.message ?? "lesson insert failed")
         return NextResponse.json({ error: "Cursul a fost creat, dar lecțiile nu au putut fi salvate." }, { status: 500 })
       }
 
       const itemRows = lesson.items.map((item, itemIndex) =>
-        getItemInsertPayload(course.id, insertedLesson.id, item, itemIndex, candidatesByKey),
+        getOfficialItemInsertPayload(insertedLesson.id, item, itemIndex, candidatesByKey),
       )
-      const { error: itemsError } = await admin.from("personalized_course_items").insert(itemRows)
+      const { error: itemsError } = await admin.from("learning_path_lesson_items").insert(itemRows)
       if (itemsError) {
-        console.error("personalized item insert:", itemsError)
-        await markCourseFailed(admin, course.id, itemsError.message ?? "item insert failed")
+        console.error("learning path items insert:", itemsError)
+        await markChapterFailed(admin, chapter.id, itemsError.message ?? "item insert failed")
         return NextResponse.json({ error: "Cursul a fost creat, dar itemii nu au putut fi salvați." }, { status: 500 })
       }
     }
 
-    const { data: readyCourse, error: readyError } = await admin
-      .from("personalized_courses")
+    const { data: readyChapter, error: readyError } = await admin
+      .from("learning_path_chapters")
       .update({
-        status: "ready",
+        generation_status: "ready",
         generation_metadata: {
           ...generationMetadata,
           readyAt: new Date().toISOString(),
         },
       })
-      .eq("id", course.id)
-      .eq("user_id", user.id)
+      .eq("id", chapter.id)
       .select("*")
       .single()
 
-    if (readyError || !readyCourse) {
-      console.error("personalized course ready update:", readyError)
-      await markCourseFailed(admin, course.id, readyError?.message ?? "course ready update failed")
-      return NextResponse.json({ error: "Cursul a fost generat, dar nu a putut fi finalizat." }, { status: 500 })
+    if (readyError || !readyChapter) {
+      console.error("learning path chapter ready update:", readyError)
+      await markChapterFailed(admin, chapter.id, readyError?.message ?? "ready update failed")
+      return NextResponse.json({ error: "Cursul a fost generat, dar nu a putut fi activat." }, { status: 500 })
     }
 
-    return NextResponse.json({
-      course: {
-        id: readyCourse.id,
-        title: readyCourse.title,
-        description: readyCourse.description,
-        href: getPersonalizedCourseHref(readyCourse.id),
-      },
-      href: getPersonalizedCourseHref(readyCourse.id),
-    })
+    const href = firstLessonSlug ? `/invata/${chapterSlug}/${firstLessonSlug}` : `/invata/${chapterSlug}`
+    return NextResponse.json({ course: readyChapter, href }, { status: 201 })
   } catch (error) {
-    console.error("personalized course generation:", error)
-    const message = error instanceof Error && error.message.includes("OPENAI_API_KEY")
-      ? "OPENAI_API_KEY lipsește din configurația serverului."
-      : "Nu am putut genera cursul personalizat acum. Încearcă din nou."
-    return NextResponse.json({ error: message }, { status: 502 })
+    console.error("personalized learning path generation:", error)
+    return NextResponse.json({ error: "Nu am putut genera cursul personalizat acum." }, { status: 502 })
   }
 }

@@ -95,7 +95,7 @@ function coerceItem(
   const sourceKey = item.source_key?.trim() || null
   const hasValidSource = !!sourceKey && validSourceKeys.has(sourceKey)
   const candidate = hasValidSource && sourceKey ? candidatesByKey.get(sourceKey) : undefined
-  const itemType = hasValidSource ? candidate?.item_type ?? item.item_type : item.item_type === "text" ? "custom_text" : item.item_type
+  const itemType = hasValidSource ? candidate?.item_type ?? item.item_type : "custom_text"
 
   return {
     title: item.title.trim(),

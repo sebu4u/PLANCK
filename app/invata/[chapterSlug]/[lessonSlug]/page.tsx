@@ -76,10 +76,14 @@ export default async function InvataLessonDetailPage({
   params: Promise<{ chapterSlug: string; lessonSlug: string }>
 }) {
   const { chapterSlug, lessonSlug } = await params
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const chapter = isUuid(chapterSlug)
-    ? await getLearningPathChapterById(chapterSlug)
-    : await getLearningPathChapterBySlug(chapterSlug)
+    ? await getLearningPathChapterById(chapterSlug, supabase)
+    : await getLearningPathChapterBySlug(chapterSlug, supabase)
 
   if (!chapter) {
     notFound()
@@ -89,8 +93,8 @@ export default async function InvataLessonDetailPage({
   const showRealContent = access.mode === "full" || access.mode === "free-preview"
 
   const lesson = isUuid(lessonSlug)
-    ? await getLearningPathLessonById(lessonSlug)
-    : await getLearningPathLessonBySlug(chapterSlug, lessonSlug)
+    ? await getLearningPathLessonById(lessonSlug, supabase)
+    : await getLearningPathLessonBySlug(chapterSlug, lessonSlug, supabase)
 
   if (!lesson || lesson.chapter_id !== chapter.id) {
     notFound()
@@ -101,25 +105,20 @@ export default async function InvataLessonDetailPage({
     redirect(canonicalRedirect)
   }
 
-  const chapterLessons = showRealContent ? await getLearningPathLessonsByChapterId(chapter.id) : []
+  const chapterLessons = showRealContent ? await getLearningPathLessonsByChapterId(chapter.id, supabase) : []
   const currentLessonIndex = chapterLessons.findIndex((chapterLesson) => chapterLesson.id === lesson.id)
   const nextLesson =
     currentLessonIndex >= 0 && currentLessonIndex < chapterLessons.length - 1
       ? chapterLessons[currentLessonIndex + 1]
       : null
 
-  const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id) : []
+  const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id, supabase) : []
   const items = rawItems.map((item) => ({
     ...item,
     content_json: sanitizeTestContentJson(item.item_type, item.content_json ?? null),
   }))
   let initialSelectedItemId: string | null = items[0]?.id ?? null
   let completedItemIdList: string[] = []
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   let guestProgressMap = parseGuestLearningPathProgress(undefined)
   if (access.mode === "free-preview" && !user) {

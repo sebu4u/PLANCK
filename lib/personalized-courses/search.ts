@@ -165,6 +165,7 @@ async function fetchLearningPathCandidates(
         metadata: {
           chapter_id: row.chapter_id,
           cursuri_lesson_slug: row.cursuri_lesson_slug,
+          youtube_url: row.youtube_url,
           quiz_question_id: row.quiz_question_id,
           problem_id: row.problem_id,
         },
@@ -193,6 +194,8 @@ async function fetchLearningPathCandidates(
         url: null,
         metadata: {
           lesson_id: row.lesson_id,
+          cursuri_lesson_slug: row.cursuri_lesson_slug,
+          youtube_url: row.youtube_url,
           quiz_question_id: row.quiz_question_id,
           problem_id: row.problem_id,
         },
