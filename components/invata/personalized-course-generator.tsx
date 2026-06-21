@@ -91,13 +91,12 @@ export function PersonalizedCourseGenerator({
         }
 
         const targetHref = data?.href ?? data?.course?.href ?? null
+        // Don't navigate away — stay on /invata and refresh so the in-progress
+        // chapter card appears in the list with a real-time progress bar.
         setStatus("done")
         setCreatedHref(targetHref)
 
-        if (targetHref) {
-          router.refresh()
-          router.push(targetHref)
-        }
+        router.refresh()
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return
         setStatus("error")

@@ -25,6 +25,8 @@ import {
   useRegisterInvataChapterSection,
 } from "@/components/invata/invata-chapter-image-load-context"
 
+import { PersonalizedCourseProgressCard } from "@/components/invata/personalized-course-progress-card"
+
 export type LessonProgressByLessonId = Record<string, { completed: number; total: number }>
 
 interface LearningPathsListProps {
@@ -402,6 +404,57 @@ function InvataChapterSection({
   const sectionRef = useRegisterInvataChapterSection(chapterIndex)
   const imagesEnabled = useInvataChapterImagesEnabled(chapterIndex)
   const canDeletePersonalizedChapter = chapter.is_personalized === true && !!onDeletePersonalizedChapter
+
+  // In-progress or failed personalized chapter → render a progress/failure card instead.
+  if (chapter.generation_status === "creating" || chapter.generation_status === "failed") {
+    const meta =
+      chapter.generation_metadata && typeof chapter.generation_metadata === "object" && !Array.isArray(chapter.generation_metadata)
+        ? (chapter.generation_metadata as Record<string, unknown>)
+        : {}
+    const metaProgress =
+      meta.progress && typeof meta.progress === "object" && !Array.isArray(meta.progress)
+        ? (meta.progress as { stage?: string; percent?: number; message?: string })
+        : null
+    const failureReason =
+      chapter.generation_status === "failed" && typeof meta.reason === "string"
+        ? meta.reason
+        : null
+
+    return (
+      <section
+        ref={sectionRef}
+        id={invataChapterSectionDomId(chapter.id)}
+        className={
+          chapterIndex === 0
+            ? "relative"
+            : "relative border-t border-[#ececec] pt-10 sm:pt-10"
+        }
+        aria-label={chapter.title}
+      >
+        <PersonalizedCourseProgressCard
+          chapterId={chapter.id}
+          title={chapter.title}
+          description={chapter.description}
+          status={chapter.generation_status}
+          failureReason={failureReason}
+          initialProgress={
+            metaProgress
+              ? {
+                  stage: metaProgress.stage ?? null,
+                  percent: typeof metaProgress.percent === "number" ? metaProgress.percent : 0,
+                  message: metaProgress.message ?? null,
+                }
+              : null
+          }
+          onDelete={
+            canDeletePersonalizedChapter
+              ? () => onDeletePersonalizedChapter?.(chapter)
+              : undefined
+          }
+        />
+      </section>
+    )
+  }
 
   return (
     <section

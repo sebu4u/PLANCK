@@ -283,6 +283,33 @@ export async function getLearningPathChapters(client: SupabaseClient = supabase)
   return data || []
 }
 
+/**
+ * Fetch the current user's personalized chapters that are still being generated
+ * (generation_status creating/failed, is_active=false). These are shown on /invata
+ * as in-progress cards so the user sees real-time progress without navigating away.
+ */
+export async function getInProgressPersonalizedChapters(
+  userId: string,
+  client: SupabaseClient = supabase,
+): Promise<LearningPathChapter[]> {
+  if (!userId) return []
+  const { data, error } = await client
+    .from("learning_path_chapters")
+    .select("*")
+    .eq("generated_by_user_id", userId)
+    .eq("is_personalized", true)
+    .eq("is_active", false)
+    .in("generation_status", ["creating", "failed"])
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error fetching in-progress personalized chapters:", error)
+    return []
+  }
+
+  return data || []
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isUuid(value: string): boolean {

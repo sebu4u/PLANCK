@@ -13,6 +13,7 @@ import {
   getLearningPathChapters,
   getLearningPathLessonItemAggregates,
   getLearningPathLessonsByChapterId,
+  getInProgressPersonalizedChapters,
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
@@ -58,6 +59,15 @@ export default async function InvataPage() {
   } = await supabase.auth.getUser()
 
   const chapters = sortLearningPathChaptersForHub(await getLearningPathChapters(supabase))
+
+  // Merge in personalized chapters that are still generating (is_active=false, status creating/failed).
+  // These appear at the top of the list with a progress card.
+  if (user) {
+    const inProgress = await getInProgressPersonalizedChapters(user.id, supabase)
+    if (inProgress.length > 0) {
+      chapters.unshift(...inProgress)
+    }
+  }
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
 
   await Promise.all(
