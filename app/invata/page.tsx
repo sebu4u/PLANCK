@@ -29,6 +29,7 @@ import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
+import { PersonalizedCourseGenerationProvider } from "@/components/invata/personalized-course-generation-context"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import { isFreePreviewLearningPathChapterSlug, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
@@ -168,18 +169,20 @@ export default async function InvataPage() {
               </div>
             </header>
 
-            <div className="mb-10 sm:mb-12">
-              <PersonalizedCourseGenerator isAuthenticated={Boolean(user)} />
-            </div>
+            <PersonalizedCourseGenerationProvider>
+              <div className="mb-10 sm:mb-12">
+                <PersonalizedCourseGenerator isAuthenticated={Boolean(user)} />
+              </div>
 
-            <LearningPathsList
-              chapters={visibleChapters}
-              archivedChapters={archivedChapters}
-              lessonsByChapter={lessonsByChapter}
-              lockedChapterIds={lockedChapterIds}
-              completedLessonIds={completedLessonIds}
-              lessonProgressByLessonId={lessonProgressByLessonId}
-            />
+              <LearningPathsList
+                chapters={visibleChapters}
+                archivedChapters={archivedChapters}
+                lessonsByChapter={lessonsByChapter}
+                lockedChapterIds={lockedChapterIds}
+                completedLessonIds={completedLessonIds}
+                lessonProgressByLessonId={lessonProgressByLessonId}
+              />
+            </PersonalizedCourseGenerationProvider>
 
             <InvataSeoIntro />
           </div>

@@ -26,6 +26,10 @@ import {
 } from "@/components/invata/invata-chapter-image-load-context"
 
 import { PersonalizedCourseProgressCard } from "@/components/invata/personalized-course-progress-card"
+import {
+  usePersonalizedCourseGeneration,
+  type OptimisticInProgressChapter,
+} from "@/components/invata/personalized-course-generation-context"
 
 export type LessonProgressByLessonId = Record<string, { completed: number; total: number }>
 
@@ -403,7 +407,9 @@ function InvataChapterSection({
 }: InvataChapterSectionProps) {
   const sectionRef = useRegisterInvataChapterSection(chapterIndex)
   const imagesEnabled = useInvataChapterImagesEnabled(chapterIndex)
-  const canDeletePersonalizedChapter = chapter.is_personalized === true && !!onDeletePersonalizedChapter
+  const generation = usePersonalizedCourseGeneration()
+  const isOptimistic = (chapter as { __optimistic?: boolean }).__optimistic === true
+  const canDeletePersonalizedChapter = chapter.is_personalized === true && (!!onDeletePersonalizedChapter || isOptimistic)
 
   // In-progress or failed personalized chapter → render a progress/failure card instead.
   if (chapter.generation_status === "creating" || chapter.generation_status === "failed") {
@@ -448,7 +454,10 @@ function InvataChapterSection({
           }
           onDelete={
             canDeletePersonalizedChapter
-              ? () => onDeletePersonalizedChapter?.(chapter)
+              ? () => {
+                  if (isOptimistic) generation?.removeOptimisticChapter(chapter.id)
+                  onDeletePersonalizedChapter?.(chapter)
+                }
               : undefined
           }
         />
@@ -715,10 +724,22 @@ export function LearningPathsList({
   lessonProgressByLessonId = {},
 }: LearningPathsListProps) {
   const router = useRouter()
+  const generation = usePersonalizedCourseGeneration()
   const lockedChapterIdSet = new Set(lockedChapterIds)
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null)
   const [deletedChapterIds, setDeletedChapterIds] = useState<Set<string>>(() => new Set())
-  const visibleChapters = chapters.filter((chapter) => !deletedChapterIds.has(chapter.id))
+
+  // Merge optimistic in-progress chapters (from the generator) at the top. Dedupe
+  // against server-rendered chapters by id — once the real chapter appears (after a
+  // refresh when generation completes), the optimistic one is dropped.
+  const optimisticChapters = generation?.optimisticChapters ?? []
+  const serverChapterIds = new Set(chapters.map((c) => c.id))
+  const mergedChapters: LearningPathChapter[] = [
+    ...(optimisticChapters.filter((c) => !serverChapterIds.has(c.id) && !deletedChapterIds.has(c.id)) as unknown as LearningPathChapter[]),
+    ...chapters,
+  ]
+
+  const visibleChapters = mergedChapters.filter((chapter) => !deletedChapterIds.has(chapter.id))
   const visibleArchivedChapters = archivedChapters.filter((chapter) => !deletedChapterIds.has(chapter.id))
 
   const handleDeletePersonalizedChapter = useCallback(

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { AlertCircle, CheckCircle2, Loader2, Sparkles, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { usePersonalizedCourseGeneration } from "@/components/invata/personalized-course-generation-context"
 
 interface PersonalizedCourseProgressCardProps {
   chapterId: string
@@ -40,6 +41,7 @@ export function PersonalizedCourseProgressCard({
   onDelete,
 }: PersonalizedCourseProgressCardProps) {
   const router = useRouter()
+  const generation = usePersonalizedCourseGeneration()
   const [status, setStatus] = useState(initialStatus)
   const [progress, setProgress] = useState(
     initialProgress ?? { stage: null, percent: 0, message: null },
@@ -63,6 +65,9 @@ export function PersonalizedCourseProgressCard({
       if (data.status && data.status !== status) {
         setStatus(data.status)
         if (data.status === "ready") {
+          // Drop the optimistic entry (if any) so the server-rendered real chapter
+          // takes its place after refresh.
+          generation?.removeOptimisticChapter(chapterId)
           router.refresh()
         }
       }
@@ -73,6 +78,7 @@ export function PersonalizedCourseProgressCard({
 
   useEffect(() => {
     if (status === "ready") {
+      generation?.removeOptimisticChapter(chapterId)
       router.refresh()
       return
     }

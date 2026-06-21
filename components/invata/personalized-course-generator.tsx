@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Loader2, LogIn, Sparkles, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { usePersonalizedCourseGeneration, type OptimisticInProgressChapter } from "@/components/invata/personalized-course-generation-context"
 
 interface PersonalizedCourseGeneratorProps {
   isAuthenticated: boolean
@@ -19,6 +20,7 @@ export function PersonalizedCourseGenerator({
   loginHref = "/login?next=/invata",
 }: PersonalizedCourseGeneratorProps) {
   const router = useRouter()
+  const generation = usePersonalizedCourseGeneration()
   const [prompt, setPrompt] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -71,8 +73,10 @@ export function PersonalizedCourseGenerator({
 
         const data = (await response.json().catch(() => ({}))) as {
           error?: string
-          href?: string
-          course?: { id: string; href: string }
+          chapterId?: string
+          chapterSlug?: string
+          title?: string
+          description?: string | null
         }
 
         if (!response.ok) {
@@ -88,11 +92,27 @@ export function PersonalizedCourseGenerator({
           return
         }
 
-        // On 202 the course is queued (NOT ready). Reset the form and refresh so the
-        // in-progress chapter card appears in the list with a real-time progress bar.
-        // Never navigate away — the user stays on /invata and watches the card fill.
+        // On 202: push an optimistic in-progress chapter into the shared context so the
+        // progress card appears INSTANTLY at the top of the list (no server refresh
+        // needed). The card polls for readiness and refreshes when done. Never navigate.
+        if (data.chapterId && generation) {
+          const optimistic: OptimisticInProgressChapter = {
+            id: data.chapterId,
+            slug: data.chapterSlug ?? "",
+            title: data.title ?? (prompt.slice(0, 60) || "Curs personalizat"),
+            description: data.description ?? null,
+            is_personalized: true,
+            is_active: false,
+            generation_status: "creating",
+            generation_metadata: null,
+            __optimistic: true,
+          }
+          generation.addOptimisticChapter(optimistic)
+        }
         setPrompt("")
         setStatus("idle")
+        // Also refresh so any server-rendered in-progress chapters sync up, but the
+        // optimistic card is already visible — this is just for consistency.
         router.refresh()
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return
@@ -100,7 +120,7 @@ export function PersonalizedCourseGenerator({
         setErrorMessage("Conexiunea a eșuat. Verifică internetul și încearcă din nou.")
       }
     },
-    [isAuthenticated, prompt, router],
+    [isAuthenticated, prompt, router, generation],
   )
 
   const isDisabled = status === "loading"

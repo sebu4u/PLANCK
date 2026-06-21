@@ -487,10 +487,18 @@ export async function POST(request: Request) {
     }
   })
 
-  // Return immediately — the client redirects to the chapter page which shows a
-  // "generating" state; the page polls/refreshes until the chapter flips to "ready".
+  // Return immediately with the chapter id/slug/title so the client can render an
+  // optimistic in-progress card on /invata without waiting for a server refresh.
   return NextResponse.json(
-    { course: { id: chapterId, href: chapterHref }, href: chapterHref, status: "creating" },
+    {
+      course: { id: chapterId, href: chapterHref },
+      href: chapterHref,
+      status: "creating",
+      chapterId,
+      chapterSlug,
+      title: placeholderTitle,
+      description: `Curs personalizat pentru: ${prompt}`,
+    },
     { status: 202 },
   )
 }
