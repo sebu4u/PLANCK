@@ -293,6 +293,80 @@
   animation: fade-in-up 0.4s ease-out;
 }
 
+/* Continuous shimmer for the personalized-course generation progress bar.
+   The fill width tracks the real percent; this sweeps a lighter band across the
+   gradient so the bar always looks alive between percent updates. */
+@keyframes pc-progress-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.pc-progress-fill {
+  background-image: linear-gradient(
+    90deg,
+    #8b5cf6 0%,
+    #a78bfa 20%,
+    #7c3aed 40%,
+    #8b5cf6 60%,
+    #a78bfa 80%,
+    #7c3aed 100%
+  );
+  background-size: 200% 100%;
+  animation: pc-progress-shimmer 1.8s linear infinite;
+}
+
+@keyframes invata-ask-thinking-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.invata-ask-thinking-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
+  animation: invata-ask-thinking-bounce 1.2s ease-in-out infinite;
+}
+
+.invata-ask-thinking-dot-delay-1 {
+  animation-delay: 0.15s;
+}
+
+.invata-ask-thinking-dot-delay-2 {
+  animation-delay: 0.3s;
+}
+
+.invata-ask-thinking-dot-delay-3 {
+  animation-delay: 0.45s;
+}
+
+@keyframes invata-ask-stream-cursor-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.invata-ask-stream-cursor {
+  animation: invata-ask-stream-cursor-blink 1s step-end infinite;
+}
+
 @keyframes learning-path-card-pop {
   0% {
     opacity: 0;
@@ -2201,6 +2275,200 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
 .loading-video-pop-in {
   animation: loading-video-pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   will-change: transform, opacity;
+}
+
+@keyframes generation-iris-open {
+  from {
+    clip-path: circle(0% at 50% 50%);
+  }
+  to {
+    clip-path: circle(150% at 50% 50%);
+  }
+}
+
+@keyframes generation-iris-reveal-page {
+  from {
+    clip-path: circle(150% at 50% 50%);
+  }
+  to {
+    clip-path: circle(0% at 50% 50%);
+  }
+}
+
+.generation-cinematic-backdrop {
+  background:
+    linear-gradient(180deg, rgba(34, 197, 94, 0.22) 0%, rgba(187, 247, 208, 0.12) 18%, rgba(255, 255, 255, 0) 42%),
+    #ffffff;
+  will-change: clip-path;
+}
+
+.generation-cinematic-backdrop-open {
+  clip-path: circle(150% at 50% 50%);
+}
+
+.generation-iris-open {
+  animation: generation-iris-open 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.generation-iris-reveal-page {
+  animation: generation-iris-reveal-page 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes generation-word-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes generation-message-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(12px);
+  }
+  65% {
+    transform: scale(1.04) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes generation-message-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94) translateY(-8px);
+  }
+}
+
+.generation-message-pop {
+  animation: generation-message-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.generation-message-pop-out {
+  animation: generation-message-pop-out 0.28s ease-in both;
+}
+
+.generation-video-center {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes generation-video-to-corner {
+  from {
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    left: auto;
+    top: auto;
+    right: 1.5rem;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    transform: translate(0, 0) scale(0.72);
+  }
+}
+
+@media (min-width: 640px) {
+  @keyframes generation-video-to-corner {
+    from {
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+      left: auto;
+      top: auto;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      transform: translate(0, 0) scale(0.72);
+    }
+  }
+}
+
+.generation-video-to-corner {
+  animation: generation-video-to-corner 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.generation-floating-widget-anchor {
+  right: 1rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .generation-floating-widget-anchor {
+    right: 1.5rem;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.generation-video-corner-widget {
+  animation: loading-video-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes generation-tooltip-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.generation-tooltip-pop {
+  animation: generation-tooltip-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: bottom right;
+}
+
+@keyframes generation-status-line-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.generation-status-line-pop {
+  animation: generation-status-line-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: left center;
+}
+
+@keyframes generation-status-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  65% {
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.generation-status-check-pop {
+  animation: generation-status-check-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.generation-video-corner {
+  will-change: transform;
 }
 
 @keyframes learning-path-item-enter-up {

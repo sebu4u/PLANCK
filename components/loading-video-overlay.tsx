@@ -1,9 +1,59 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
+import { cn } from "@/lib/utils"
+
+export const LOADING_VIDEO_SRC = "/videos/loading.webm"
+
+export interface LoadingVideoProps {
+  className?: string
+  style?: React.CSSProperties
+  animateEntry?: boolean
+  maxWidth?: string
+  maxHeight?: string
+}
+
+export const LoadingVideo = forwardRef<HTMLVideoElement, LoadingVideoProps>(function LoadingVideo(
+  { className, style, animateEntry = false, maxWidth = "min(40vw, 140px)", maxHeight = "22vh" },
+  ref,
+) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement)
+
+  useEffect(() => {
+    if (!videoRef.current) return
+    const playPromise = videoRef.current.play()
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => {})
+    }
+  }, [])
+
+  return (
+    <div className={animateEntry ? "loading-video-pop-in" : undefined}>
+      <video
+        ref={videoRef}
+        src={LOADING_VIDEO_SRC}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        className={cn("block object-contain", className)}
+        style={{
+          width: "auto",
+          height: "auto",
+          maxWidth,
+          maxHeight,
+          ...style,
+        }}
+      />
+    </div>
+  )
+})
 
 export const DEFAULT_LOADING_TIPS = [
-  "Tips: Explorează secțiunea \"Grile\" pentru a-ți testa rapid cunoștințele!",
+  'Tips: Explorează secțiunea "Grile" pentru a-ți testa rapid cunoștințele!',
   "Tips: Poți salva proiectele tale pe PlanckCode pentru a reveni oricând la ele.",
   "Tips: Folosește AI Tutor pentru explicații pas cu pas la problemele dificile.",
 ]
@@ -21,7 +71,6 @@ export function LoadingVideoOverlay({
   showTips = true,
   animateEntry = false,
 }: LoadingVideoOverlayProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
   const [randomTip, setRandomTip] = useState<string | null>(null)
 
   useEffect(() => {
@@ -32,14 +81,6 @@ export function LoadingVideoOverlay({
 
     setRandomTip(tipMessages[Math.floor(Math.random() * tipMessages.length)])
   }, [showTips, tipMessages])
-
-  useEffect(() => {
-    if (!videoRef.current) return
-    const playPromise = videoRef.current.play()
-    if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch(() => { })
-    }
-  }, [])
 
   return (
     <div
@@ -54,25 +95,7 @@ export function LoadingVideoOverlay({
         backgroundColor: "#ffffff",
       }}
     >
-      <div className={animateEntry ? "loading-video-pop-in" : undefined}>
-        <video
-          ref={videoRef}
-          src="/videos/loading.webm"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          style={{
-            display: "block",
-            width: "auto",
-            height: "auto",
-            maxWidth: "min(40vw, 140px)",
-            maxHeight: "22vh",
-            objectFit: "contain",
-          }}
-        />
-      </div>
+      <LoadingVideo animateEntry={animateEntry} />
       {randomTip && (
         <p
           style={{

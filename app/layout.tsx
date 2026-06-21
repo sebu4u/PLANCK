@@ -15,6 +15,8 @@ import { MobileViewportFix } from "@/components/mobile-viewport-fix"
 import { RealVHProvider } from "@/components/real-vh-provider"
 import { EngagementProvider } from "@/components/engagement/notification-provider"
 import { EngagementNotificationToaster } from "@/components/engagement/notification-toaster"
+import { PersonalizedCourseGenerationProvider } from "@/components/invata/personalized-course-generation-context"
+import { PersonalizedCourseGenerationShell } from "@/components/invata/personalized-course-generation-shell"
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
@@ -122,7 +124,10 @@ export default function RootLayout({
             <AnalyticsProvider>
               <KatexProvider>
                 <EngagementProvider>
-                  <AuthSessionGate>{children}</AuthSessionGate>
+                  <PersonalizedCourseGenerationProvider>
+                    <AuthSessionGate>{children}</AuthSessionGate>
+                    <PersonalizedCourseGenerationShell />
+                  </PersonalizedCourseGenerationProvider>
                 </EngagementProvider>
               </KatexProvider>
               <Toaster />

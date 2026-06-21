@@ -1,7 +1,5 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { cookies } from "next/headers"
-import { Layers } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { generateMetadata } from "@/lib/metadata"
@@ -13,6 +11,7 @@ import {
   getLearningPathChapters,
   getLearningPathLessonItemAggregates,
   getLearningPathLessonsByChapterId,
+  type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
 import {
@@ -26,6 +25,7 @@ import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context
 import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
+import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import { isFreePreviewLearningPathChapterSlug, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
@@ -33,29 +33,45 @@ import { getLearningPathAccess } from "@/lib/learning-path-access"
 export const metadata: Metadata = generateMetadata("learning-paths")
 export const revalidate = 21600
 
+function sortLearningPathChaptersForHub(chapters: LearningPathChapter[]): LearningPathChapter[] {
+  return [...chapters].sort((a, b) => {
+    const aPersonalized = a.is_personalized === true
+    const bPersonalized = b.is_personalized === true
+    if (aPersonalized !== bPersonalized) return aPersonalized ? -1 : 1
+
+    if (aPersonalized && bPersonalized) {
+      return Date.parse(b.created_at) - Date.parse(a.created_at)
+    }
+
+    return a.order_index - b.order_index
+  })
+}
+
 export default async function InvataPage() {
   const access = await getLearningPathAccess(null)
   const hasFullAccess = access.mode === "full"
-  const chapters = await getLearningPathChapters()
-  const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
-
-  await Promise.all(
-    chapters.map(async (chapter) => {
-      lessonsByChapter[chapter.id] = await getLearningPathLessonsByChapterId(chapter.id)
-    })
-  )
-
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  const chapters = sortLearningPathChaptersForHub(await getLearningPathChapters(supabase))
+
+  const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
+
+  await Promise.all(
+    chapters.map(async (chapter) => {
+      lessonsByChapter[chapter.id] = await getLearningPathLessonsByChapterId(chapter.id, supabase)
+    })
+  )
   const allLessonIds = Object.values(lessonsByChapter).flatMap((lessons) => lessons.map((l) => l.id))
+
   const completedLessonIds = user
     ? await getCompletedLearningPathLessonIdsForUser(supabase, user.id, allLessonIds)
     : []
 
   const { counts: itemCountsByLessonId, itemIdsByLessonId } =
-    await getLearningPathLessonItemAggregates(allLessonIds)
+    await getLearningPathLessonItemAggregates(allLessonIds, supabase)
   const allItemIds = Object.values(itemIdsByLessonId).flat()
 
   let completedItemIdSet = new Set<string>()
@@ -127,19 +143,19 @@ export default async function InvataPage() {
                   Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
                 </p>
               </div>
-              <div className="flex flex-col items-start gap-3 sm:items-end">
-                {user ? (
-                  <Link
-                    href="/invata/flashcard-uri"
-                    className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100"
-                  >
-                    <Layers className="h-4 w-4" />
-                    Flashcard-urile mele
-                  </Link>
-                ) : null}
+              <div className="flex w-full max-w-[420px] flex-col items-start gap-3 sm:items-end">
+                <PersonalizedCourseGenerator
+                  isAuthenticated={Boolean(user)}
+                  className="hidden w-full sm:block"
+                />
                 <InvataAdminLearningPathsLink />
               </div>
             </header>
+
+            <PersonalizedCourseGenerator
+              isAuthenticated={Boolean(user)}
+              className="mb-6 sm:hidden"
+            />
 
             <LearningPathsList
               chapters={visibleChapters}

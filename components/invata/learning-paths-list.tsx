@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowRight, BookOpen, ChevronDown } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowRight, BookOpen, ChevronDown, Loader2, Trash2 } from "lucide-react"
 import {
   getLearningPathLessonHref,
   type LearningPathChapter,
@@ -377,6 +378,10 @@ function ElasticLessonsScroller({
   )
 }
 
+function isHiddenGeneratingChapter(chapter: LearningPathChapter): boolean {
+  return chapter.generation_status === "creating" || chapter.generation_status === "failed"
+}
+
 interface InvataChapterSectionProps {
   chapter: LearningPathChapter
   chapterIndex: number
@@ -384,6 +389,8 @@ interface InvataChapterSectionProps {
   isLocked: boolean
   completedLessonIds: string[]
   lessonProgressByLessonId: LessonProgressByLessonId
+  isDeletingPersonalizedChapter?: boolean
+  onDeletePersonalizedChapter?: (chapter: LearningPathChapter) => void
 }
 
 function InvataChapterSection({
@@ -393,9 +400,16 @@ function InvataChapterSection({
   isLocked,
   completedLessonIds,
   lessonProgressByLessonId,
+  isDeletingPersonalizedChapter = false,
+  onDeletePersonalizedChapter,
 }: InvataChapterSectionProps) {
   const sectionRef = useRegisterInvataChapterSection(chapterIndex)
   const imagesEnabled = useInvataChapterImagesEnabled(chapterIndex)
+  const canDeletePersonalizedChapter = chapter.is_personalized === true && !!onDeletePersonalizedChapter
+
+  if (isHiddenGeneratingChapter(chapter)) {
+    return null
+  }
 
   return (
     <section
@@ -422,6 +436,21 @@ function InvataChapterSection({
               <span className="mt-3 inline-flex rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
                 În curând..
               </span>
+            ) : null}
+            {canDeletePersonalizedChapter ? (
+              <button
+                type="button"
+                onClick={() => onDeletePersonalizedChapter?.(chapter)}
+                disabled={isDeletingPersonalizedChapter}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#e6e6e6] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f5f5f] transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeletingPersonalizedChapter ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                Șterge
+              </button>
             ) : null}
           </div>
           {chapter.icon_url ? (
@@ -463,7 +492,14 @@ function InvataChapterSection({
           )}
 
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-[#111111]">{chapter.title}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold text-[#111111]">{chapter.title}</h2>
+              {chapter.is_personalized ? (
+                <span className="rounded-full border border-[#e6e6e6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#6f6f6f]">
+                  Curs personalizat
+                </span>
+              ) : null}
+            </div>
             {chapter.description ? (
               <p className="mt-0.5 text-sm text-[#707070]">{chapter.description}</p>
             ) : null}
@@ -475,11 +511,28 @@ function InvataChapterSection({
             ) : null}
           </div>
         </div>
-        {isLocked ? (
-          <span className="shrink-0 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
-            In curand..
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {canDeletePersonalizedChapter ? (
+            <button
+              type="button"
+              onClick={() => onDeletePersonalizedChapter?.(chapter)}
+              disabled={isDeletingPersonalizedChapter}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#e6e6e6] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f5f5f] transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isDeletingPersonalizedChapter ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              Șterge
+            </button>
+          ) : null}
+          {isLocked ? (
+            <span className="rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
+              In curand..
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="relative sm:hidden" style={{ zIndex: INVATA_HUB_LESSON_CARDS_Z }}>
@@ -616,9 +669,58 @@ export function LearningPathsList({
   completedLessonIds = [],
   lessonProgressByLessonId = {},
 }: LearningPathsListProps) {
+  const router = useRouter()
   const lockedChapterIdSet = new Set(lockedChapterIds)
+  const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null)
+  const [deletedChapterIds, setDeletedChapterIds] = useState<Set<string>>(() => new Set())
 
-  if (!chapters.length) {
+  const visibleChapters = chapters
+    .filter((chapter) => !deletedChapterIds.has(chapter.id))
+    .filter((chapter) => !isHiddenGeneratingChapter(chapter))
+  const visibleArchivedChapters = archivedChapters
+    .filter((chapter) => !deletedChapterIds.has(chapter.id))
+    .filter((chapter) => !isHiddenGeneratingChapter(chapter))
+
+  const handleDeletePersonalizedChapter = useCallback(
+    async (chapter: LearningPathChapter) => {
+      if (chapter.is_personalized !== true || deletingChapterId) return
+
+      const confirmed = window.confirm(
+        `Ștergi cursul personalizat „${chapter.title}”? Această acțiune nu poate fi anulată.`,
+      )
+      if (!confirmed) return
+
+      setDeletingChapterId(chapter.id)
+      try {
+        const response = await fetch("/api/personalized-courses", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chapterId: chapter.id }),
+          credentials: "same-origin",
+        })
+        const data = (await response.json().catch(() => ({}))) as { error?: string }
+
+        if (!response.ok) {
+          window.alert(data.error || "Nu am putut șterge cursul personalizat.")
+          return
+        }
+
+        setDeletedChapterIds((current) => {
+          const next = new Set(current)
+          next.add(chapter.id)
+          return next
+        })
+        router.refresh()
+      } catch {
+        window.alert("Conexiunea a eșuat. Încearcă din nou.")
+      } finally {
+        setDeletingChapterId(null)
+      }
+    },
+    [deletingChapterId, router],
+  )
+
+  if (!visibleChapters.length) {
     return (
       <section className="rounded-2xl border border-[#e6e6e6] bg-[#f7f7f7] p-8 text-center">
         <h2 className="text-lg font-semibold text-[#1f1f1f]">Nu există încă learning paths.</h2>
@@ -631,10 +733,10 @@ export function LearningPathsList({
 
   return (
     <div className="pb-14">
-      <InvataChapterSectionIndicator chapterIds={chapters.map((c) => c.id)} />
+      <InvataChapterSectionIndicator chapterIds={visibleChapters.map((c) => c.id)} />
 
       <div className="space-y-12 sm:space-y-10">
-        {chapters.map((chapter, chapterIndex) => (
+        {visibleChapters.map((chapter, chapterIndex) => (
           <InvataChapterSection
             key={chapter.id}
             chapter={chapter}
@@ -643,11 +745,13 @@ export function LearningPathsList({
             isLocked={lockedChapterIdSet.has(chapter.id)}
             completedLessonIds={completedLessonIds}
             lessonProgressByLessonId={lessonProgressByLessonId}
+            isDeletingPersonalizedChapter={deletingChapterId === chapter.id}
+            onDeletePersonalizedChapter={handleDeletePersonalizedChapter}
           />
         ))}
       </div>
 
-      <InvataArchivedLearningPathsSection chapters={archivedChapters} />
+      <InvataArchivedLearningPathsSection chapters={visibleArchivedChapters} />
     </div>
   )
 }
