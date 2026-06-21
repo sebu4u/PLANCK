@@ -13,6 +13,7 @@ import {
   isInteractiveLessonItemType,
   validateInteractiveItemContent,
 } from "@/lib/learning-path-interactive-items"
+import { validateTestContent } from "@/lib/learning-path-test"
 import type { LearningPathLessonType } from "@/lib/supabase-learning-paths"
 
 const PERSONALIZED_ITEM_TYPES = [
@@ -104,7 +105,16 @@ const planSchema = z.object({
   lessons: z.array(planLessonSchema).min(1).max(8),
 })
 
-/** Item types the AI may generate rich content_json for (no external DB row needed). */
+/**
+ * Item types the AI may generate rich content_json for (no external DB row needed).
+ * Chosen to match the real distribution of official PLANCK lesson items:
+ * custom_text (802), poll (323), match (109), code_trace (95), reveal_steps (90),
+ * swipe_classify (73), fill_slot (62), test (53), card_sort (48), table_fill (25),
+ * memory_flip (11). Rare/absent official types (slider_explore, speed_round,
+ * graph_build, flow_build) are intentionally excluded — generating them made AI
+ * lessons *more* varied than official ones in a way that was a tell, and their
+ * schemas (SVG paths, mathjs formulas, timed rounds) are the most error-prone.
+ */
 const GENERATABLE_ITEM_TYPES = [
   "custom_text",
   "match",
@@ -114,11 +124,9 @@ const GENERATABLE_ITEM_TYPES = [
   "table_fill",
   "swipe_classify",
   "memory_flip",
-  "flow_build",
   "code_trace",
-  "slider_explore",
-  "graph_build",
-  "speed_round",
+  "poll",
+  "test",
 ] as const satisfies readonly LearningPathLessonType[]
 
 const GENERATABLE_ITEM_TYPE_SET: ReadonlySet<string> = new Set(GENERATABLE_ITEM_TYPES)
@@ -260,10 +268,46 @@ function makeRichCustomTextBody(title: string, userPrompt: string, lessonTitle?:
 }
 
 /**
- * Build a generated (non-source) item, preserving the AI-chosen interactive type when
- * its content_json validates against the real interactive parsers. Falls back to a rich
- * custom_text explanation when the interactive content is missing or invalid — never to a
- * broken item or a one-line connector.
+ * Validate poll content_json the same way the renderer's parsePollContent does:
+ * question + correctAnswerId + options[{id,label,feedback}], correctAnswerId must
+ * match an option id, no empty options. Returns an error string or null when valid.
+ */
+function validatePollContent(content: Record<string, unknown> | null): string | null {
+  if (!content) return "poll: content_json obligatoriu."
+  if (typeof content.question !== "string" || !content.question.trim()) {
+    return "poll: question (string nevid) obligatoriu."
+  }
+  if (typeof content.correctAnswerId !== "string" || !content.correctAnswerId.trim()) {
+    return "poll: correctAnswerId (string nevid) obligatoriu."
+  }
+  const rawOptions = content.options
+  if (!Array.isArray(rawOptions) || rawOptions.length < 2) {
+    return "poll: options trebuie să fie un array cu minim 2 elemente."
+  }
+  const ids = new Set<string>()
+  for (let i = 0; i < rawOptions.length; i += 1) {
+    const opt = rawOptions[i]
+    if (!opt || typeof opt !== "object") return `poll: opțiunea #${i + 1} invalidă.`
+    const o = opt as Record<string, unknown>
+    if (typeof o.id !== "string" || !o.id.trim()) return `poll: opțiunea #${i + 1} are id lipsă.`
+    if (typeof o.label !== "string" || !o.label.trim()) return `poll: opțiunea #${i + 1} are label lipsă.`
+    if (typeof o.feedback !== "string" || !o.feedback.trim()) {
+      return `poll: opțiunea #${i + 1} are feedback lipsă (explicație afișată după răspuns).`
+    }
+    if (ids.has(o.id)) return `poll: id opțiune duplicat (${o.id}).`
+    ids.add(o.id)
+  }
+  if (!ids.has(content.correctAnswerId)) {
+    return "poll: correctAnswerId trebuie să fie unul dintre id-urile opțiunilor."
+  }
+  return null
+}
+
+/**
+ * Build a generated (non-source) item, preserving the AI-chosen type when its
+ * content_json validates against the real parsers (interactive types, poll, test).
+ * Falls back to a rich custom_text explanation when the content is missing or invalid —
+ * never to a broken item or a one-line connector.
  */
 function buildGeneratedItem(
   item: PersonalizedCourseGeneratedPlanItem,
@@ -283,6 +327,14 @@ function buildGeneratedItem(
       return { title, item_type: requestedType, source_key: null, content_json: rawContent }
     }
     // Invalid interactive content → fall back to rich custom_text (do not store a broken item).
+  } else if (requestedType === "poll" && rawContent) {
+    if (!validatePollContent(rawContent)) {
+      return { title, item_type: "poll", source_key: null, content_json: rawContent }
+    }
+  } else if (requestedType === "test" && rawContent) {
+    if (!validateTestContent(rawContent, { minProblems: 2 })) {
+      return { title, item_type: "test", source_key: null, content_json: rawContent }
+    }
   }
 
   const body =
@@ -608,26 +660,26 @@ function normalizePlan(
   }, candidates, userPrompt)
 }
 
-const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) și conținutul content_json EXACT (validat strict):
+const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) și conținutul content_json EXACT (validat strict). Folosește DOAR aceste tipuri pentru itemi generați — ele reflectă frecvența tipurilor din lecțiile oficiale Planck:
 
-- custom_text: {"body": "markdown substancial — titlu ##, 2-4 paragrafe, exemple, $formule LaTeX$. Minim ~80 de cuvinte."}
-- match: {"instructions": "...opțional", "left": [{"id":"l1","text":"..."}], "right": [{"id":"r1","text":"..."}], "pairs": [{"leftId":"l1","rightId":"r1"}]} — left și right au aceeași lungime (3-6); pairs acoperă fiecare element o singură dată.
-- card_sort: {"instructions": "...opțional", "cards": [{"id":"a","text":"..."}], "correctOrder": ["a",...]} — correctOrder este o permutare a id-urilor (4-7 carduri).
+- custom_text: {"body": "markdown substancial — titlu ##, 2-4 paragrafe, exemple, $formule LaTeX$. Minim ~80 de cuvinte."}. Pentru sublinieri folosește shortcode-urile oficiale: [IMPORTANT]...[/IMPORTANT] pentru idei-cheie, [FORMULA]$$...$$[/FORMULA] pentru formule evidențiate, [ENUNT]...[/ENUNT] pentru enunțuri de probleme, [CODINLINE]...[/CODINLINE] pentru cod inline, [DEFINITIE]...[/DEFINITIE] pentru definiții, [EXEMPLU]...[/EXEMPLU] pentru exemple. Aceste shortcode-uri sunt stilizate special în Planck — folosește-le ca în lecțiile oficiale.
+- poll: {"imageSrc": "" (sau URL imagine, opțional), "imageAlt": "" (opțional), "question": "...?", "correctAnswerId": "id_răspuns_corect", "options": [{"id":"a","label":"...","feedback":"explicație afișată după răspuns"}]} — minim 2 opțiuni; FIECARE opțiune trebuie să aibă feedback (explicație scurtă, educativă); correctAnswerId trebuie să fie unul dintre id-urile opțiunilor. Folosește poll pentru verificări de înțelegere cu explicații.
+- match: {"instructions": "...opțional", "left": [{"id":"l1","text":"..."}], "right": [{"id":"r1","text":"..."}], "pairs": [{"leftId":"l1","rightId":"r1"}]} — left și right au aceeași lungime (2-6); pairs asociază fiecare element o singură dată. Bine pentru termen↔definiție.
+- card_sort: {"instructions": "...opțional", "cards": [{"id":"a","text":"..."}], "correctOrder": ["a",...]} — correctOrder este o permutare a id-urilor (4 carduri). Bine pentru ordonare de pași/nivele.
 - fill_slot: {"instructions": "...opțional", "latexTemplate": "F = {{m}} \\cdot a", "slots": [{"id":"m","answer":"2"}], "chips": ["1","2","5","10"]} — fiecare {{id}} apare în latexTemplate; chips include toate answer-urile + distractoare.
-- reveal_steps: {"instructions": "...opțional", "steps": [{"kind":"markdown","content":"..."},{"kind":"quiz","content":"...?","options":["a","b","c"],"correctIndex":0}]} — minim 3 pași.
-- table_fill: {"instructions": "...opțional", "headers": ["Mărime","Unitate"], "rows": [{"cells": [{"text":"Forță"},{"blank":true,"answer":"N"}]}]} — cells.length === headers.length.
+- reveal_steps: {"instructions": "...opțional", "steps": [{"kind":"markdown","content":"..."},{"kind":"quiz","content":"...?","options":["a","b","c"],"correctIndex":0}]} — minim 3 pași. Bine pentru exerciții rezolvate pas cu pas: folosește [ENUNT]...[/ENUNT] la primul pas, [FORMULA]$$...$$[/FORMULA] în pașii de calcul, [IMPORTANT]...[/IMPORTANT] la concluzie.
+- table_fill: {"instructions": "...opțional", "headers": ["Mărime","Unitate"], "rows": [{"cells": [{"text":"Forță"},{"blank":true,"answer":"N"}]}]} — cells.length === headers.length; celulele blank au {"blank":true,"answer":"..."}.
 - swipe_classify: {"prompt": "...opțional", "leftLabel": "Adevărat", "rightLabel": "Fals", "cards": [{"text":"...","side":"left"}]} — 4-8 carduri; side "left" sau "right".
-- memory_flip: {"instructions": "...opțional", "pairs": [{"a":"$\\vec{F}$","b":"Forță"}]} — 3-6 perechi; a/b markdown sau LaTeX.
-- flow_build: {"instructions": "...opțional", "nodes": [{"id":"s","kind":"start","label":"Start"}], "correctEdges": [{"from":"s","to":"p"}]} — kind: start|process|decision|end.
-- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"choice","options":["1","2","3"],"answer":"3"}]} — pentru inputMode "choice", answer trebuie să fie printre options; lineIndex în raza lines. FĂRĂ caractere < > & în lines/options/answer.
-- slider_explore: {"instructions": "...opțional", "sliders": [{"id":"m","label":"masa (kg)","min":0.5,"max":20,"step":0.1,"default":2}], "formula": "m*5", "targetMin": 49, "targetMax": 51} — formula folosește doar id-urile sliderelor + operatori mathjs.
-- graph_build: {"mode":"pick_curve", "prompt":"Care curbă...?", "options": [{"id":"a","label":"Constant","svgPath":"M 5 30 L 95 30"}], "correctOptionId":"b"} — svgPath e cale SVG în viewBox x 0..100, y 0..40.
-- speed_round: {"secondsTotal": 60, "questions": [{"prompt":"...?","options":["a","b","c"],"correctIndex":1}]} — 3-6 întrebări.
+- memory_flip: {"instructions": "...opțional", "pairs": [{"a":"$\\vec{F}$","b":"Forță"}]} — 3 perechi; a/b markdown sau LaTeX.
+- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"text","answer":"3"}]} — pentru inputMode "choice", answer trebuie să fie printre options și minim 2 opțiuni; lineIndex în raza lines (0..len-1). Preferă inputMode "text" ca în lecțiile oficiale. Folosește [CODINLINE]...[/CODINLINE] în prompt pentru variabile.
+- test: {"icon": "Zap", "description": "...", "difficulty": 1-5, "timeLimitSeconds": 300, "problems": [{"id":"q1","statement":"...?","imageUrl":null,"options":[{"id":"q1_a","label":"..."}],"correctOptionId":"q1_a"}]} — minim 2 probleme, fiecare cu 2-4 opțiuni și correctOptionId printre ele; id-uri unice; imageUrl null sau URL http(s). Bine pentru mini-test de recapitulare la final de lecție.
 
 REGULI PENTRU ITEMI GENERAȚI:
-- Fiecare lecție trebuie să conțină un MIX VARIAT de tipuri: minim 2 itemi custom_text cu explicații substaniale ȘI minim 3 itemi interactivi de tipuri DIFERITE (match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, flow_build, code_trace etc.). NU folosi doar custom_text.
+- Fiecare lecție trebuie să conțină un MIX VARIAT, ca în lecțiile oficiale Planck: minim 2 itemi custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri DIFERITE din lista de mai sus (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace). NU folosi doar custom_text.
+- Ponderie naturală: folosește des poll (verificări cu feedback), match, code_trace, reveal_steps, swipe_classify, fill_slot, card_sort; mai rar memory_flip și table_fill. NU genera tipurile care nu sunt în lista de mai sus (flow_build, graph_build, slider_explore, speed_round).
+- La finalul ultimei lecții adaugă de obicei un item test (mini-test de recapitulare).
 - Conținutul generat trebuie să fie relevant pentru TITLUL lecției și obiectivul userului, calitate de manual, NU text generic de legătură.
-- Pentru matematică folosește LaTeX ($...$). NU folosi caractere < > & în câmpuri afișate ca text simplu (lines, options, answer, chips, label, svgPath, formula).
+- Pentru matematică folosește LaTeX ($...$, $$...$$). NU folosi caractere < > & în câmpuri afișate ca text simplu (lines, options, answer, chips, label, statement, feedback).
 - Pentru itemii cu source_key, content_json = null. Nu inventa source_key — folosește doar cheile din listă sau null.`
 
 const SYSTEM_PROMPT = `Ești plannerul de cursuri personalizate PLANCK Academy.
@@ -683,7 +735,7 @@ export async function planPersonalizedCourse(
           {
             user_learning_goal: userPrompt,
             available_planck_content: stringifyCandidates(candidates),
-            instruction: "Alege iteme prin source_key din lista de mai sus (fără duplicate). Fiecare lecție trebuie să aibă 20-25 itemi. Completează restul cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substaniale și minim 3 itemi interactivi de tipuri diferite per lecție, cu content_json valid conform ghidului. Nu genera doar custom_text.",
+            instruction: "Alege iteme prin source_key din lista de mai sus (fără duplicate). Fiecare lecție trebuie să aibă 20-25 itemi. Completează restul cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text și nu genera tipurile care nu sunt în ghid (flow_build, graph_build, slider_explore, speed_round).",
             required_json_shape: {
               title: "string",
               description: "string",
@@ -694,7 +746,7 @@ export async function planPersonalizedCourse(
                   items: [
                     {
                       title: "string",
-                      item_type: "custom_text | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | flow_build | code_trace | slider_explore | graph_build | speed_round | text | grila | problem | ...",
+                      item_type: "custom_text | poll | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | code_trace | test | text | grila | problem | ...",
                       source_key: "exact un source_key din listă sau null",
                       content_json: "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului",
                     },
