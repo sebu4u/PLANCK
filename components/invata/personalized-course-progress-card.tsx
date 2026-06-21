@@ -78,6 +78,30 @@ function buildMessageCycle(stage: string | null, serverMessage: string | null): 
   return cycle
 }
 
+/**
+ * The bar creeps continuously toward the next stage threshold (minus a small
+ * margin) so it always moves, even during the long AI planning call where the
+ * server percent sits at 15% for ~60s. When the server advances to the next
+ * stage, the floor jumps up and creeping continues toward the new cap.
+ */
+function creepCapForStage(stage: string | null): number {
+  switch (stage) {
+    case "searching":
+      return 14
+    case "planning":
+      return 64
+    case "saving":
+    case "saving_lessons":
+      return 96
+    case "finalizing":
+      return 99
+    case "ready":
+      return 100
+    default:
+      return 4 // before the first stage report
+  }
+}
+
 export function PersonalizedCourseProgressCard({
   chapterId,
   title,
@@ -121,6 +145,25 @@ export function PersonalizedCourseProgressCard({
   }, [status])
 
   const displayMessage = messageCycleRef.current[messageIndex % Math.max(1, messageCycleRef.current.length)] ?? "Pornire…"
+
+  // Continuous creep: the displayed percent slowly increases toward the next
+  // stage threshold so the bar always moves, even when the server percent is
+  // unchanged for a long time. The server percent is the floor (jumps up on
+  // stage change); the cap is just below the next milestone.
+  const serverPercent = Math.max(0, Math.min(100, progress.percent))
+  const [displayPercent, setDisplayPercent] = useState(serverPercent)
+  useEffect(() => {
+    // When the server reports a higher percent (new stage), jump the floor up.
+    setDisplayPercent((prev) => Math.max(prev, serverPercent))
+  }, [serverPercent])
+  useEffect(() => {
+    if (status === "ready" || status === "failed") return
+    const cap = creepCapForStage(progress.stage)
+    const interval = window.setInterval(() => {
+      setDisplayPercent((prev) => (prev < cap ? Math.min(cap, prev + 0.25) : prev))
+    }, 400)
+    return () => window.clearInterval(interval)
+  }, [status, progress.stage])
 
   const poll = useCallback(async () => {
     try {
@@ -202,7 +245,7 @@ export function PersonalizedCourseProgressCard({
     )
   }
 
-  const percent = Math.max(0, Math.min(100, progress.percent))
+  const percent = Math.max(0, Math.min(100, displayPercent))
 
   // --- Creating state (progress bar) ---
   return (

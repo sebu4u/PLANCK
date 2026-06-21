@@ -23,6 +23,7 @@ import {
   parseGuestLearningPathProgress,
 } from "@/lib/guest-learning-path-cookie"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabaseAdmin"
 import { InvataChapterImageLoadProvider } from "@/components/invata/invata-chapter-image-load-context"
 import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context"
 import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
@@ -62,9 +63,11 @@ export default async function InvataPage() {
   const chapters = sortLearningPathChaptersForHub(await getLearningPathChapters(supabase))
 
   // Merge in personalized chapters that are still generating (is_active=false, status creating/failed).
-  // These appear at the top of the list with a progress card.
+  // These appear at the top of the list with a progress card. Use the admin client because
+  // RLS blocks reading is_active=false rows even for the owner.
   if (user) {
-    const inProgress = await getInProgressPersonalizedChapters(user.id, supabase)
+    const admin = createAdminClient()
+    const inProgress = await getInProgressPersonalizedChapters(user.id, admin)
     if (inProgress.length > 0) {
       chapters.unshift(...inProgress)
     }
