@@ -3,6 +3,7 @@ import { after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
+import { isDevFromDB } from "@/lib/admin-check"
 import type { PersonalizedCourseCatalogCandidate, PersonalizedCourseGeneratedPlanItem, SupabaseAnyClient } from "@/lib/personalized-courses/types"
 import { searchPlanckContentForPrompt } from "@/lib/personalized-courses/search"
 import { planPersonalizedCourse, getPlannerModel } from "@/lib/personalized-courses/planner"
@@ -174,7 +175,10 @@ async function markChapterFailed(admin: SupabaseAnyClient, chapterId: string, re
     .eq("id", chapterId)
 }
 
-async function checkRateLimit(admin: SupabaseAnyClient, userId: string): Promise<string | null> {
+async function checkRateLimit(admin: SupabaseAnyClient, userId: string, isDev: boolean): Promise<string | null> {
+  // Dev users can generate unlimited courses.
+  if (isDev) return null
+
   const { count: totalCourses } = await admin
     .from("learning_path_chapters")
     .select("id", { count: "exact", head: true })
@@ -277,7 +281,9 @@ export async function POST(request: Request) {
   }
 
   const access = await getLearningPathAccess(null)
-  if (access.mode !== "full") {
+  const isDev = await isDevFromDB(supabase, user.id)
+  // Dev users bypass the subscription requirement and rate limits.
+  if (access.mode !== "full" && !isDev) {
     return NextResponse.json(
       { error: "Generarea de cursuri personalizate este disponibilă pentru membrii Plus/Premium." },
       { status: 403 },
@@ -298,7 +304,7 @@ export async function POST(request: Request) {
   if (promptError) return NextResponse.json({ error: promptError }, { status: 400 })
 
   const admin = createAdminClient()
-  const rateLimitError = await checkRateLimit(admin, user.id)
+  const rateLimitError = await checkRateLimit(admin, user.id, isDev)
   if (rateLimitError) return NextResponse.json({ error: rateLimitError }, { status: 429 })
 
   // Phase 1: insert the chapter row IMMEDIATELY with status "creating" and return 202.
