@@ -21,13 +21,27 @@ Keep changes focused, validate them, and prefer existing PLANCK patterns over ne
 
 ## `/invata` learning paths
 
-- Premade and AI-generated courses should use the same backend: `learning_path_chapters`, `learning_path_lessons`, `learning_path_lesson_items`, and existing progress tables.
-- Do **not** add separate personalized-course routes/tables unless the user explicitly asks; generated chapters should render through `/invata/[chapterSlug]/[lessonSlug]/[itemIndex]`.
-- User-scoped generated chapters should be private via RLS/metadata such as `generated_by_user_id`, while official chapters remain public.
+- Premade and AI-generated courses share one backend: `learning_path_chapters`, `learning_path_lessons`, `learning_path_lesson_items`, and existing progress tables. AI chapters set `is_personalized=true`, `generated_by_user_id=<user>`, `is_active=false` while generating.
+- Do **not** add separate personalized-course routes/tables unless the user explicitly asks; generated chapters render through `/invata/[chapterSlug]/[lessonSlug]/[itemIndex]`.
 - Reuse real Planck content by reference when possible. Do not fabricate problems/quizzes/tests if existing DB content can cover the prompt.
-- Source-less AI connector/explanation items should be `custom_text`; avoid creating broken `text`, `video`, `grila`, `problem`, `math_problem`, or `coding_problem` items without valid source fields.
 - Lesson/course UI must look indistinguishable from existing `/invata`: `#f7f7f7` backgrounds, `#e6e6e6` borders, `#1f1f1f` buttons, 142x142 lesson cards, horizontal scroll, connection lines, no invented gradients.
 - For generated learning paths, target multiple lessons and 20+ meaningful items per lesson unless the user asks for a smaller course.
+
+### Personalized courses (AI-generated) — critical operational rules
+
+Full how-to is in the `planck-personalized-courses` skill (load it before non-trivial work here). Key invariants any agent must know up front:
+
+- **Detached generation only.** `POST /api/personalized-courses` inserts the chapter row (status `creating`, `is_active=false`) and returns `202` immediately; the heavy AI + DB work runs via Next.js `after()` (import from `next/server`). Never run the AI call in the synchronous handler — a client disconnect cancels it and nothing is saved. On success flip to `ready`+`is_active=true`; on error `failed` with the reason. Hard 5-min deadline in the planner.
+- **Provider is OpenAI-compatible via env**, not hardcoded OpenAI. `DEEPSEEK_API_KEY` → `https://api.deepseek.com`, default model `deepseek-v4-flash`. Reasoning models (`deepseek-v4-pro`, `deepseek-reasoner`) truncate on a full plan (~20k reasoning tokens) — use the chat-class model. `response_format: { type: "json_object" }` is supported by chat-class only.
+- **Generated item content is validated against the real parsers** (`validateInteractiveItemContent`, `validateTestContent`, plus `validatePollContent` in the planner). Invalid interactive content falls back to rich `custom_text` — never store a broken item. Generatable types match the official DB distribution (no `flow_build`/`graph_build`/`slider_explore`/`speed_round` — rare officially and error-prone).
+- **`fill_slot` `latexTemplate` uses `{{id}}`/`{{{id}}}` placeholders ONLY** — never `?`, `\htmlId`, `\boxed`, `\text{?}`, `\color{#...}` (those are the renderer's *output*). `hasForbiddenFillSlotMarkers` rejects them; the count of `{{id}}` must equal the number of slots.
+- **`sanitize.ts` is field- AND math-aware.** Escape `<>&` only in HTML-rendered prose fields (`body`, `content`, `text`, `instructions`, `prompt`, `a`, `b`, `description`, `headers`) while preserving `$...$`/`$$...$$` spans verbatim; leave KaTeX/code/JSX-text fields (`latexTemplate`, `chips`, `formula`, `lines`, `options`, `answer`, `label`, `question`, `statement`, …) **raw**. Official content is stored raw — never pre-escape `'` (breaks KaTeX primes `f'(x)`).
+- **All math must be wrapped in `$...$`/`$$...$`.** Bare `x_0`, `f(x)=x^2` renders broken. The verifier auto-wraps single-letter `+_/^+alnum` tokens; the guide teaches the AI the format + official shortcodes (`[IMPORTANT]`/`[FORMULA]`/`[ENUNT]`/`[CODINLINE]`/`[DEFINITIE]`/`[EXEMPLU]`, supported by `LessonRichContent`).
+- **Multiple-choice = exactly 4 options** (poll, test problems, `code_trace` choice, `reveal_steps` quiz). No answer leaks (correct option text must not appear in the question/statement/prompt/instructions).
+- **Verifier pipeline** (`verifyGeneratedPlan`) runs after `normalizePlan`: hard checks (broken fill_slot, answer leak, ≠4 options, structural mismatches) replace the item with a `custom_text` connector; soft checks (bare math) flag only. The `VerificationReport` is stored in `generation_metadata.verification`.
+- **Tolerant JSON parsing** (`parseJsonTolerant`): direct → trailing-comma repair → progressive truncation to recover a partial plan. Plus 1 retry with a repair note + higher `max_tokens`.
+- **UI never navigates away during generation.** The optimistic in-progress card appears instantly at the top of the `/invata` chapter list via `PersonalizedCourseGenerationProvider` context; it polls `/api/personalized-courses/status` every 3s, the percent creeps continuously toward the next stage cap, and on `ready` it removes the optimistic entry and `router.refresh()` so the real card replaces it in place. Refresh survives because `/invata` fetches in-progress chapters (`is_active=false`) with the **admin client** (RLS blocks the user client from reading those rows).
+- **Dev users** (`profiles.is_dev = true`, via `isDevFromDB`) bypass the Plus/Premium subscription gate and the 3/day + 20/total rate limits.
 
 ## Validation
 
@@ -46,5 +60,5 @@ Keep changes focused, validate them, and prefer existing PLANCK patterns over ne
 
 ## Skills & cross-agent context
 
-- `.agents/skills/` holds Agent Skills packs (`planck-supabase`, `planck-learning-path`, `planck-add-api-route`, `planck-add-supabase-migration`); load the relevant one before non-trivial work in that area.
+- `.agents/skills/` holds Agent Skills packs (`planck-supabase`, `planck-learning-path`, `planck-add-api-route`, `planck-add-supabase-migration`, `planck-personalized-courses`); load the relevant one before non-trivial work in that area.
 - `CLAUDE.md` is a symlink to this file, so Claude Code and pi/Codex/Cursor share one source of truth. Edit here only.
