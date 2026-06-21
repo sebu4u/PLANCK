@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowRight, CheckCircle2, Loader2, LogIn, Sparkles, AlertCircle } from "lucide-react"
+import { ArrowRight, Loader2, LogIn, Sparkles, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PersonalizedCourseGeneratorProps {
@@ -20,9 +20,8 @@ export function PersonalizedCourseGenerator({
 }: PersonalizedCourseGeneratorProps) {
   const router = useRouter()
   const [prompt, setPrompt] = useState("")
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "done">("idle")
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [createdHref, setCreatedHref] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -56,7 +55,6 @@ export function PersonalizedCourseGenerator({
 
       setStatus("loading")
       setErrorMessage(null)
-      setCreatedHref(null)
 
       abortRef.current?.abort()
       const controller = new AbortController()
@@ -90,12 +88,11 @@ export function PersonalizedCourseGenerator({
           return
         }
 
-        const targetHref = data?.href ?? data?.course?.href ?? null
-        // Don't navigate away — stay on /invata and refresh so the in-progress
-        // chapter card appears in the list with a real-time progress bar.
-        setStatus("done")
-        setCreatedHref(targetHref)
-
+        // On 202 the course is queued (NOT ready). Reset the form and refresh so the
+        // in-progress chapter card appears in the list with a real-time progress bar.
+        // Never navigate away — the user stays on /invata and watches the card fill.
+        setPrompt("")
+        setStatus("idle")
         router.refresh()
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return
@@ -135,7 +132,7 @@ export function PersonalizedCourseGenerator({
             value={prompt}
             onChange={(event) => {
               setPrompt(event.target.value)
-              if (status === "error" || status === "done") {
+              if (status === "error") {
                 setStatus("idle")
                 setErrorMessage(null)
               }
@@ -178,18 +175,6 @@ export function PersonalizedCourseGenerator({
           </div>
         </div>
       </form>
-
-      {status === "done" && createdHref ? (
-        <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-[#e6e6e6] bg-white px-3.5 py-3 text-sm text-[#1f1f1f]">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#059669]" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">Cursul tău personalizat este gata.</p>
-            <Link href={createdHref} className="mt-1 inline-flex items-center gap-1 font-semibold text-[#1f1f1f] hover:underline">
-              Deschide cursul <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        </div>
-      ) : null}
 
       {status === "error" && errorMessage ? (
         <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-[#e6e6e6] bg-white px-3.5 py-3 text-sm text-[#1f1f1f]">
