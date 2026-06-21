@@ -81,13 +81,14 @@ Runs after `normalizePlan` as a second pass, catching quality issues that pass s
 
 ## Validation checklist
 
-After changes, run:
-1. `pnpm exec tsc --noEmit --pretty false` — filter for `personalized-courses` (other errors are pre-existing).
-2. `pnpm exec next build --webpack` — confirm the routes exist: `/api/personalized-courses`, `/api/personalized-courses/status`, `/invata/[chapterSlug]`.
-3. **End-to-end against a live model** (the decisive test). The planner uses `@/` aliases + `server-only`, so run it with a loader:
-   - Write a `.mjs` smoke test that imports `planPersonalizedCourse` from `./lib/personalized-courses/planner.ts`, passes a small candidate set, and asserts: `lessons ≥ 3`, `by_type` has variety, **no fill_slot `latexTemplate` contains `?`**, `{{id}}` count === slots count, **all polls/tests have exactly 4 options**, **0 HTML entities inside `$...$` math spans**, `verification.replaced` is small, `verification.passed` true.
-   - Run with: `node --experimental-strip-types --import /tmp/register.mjs --env-file=.env.local smoke.mjs` where `/tmp/register.mjs` registers a loader that maps `@/` → repo root and stubs `server-only` to an empty file. (See the session history for the exact loader snippet.)
-4. `git diff --check` before committing. Never commit `.env.local` or scratch `.mjs` files.
+This skill ships scripts in `scripts/` — use them instead of re-deriving the harness:
+
+1. **`./scripts/validate-changed.sh [base]`** — runs `tsc --noEmit` and shows ONLY errors in files changed vs `base` (default `main`). Collapses the ~30 pre-existing unrelated errors into the 0-3 lines that matter. Exit 0 = clean.
+2. **`pnpm exec next build --webpack`** — confirm the routes exist: `/api/personalized-courses`, `/api/personalized-courses/status`, `/invata/[chapterSlug]`.
+3. **`./scripts/run-smoke.sh ["<prompt>"]`** — the decisive test: runs `planPersonalizedCourse` against a live model and asserts variety, no `fill_slot` `?`, `{{id}}` count === slots, exactly-4 options, 0 HTML entities in math spans, 0 poll answer leaks, verifier replaced < 25%. Exits non-zero on failure. It loads `.env.local` for the API key and uses the bundled `register.mjs`/`loader.mjs` to resolve `@/` aliases and stub `server-only`.
+4. `git diff --check` before committing. Never commit `.env.local` or scratch `.mjs` files (the scripts in `scripts/` are committed — those are fine).
+
+If you must run the planner by hand without the script, the loader pattern is: `node --experimental-strip-types --import <skill>/scripts/register.mjs --env-file=.env.local <your-test.mjs>`.
 
 ## Known gotchas
 
