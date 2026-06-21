@@ -318,7 +318,37 @@ function hasForbiddenFillSlotMarkers(
 ): boolean {
   if (itemType !== "fill_slot") return false
   const template = typeof content.latexTemplate === "string" ? content.latexTemplate : ""
-  return /(\\htmlId|fill-slot-|\\boxed|\\text\{\?\}|\\color\{#)/.test(template)
+  // Rendered-output constructs (the AI confusing input format with renderer output).
+  if (/(\\htmlId|fill-slot-|\\boxed|\\text\{\?\}|\\color\{#)/.test(template)) return true
+  // Bare "?" is always a placeholder mistake — the AI wrote \frac{?}{?} instead of
+  // \frac{{{id1}}}{{{id2}}}. A literal ? in a formula template is never legitimate.
+  if (template.includes("?")) return true
+  // The number of {{id}} placeholders must equal the number of slots, otherwise some
+  // boxes are unanswerable (extra {{id}} with no slot) or slots have no box in the template.
+  const placeholderIds = template.match(/\{\{(\w+)\}\}/g) ?? []
+  const rawSlots = Array.isArray(content.slots) ? content.slots : []
+  const slotIds = rawSlots
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
+    .map((s) => (typeof s.id === "string" ? s.id.trim() : ""))
+    .filter(Boolean)
+  // Extract unique placeholder ids from template ({{{id}}} also matches {{id}}).
+  const uniquePlaceholderIds = new Set(placeholderIds.map((m) => m.replace(/\{\{|\}\}/g, "")))
+  const uniqueSlotIds = new Set(slotIds)
+  if (uniquePlaceholderIds.size !== uniqueSlotIds.size) return true
+  for (const id of uniquePlaceholderIds) {
+    if (!uniqueSlotIds.has(id)) return true
+  }
+  // Chips must include every slot answer (otherwise the student can't fill a slot).
+  const chips = Array.isArray(content.chips)
+    ? content.chips.filter((c): c is string => typeof c === "string").map((c) => c.trim())
+    : []
+  const chipSet = new Set(chips)
+  for (const s of rawSlots) {
+    if (s && typeof s === "object" && typeof s.answer === "string") {
+      if (!chipSet.has(s.answer.trim())) return true
+    }
+  }
+  return false
 }
 
 /**
@@ -679,25 +709,297 @@ function normalizePlan(
   }, candidates, userPrompt)
 }
 
+// ===================== VERIFIER PIPELINE =====================
+// After normalizePlan, every item has already passed schema validation (interactive
+// parsers, poll/test validators, fill_slot guard). The verifier is a SECOND pass that
+// catches QUALITY issues which pass schema validation but still produce a broken or
+// low-quality learning experience — the things a human reviewer would reject:
+//   - fill_slot with answer leaked in instructions (student gets the answer for free)
+//   - multiple-choice items with ≠ 4 options (too easy / not exam-quality)
+//   - answer text appearing in the question/statement/prompt (answer leaked)
+//   - structural inconsistencies the parsers tolerate (e.g. match pairs not covering)
+// Broken items are replaced with a safe custom_text connector so the lesson keeps its
+// length and variety without shipping a broken interaction. The report is stored in
+// generation_metadata so quality is observable.
+
+export interface VerificationIssue {
+  lessonIndex: number
+  itemIndex: number
+  itemType: string
+  title: string
+  reason: string
+}
+
+export interface VerificationReport {
+  totalItems: number
+  replaced: number
+  byType: Record<string, number>
+  issues: VerificationIssue[]
+  bareMathFlags: number
+  passed: boolean
+}
+
+/** Strip LaTeX delimiters and whitespace for answer-leak substring matching. */
+function normalizeForLeakCheck(value: string): string {
+  return value
+    .replace(/\$\$|\$|\\\(|\\\)|\\\[|\\\]/g, "")
+    .replace(/\\[a-zA-Z]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+}
+
+/** Detect bare math (subscripts/superscripts) outside $...$ — a rendering glitch. */
+function countBareMath(text: string): number {
+  // Split out math spans, then look for _ or ^ preceded by alnum in the non-math parts.
+  const parts = text.split(/\$\$[^$]+\$\$|\$[^$]+\$/g)
+  let count = 0
+  for (const part of parts) {
+    const matches = part.match(/[a-zA-Z0-9)][_^[a-zA-Z0-9]/g)
+    if (matches) count += matches.length
+  }
+  return count
+}
+
+/** Returns a reason string if the item is broken (should be replaced), else null. */
+function findItemIssue(
+  item: PersonalizedCourseGeneratedPlanItem,
+): { reason: string; bareMath: boolean } {
+  const cj =
+    item.content_json && typeof item.content_json === "object" && !Array.isArray(item.content_json)
+      ? (item.content_json as Record<string, unknown>)
+      : {}
+  const t = item.item_type
+
+  if (t === "fill_slot") {
+    const template = typeof cj.latexTemplate === "string" ? cj.latexTemplate : ""
+    const instructions = typeof cj.instructions === "string" ? cj.instructions : ""
+    if (template.includes("?")) return { reason: "fill_slot: „?” în template (folosește {{id}})", bareMath: false }
+    // Answer leaked in instructions: instructions contain a full formula (has \frac or =)
+    if (instructions.length > 60 && /(\\frac|\=)/.test(instructions)) {
+      return { reason: "fill_slot: formula rezolvată în instructions (răspuns dezvăluit)", bareMath: false }
+    }
+    // Slot answer appears in instructions (for answers ≥ 2 chars to avoid false positives)
+    const slots = Array.isArray(cj.slots) ? cj.slots : []
+    const instrNorm = normalizeForLeakCheck(instructions)
+    for (const s of slots) {
+      if (s && typeof s === "object" && typeof s.answer === "string" && s.answer.trim().length >= 2) {
+        if (instrNorm.includes(normalizeForLeakCheck(s.answer))) {
+          return { reason: "fill_slot: răspuns în instructions (răspuns dezvăluit)", bareMath: false }
+        }
+      }
+    }
+  }
+
+  if (t === "poll") {
+    const options = Array.isArray(cj.options) ? cj.options : []
+    if (options.length !== 4) return { reason: `poll: ${options.length} opțiuni (trebuie 4)`, bareMath: false }
+    const question = typeof cj.question === "string" ? cj.question : ""
+    const correctId = typeof cj.correctAnswerId === "string" ? cj.correctAnswerId : ""
+    const correctOpt = options.find((o: any) => o?.id === correctId)
+    if (correctOpt && typeof correctOpt.label === "string") {
+      const qNorm = normalizeForLeakCheck(question)
+      const aNorm = normalizeForLeakCheck(correctOpt.label)
+      if (aNorm.length >= 3 && qNorm.includes(aNorm)) {
+        return { reason: "poll: răspunsul corect apare în întrebare (răspuns dezvăluit)", bareMath: false }
+      }
+    }
+  }
+
+  if (t === "test") {
+    const problems = Array.isArray(cj.problems) ? cj.problems : []
+    for (let i = 0; i < problems.length; i++) {
+      const prob = problems[i] as Record<string, unknown> | undefined
+      if (!prob) continue
+      const opts = Array.isArray(prob.options) ? prob.options : []
+      if (opts.length !== 4) return { reason: `test: problema #${i + 1} are ${opts.length} opțiuni (trebuie 4)`, bareMath: false }
+      const stmt = typeof prob.statement === "string" ? prob.statement : ""
+      const correctId = typeof prob.correctOptionId === "string" ? prob.correctOptionId : ""
+      const correctOpt = opts.find((o: any) => o?.id === correctId)
+      if (correctOpt && typeof correctOpt.label === "string") {
+        const sNorm = normalizeForLeakCheck(stmt)
+        const aNorm = normalizeForLeakCheck(correctOpt.label)
+        if (aNorm.length >= 3 && sNorm.includes(aNorm)) {
+          return { reason: `test: problema #${i + 1} dezvăluie răspunsul în enunț`, bareMath: false }
+        }
+      }
+    }
+  }
+
+  if (t === "code_trace") {
+    const lines = Array.isArray(cj.lines) ? cj.lines : []
+    const steps = Array.isArray(cj.steps) ? cj.steps : []
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i] as Record<string, unknown> | undefined
+      if (!step) continue
+      const inputMode = typeof step.inputMode === "string" ? step.inputMode : "text"
+      const answer = typeof step.answer === "string" ? step.answer : ""
+      const prompt = typeof step.prompt === "string" ? step.prompt : ""
+      const lineIndex = typeof step.lineIndex === "number" ? step.lineIndex : -1
+      if (lineIndex < 0 || lineIndex >= lines.length) {
+        return { reason: `code_trace: pasul #${i + 1} lineIndex în afara razei`, bareMath: false }
+      }
+      if (inputMode === "choice") {
+        const opts = Array.isArray(step.options) ? step.options : []
+        if (opts.length !== 4) return { reason: `code_trace: pasul #${i + 1} are ${opts.length} opțiuni (trebuie 4)`, bareMath: false }
+      }
+      // Answer leaked in prompt
+      if (answer.trim().length >= 2) {
+        const pNorm = normalizeForLeakCheck(prompt)
+        const aNorm = normalizeForLeakCheck(answer)
+        if (aNorm.length >= 2 && pNorm.includes(aNorm)) {
+          return { reason: `code_trace: pasul #${i + 1} dezvăluie răspunsul în prompt`, bareMath: false }
+        }
+      }
+    }
+  }
+
+  if (t === "reveal_steps") {
+    const steps = Array.isArray(cj.steps) ? cj.steps : []
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i] as Record<string, unknown> | undefined
+      if (!step) continue
+      if (step.kind === "quiz") {
+        const opts = Array.isArray(step.options) ? step.options : []
+        if (opts.length !== 4) return { reason: `reveal_steps: pasul quiz #${i + 1} are ${opts.length} opțiuni (trebuie 4)`, bareMath: false }
+      }
+    }
+  }
+
+  if (t === "match") {
+    const left = Array.isArray(cj.left) ? cj.left : []
+    const right = Array.isArray(cj.right) ? cj.right : []
+    const pairs = Array.isArray(cj.pairs) ? cj.pairs : []
+    if (left.length !== right.length || left.length !== pairs.length) {
+      return { reason: `match: left/right/pairs lungimi inegale (${left.length}/${right.length}/${pairs.length})`, bareMath: false }
+    }
+  }
+
+  if (t === "card_sort") {
+    const cards = Array.isArray(cj.cards) ? cj.cards : []
+    const order = Array.isArray(cj.correctOrder) ? cj.correctOrder : []
+    const cardIds = new Set(cards.map((c: any) => c?.id).filter(Boolean))
+    if (order.length !== cards.length) {
+      return { reason: `card_sort: correctOrder lungime ≠ cards`, bareMath: false }
+    }
+    for (const id of order) {
+      if (!cardIds.has(id)) return { reason: "card_sort: correctOrder conține id inexistent", bareMath: false }
+    }
+  }
+
+  if (t === "table_fill") {
+    const headers = Array.isArray(cj.headers) ? cj.headers : []
+    const rows = Array.isArray(cj.rows) ? cj.rows : []
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] as Record<string, unknown> | undefined
+      const cells = row && Array.isArray(row.cells) ? row.cells : []
+      if (cells.length !== headers.length) {
+        return { reason: `table_fill: rând #${i + 1} cells.length ≠ headers.length`, bareMath: false }
+      }
+    }
+  }
+
+  if (t === "memory_flip") {
+    const pairs = Array.isArray(cj.pairs) ? cj.pairs : []
+    if (pairs.length < 2) return { reason: `memory_flip: ${pairs.length} perechi (minim 2)`, bareMath: false }
+  }
+
+  if (t === "custom_text") {
+    const body = typeof cj.body === "string" ? cj.body : ""
+    if (body.trim().length < MIN_CUSTOM_TEXT_BODY_LENGTH) {
+      return { reason: "custom_text: body prea scurt", bareMath: false }
+    }
+  }
+
+  // Soft check: bare math outside $...$ (flag, don't replace unless severe)
+  if (t === "custom_text") {
+    const text = typeof cj.body === "string" ? cj.body : ""
+    const bare = countBareMath(text)
+    if (bare >= 6) return { reason: `custom_text: ${bare} expresii matematice neîncadrate în $...$`, bareMath: true }
+  }
+
+  return { reason: "", bareMath: false }
+}
+
+/**
+ * Verify every generated item in the plan. Broken items are replaced with a safe
+ * custom_text connector; the report tracks what was replaced and why.
+ */
+function verifyGeneratedPlan(
+  plan: PersonalizedCourseGeneratedPlan,
+  userPrompt: string,
+): { plan: PersonalizedCourseGeneratedPlan; report: VerificationReport } {
+  const issues: VerificationIssue[] = []
+  const byType: Record<string, number> = {}
+  let replaced = 0
+  let bareMathFlags = 0
+
+  const lessons = plan.lessons.map((lesson, lessonIndex) => ({
+    ...lesson,
+    items: lesson.items.map((item, itemIndex) => {
+      byType[item.item_type] = (byType[item.item_type] ?? 0) + 1
+      // Only verify generated items; source-key items are official content (assumed valid).
+      if (item.source_key) return item
+
+      const issue = findItemIssue(item)
+      // Bare math is a SOFT flag (rendering quality, addressed by the guide): count it
+      // but do NOT replace the item — replacing would destroy the lesson content.
+      if (issue.bareMath) {
+        bareMathFlags += 1
+        return item
+      }
+      if (!issue.reason) return item
+
+      issues.push({
+        lessonIndex,
+        itemIndex,
+        itemType: item.item_type,
+        title: item.title,
+        reason: issue.reason,
+      })
+      replaced += 1
+      // Replace with a safe custom_text connector (keeps lesson length/variety).
+      return makeGeneratedConnectorItem(
+        makeFallbackItemTitle(itemIndex),
+        userPrompt,
+        lesson.title,
+      )
+    }),
+  }))
+
+  const totalItems = lessons.reduce((total, l) => total + l.items.length, 0)
+  const report: VerificationReport = {
+    totalItems,
+    replaced,
+    byType,
+    issues,
+    bareMathFlags,
+    passed: issues.length === 0,
+  }
+  return { plan: { ...plan, lessons }, report }
+}
+
 const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) și conținutul content_json EXACT (validat strict). Folosește DOAR aceste tipuri pentru itemi generați — ele reflectă frecvența tipurilor din lecțiile oficiale Planck:
 
 - custom_text: {"body": "markdown substancial — titlu ##, 2-4 paragrafe, exemple, $formule LaTeX$. Minim ~80 de cuvinte."}. Pentru sublinieri folosește shortcode-urile oficiale: [IMPORTANT]...[/IMPORTANT] pentru idei-cheie, [FORMULA]$$...$$[/FORMULA] pentru formule evidențiate, [ENUNT]...[/ENUNT] pentru enunțuri de probleme, [CODINLINE]...[/CODINLINE] pentru cod inline, [DEFINITIE]...[/DEFINITIE] pentru definiții, [EXEMPLU]...[/EXEMPLU] pentru exemple. Aceste shortcode-uri sunt stilizate special în Planck — folosește-le ca în lecțiile oficiale.
-- poll: {"imageSrc": "" (sau URL imagine, opțional), "imageAlt": "" (opțional), "question": "...?", "correctAnswerId": "id_răspuns_corect", "options": [{"id":"a","label":"...","feedback":"explicație afișată după răspuns"}]} — minim 2 opțiuni; FIECARE opțiune trebuie să aibă feedback (explicație scurtă, educativă); correctAnswerId trebuie să fie unul dintre id-urile opțiunilor. Folosește poll pentru verificări de înțelegere cu explicații.
+- poll: {"imageSrc": "" (sau URL imagine, opțional), "imageAlt": "" (opțional), "question": "...?", "correctAnswerId": "id_răspuns_corect", "options": [{"id":"a","label":"...","feedback":"explicație afișată după răspuns"},{"id":"b","label":"...","feedback":"..."},{"id":"c","label":"...","feedback":"..."},{"id":"d","label":"...","feedback":"..."}]} — EXACT 4 opțiuni (niciodată 3 sau 5); FIECARE opțiune trebuie să aibă feedback (explicație scurtă, educativă); correctAnswerId trebuie să fie unul dintre id-urile opțiunilor. Întrebarea NU trebuie să conțină răspunsul corect sau să-l dezvăluie. Folosește poll pentru verificări de înțelegere cu explicații.
 - match: {"instructions": "...opțional", "left": [{"id":"l1","text":"..."}], "right": [{"id":"r1","text":"..."}], "pairs": [{"leftId":"l1","rightId":"r1"}]} — left și right au aceeași lungime (2-6); pairs asociază fiecare element o singură dată. Bine pentru termen↔definiție.
 - card_sort: {"instructions": "...opțional", "cards": [{"id":"a","text":"..."}], "correctOrder": ["a",...]} — correctOrder este o permutare a id-urilor (4 carduri). Bine pentru ordonare de pași/nivele.
-- fill_slot: {"instructions": "...opțional", "latexTemplate": "F = {{m}} \\cdot a", "slots": [{"id":"m","answer":"2"}], "chips": ["1","2","5","10"]}. FORMAT CRITIC pentru latexTemplate: locurile goale se marchază cu placeholder-e {{id}} sau {{{id}}}, EXACT ca în exemple. Exemple corecte: "F = {{m}} \\cdot a", "v = \\frac{{{d}}}{{{t}}}", "P = {{{U}}} \\cdot {{{I}}}", "a^2 + b^2 = {{c}}^2". Pentru fracții folosește {{{id}}} (triple acolade) ca argument: \\frac{{{num}}}{{{den}}}. FIECARE {{id}} din slots trebuie să apară în latexTemplate; chips include toate answer-urile + distractoare. INTERZIS STRICT în latexTemplate: \htmlId, fill-slot-, \boxed, \text{?}, \color{#...} — acestea sunt OUTPUT-ul randat de Planck, NU formatul de intrare. Dacă le scrii, formula se strică. Folosești DOAR {{id}} ca placeholder.
-- reveal_steps: {"instructions": "...opțional", "steps": [{"kind":"markdown","content":"..."},{"kind":"quiz","content":"...?","options":["a","b","c"],"correctIndex":0}]} — minim 3 pași. Bine pentru exerciții rezolvate pas cu pas: folosește [ENUNT]...[/ENUNT] la primul pas, [FORMULA]$$...$$[/FORMULA] în pașii de calcul, [IMPORTANT]...[/IMPORTANT] la concluzie.
+- fill_slot: {"instructions": "...opțional, SCURT — fără formula rezolvată", "latexTemplate": "F = {{m}} \\cdot a", "slots": [{"id":"m","answer":"2"}], "chips": ["1","2","5","10"]}. FORMAT CRITIC: locurile goale se marchează EXCLUSIV cu {{id}} sau {{{id}}}. Exemple corecte: "F = {{m}} \\cdot a", "v = \\frac{{{d}}}{{{t}}}", "P = {{{U}}} \\cdot {{{I}}}", "a^2 + b^2 = {{c}}^2". Pentru fracții: \\frac{{{num}}}{{{den}}} (triple acolade). FIECARE {{id}} din slots trebuie să apară în latexTemplate; chips include toate answer-urile + minim 2 distractoare. INTERZIS STRICT în latexTemplate: caracterul ?, \\htmlId, fill-slot-, \\boxed, \\text{?}, \\color{#...}. Folosești DOAR {{id}} — NICIODATĂ ?. Numărul de {{id}} din template trebuie să fie exact egal cu numărul de slots. INSTRUCTIONS nu trebuie să conțină formula rezolvată sau răspunsul — studentul completează blanks-urile; dacă pui formula cu răspunsuri în instructions, îi dai răspunsul gratuit.
+- reveal_steps: {"instructions": "...opțional", "steps": [{"kind":"markdown","content":"..."},{"kind":"quiz","content":"...?","options":["a","b","c","d"],"correctIndex":0}]} — minim 3 pași. Pentru pașii quiz: EXACT 4 opțiuni. Bine pentru exerciții rezolvate pas cu pas: [ENUNT]...[/ENUNT] la primul pas, [FORMULA]$$...$$[/FORMULA] în calcule, [IMPORTANT]...[/IMPORTANT] la concluzie. Conținutul unui pas markdown NU trebuie să dezvăluie răspunsul unui pas quiz anterior.
 - table_fill: {"instructions": "...opțional", "headers": ["Mărime","Unitate"], "rows": [{"cells": [{"text":"Forță"},{"blank":true,"answer":"N"}]}]} — cells.length === headers.length; celulele blank au {"blank":true,"answer":"..."}.
 - swipe_classify: {"prompt": "...opțional", "leftLabel": "Adevărat", "rightLabel": "Fals", "cards": [{"text":"...","side":"left"}]} — 4-8 carduri; side "left" sau "right".
 - memory_flip: {"instructions": "...opțional", "pairs": [{"a":"$\\vec{F}$","b":"Forță"}]} — 3 perechi; a/b markdown sau LaTeX.
-- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2","while i <= 4:"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"text","answer":"3"}]} — pentru inputMode "choice", answer trebuie să fie printre options și minim 2 opțiuni; lineIndex în raza lines (0..len-1). Preferă inputMode "text" ca în lecțiile oficiale. În lines poți folosi < > <= >= (codul se afișează monospaced). Folosește [CODINLINE]...[/CODINLINE] în prompt pentru variabile; nu folosi $...$ în lines (e cod, nu matematică).
-- test: {"icon": "Zap", "description": "...", "difficulty": 1-5, "timeLimitSeconds": 300, "problems": [{"id":"q1","statement":"...?","imageUrl":null,"options":[{"id":"q1_a","label":"..."}],"correctOptionId":"q1_a"}]} — minim 2 probleme, fiecare cu 2-4 opțiuni și correctOptionId printre ele; id-uri unice; imageUrl null sau URL http(s). Bine pentru mini-test de recapitulare la final de lecție.
+- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2","while i <= 4:"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"text","answer":"3"}]} — pentru inputMode "choice": EXACT 4 opțiuni și answer printre ele; lineIndex în raza lines (0..len-1). Preferă inputMode "text" ca în lecțiile oficiale. În lines poți folosi < > <= >= (monospaced). [CODINLINE]...[/CODINLINE] în prompt pentru variabile; nu $...$ în lines. Promptul NU trebuie să conțină răspunsul.
+- test: {"icon": "Zap", "description": "...", "difficulty": 1-5, "timeLimitSeconds": 300, "problems": [{"id":"q1","statement":"...?","imageUrl":null,"options":[{"id":"q1_a","label":"..."},{"id":"q1_b","label":"..."},{"id":"q1_c","label":"..."},{"id":"q1_d","label":"..."}],"correctOptionId":"q1_a"}]} — minim 2 probleme, FIECARE cu EXACT 4 opțiuni și correctOptionId printre ele; id-uri unice; imageUrl null sau URL http(s). Enunțul NU trebuie să conțină răspunsul corect. Bine pentru mini-test de recapitulare la final de lecție.
 
 REGULI PENTRU ITEMI GENERAȚI:
 - Fiecare lecție trebuie să conțină un MIX VARIAT, ca în lecțiile oficiale Planck: minim 2 itemi custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri DIFERITE din lista de mai sus (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace). NU folosi doar custom_text.
 - Ponderie naturală: folosește des poll (verificări cu feedback), match, code_trace, reveal_steps, swipe_classify, fill_slot, card_sort; mai rar memory_flip și table_fill. NU genera tipurile care nu sunt în lista de mai sus (flow_build, graph_build, slider_explore, speed_round).
 - La finalul ultimei lecții adaugă de obicei un item test (mini-test de recapitulare).
 - Conținutul generat trebuie să fie relevant pentru TITLUL lecției și obiectivul userului, calitate de manual, NU text generic de legătură.
+- RĂSPUNS CORECT NU SE DEZVĂLUI: întrebarea/enunțul/instrucțiunile/promptul NU trebuie să conțină răspunsul corect sau formula rezolvată. La fill_slot, instructions e doar un scurt context („Completează formula alungirii”), NU formula cu valori puse. La poll/test, enunțul nu conține textul opțiunii corectă. La code_trace, promptul nu conține valoarea answer.
+- 4 OPȚIUNI: toate itemile cu variante (poll, test problems, code_trace choice, reveal_steps quiz) trebuie să aibă EXACT 4 opțiuni/variante — niciodată 3, niciodată 5. Patru opțiuni = calitate de bacalaureat/examen.
 
 FORMAT MATEMATIC (CRITIC — fără excepții):
 - ORICE matematică (variabile, indici, exponenți, formule, fracții, inegalități, prime) TREBUIE încadrată cu delimitatori LaTeX: $...$ pentru matematică inline (în text) și $$...$$ pentru formule pe rând propriu (display). EXEMPLE CORECTE: „Derivata funcției $f$ în punctul $x_0$...”, „pentru $f(x)=x^2$, derivata în $x=3$ este $f'(3)=6$”, „dacă $f'(x_0)>0$ funcția este crescătoare”, „$$f'(x_0)=\\lim_{h\\to 0}\\frac{f(x_0+h)-f(x_0)}{h}$$”.
@@ -806,7 +1108,7 @@ function extractJsonObject(raw: string): string {
 export async function planPersonalizedCourse(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
-): Promise<PersonalizedCourseGeneratedPlan> {
+): Promise<{ plan: PersonalizedCourseGeneratedPlan; verification: VerificationReport }> {
   const openai = getOpenAIClient()
   const { model, maxTokens } = getPlannerProviderConfig()
 
@@ -871,5 +1173,7 @@ export async function planPersonalizedCourse(
 
   if (!validated) throw lastError ?? new Error("AI course generation failed")
 
-  return normalizePlan(validated.data, candidates, userPrompt)
+  const normalizedPlan = normalizePlan(validated.data, candidates, userPrompt)
+  const { plan: verifiedPlan, report: verification } = verifyGeneratedPlan(normalizedPlan, userPrompt)
+  return { plan: verifiedPlan, verification }
 }

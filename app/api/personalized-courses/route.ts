@@ -302,7 +302,7 @@ export async function POST(request: Request) {
 
   try {
     const candidates = await searchPlanckContentForPrompt(supabase, prompt, 140)
-    const plan = await planPersonalizedCourse(prompt, candidates)
+    const { plan, verification } = await planPersonalizedCourse(prompt, candidates)
     const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
     const planItems = plan.lessons.flatMap((lesson) => lesson.items)
     const sourceItemsById = await getSourceLearningPathItems(admin, planItems, candidatesByKey)
@@ -312,6 +312,7 @@ export async function POST(request: Request) {
       model: getPlannerModel(),
       generatedAt: new Date().toISOString(),
       backend: "learning_path",
+      verification,
     }
 
     const chapterSlug = makeUniqueSlug("ai", plan.title, user.id)
