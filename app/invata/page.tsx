@@ -27,7 +27,7 @@ import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
-import { isFreePreviewLearningPathChapterSlug, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT } from "@/lib/learning-path-free-plan"
+import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
@@ -116,12 +116,8 @@ export default async function InvataPage() {
         .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
         .map((chapter) => chapter.id)
 
-  const visibleChapters = hasFullAccess
-    ? chapters
-    : chapters.slice(0, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT)
-  const archivedChapters = hasFullAccess
-    ? []
-    : chapters.slice(FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT)
+  const visibleChapters = chapters
+  const archivedChapters: LearningPathChapter[] = []
 
   return (
     <InvataHubNavProvider chapters={visibleChapters}>

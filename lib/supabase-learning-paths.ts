@@ -36,6 +36,12 @@ export interface LearningPathChapter {
   allowed_dev_user_ids: string[] | null
   order_index: number
   is_active: boolean
+  generated_by_user_id?: string | null
+  is_personalized?: boolean
+  original_prompt?: string | null
+  generation_status?: "creating" | "ready" | "failed" | null
+  source_summary?: unknown
+  generation_metadata?: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
@@ -262,8 +268,8 @@ export async function getLearningPathChapterDashboardSnapshot(
   }
 }
 
-export async function getLearningPathChapters(): Promise<LearningPathChapter[]> {
-  const { data, error } = await supabase
+export async function getLearningPathChapters(client: SupabaseClient = supabase): Promise<LearningPathChapter[]> {
+  const { data, error } = await client
     .from("learning_path_chapters")
     .select("*")
     .eq("is_active", true)
@@ -277,17 +283,47 @@ export async function getLearningPathChapters(): Promise<LearningPathChapter[]> 
   return data || []
 }
 
+/**
+ * Fetch the current user's personalized chapters that are still being generated
+ * (generation_status creating/failed, is_active=false). These are shown on /invata
+ * as in-progress cards so the user sees real-time progress without navigating away.
+ */
+export async function getInProgressPersonalizedChapters(
+  userId: string,
+  client: SupabaseClient = supabase,
+): Promise<LearningPathChapter[]> {
+  if (!userId) return []
+  const { data, error } = await client
+    .from("learning_path_chapters")
+    .select("*")
+    .eq("generated_by_user_id", userId)
+    .eq("is_personalized", true)
+    .eq("is_active", false)
+    .in("generation_status", ["creating", "failed"])
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error fetching in-progress personalized chapters:", error)
+    return []
+  }
+
+  return data || []
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isUuid(value: string): boolean {
   return UUID_REGEX.test((value || "").trim())
 }
 
-export async function getLearningPathChapterBySlug(slug: string): Promise<LearningPathChapter | null> {
+export async function getLearningPathChapterBySlug(
+  slug: string,
+  client: SupabaseClient = supabase
+): Promise<LearningPathChapter | null> {
   const normalizedSlug = slug.trim()
   if (!normalizedSlug) return null
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("learning_path_chapters")
     .select("*")
     .eq("slug", normalizedSlug)
@@ -302,11 +338,14 @@ export async function getLearningPathChapterBySlug(slug: string): Promise<Learni
   return data || null
 }
 
-export async function getLearningPathChapterById(id: string): Promise<LearningPathChapter | null> {
+export async function getLearningPathChapterById(
+  id: string,
+  client: SupabaseClient = supabase
+): Promise<LearningPathChapter | null> {
   const normalizedId = id.trim()
   if (!normalizedId) return null
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("learning_path_chapters")
     .select("*")
     .eq("id", normalizedId)
@@ -321,8 +360,11 @@ export async function getLearningPathChapterById(id: string): Promise<LearningPa
   return data || null
 }
 
-export async function getLearningPathLessonsByChapterId(chapterId: string): Promise<LearningPathLesson[]> {
-  const { data, error } = await supabase
+export async function getLearningPathLessonsByChapterId(
+  chapterId: string,
+  client: SupabaseClient = supabase
+): Promise<LearningPathLesson[]> {
+  const { data, error } = await client
     .from("learning_path_lessons")
     .select("*")
     .eq("chapter_id", chapterId)
@@ -339,18 +381,19 @@ export async function getLearningPathLessonsByChapterId(chapterId: string): Prom
 
 export async function getLearningPathLessonBySlug(
   chapterSlug: string,
-  lessonSlug: string
+  lessonSlug: string,
+  client: SupabaseClient = supabase
 ): Promise<LearningPathLesson | null> {
   const chapter = isUuid(chapterSlug)
-    ? await getLearningPathChapterById(chapterSlug)
-    : await getLearningPathChapterBySlug(chapterSlug)
+    ? await getLearningPathChapterById(chapterSlug, client)
+    : await getLearningPathChapterBySlug(chapterSlug, client)
   const normalizedLessonSlug = lessonSlug.trim()
 
   if (!chapter || !normalizedLessonSlug) {
     return null
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("learning_path_lessons")
     .select("*")
     .eq("chapter_id", chapter.id)
@@ -369,11 +412,14 @@ export async function getLearningPathLessonBySlug(
   return data || null
 }
 
-export async function getLearningPathLessonById(lessonId: string): Promise<LearningPathLesson | null> {
+export async function getLearningPathLessonById(
+  lessonId: string,
+  client: SupabaseClient = supabase
+): Promise<LearningPathLesson | null> {
   const normalizedId = lessonId.trim()
   if (!normalizedId) return null
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("learning_path_lessons")
     .select("*")
     .eq("id", normalizedId)
@@ -388,8 +434,11 @@ export async function getLearningPathLessonById(lessonId: string): Promise<Learn
   return data || null
 }
 
-export async function getLearningPathLessonItems(lessonId: string): Promise<LearningPathLessonItem[]> {
-  const { data, error } = await supabase
+export async function getLearningPathLessonItems(
+  lessonId: string,
+  client: SupabaseClient = supabase
+): Promise<LearningPathLessonItem[]> {
+  const { data, error } = await client
     .from("learning_path_lesson_items")
     .select("*")
     .eq("lesson_id", lessonId)
@@ -413,7 +462,8 @@ const LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE = 80
 
 /** Active item counts and IDs per lesson (batched queries for hub progress). */
 export async function getLearningPathLessonItemAggregates(
-  lessonIds: string[]
+  lessonIds: string[],
+  client: SupabaseClient = supabase
 ): Promise<LearningPathLessonItemAggregates> {
   if (!lessonIds.length) {
     return { counts: {}, itemIdsByLessonId: {} }
@@ -424,7 +474,7 @@ export async function getLearningPathLessonItemAggregates(
 
   for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
     const chunk = lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE)
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from("learning_path_lesson_items")
       .select("id, lesson_id")
       .in("lesson_id", chunk)

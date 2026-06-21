@@ -75,16 +75,16 @@ export type LearningPathItemLoadResult =
   | { status: "blocked"; lessonBaseHref: string }
   | { status: "ok"; payload: LearningPathItemPayload }
 
-export async function resolveLessonContext(chapterSlug: string, lessonSlug: string) {
+export async function resolveLessonContext(chapterSlug: string, lessonSlug: string, client = supabase) {
   const chapter = isUuid(chapterSlug)
-    ? await getLearningPathChapterById(chapterSlug)
-    : await getLearningPathChapterBySlug(chapterSlug)
+    ? await getLearningPathChapterById(chapterSlug, client)
+    : await getLearningPathChapterBySlug(chapterSlug, client)
 
   if (!chapter) return { chapter: null, lesson: null }
 
   const lesson = isUuid(lessonSlug)
-    ? await getLearningPathLessonById(lessonSlug)
-    : await getLearningPathLessonBySlug(chapterSlug, lessonSlug)
+    ? await getLearningPathLessonById(lessonSlug, client)
+    : await getLearningPathLessonBySlug(chapterSlug, lessonSlug, client)
 
   if (!lesson || lesson.chapter_id !== chapter.id) {
     return { chapter: null, lesson: null }
@@ -272,7 +272,8 @@ export async function loadLearningPathItemPayload(
     return { status: "invalid_index" }
   }
 
-  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
+  const requestClient = await createClient()
+  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug, requestClient)
   if (!chapter || !lesson) {
     return { status: "not_found" }
   }
@@ -282,7 +283,7 @@ export async function loadLearningPathItemPayload(
     return { status: "locked", chapter, lesson }
   }
 
-  const items = await getLearningPathLessonItems(lesson.id)
+  const items = await getLearningPathLessonItems(lesson.id, requestClient)
   const item = items[itemIndex - 1]
   if (!item) {
     return { status: "not_found" }
