@@ -13,6 +13,7 @@ import {
   getLearningPathChapters,
   getLearningPathLessonItemAggregates,
   getLearningPathLessonsByChapterId,
+  type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
 import {
@@ -34,6 +35,20 @@ import { getLearningPathAccess } from "@/lib/learning-path-access"
 export const metadata: Metadata = generateMetadata("learning-paths")
 export const revalidate = 21600
 
+function sortLearningPathChaptersForHub(chapters: LearningPathChapter[]): LearningPathChapter[] {
+  return [...chapters].sort((a, b) => {
+    const aPersonalized = a.is_personalized === true
+    const bPersonalized = b.is_personalized === true
+    if (aPersonalized !== bPersonalized) return aPersonalized ? -1 : 1
+
+    if (aPersonalized && bPersonalized) {
+      return Date.parse(b.created_at) - Date.parse(a.created_at)
+    }
+
+    return a.order_index - b.order_index
+  })
+}
+
 export default async function InvataPage() {
   const access = await getLearningPathAccess(null)
   const hasFullAccess = access.mode === "full"
@@ -42,7 +57,7 @@ export default async function InvataPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const chapters = await getLearningPathChapters(supabase)
+  const chapters = sortLearningPathChaptersForHub(await getLearningPathChapters(supabase))
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
 
   await Promise.all(

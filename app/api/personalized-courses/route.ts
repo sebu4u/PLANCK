@@ -4,9 +4,10 @@ import { createAdminClient } from "@/lib/supabaseAdmin"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 import type { PersonalizedCourseCatalogCandidate, PersonalizedCourseGeneratedPlanItem, SupabaseAnyClient } from "@/lib/personalized-courses/types"
 import { searchPlanckContentForPrompt } from "@/lib/personalized-courses/search"
-import { planPersonalizedCourse } from "@/lib/personalized-courses/planner"
+import { planPersonalizedCourse, getPlannerModel } from "@/lib/personalized-courses/planner"
 import { sanitizeContentJson } from "@/lib/personalized-courses/sanitize"
 import { slugify } from "@/lib/slug"
+import type { LearningPathLessonItem } from "@/lib/supabase-learning-paths"
 
 const MIN_PROMPT_LENGTH = 3
 const MAX_PROMPT_LENGTH = 500
@@ -57,9 +58,29 @@ function getOfficialItemInsertPayload(
   item: PersonalizedCourseGeneratedPlanItem,
   orderIndex: number,
   candidatesByKey: Map<string, PersonalizedCourseCatalogCandidate>,
+  sourceItemsById: Map<string, LearningPathLessonItem>,
 ) {
   const sourceKey = item.source_key?.trim() || ""
   const candidate = sourceKey ? candidatesByKey.get(sourceKey) : undefined
+
+  if (candidate?.source_type === "learning_path_item") {
+    const sourceItem = sourceItemsById.get(candidate.source_id)
+    if (sourceItem) {
+      return {
+        lesson_id: lessonId,
+        item_type: sourceItem.item_type,
+        title: sourceItem.title ?? item.title,
+        cursuri_lesson_slug: sourceItem.cursuri_lesson_slug,
+        youtube_url: sourceItem.youtube_url,
+        quiz_question_id: sourceItem.quiz_question_id,
+        problem_id: sourceItem.problem_id,
+        content_json: sourceItem.content_json ?? null,
+        order_index: orderIndex,
+        is_active: true,
+      }
+    }
+  }
+
   const itemType =
     (candidate?.item_type ?? item.item_type) === "text" &&
     typeof candidate?.metadata?.cursuri_lesson_slug !== "string"
@@ -107,6 +128,38 @@ function getOfficialItemInsertPayload(
   return row
 }
 
+async function getSourceLearningPathItems(
+  admin: SupabaseAnyClient,
+  planItems: PersonalizedCourseGeneratedPlanItem[],
+  candidatesByKey: Map<string, PersonalizedCourseCatalogCandidate>,
+): Promise<Map<string, LearningPathLessonItem>> {
+  const sourceItemIds = Array.from(
+    new Set(
+      planItems
+        .map((item) => {
+          const sourceKey = item.source_key?.trim() || ""
+          const candidate = sourceKey ? candidatesByKey.get(sourceKey) : undefined
+          return candidate?.source_type === "learning_path_item" ? candidate.source_id : null
+        })
+        .filter((id): id is string => Boolean(id)),
+    ),
+  )
+
+  if (!sourceItemIds.length) return new Map()
+
+  const { data, error } = await admin
+    .from("learning_path_lesson_items")
+    .select("*")
+    .in("id", sourceItemIds)
+    .eq("is_active", true)
+
+  if (error) {
+    throw new Error(`Could not fetch source learning path items: ${error.message}`)
+  }
+
+  return new Map((data ?? []).map((row) => [String(row.id), row as LearningPathLessonItem]))
+}
+
 async function markChapterFailed(admin: SupabaseAnyClient, chapterId: string, reason: string) {
   await admin
     .from("learning_path_chapters")
@@ -152,6 +205,65 @@ export async function GET() {
   return NextResponse.json({ courses: [] })
 }
 
+export async function DELETE(request: Request) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return NextResponse.json({ error: "Necesită autentificare." }, { status: 401 })
+  }
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "JSON invalid." }, { status: 400 })
+  }
+
+  const chapterId = typeof (body as { chapterId?: unknown })?.chapterId === "string"
+    ? (body as { chapterId: string }).chapterId.trim()
+    : ""
+
+  if (!chapterId) {
+    return NextResponse.json({ error: "ID-ul cursului este obligatoriu." }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+  const { data: chapter, error: chapterError } = await admin
+    .from("learning_path_chapters")
+    .select("id")
+    .eq("id", chapterId)
+    .eq("generated_by_user_id", user.id)
+    .eq("is_personalized", true)
+    .maybeSingle()
+
+  if (chapterError) {
+    console.error("personalized course delete lookup:", chapterError)
+    return NextResponse.json({ error: "Nu am putut verifica acest curs." }, { status: 500 })
+  }
+
+  if (!chapter) {
+    return NextResponse.json({ error: "Cursul nu există sau nu îți aparține." }, { status: 404 })
+  }
+
+  const { error: deleteError } = await admin
+    .from("learning_path_chapters")
+    .delete()
+    .eq("id", chapterId)
+    .eq("generated_by_user_id", user.id)
+    .eq("is_personalized", true)
+
+  if (deleteError) {
+    console.error("personalized course delete:", deleteError)
+    return NextResponse.json({ error: "Nu am putut șterge cursul personalizat." }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true })
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -189,13 +301,15 @@ export async function POST(request: Request) {
   if (rateLimitError) return NextResponse.json({ error: rateLimitError }, { status: 429 })
 
   try {
-    const candidates = await searchPlanckContentForPrompt(supabase, prompt, 80)
+    const candidates = await searchPlanckContentForPrompt(supabase, prompt, 140)
     const plan = await planPersonalizedCourse(prompt, candidates)
     const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
+    const planItems = plan.lessons.flatMap((lesson) => lesson.items)
+    const sourceItemsById = await getSourceLearningPathItems(admin, planItems, candidatesByKey)
     const generationMetadata = {
       lessonCount: plan.lessons.length,
       itemCount: plan.lessons.reduce((total, lesson) => total + lesson.items.length, 0),
-      model: process.env.PERSONALIZED_COURSE_OPENAI_MODEL || "gpt-4o-mini",
+      model: getPlannerModel(),
       generatedAt: new Date().toISOString(),
       backend: "learning_path",
     }
@@ -265,7 +379,7 @@ export async function POST(request: Request) {
       }
 
       const itemRows = lesson.items.map((item, itemIndex) =>
-        getOfficialItemInsertPayload(insertedLesson.id, item, itemIndex, candidatesByKey),
+        getOfficialItemInsertPayload(insertedLesson.id, item, itemIndex, candidatesByKey, sourceItemsById),
       )
       const { error: itemsError } = await admin.from("learning_path_lesson_items").insert(itemRows)
       if (itemsError) {

@@ -8,7 +8,11 @@ import type {
   PersonalizedCourseGeneratedPlanItem,
   PersonalizedCourseGeneratedPlanLesson,
 } from "@/lib/personalized-courses/types"
-import { LEARNING_PATH_INTERACTIVE_ITEM_TYPE_LIST } from "@/lib/learning-path-interactive-items"
+import {
+  LEARNING_PATH_INTERACTIVE_ITEM_TYPE_LIST,
+  isInteractiveLessonItemType,
+  validateInteractiveItemContent,
+} from "@/lib/learning-path-interactive-items"
 import type { LearningPathLessonType } from "@/lib/supabase-learning-paths"
 
 const PERSONALIZED_ITEM_TYPES = [
@@ -25,6 +29,60 @@ const PERSONALIZED_ITEM_TYPES = [
   ...LEARNING_PATH_INTERACTIVE_ITEM_TYPE_LIST,
 ] as const satisfies readonly LearningPathLessonType[]
 
+const MIN_ITEMS_PER_LESSON = 20
+const MAX_ITEMS_PER_LESSON = 30
+
+const PLANNER_STOP_WORDS = new Set([
+  "azi",
+  "vreau",
+  "doresc",
+  "invăț",
+  "invat",
+  "învaț",
+  "despre",
+  "pentru",
+  "care",
+  "cum",
+  "este",
+  "sunt",
+  "curs",
+  "cursul",
+  "lectie",
+  "lecție",
+  "lectia",
+  "lecția",
+  "concept",
+  "conceptul",
+  "notiune",
+  "noțiune",
+  "notiuni",
+  "noțiuni",
+  "baza",
+  "bază",
+  "baze",
+  "introducere",
+  "aplicare",
+  "aplicatii",
+  "aplicații",
+  "aprofundare",
+  "recapitulare",
+  "exercitiu",
+  "exercițiu",
+  "exercitii",
+  "exerciții",
+  "problema",
+  "problemă",
+  "probleme",
+  "intelegere",
+  "înțelegere",
+  "din",
+  "sau",
+  "mai",
+  "ale",
+  "fara",
+  "fără",
+])
+
 const personalizedItemTypeSchema = z.enum(PERSONALIZED_ITEM_TYPES)
 
 const planItemSchema = z.object({
@@ -37,7 +95,7 @@ const planItemSchema = z.object({
 const planLessonSchema = z.object({
   title: z.string().min(2).max(120),
   description: z.string().max(500).nullable().optional(),
-  items: z.array(planItemSchema).min(1).max(30),
+  items: z.array(planItemSchema).min(1).max(MAX_ITEMS_PER_LESSON),
 })
 
 const planSchema = z.object({
@@ -46,44 +104,193 @@ const planSchema = z.object({
   lessons: z.array(planLessonSchema).min(1).max(8),
 })
 
+/** Item types the AI may generate rich content_json for (no external DB row needed). */
+const GENERATABLE_ITEM_TYPES = [
+  "custom_text",
+  "match",
+  "card_sort",
+  "fill_slot",
+  "reveal_steps",
+  "table_fill",
+  "swipe_classify",
+  "memory_flip",
+  "flow_build",
+  "code_trace",
+  "slider_explore",
+  "graph_build",
+  "speed_round",
+] as const satisfies readonly LearningPathLessonType[]
+
+const GENERATABLE_ITEM_TYPE_SET: ReadonlySet<string> = new Set(GENERATABLE_ITEM_TYPES)
+
+const MAX_CONNECTORS_PER_LESSON = 8
+
+const MIN_CUSTOM_TEXT_BODY_LENGTH = 40
+
+/**
+ * Provider config for the personalized-course planner. Supports any OpenAI-compatible
+ * endpoint (OpenAI, DeepSeek, OpenRouter, …) via env. DeepSeek is used when
+ * DEEPSEEK_API_KEY is present; otherwise falls back to OpenAI.
+ *
+ *   DEEPSEEK_API_KEY=sk-...                (DeepSeek)
+ *   PERSONALIZED_COURSE_OPENAI_MODEL=...   (model id; default deepseek-chat on DeepSeek)
+ *   PERSONALIZED_COURSE_BASE_URL=...       (override endpoint, e.g. OpenRouter)
+ *   PERSONALIZED_COURSE_API_KEY=...        (override key, takes precedence)
+ */
+function getPlannerProviderConfig() {
+  const overrideKey = process.env.PERSONALIZED_COURSE_API_KEY?.trim()
+  const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim()
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+
+  const apiKey = overrideKey || deepseekKey || openaiKey
+  if (!apiKey) {
+    throw new Error(
+      "Missing API key for course planner. Set DEEPSEEK_API_KEY (or OPENAI_API_KEY, or PERSONALIZED_COURSE_API_KEY).",
+    )
+  }
+
+  const isDeepseek = Boolean(deepseekKey && !overrideKey)
+  const baseURL =
+    process.env.PERSONALIZED_COURSE_BASE_URL?.trim() ||
+    (isDeepseek ? "https://api.deepseek.com" : undefined)
+  // Default to deepseek-v4-flash: it is fast (~50s) and fits the plan JSON within the
+  // token budget. The reasoning model deepseek-v4-pro spends ~20k tokens on hidden
+  // reasoning per plan and truncates the output even at max_tokens=32000, so it is NOT
+  // suitable for this single-shot generation. Override via PERSONALIZED_COURSE_OPENAI_MODEL.
+  const defaultModel = isDeepseek ? "deepseek-v4-flash" : "gpt-4o-mini"
+  const model = process.env.PERSONALIZED_COURSE_OPENAI_MODEL?.trim() || defaultModel
+
+  // Reasoning models (deepseek-v4-pro, deepseek-reasoner, o-series) spend part of the
+  // max_tokens budget on hidden reasoning before emitting visible content. Give them a
+  // much larger shared budget so the JSON output isn't truncated to an empty string.
+  const isReasoningModel = /pro|reasoner|\bo[1-9]\b|r1/i.test(model)
+  const maxTokens = isReasoningModel ? 32000 : 20000
+
+  return { apiKey, baseURL, model, provider: isDeepseek ? "deepseek" : "openai", maxTokens, isReasoningModel }
+}
+
 function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY")
-  return new OpenAI({ apiKey })
+  const { apiKey, baseURL } = getPlannerProviderConfig()
+  // A full plan (up to ~100 rich items) can take over a minute even on flash; allow 180s.
+  const timeout = 180_000
+  const opts: Record<string, unknown> = { apiKey, timeout }
+  if (baseURL) opts.baseURL = baseURL
+  return new OpenAI(opts)
+}
+
+export function getPlannerModel(): string {
+  return getPlannerProviderConfig().model
 }
 
 function stringifyCandidates(candidates: PersonalizedCourseCatalogCandidate[]): string {
   if (!candidates.length) return "Nu s-a găsit conținut Planck relevant. Generează iteme de legătură (doar custom_text cu explicații scurte)."
   return candidates
-    .slice(0, 48)
+    .slice(0, 100)
     .map((candidate, index) => {
       return [
         `#${index + 1}`,
         `source_key: ${candidate.key}`,
         `tip: ${candidate.item_type}`,
         `titlu: ${candidate.title}`,
-        `continut: ${candidate.summary}`,
+        `continut: ${candidate.summary.slice(0, 280)}`,
       ].join("\n")
     })
     .join("\n\n")
 }
 
-function defaultCustomTextBody(title: string, userPrompt: string): string {
-  return `## ${title}\n\nÎn această secțiune lucrăm cu conținut Planck existent pentru obiectivul: **${userPrompt}**.`
+function normalizeText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
 }
 
-function makeGeneratedContentJson(
+function extractPlannerTerms(value: string): string[] {
+  const normalized = normalizeText(value)
+  return Array.from(
+    new Set(
+      normalized
+        .split(/[^a-z0-9]+/g)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 3 && !PLANNER_STOP_WORDS.has(term)),
+    ),
+  )
+}
+
+function scoreTextByTerms(terms: string[], haystack: string): number {
+  if (!terms.length) return 1
+  const normalized = normalizeText(haystack)
+  let score = 0
+  for (const term of terms) {
+    if (normalized.includes(term)) score += term.length >= 6 ? 3 : 2
+  }
+  return score
+}
+
+function getLessonFocusTerms(
+  lesson: Pick<PersonalizedCourseGeneratedPlanLesson, "title" | "description">,
+  userPrompt: string,
+): string[] {
+  const lessonTerms = extractPlannerTerms(`${lesson.title} ${lesson.description ?? ""}`)
+  const promptTerms = extractPlannerTerms(userPrompt)
+  return Array.from(new Set([...lessonTerms, ...promptTerms]))
+}
+
+function scoreCandidateForLesson(
+  candidate: PersonalizedCourseCatalogCandidate,
+  lesson: Pick<PersonalizedCourseGeneratedPlanLesson, "title" | "description">,
+  userPrompt: string,
+): number {
+  const terms = getLessonFocusTerms(lesson, userPrompt)
+  return scoreTextByTerms(
+    terms,
+    `${candidate.title} ${candidate.summary} ${Object.values(candidate.metadata ?? {}).join(" ")}`,
+  )
+}
+
+function makeRichCustomTextBody(title: string, userPrompt: string, lessonTitle?: string): string {
+  const lessonLine = lessonTitle ? `\n\n**În lecția:** ${lessonTitle}.` : ""
+  return [
+    `## ${title}${lessonLine}`,
+    "",
+    `Ideea centrală a acestui pas sprijină direct obiectivul tău: **${userPrompt}**.`,
+    "",
+    "Parcurge explicația în ritm propriu, apoi continuă cu următorul item din lecție pentru a fixa noțiunea prin practică.",
+  ].join("\n")
+}
+
+/**
+ * Build a generated (non-source) item, preserving the AI-chosen interactive type when
+ * its content_json validates against the real interactive parsers. Falls back to a rich
+ * custom_text explanation when the interactive content is missing or invalid — never to a
+ * broken item or a one-line connector.
+ */
+function buildGeneratedItem(
   item: PersonalizedCourseGeneratedPlanItem,
   userPrompt: string,
-): Record<string, unknown> {
-  const current = item.content_json && typeof item.content_json === "object" && !Array.isArray(item.content_json)
-    ? item.content_json
-    : null
+  lessonTitle?: string,
+): PersonalizedCourseGeneratedPlanItem {
+  const title = item.title.trim()
+  const requestedType = item.item_type
+  const rawContent =
+    item.content_json && typeof item.content_json === "object" && !Array.isArray(item.content_json)
+      ? (item.content_json as Record<string, unknown>)
+      : null
 
-  if (current && Object.keys(current).length > 0) return current
+  if (isInteractiveLessonItemType(requestedType) && rawContent) {
+    const validationError = validateInteractiveItemContent(requestedType, rawContent)
+    if (!validationError) {
+      return { title, item_type: requestedType, source_key: null, content_json: rawContent }
+    }
+    // Invalid interactive content → fall back to rich custom_text (do not store a broken item).
+  }
 
-  // Only generate lightweight connector text — never fake real problems/quizzes/tests
-  return { body: defaultCustomTextBody(item.title, userPrompt) }
+  const body =
+    typeof rawContent?.body === "string" && rawContent.body.trim().length >= MIN_CUSTOM_TEXT_BODY_LENGTH
+      ? rawContent.body.trim()
+      : makeRichCustomTextBody(title, userPrompt, lessonTitle)
+
+  return { title, item_type: "custom_text", source_key: null, content_json: { body } }
 }
 
 function coerceItem(
@@ -91,25 +298,132 @@ function coerceItem(
   validSourceKeys: Set<string>,
   candidatesByKey: Map<string, PersonalizedCourseCatalogCandidate>,
   userPrompt: string,
+  lessonTitle?: string,
 ): PersonalizedCourseGeneratedPlanItem {
   const sourceKey = item.source_key?.trim() || null
   const hasValidSource = !!sourceKey && validSourceKeys.has(sourceKey)
-  const candidate = hasValidSource && sourceKey ? candidatesByKey.get(sourceKey) : undefined
-  const itemType = hasValidSource ? candidate?.item_type ?? item.item_type : "custom_text"
 
+  if (hasValidSource && sourceKey) {
+    const candidate = candidatesByKey.get(sourceKey)
+    return {
+      title: item.title.trim(),
+      item_type: candidate?.item_type ?? item.item_type,
+      source_key: sourceKey,
+      content_json: item.content_json ?? null,
+    }
+  }
+
+  // Non-source item: only generatable types are allowed; anything else becomes rich text.
+  const generatableItem: PersonalizedCourseGeneratedPlanItem = GENERATABLE_ITEM_TYPE_SET.has(item.item_type)
+    ? item
+    : { ...item, item_type: "custom_text" }
+
+  return buildGeneratedItem(generatableItem, userPrompt, lessonTitle)
+}
+
+function candidateToPlanItem(candidate: PersonalizedCourseCatalogCandidate): PersonalizedCourseGeneratedPlanItem {
   return {
-    title: item.title.trim(),
-    item_type: itemType,
-    source_key: hasValidSource ? sourceKey : null,
-    content_json: hasValidSource ? item.content_json ?? null : makeGeneratedContentJson({ ...item, item_type: itemType }, userPrompt),
+    title: candidate.title,
+    item_type: candidate.item_type,
+    source_key: candidate.key,
+    content_json: null,
   }
 }
 
-/**
- * Post-process the AI plan: inject unused real Planck candidates that the AI missed.
- * This ensures we maximize real content usage and don't let the AI skip relevant items.
- */
-function injectMissedCandidates(
+function replaceDuplicateSourceKeys(
+  plan: PersonalizedCourseGeneratedPlan,
+): PersonalizedCourseGeneratedPlan {
+  const usedKeys = new Set<string>()
+
+  const lessons = plan.lessons.map((lesson) => {
+    const items: PersonalizedCourseGeneratedPlanItem[] = []
+
+    for (const item of lesson.items) {
+      const sourceKey = item.source_key?.trim() || null
+      if (!sourceKey) {
+        items.push(item)
+        continue
+      }
+
+      if (!usedKeys.has(sourceKey)) {
+        usedKeys.add(sourceKey)
+        items.push({ ...item, source_key: sourceKey })
+        continue
+      }
+
+      // Drop duplicates; the lesson-aware filler below chooses the best replacement.
+    }
+
+    return { ...lesson, items }
+  })
+
+  return { ...plan, lessons }
+}
+
+function removeIrrelevantSourceItems(
+  plan: PersonalizedCourseGeneratedPlan,
+  candidatesByKey: Map<string, PersonalizedCourseCatalogCandidate>,
+  userPrompt: string,
+): PersonalizedCourseGeneratedPlan {
+  const lessons = plan.lessons.map((lesson) => {
+    const items = lesson.items.filter((item) => {
+      const sourceKey = item.source_key?.trim() || null
+      if (!sourceKey) return true
+
+      const candidate = candidatesByKey.get(sourceKey)
+      if (!candidate) return false
+
+      return scoreCandidateForLesson(candidate, lesson, userPrompt) > 0
+    })
+
+    return { ...lesson, items }
+  })
+
+  return { ...plan, lessons }
+}
+
+const FALLBACK_ITEM_TITLES = [
+  "Obiectivul lecției",
+  "Ideea centrală",
+  "Vocabular esențial",
+  "Intuiție rapidă",
+  "De ce contează",
+  "Exemplu ghidat",
+  "Pașii de lucru",
+  "Verificare de înțelegere",
+  "Greșeală frecventă",
+  "Conexiune cu practica",
+  "Mini-recapitulare",
+  "Întrebare de control",
+] as const
+
+function makeGeneratedConnectorItem(
+  title: string,
+  userPrompt: string,
+  lessonTitle?: string,
+): PersonalizedCourseGeneratedPlanItem {
+  return {
+    title,
+    item_type: "custom_text",
+    source_key: null,
+    content_json: {
+      body: [
+        `## ${title}`,
+        lessonTitle ? `**În lecția ${lessonTitle}** continuăm să fixăm ideile pentru obiectivul: **${userPrompt}**.` : `Continuăm să fixăm ideile pentru obiectivul: **${userPrompt}**.`,
+        "",
+        "Recapitulează punctele cheie parcursse până aici, apoi mergi mai departe pentru a aplica noțiunea într-un nou context.",
+      ].join("\n"),
+    },
+  }
+}
+
+function makeFallbackItemTitle(index: number): string {
+  const stage = Math.floor(index / FALLBACK_ITEM_TITLES.length) + 1
+  const suffix = stage > 1 ? ` (${stage})` : ""
+  return `${FALLBACK_ITEM_TITLES[index % FALLBACK_ITEM_TITLES.length]}${suffix}`
+}
+
+function ensureMinimumItemsPerLesson(
   plan: PersonalizedCourseGeneratedPlan,
   candidates: PersonalizedCourseCatalogCandidate[],
   userPrompt: string,
@@ -121,49 +435,68 @@ function injectMissedCandidates(
     }
   }
 
-  const unused = candidates.filter((c) => !usedKeys.has(c.key))
-  if (!unused.length) return plan
+  function takeBestCandidateForLesson(
+    lesson: PersonalizedCourseGeneratedPlanLesson,
+  ): PersonalizedCourseGeneratedPlanItem | null {
+    const best = candidates
+      .filter((candidate) => !usedKeys.has(candidate.key))
+      .map((candidate) => ({
+        candidate,
+        score: scoreCandidateForLesson(candidate, lesson, userPrompt),
+      }))
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score || a.candidate.title.localeCompare(b.candidate.title))[0]
 
-  // Group unused candidates by type for balanced injection
-  const byType = new Map<string, PersonalizedCourseCatalogCandidate[]>()
-  for (const c of unused) {
-    const bucket = byType.get(c.item_type) ?? []
-    bucket.push(c)
-    byType.set(c.item_type, bucket)
+    if (!best) return null
+    usedKeys.add(best.candidate.key)
+    return candidateToPlanItem(best.candidate)
   }
 
-  // Inject up to 10 unused real items per lesson (replace generated custom_text items)
-  const lessons = plan.lessons.map((lesson) => {
-    let injected = 0
-    const maxInject = Math.min(10, Math.ceil(unused.length / plan.lessons.length))
-    const items = lesson.items.map((item) => {
-      if (injected >= maxInject) return item
-      // Only replace generated custom_text items (connectors), not real content
-      if (item.source_key) return item
-      if (item.item_type !== "custom_text") return item
+  return {
+    ...plan,
+    lessons: plan.lessons.map((lesson) => {
+      const items = lesson.items.slice(0, MAX_ITEMS_PER_LESSON)
+      let connectorCount = items.filter((item) => !item.source_key && item.item_type === "custom_text").length
 
-      // Find a suitable unused candidate
-      for (const [type, candidatesOfType] of byType) {
-        const candidate = candidatesOfType[0]
-        if (candidate) {
-          candidatesOfType.shift()
-          if (candidatesOfType.length === 0) byType.delete(type)
-          injected++
-          return {
-            title: candidate.title,
-            item_type: candidate.item_type,
-            source_key: candidate.key,
-            content_json: null,
-          }
+      while (items.length < MIN_ITEMS_PER_LESSON) {
+        const sourceItem = takeBestCandidateForLesson({ ...lesson, items })
+        if (sourceItem) {
+          items.push(sourceItem)
+          continue
         }
+
+        if (connectorCount >= MAX_CONNECTORS_PER_LESSON) break
+        connectorCount += 1
+
+        const fallbackIndex = items.length
+        items.push(
+          makeGeneratedConnectorItem(
+            makeFallbackItemTitle(fallbackIndex),
+            userPrompt,
+            lesson.title,
+          ),
+        )
       }
-      return item
-    })
 
-    return { ...lesson, items }
-  })
+      return { ...lesson, items }
+    }),
+  }
+}
 
-  return { ...plan, lessons }
+function finalizePlan(
+  plan: PersonalizedCourseGeneratedPlan,
+  candidates: PersonalizedCourseCatalogCandidate[],
+  userPrompt: string,
+): PersonalizedCourseGeneratedPlan {
+  const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
+  const withoutDuplicates = replaceDuplicateSourceKeys(plan)
+  const withoutIrrelevantSources = removeIrrelevantSourceItems(
+    withoutDuplicates,
+    candidatesByKey,
+    userPrompt,
+  )
+
+  return ensureMinimumItemsPerLesson(withoutIrrelevantSources, candidates, userPrompt)
 }
 
 function normalizePlan(
@@ -175,7 +508,7 @@ function normalizePlan(
   const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
 
   const lessons: PersonalizedCourseGeneratedPlanLesson[] = plan.lessons.slice(0, 8).map((lesson) => {
-    const items = lesson.items.slice(0, 30).map((item) => coerceItem(item, validSourceKeys, candidatesByKey, userPrompt))
+    const items = lesson.items.slice(0, MAX_ITEMS_PER_LESSON).map((item) => coerceItem(item, validSourceKeys, candidatesByKey, userPrompt, lesson.title))
     if (items.length >= 2) {
       return { ...lesson, title: lesson.title.trim(), description: lesson.description?.trim() || null, items }
     }
@@ -185,14 +518,14 @@ function normalizePlan(
       description: lesson.description?.trim() || null,
       items: [
         ...items,
-        coerceItem({ title: `Explicație: ${lesson.title}`, item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt),
+        coerceItem({ title: `Explicație: ${lesson.title}`, item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt, lesson.title),
       ],
     }
   })
 
   if (lessons.length >= 2) {
     const finalPlan = { title: plan.title.trim(), description: plan.description.trim(), lessons }
-    return injectMissedCandidates(finalPlan, candidates, userPrompt)
+    return finalizePlan(finalPlan, candidates, userPrompt)
   }
 
   // AI returned only 1 lesson — add a second from real candidates
@@ -221,7 +554,7 @@ function normalizePlan(
           },
         ],
       }
-      return injectMissedCandidates(finalPlan, candidates, userPrompt)
+      return finalizePlan(finalPlan, candidates, userPrompt)
     }
   }
 
@@ -235,18 +568,9 @@ function normalizePlan(
       content_json: null as Record<string, unknown> | null,
     }))
 
-    // Pad with custom_text connectors to reach 15+ per lesson
     const lessons: PersonalizedCourseGeneratedPlanLesson[] = []
-    const itemsPerLesson = Math.max(15, Math.ceil(allItems.length / 3))
     for (let i = 0; i < 3; i++) {
       const slice: PersonalizedCourseGeneratedPlanItem[] = allItems.slice(i * Math.ceil(allItems.length / 3), (i + 1) * Math.ceil(allItems.length / 3))
-      // Pad with connectors
-      while (slice.length < itemsPerLesson) {
-        slice.push(coerceItem(
-          { title: `Recapitulare ${i + 1}`, item_type: "custom_text" },
-          validSourceKeys, candidatesByKey, userPrompt,
-        ))
-      }
       lessons.push({
         title: i === 0 ? "Baze și introducere" : i === 1 ? "Aprofundare" : "Aplicare și probleme",
         description: i === 0 ? "Noțiuni fundamentale și intuiție." : i === 1 ? "Aprofundare și exemple." : "Probleme și aplicare.",
@@ -254,15 +578,15 @@ function normalizePlan(
       })
     }
 
-    return {
+    return finalizePlan({
       title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
       description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
       lessons,
-    }
+    }, candidates, userPrompt)
   }
 
   // Last resort: minimal generated content
-  return {
+  return finalizePlan({
     title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
     description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
     lessons: [
@@ -270,39 +594,58 @@ function normalizePlan(
         title: "Start rapid",
         description: "Clarificăm obiectivul și construim baza.",
         items: [
-          coerceItem({ title: "Imaginea de ansamblu", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt),
+          coerceItem({ title: "Imaginea de ansamblu", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt, "Start rapid"),
         ],
       },
       {
         title: "Aplicare ghidată",
         description: "Fixăm ideile prin exerciții.",
         items: [
-          coerceItem({ title: "Pași de rezolvare", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt),
+          coerceItem({ title: "Pași de rezolvare", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt, "Aplicare ghidată"),
         ],
       },
     ],
-  }
+  }, candidates, userPrompt)
 }
 
+const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) și conținutul content_json EXACT (validat strict):
+
+- custom_text: {"body": "markdown substancial — titlu ##, 2-4 paragrafe, exemple, $formule LaTeX$. Minim ~80 de cuvinte."}
+- match: {"instructions": "...opțional", "left": [{"id":"l1","text":"..."}], "right": [{"id":"r1","text":"..."}], "pairs": [{"leftId":"l1","rightId":"r1"}]} — left și right au aceeași lungime (3-6); pairs acoperă fiecare element o singură dată.
+- card_sort: {"instructions": "...opțional", "cards": [{"id":"a","text":"..."}], "correctOrder": ["a",...]} — correctOrder este o permutare a id-urilor (4-7 carduri).
+- fill_slot: {"instructions": "...opțional", "latexTemplate": "F = {{m}} \\cdot a", "slots": [{"id":"m","answer":"2"}], "chips": ["1","2","5","10"]} — fiecare {{id}} apare în latexTemplate; chips include toate answer-urile + distractoare.
+- reveal_steps: {"instructions": "...opțional", "steps": [{"kind":"markdown","content":"..."},{"kind":"quiz","content":"...?","options":["a","b","c"],"correctIndex":0}]} — minim 3 pași.
+- table_fill: {"instructions": "...opțional", "headers": ["Mărime","Unitate"], "rows": [{"cells": [{"text":"Forță"},{"blank":true,"answer":"N"}]}]} — cells.length === headers.length.
+- swipe_classify: {"prompt": "...opțional", "leftLabel": "Adevărat", "rightLabel": "Fals", "cards": [{"text":"...","side":"left"}]} — 4-8 carduri; side "left" sau "right".
+- memory_flip: {"instructions": "...opțional", "pairs": [{"a":"$\\vec{F}$","b":"Forță"}]} — 3-6 perechi; a/b markdown sau LaTeX.
+- flow_build: {"instructions": "...opțional", "nodes": [{"id":"s","kind":"start","label":"Start"}], "correctEdges": [{"from":"s","to":"p"}]} — kind: start|process|decision|end.
+- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"choice","options":["1","2","3"],"answer":"3"}]} — pentru inputMode "choice", answer trebuie să fie printre options; lineIndex în raza lines. FĂRĂ caractere < > & în lines/options/answer.
+- slider_explore: {"instructions": "...opțional", "sliders": [{"id":"m","label":"masa (kg)","min":0.5,"max":20,"step":0.1,"default":2}], "formula": "m*5", "targetMin": 49, "targetMax": 51} — formula folosește doar id-urile sliderelor + operatori mathjs.
+- graph_build: {"mode":"pick_curve", "prompt":"Care curbă...?", "options": [{"id":"a","label":"Constant","svgPath":"M 5 30 L 95 30"}], "correctOptionId":"b"} — svgPath e cale SVG în viewBox x 0..100, y 0..40.
+- speed_round: {"secondsTotal": 60, "questions": [{"prompt":"...?","options":["a","b","c"],"correctIndex":1}]} — 3-6 întrebări.
+
+REGULI PENTRU ITEMI GENERAȚI:
+- Fiecare lecție trebuie să conțină un MIX VARIAT de tipuri: minim 2 itemi custom_text cu explicații substaniale ȘI minim 3 itemi interactivi de tipuri DIFERITE (match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, flow_build, code_trace etc.). NU folosi doar custom_text.
+- Conținutul generat trebuie să fie relevant pentru TITLUL lecției și obiectivul userului, calitate de manual, NU text generic de legătură.
+- Pentru matematică folosește LaTeX ($...$). NU folosi caractere < > & în câmpuri afișate ca text simplu (lines, options, answer, chips, label, svgPath, formula).
+- Pentru itemii cu source_key, content_json = null. Nu inventa source_key — folosește doar cheile din listă sau null.`
+
 const SYSTEM_PROMPT = `Ești plannerul de cursuri personalizate PLANCK Academy.
-Răspunzi DOAR cu JSON valid, fără Markdown.
+Răspunzi DOAR cu JSON valid, fără Markdown în afara valorilor din content_json.
 
 REGULA PRINCIPALĂ: Folosește cât mai mult conținut real din Planck (via source_key). Nu inventa probleme, grile, teste sau lecții care deja există în lista de mai jos.
 
-Prioritizează itemele cu source_key valid. Generează iteme noi DOAR ca text de legătură (custom_text) între itemele reale — nu inventa exerciții noi dacă există deja în listă.
+Pentru itemii cu source_key: content_json = null, item_type = tipul din listă. Nu repeta niciun source_key în curs — fiecare item real apare o singură dată.
 
-Dacă lista de conținut are probleme/grile/lecții relevante, folosește-le pe acelea cu source_key. Nu le recrea cu content_json.
+Pentru itemii FĂRĂ source_key (generați): creează conținut rich și variat, exact ca în lecțiile oficiale Planck. Urmează ghidul de mai jos. Fiecare item generat trebuie să aibă un item_type permis și un content_json valid complet — nu lăsa câmpuri goale.
 
-Pentru itemele cu source_key, pune content_json null.
-Pentru itemele fără source_key (doar custom_text de legătură), folosește: {"body":"text markdown scurt"}
+${GENERATED_CONTENT_GUIDE}
 
-Nu inventa source_key-uri. Folosește doar cheile din lista de mai jos sau null.
+Creează un traseu complet, cu 3-5 lecții. FIECARE lecție trebuie să aibă 20-25 itemi relevanți pentru titlul lecției. Folosește întâi itemele reale relevante din listă (fără duplicate), apoi completează cu itemi generați rich și variați (explicații custom_text + itemi interactivi), NU cu text generic de legătură.
 
-Creează un traseu complet, cu 3-5 lecții, FIECARE cu 15-25 itemi. Folosește TOATE itemele relevante din listă. Dacă sunt mai puține iteme reale, repetă/combina itemii reali disponibili și adaugă custom_text scurt ca legături pentru a ajunge la minim 15 itemi per lecție.
+Distribuie itemii pe lecții în ordine logică: prima lecție = introducere/baze, ultimele = aplicare/probleme. Fiecare lecție trebuie să arate ca o lecție oficială Planck: explicații clare urmate de practică interactivă.
 
-Distribuie itemii pe lecții în ordine logică: prima lecție = introducere/baze, ultimele = aplicare/probleme.
-
-Minim 60% din itemi trebuie să aibă source_key valid când există conținut relevant.`
+Minim 50% din itemi trebuie să aibă source_key valid când există conținut relevant. Restul sunt itemi generați rich și variați (nu doar custom_text).`
 
 function normalizeParsedPlan(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -329,8 +672,9 @@ export async function planPersonalizedCourse(
   candidates: PersonalizedCourseCatalogCandidate[],
 ): Promise<PersonalizedCourseGeneratedPlan> {
   const openai = getOpenAIClient()
+  const { model, maxTokens, isReasoningModel } = getPlannerProviderConfig()
   const completion = await openai.chat.completions.create({
-    model: process.env.PERSONALIZED_COURSE_OPENAI_MODEL || "gpt-4o-mini",
+    model,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
@@ -339,7 +683,7 @@ export async function planPersonalizedCourse(
           {
             user_learning_goal: userPrompt,
             available_planck_content: stringifyCandidates(candidates),
-            instruction: "Folosește maxim itemele cu source_key din lista above. Generează doar custom_text scurt ca legături între ele.",
+            instruction: "Alege iteme prin source_key din lista de mai sus (fără duplicate). Fiecare lecție trebuie să aibă 20-25 itemi. Completează restul cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substaniale și minim 3 itemi interactivi de tipuri diferite per lecție, cu content_json valid conform ghidului. Nu genera doar custom_text.",
             required_json_shape: {
               title: "string",
               description: "string",
@@ -350,9 +694,9 @@ export async function planPersonalizedCourse(
                   items: [
                     {
                       title: "string",
-                      item_type: "text | grila | problem | ...",
+                      item_type: "custom_text | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | flow_build | code_trace | slider_explore | graph_build | speed_round | text | grila | problem | ...",
                       source_key: "exact un source_key din listă sau null",
-                      content_json: "null dacă ai source_key, {\"body\":\"text\"} dacă nu",
+                      content_json: "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului",
                     },
                   ],
                 },
@@ -365,8 +709,8 @@ export async function planPersonalizedCourse(
       },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.3,
-    max_tokens: 8000,
+    temperature: 0.4,
+    max_tokens: maxTokens,
   })
 
   const rawContent = completion.choices[0]?.message?.content

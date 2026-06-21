@@ -20,6 +20,36 @@ const ROMANIAN_STOP_WORDS = new Set([
   "ce",
   "este",
   "sunt",
+  "curs",
+  "cursul",
+  "lectie",
+  "lecție",
+  "lectia",
+  "lecția",
+  "concept",
+  "conceptul",
+  "notiune",
+  "noțiune",
+  "notiuni",
+  "noțiuni",
+  "baza",
+  "bază",
+  "baze",
+  "introducere",
+  "aplicare",
+  "aplicatii",
+  "aplicații",
+  "aprofundare",
+  "recapitulare",
+  "exercitiu",
+  "exercițiu",
+  "exercitii",
+  "exerciții",
+  "problema",
+  "problemă",
+  "probleme",
+  "intelegere",
+  "înțelegere",
   "din",
   "la",
   "cu",
@@ -85,7 +115,7 @@ function compactSummary(...parts: unknown[]): string {
 }
 
 function candidateLimit(limit: number): number {
-  return Math.max(4, Math.min(limit, 60))
+  return Math.max(4, Math.min(limit, 160))
 }
 
 function sortAndLimit(
@@ -112,13 +142,58 @@ function sortAndLimit(
     .map((row) => row.candidate)
 }
 
+type LearningPathItemSearchRow = {
+  id: string
+  lesson_id: string | null
+  item_type: string | null
+  title: string | null
+  cursuri_lesson_slug: string | null
+  youtube_url: string | null
+  quiz_question_id: string | null
+  problem_id: string | null
+  content_json?: unknown
+}
+
+function addLearningPathItemCandidate(
+  candidates: PersonalizedCourseCatalogCandidate[],
+  row: LearningPathItemSearchRow,
+  context: Record<string, unknown> = {},
+) {
+  candidates.push({
+    key: `learning_path_item:${row.id}`,
+    source_type: "learning_path_item",
+    source_id: String(row.id),
+    source_table: "learning_path_lesson_items",
+    item_type: (row.item_type || "custom_text") as LearningPathLessonType,
+    title: String(row.title ?? `Item ${row.item_type ?? "Planck"}`),
+    summary: compactSummary(
+      context.chapter_title,
+      context.lesson_title,
+      row.cursuri_lesson_slug,
+      row.youtube_url,
+      row.quiz_question_id,
+      row.problem_id,
+      JSON.stringify(row.content_json ?? {}).slice(0, 300),
+    ),
+    url: null,
+    metadata: {
+      ...context,
+      lesson_id: row.lesson_id,
+      cursuri_lesson_slug: row.cursuri_lesson_slug,
+      youtube_url: row.youtube_url,
+      quiz_question_id: row.quiz_question_id,
+      problem_id: row.problem_id,
+    },
+  })
+}
+
 async function fetchLearningPathCandidates(
   supabase: SupabaseAnyClient,
   terms: string[],
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
   const candidates: PersonalizedCourseCatalogCandidate[] = []
 
-  // Search chapters with each term
+  // If a prompt matches a chapter, offer that chapter's concrete lesson items.
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
     const { data: chapters } = await supabase
@@ -127,48 +202,74 @@ async function fetchLearningPathCandidates(
       .eq("is_active", true)
       .or(`title.ilike.${pattern},description.ilike.${pattern},problem_category.ilike.${pattern}`)
       .limit(20)
-    for (const row of chapters ?? []) {
-      candidates.push({
-        key: `chapter:${row.id}`,
-        source_type: "lesson",
-        source_id: String(row.id),
-        source_table: "learning_path_chapters",
-        item_type: "custom_text",
-        title: String(row.title ?? "Traseu Planck"),
-        summary: compactSummary(row.description, row.problem_category, row.materie),
-        url: row.slug ? `/invata/${row.slug}` : `/invata/${row.id}`,
-        metadata: { problem_category: row.problem_category, materie: row.materie },
+
+    const chapterRows = chapters ?? []
+    const chapterIds = chapterRows.map((row) => String(row.id)).filter(Boolean)
+    if (!chapterIds.length) continue
+
+    const chapterById = new Map(chapterRows.map((row) => [String(row.id), row]))
+    const { data: lessons } = await supabase
+      .from("learning_path_lessons")
+      .select("id, chapter_id, title, description")
+      .eq("is_active", true)
+      .in("chapter_id", chapterIds)
+      .order("order_index", { ascending: true })
+      .limit(80)
+
+    const lessonRows = lessons ?? []
+    const lessonIds = lessonRows.map((row) => String(row.id)).filter(Boolean)
+    if (!lessonIds.length) continue
+
+    const lessonById = new Map(lessonRows.map((row) => [String(row.id), row]))
+    const { data: items } = await supabase
+      .from("learning_path_lesson_items")
+      .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
+      .eq("is_active", true)
+      .in("lesson_id", lessonIds)
+      .order("order_index", { ascending: true })
+      .limit(120)
+
+    for (const row of items ?? []) {
+      const lesson = row.lesson_id ? lessonById.get(String(row.lesson_id)) : null
+      const chapter = lesson?.chapter_id ? chapterById.get(String(lesson.chapter_id)) : null
+      addLearningPathItemCandidate(candidates, row, {
+        matched_by: "chapter",
+        chapter_id: chapter?.id ?? null,
+        chapter_title: chapter?.title ?? null,
+        lesson_title: lesson?.title ?? null,
       })
     }
   }
 
-  // Search lessons with each term
+  // If a prompt matches a lesson, offer that lesson's concrete items.
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
     const { data: lessons } = await supabase
       .from("learning_path_lessons")
-      .select("id, slug, chapter_id, title, description, lesson_type, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id")
+      .select("id, slug, chapter_id, title, description")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},description.ilike.${pattern}`)
       .limit(25)
-    for (const row of lessons ?? []) {
-      const itemType = (row.lesson_type || "custom_text") as LearningPathLessonType
-      candidates.push({
-        key: `lesson:${row.id}`,
-        source_type: "lesson",
-        source_id: String(row.id),
-        source_table: "learning_path_lessons",
-        item_type: itemType === "text" ? "custom_text" : itemType,
-        title: String(row.title ?? "Lecție Planck"),
-        summary: compactSummary(row.description, row.cursuri_lesson_slug, row.youtube_url, row.problem_id),
-        url: null,
-        metadata: {
-          chapter_id: row.chapter_id,
-          cursuri_lesson_slug: row.cursuri_lesson_slug,
-          youtube_url: row.youtube_url,
-          quiz_question_id: row.quiz_question_id,
-          problem_id: row.problem_id,
-        },
+
+    const lessonRows = lessons ?? []
+    const lessonIds = lessonRows.map((row) => String(row.id)).filter(Boolean)
+    if (!lessonIds.length) continue
+
+    const lessonById = new Map(lessonRows.map((row) => [String(row.id), row]))
+    const { data: items } = await supabase
+      .from("learning_path_lesson_items")
+      .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
+      .eq("is_active", true)
+      .in("lesson_id", lessonIds)
+      .order("order_index", { ascending: true })
+      .limit(80)
+
+    for (const row of items ?? []) {
+      const lesson = row.lesson_id ? lessonById.get(String(row.lesson_id)) : null
+      addLearningPathItemCandidate(candidates, row, {
+        matched_by: "lesson",
+        chapter_id: lesson?.chapter_id ?? null,
+        lesson_title: lesson?.title ?? null,
       })
     }
   }
@@ -183,23 +284,7 @@ async function fetchLearningPathCandidates(
       .or(`title.ilike.${pattern},cursuri_lesson_slug.ilike.${pattern}`)
       .limit(30)
     for (const row of items ?? []) {
-      candidates.push({
-        key: `learning_path_item:${row.id}`,
-        source_type: "learning_path_item",
-        source_id: String(row.id),
-        source_table: "learning_path_lesson_items",
-        item_type: (row.item_type || "custom_text") as LearningPathLessonType,
-        title: String(row.title ?? `Item ${row.item_type ?? "Planck"}`),
-        summary: compactSummary(row.cursuri_lesson_slug, row.youtube_url, row.quiz_question_id, row.problem_id, JSON.stringify(row.content_json ?? {}).slice(0, 300)),
-        url: null,
-        metadata: {
-          lesson_id: row.lesson_id,
-          cursuri_lesson_slug: row.cursuri_lesson_slug,
-          youtube_url: row.youtube_url,
-          quiz_question_id: row.quiz_question_id,
-          problem_id: row.problem_id,
-        },
-      })
+      addLearningPathItemCandidate(candidates, row, { matched_by: "item" })
     }
   }
 
