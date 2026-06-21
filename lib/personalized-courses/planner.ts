@@ -751,14 +751,39 @@ function normalizeForLeakCheck(value: string): string {
 
 /** Detect bare math (subscripts/superscripts) outside $...$ — a rendering glitch. */
 function countBareMath(text: string): number {
-  // Split out math spans, then look for _ or ^ preceded by alnum in the non-math parts.
+  // Split out math spans, then look for letter/digit + _ or ^ + letter/digit in non-math parts.
+  // NOTE: the middle character class is [_^] only — NOT [_^a-zA-Z0-9] which would match every
+  // adjacent letter pair in normal prose.
   const parts = text.split(/\$\$[^$]+\$\$|\$[^$]+\$/g)
   let count = 0
   for (const part of parts) {
-    const matches = part.match(/[a-zA-Z0-9)][_^[a-zA-Z0-9]/g)
+    const matches = part.match(/[a-zA-Z0-9)][_^][a-zA-Z0-9]/g)
     if (matches) count += matches.length
   }
   return count
+}
+
+/**
+ * Auto-repair: wrap bare subscript/superscript tokens (e.g. L_0, x^2, v_0, a_n) in
+ * $...$ so KaTeX renders them. Only wraps single-letter-variable + _/^ + single
+ * alnum, not preceded/followed by letters (avoids matching words like "not_verb").
+ * Preserves existing $...$ / $$...$$ spans. Applied to custom_text bodies and
+ * reveal_steps markdown content — the most common source of formatting errors.
+ */
+function wrapBareMathTokens(text: string): string {
+  if (!text) return text
+  const parts = text.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g)
+  return parts
+    .map((part) => {
+      if (part.startsWith("$$") && part.endsWith("$$")) return part
+      if (part.startsWith("$") && part.endsWith("$") && part.length > 1) return part
+      // Single letter + _/^ + single alnum, not part of a larger word.
+      return part.replace(
+        /(?<![a-zA-Z])([a-zA-Z])([_^])([a-zA-Z0-9])(?![a-zA-Z])/g,
+        (_m, letter: string, op: string, sub: string) => `$${letter}${op}${sub}$`,
+      )
+    })
+    .join("")
 }
 
 /** Returns a reason string if the item is broken (should be replaced), else null. */
@@ -922,6 +947,33 @@ function findItemIssue(
 }
 
 /**
+ * Apply bare-math auto-wrap repair to a generated item's text fields (custom_text
+ * body, reveal_steps markdown step content). Returns a new item with repaired content.
+ */
+function applyBareMathWrap(item: PersonalizedCourseGeneratedPlanItem): PersonalizedCourseGeneratedPlanItem {
+  if (!item.content_json || typeof item.content_json !== "object" || Array.isArray(item.content_json)) {
+    return item
+  }
+  const cj = item.content_json as Record<string, unknown>
+  if (item.item_type === "custom_text" && typeof cj.body === "string") {
+    return { ...item, content_json: { ...cj, body: wrapBareMathTokens(cj.body) } }
+  }
+  if (item.item_type === "reveal_steps" && Array.isArray(cj.steps)) {
+    const steps = cj.steps.map((step) => {
+      if (step && typeof step === "object" && (step as Record<string, unknown>).kind === "markdown") {
+        const content = (step as Record<string, unknown>).content
+        if (typeof content === "string") {
+          return { ...step, content: wrapBareMathTokens(content) }
+        }
+      }
+      return step
+    })
+    return { ...item, content_json: { ...cj, steps } }
+  }
+  return item
+}
+
+/**
  * Verify every generated item in the plan. Broken items are replaced with a safe
  * custom_text connector; the report tracks what was replaced and why.
  */
@@ -941,20 +993,23 @@ function verifyGeneratedPlan(
       // Only verify generated items; source-key items are official content (assumed valid).
       if (item.source_key) return item
 
-      const issue = findItemIssue(item)
-      // Bare math is a SOFT flag (rendering quality, addressed by the guide): count it
-      // but do NOT replace the item — replacing would destroy the lesson content.
+      // REPAIR: auto-wrap bare subscript/superscript math tokens (L_0, x^2) in $...$.
+      const repairedItem = applyBareMathWrap(item)
+
+      const issue = findItemIssue(repairedItem)
+      // Bare math is a SOFT flag (rendering quality, addressed by the guide + auto-wrap):
+      // count it but do NOT replace the item — replacing would destroy the lesson content.
       if (issue.bareMath) {
         bareMathFlags += 1
-        return item
+        return repairedItem
       }
-      if (!issue.reason) return item
+      if (!issue.reason) return repairedItem
 
       issues.push({
         lessonIndex,
         itemIndex,
-        itemType: item.item_type,
-        title: item.title,
+        itemType: repairedItem.item_type,
+        title: repairedItem.title,
         reason: issue.reason,
       })
       replaced += 1
@@ -1105,6 +1160,30 @@ function extractJsonObject(raw: string): string {
   return text.trim()
 }
 
+/**
+ * Tolerant JSON parse: tries direct parse, then common LLM repairs (trailing commas),
+ * then progressive truncation to recover a partial plan (better than failing entirely).
+ */
+function parseJsonTolerant(raw: string): unknown | null {
+  const cleaned = extractJsonObject(raw)
+  // Attempt 1: direct parse.
+  try { return JSON.parse(cleaned) } catch { /* continue */ }
+  // Attempt 2: remove trailing commas before } or ] (most common LLM JSON error).
+  try { return JSON.parse(cleaned.replace(/,\s*([}\]])/g, "$1")) } catch { /* continue */ }
+  // Attempt 3: progressive truncation — find the last valid closing brace that produces
+  // a parseable object. Accepts a partial plan (e.g. 2 of 3 lessons) rather than failing.
+  let text = cleaned
+  while (text.length > 100) {
+    const lastBrace = text.lastIndexOf("}")
+    if (lastBrace < 0) break
+    text = text.slice(0, lastBrace + 1)
+    // If we cut mid-array, close the array and object.
+    const attempt = text + "]}".repeat(text.split("{").length - text.split("}").length)
+    try { return JSON.parse(attempt.replace(/,\s*([}\]])/g, "$1")) } catch { /* continue */ }
+  }
+  return null
+}
+
 export async function planPersonalizedCourse(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
@@ -1149,9 +1228,8 @@ export async function planPersonalizedCourse(
     }
 
     let parsed: unknown
-    try {
-      parsed = JSON.parse(extractJsonObject(rawContent))
-    } catch (err) {
+    const tolerantResult = parseJsonTolerant(rawContent)
+    if (tolerantResult === null) {
       const preview = rawContent.slice(0, 200).replace(/\s+/g, " ")
       lastError = new Error(
         `AI returned invalid JSON (attempt ${attempt + 1}, finish_reason=${finishReason ?? "unknown"}, len=${rawContent.length}): ${preview}`,
@@ -1159,6 +1237,7 @@ export async function planPersonalizedCourse(
       // Truncation (finish_reason=length) or stray text → retry with repair note + more tokens.
       continue
     }
+    parsed = tolerantResult
 
     parsed = normalizeParsedPlan(parsed)
     const result = planSchema.safeParse(parsed)
