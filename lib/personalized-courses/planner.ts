@@ -172,7 +172,10 @@ function getPlannerProviderConfig() {
   // max_tokens budget on hidden reasoning before emitting visible content. Give them a
   // much larger shared budget so the JSON output isn't truncated to an empty string.
   const isReasoningModel = /pro|reasoner|\bo[1-9]\b|r1/i.test(model)
-  const maxTokens = isReasoningModel ? 32000 : 20000
+  // A full plan (3-5 lessons × 20-25 rich items, with poll/test/interactive content_json)
+  // can be large. DeepSeek accepts up to ~8k output for flash by default but honors
+  // higher max_tokens; use a generous budget and retry with even more on truncation.
+  const maxTokens = isReasoningModel ? 32000 : 24000
 
   return { apiKey, baseURL, model, provider: isDeepseek ? "deepseek" : "openai", maxTokens, isReasoningModel }
 }
@@ -735,68 +738,131 @@ function normalizeParsedPlan(value: unknown): unknown {
   return value
 }
 
+function buildPlannerMessages(
+  userPrompt: string,
+  candidates: PersonalizedCourseCatalogCandidate[],
+  repairNote: string | null,
+): { role: "system" | "user"; content: string }[] {
+  const base: { role: "system" | "user"; content: string }[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: JSON.stringify(
+        {
+          user_learning_goal: userPrompt,
+          available_planck_content: stringifyCandidates(candidates),
+          instruction: "Alege iteme prin source_key din lista de mai sus (fără duplicate). Fiecare lecție trebuie să aibă 20-25 itemi. Completează restul cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text și nu genera tipurile care nu sunt în ghid (flow_build, graph_build, slider_explore, speed_round).",
+          required_json_shape: {
+            title: "string",
+            description: "string",
+            lessons: [
+              {
+                title: "string",
+                description: "string",
+                items: [
+                  {
+                    title: "string",
+                    item_type: "custom_text | poll | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | code_trace | test | text | grila | problem | ...",
+                    source_key: "exact un source_key din listă sau null",
+                    content_json: "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+    },
+  ]
+  if (repairNote) base.push({ role: "user", content: repairNote })
+  return base
+}
+
+/**
+ * Some providers/models occasionally wrap JSON in markdown code fences or emit stray
+ * text around it despite `response_format: json_object`. Strip a leading ```json / ```
+ * fence and trim to the outermost { ... } so JSON.parse has a clean shot.
+ */
+function extractJsonObject(raw: string): string {
+  let text = raw.trim()
+  const fenceMatch = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  if (fenceMatch) text = fenceMatch[1].trim()
+  const firstBrace = text.indexOf("{")
+  if (firstBrace > 0) text = text.slice(firstBrace)
+  const lastBrace = text.lastIndexOf("}")
+  if (lastBrace >= 0 && lastBrace < text.length - 1) text = text.slice(0, lastBrace + 1)
+  return text.trim()
+}
+
 export async function planPersonalizedCourse(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
 ): Promise<PersonalizedCourseGeneratedPlan> {
   const openai = getOpenAIClient()
-  const { model, maxTokens, isReasoningModel } = getPlannerProviderConfig()
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: JSON.stringify(
-          {
-            user_learning_goal: userPrompt,
-            available_planck_content: stringifyCandidates(candidates),
-            instruction: "Alege iteme prin source_key din lista de mai sus (fără duplicate). Fiecare lecție trebuie să aibă 20-25 itemi. Completează restul cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text și nu genera tipurile care nu sunt în ghid (flow_build, graph_build, slider_explore, speed_round).",
-            required_json_shape: {
-              title: "string",
-              description: "string",
-              lessons: [
-                {
-                  title: "string",
-                  description: "string",
-                  items: [
-                    {
-                      title: "string",
-                      item_type: "custom_text | poll | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | code_trace | test | text | grila | problem | ...",
-                      source_key: "exact un source_key din listă sau null",
-                      content_json: "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului",
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-          null,
-          2,
-        ),
-      },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.4,
-    max_tokens: maxTokens,
-  })
+  const { model, maxTokens } = getPlannerProviderConfig()
 
-  const rawContent = completion.choices[0]?.message?.content
-  if (!rawContent) throw new Error("AI did not return course JSON")
+  let lastError: Error | null = null
+  let validated: { success: true; data: PersonalizedCourseGeneratedPlan } | null = null
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(rawContent)
-  } catch {
-    throw new Error("AI returned invalid JSON")
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const repairNote =
+      attempt === 0
+        ? null
+        : "Răspunsul trecut NU a fost JSON valid sau a fost trunchiat. Răspunde din nou cu JSON-ul complet și valid, fără text în afara obiectului JSON, fără ```cod fences```. Asigură-te că obiectul JSON este complet închis. Redă planul întreg (3-5 lecții, 20-25 itemi fiecare)."
+    // On retry, raise the token budget in case the first attempt was truncated.
+    const attemptMaxTokens = attempt === 0 ? maxTokens : maxTokens + 8000
+
+    let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+    try {
+      completion = await openai.chat.completions.create({
+        model,
+        messages: buildPlannerMessages(userPrompt, candidates, repairNote),
+        response_format: { type: "json_object" },
+        temperature: attempt === 0 ? 0.4 : 0.2,
+        max_tokens: attemptMaxTokens,
+      })
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      continue
+    }
+
+    const choice = completion.choices[0]
+    const rawContent = choice?.message?.content
+    const finishReason = choice?.finish_reason ?? null
+
+    if (!rawContent) {
+      lastError = new Error(
+        `AI did not return course JSON (finish_reason=${finishReason ?? "unknown"}).`,
+      )
+      continue
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(extractJsonObject(rawContent))
+    } catch (err) {
+      const preview = rawContent.slice(0, 200).replace(/\s+/g, " ")
+      lastError = new Error(
+        `AI returned invalid JSON (attempt ${attempt + 1}, finish_reason=${finishReason ?? "unknown"}, len=${rawContent.length}): ${preview}`,
+      )
+      // Truncation (finish_reason=length) or stray text → retry with repair note + more tokens.
+      continue
+    }
+
+    parsed = normalizeParsedPlan(parsed)
+    const result = planSchema.safeParse(parsed)
+    if (!result.success) {
+      lastError = new Error(`AI course JSON failed validation: ${result.error.message}`)
+      continue
+    }
+
+    validated = result as { success: true; data: PersonalizedCourseGeneratedPlan }
+    break
   }
 
-  parsed = normalizeParsedPlan(parsed)
-
-  const validated = planSchema.safeParse(parsed)
-  if (!validated.success) {
-    throw new Error(`AI course JSON failed validation: ${validated.error.message}`)
-  }
+  if (!validated) throw lastError ?? new Error("AI course generation failed")
 
   return normalizePlan(validated.data, candidates, userPrompt)
 }
