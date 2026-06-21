@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle, CheckCircle2, Loader2, Sparkles, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { AlertCircle, Loader2, Sparkles, Trash2 } from "lucide-react"
 import { usePersonalizedCourseGeneration } from "@/components/invata/personalized-course-generation-context"
 
 interface PersonalizedCourseProgressCardProps {
@@ -21,6 +20,7 @@ interface PersonalizedCourseProgressCardProps {
 }
 
 const POLL_INTERVAL_MS = 3000
+const MESSAGE_CYCLE_MS = 2600
 
 const STAGE_LABELS: Record<string, string> = {
   searching: "Caut conținut Planck relevant",
@@ -29,6 +29,53 @@ const STAGE_LABELS: Record<string, string> = {
   saving_lessons: "Salvez lecțiile în baza de date",
   finalizing: "Verific și activez cursul",
   ready: "Curs gata!",
+}
+
+// Rotating short messages per stage — shown at the bottom so the card feels alive
+// while the bar shimmers. The server's real message is always shown first, then
+// these elaborations cycle.
+const STAGE_FALLBACK_MESSAGES: Record<string, string[]> = {
+  searching: [
+    "Analizez obiectivul tău de învățare…",
+    "Caut probleme, grile și lecții relevante…",
+    "Selectez cel mai potrivit conținut Planck…",
+  ],
+  planning: [
+    "Planific structura cursului pe lecții…",
+    "Aleg exercițiile interactive pentru fiecare lecție…",
+    "Ordonez topicurile în progresie logică…",
+    "Verific varietatea itemilor (explicații, grile, probleme)…",
+  ],
+  saving: [
+    "Salvez lecțiile și itemii în baza de date…",
+    "Generez conținutul fiecărui item…",
+    "Aplic verificările de calitate…",
+  ],
+  saving_lessons: [
+    "Salvez lecțiile și itemii în baza de date…",
+    "Generez conținutul fiecărui item…",
+    "Aplic verificările de calitate…",
+  ],
+  finalizing: [
+    "Verific că toate itemii sunt validați…",
+    "Activez cursul pe /invata…",
+    "Pregătesc redirecționarea către prima lecție…",
+  ],
+}
+
+function buildMessageCycle(stage: string | null, serverMessage: string | null): string[] {
+  const head = serverMessage || STAGE_LABELS[stage ?? ""] || "Pornire…"
+  const fallbacks = STAGE_FALLBACK_MESSAGES[stage ?? ""] ?? []
+  // Dedupe while preserving order.
+  const seen = new Set<string>([head])
+  const cycle = [head]
+  for (const m of fallbacks) {
+    if (!seen.has(m)) {
+      seen.add(m)
+      cycle.push(m)
+    }
+  }
+  return cycle
 }
 
 export function PersonalizedCourseProgressCard({
@@ -46,6 +93,34 @@ export function PersonalizedCourseProgressCard({
   const [progress, setProgress] = useState(
     initialProgress ?? { stage: null, percent: 0, message: null },
   )
+
+  // Cycling bottom message: rebuild the cycle whenever the server stage/message
+  // changes, then advance through it on a timer so the text feels alive.
+  const messageCycleRef = useRef<string[]>(buildMessageCycle(initialProgress?.stage ?? null, initialProgress?.message ?? null))
+  const [messageIndex, setMessageIndex] = useState(0)
+  const lastServerMessageRef = useRef<string | null>(initialProgress?.message ?? null)
+  const lastServerStageRef = useRef<string | null>(initialProgress?.stage ?? null)
+
+  useEffect(() => {
+    const serverMsg = progress.message
+    const serverStage = progress.stage
+    if (serverMsg !== lastServerMessageRef.current || serverStage !== lastServerStageRef.current) {
+      lastServerMessageRef.current = serverMsg
+      lastServerStageRef.current = serverStage
+      messageCycleRef.current = buildMessageCycle(serverStage, serverMsg)
+      setMessageIndex(0)
+    }
+  }, [progress.message, progress.stage])
+
+  useEffect(() => {
+    if (status === "ready" || status === "failed") return
+    const interval = window.setInterval(() => {
+      setMessageIndex((i) => (i + 1) % Math.max(1, messageCycleRef.current.length))
+    }, MESSAGE_CYCLE_MS)
+    return () => window.clearInterval(interval)
+  }, [status])
+
+  const displayMessage = messageCycleRef.current[messageIndex % Math.max(1, messageCycleRef.current.length)] ?? "Pornire…"
 
   const poll = useCallback(async () => {
     try {
@@ -128,7 +203,6 @@ export function PersonalizedCourseProgressCard({
   }
 
   const percent = Math.max(0, Math.min(100, progress.percent))
-  const stageLabel = progress.message || STAGE_LABELS[progress.stage ?? ""] || "Pornire…"
 
   // --- Creating state (progress bar) ---
   return (
@@ -152,65 +226,24 @@ export function PersonalizedCourseProgressCard({
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar (continually moving shimmer) */}
       <div>
         <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium text-[#333]">{stageLabel}</span>
-          <span className="tabular-nums font-semibold text-[#7c3aed]">{percent}%</span>
+          <span className="font-medium text-[#666]">Generare în curs…</span>
+          <span className="tabular-nums font-semibold text-[#7c3aed]">{Math.round(percent)}%</span>
         </div>
         <div className="h-3 w-full overflow-hidden rounded-full bg-[#e6e6e6]">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] transition-all duration-700 ease-out"
+            className="pc-progress-fill h-full rounded-full transition-all duration-700 ease-out"
             style={{ width: `${percent}%` }}
           />
         </div>
+      </div>
 
-        {/* Stage checkpoints */}
-        <div className="mt-5 flex items-center justify-between">
-          {[
-            { id: "search", label: "Căutare", threshold: 5 },
-            { id: "plan", label: "Planificare", threshold: 15 },
-            { id: "save", label: "Salvare", threshold: 65 },
-            { id: "ready", label: "Gata", threshold: 100 },
-          ].map((cp) => {
-            const isDone = percent >= cp.threshold
-            const isCurrent =
-              !isDone &&
-              ((cp.id === "search" && percent < 5) ||
-                (cp.id === "plan" && percent >= 5 && percent < 65) ||
-                (cp.id === "save" && percent >= 65 && percent < 100))
-            return (
-              <div key={cp.id} className="flex flex-1 flex-col items-center gap-1.5">
-                <div
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors",
-                    isDone
-                      ? "border-[#7c3aed] bg-[#7c3aed] text-white"
-                      : isCurrent
-                        ? "border-[#7c3aed] bg-white text-[#7c3aed]"
-                        : "border-[#d4d4d4] bg-white text-[#bbb]",
-                  )}
-                >
-                  {isDone ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : isCurrent ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <span className="h-2 w-2 rounded-full bg-[#d4d4d4]" />
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "text-[10px] font-medium sm:text-xs",
-                    isDone ? "text-[#7c3aed]" : isCurrent ? "text-[#555]" : "text-[#aaa]",
-                  )}
-                >
-                  {cp.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+      {/* Cycling live message at the bottom */}
+      <div className="mt-4 flex items-center gap-2 text-sm text-[#555]">
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#7c3aed]" />
+        <span key={displayMessage} className="animate-fade-in-up">{displayMessage}</span>
       </div>
 
       {onDelete ? (
