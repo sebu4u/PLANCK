@@ -8,6 +8,10 @@ export function getPostOnboardingDiscountStorageKey(userId: string) {
   return `planck_new_user_discount_start_${userId}`
 }
 
+export function getPostOnboardingDiscountMobilePromoDismissedKey(userId: string) {
+  return `planck_new_user_discount_mobile_promo_dismissed_${userId}`
+}
+
 function formatCountdown(remainingMs: number): string {
   const totalSec = Math.max(0, Math.floor(remainingMs / 1000))
   const h = Math.floor(totalSec / 3600)

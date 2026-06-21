@@ -40,10 +40,14 @@ import {
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
+import { PostOnboardingDiscountPromoModal } from "@/components/dashboard/post-onboarding-discount-promo-modal"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
-import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
+import {
+  getPostOnboardingDiscountMobilePromoDismissedKey,
+  usePostOnboardingDiscountWindow,
+} from "@/hooks/use-post-onboarding-discount-window"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -57,6 +61,8 @@ export function DashboardAuth() {
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
+  const [showMobileDiscountPromo, setShowMobileDiscountPromo] = useState(false)
+  const mobileDiscountPromoCheckedRef = useRef(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -81,9 +87,16 @@ export function DashboardAuth() {
     dashboardHasStartedByChapter: Record<string, boolean>
   } | null>(null)
 
-  useStreakTrigger({ enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack })
+  useStreakTrigger({
+    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack && !showMobileDiscountPromo,
+  })
   useSocialProofTrigger({
-    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack,
+    enabled:
+      Boolean(user?.id) &&
+      !authLoading &&
+      !loading &&
+      !showWelcomeBack &&
+      !showMobileDiscountPromo,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
 
@@ -390,6 +403,42 @@ export function DashboardAuth() {
     }
   }, [authLoading, loading, dashboardData, user?.id])
 
+  useEffect(() => {
+    if (authLoading || loading || !dashboardData || !user || isPaid) return
+    if (showWelcomeBack) return
+    if (!postOnboardingDiscount.active) return
+    if (mobileDiscountPromoCheckedRef.current) return
+    mobileDiscountPromoCheckedRef.current = true
+
+    try {
+      const dismissed = localStorage.getItem(getPostOnboardingDiscountMobilePromoDismissedKey(user.id))
+      if (!dismissed) {
+        setShowMobileDiscountPromo(true)
+      }
+    } catch {
+      // Ignore storage errors silently
+    }
+  }, [
+    authLoading,
+    loading,
+    dashboardData,
+    user?.id,
+    isPaid,
+    showWelcomeBack,
+    postOnboardingDiscount.active,
+  ])
+
+  const dismissMobileDiscountPromo = () => {
+    if (user) {
+      try {
+        localStorage.setItem(getPostOnboardingDiscountMobilePromoDismissedKey(user.id), "1")
+      } catch {
+        // Ignore storage errors silently
+      }
+    }
+    setShowMobileDiscountPromo(false)
+  }
+
   const persistWelcomeBackDismissState = () => {
     if (!user) return
 
@@ -633,6 +682,21 @@ export function DashboardAuth() {
 
       {premiumUpgradeOpen ? (
         <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
+
+      {showMobileDiscountPromo && postOnboardingDiscount.active ? (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300 md:hidden"
+          role="presentation"
+        >
+          <div className="mx-auto w-full max-w-[460px]">
+            <PostOnboardingDiscountPromoModal
+              imageSrc="/dashboard-card.png"
+              remainingLabel={postOnboardingDiscount.remainingLabel}
+              onClose={dismissMobileDiscountPromo}
+            />
+          </div>
+        </div>
       ) : null}
 
       {showWelcomeBack && (

@@ -54,7 +54,7 @@ const REFERRAL_CODE_STORAGE_KEY = "planck_referral_code"
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
 const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
 const PROFILE_SELECT =
-  "name, nickname, user_icon, grade, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at"
+  "name, nickname, user_icon, grade, preferred_materie, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (

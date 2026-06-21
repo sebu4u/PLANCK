@@ -11,16 +11,20 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { supabase } from "@/lib/supabaseClient"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
+import { OnboardingPostAuthSplash } from "@/components/onboarding/OnboardingPostAuthSplash"
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
 import {
   getCinematicaFirstLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
 import {
   consumePostOnboardingRedirect,
+  isOnboardingSubjectId,
   OAUTH_ONBOARDING_PARAM,
+  ONBOARDING_SUBJECT_OPTIONS,
+  type OnboardingSubjectId,
 } from "@/lib/onboarding"
 
-type SubjectOption = "fizica" | "informatica"
+type SubjectOption = OnboardingSubjectId
 type GradeOption = "9" | "10" | "11" | "12"
 type DailyTimeOption = "15" | "30" | "60"
 type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | "name"
@@ -45,8 +49,10 @@ const defaultOnboardingState: OnboardingState = {
 }
 
 const subjectHeadlines: Record<SubjectOption, string> = {
+  matematica: "Excelent, construim raționament matematic pas cu pas.",
   fizica: "Perfect, facem fizica mai clară împreună.",
   informatica: "Excelent, construim logică de programator.",
+  biologie: "Super, explorăm lumea vie împreună.",
 }
 
 const gradeHeadlines: Record<GradeOption, string> = {
@@ -77,7 +83,7 @@ const sanitizeStep = (value: unknown): RegisterStep => {
 }
 
 const sanitizeSubject = (value: unknown): SubjectOption | null =>
-  value === "fizica" || value === "informatica" ? value : null
+  isOnboardingSubjectId(value) ? value : null
 
 const sanitizeGrade = (value: unknown): GradeOption | null =>
   value === "9" || value === "10" || value === "11" || value === "12" ? value : null
@@ -253,11 +259,27 @@ function RegisterPageContent() {
     }
 
     if (shouldForceOAuthOnboarding && user) {
-      parsedState.step = 2
-      parsedState.awaitingPostAuth = false
+      const oauthFromRegister =
+        localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1" ||
+        parsedState.awaitingPostAuth ||
+        parsedState.step === 7
+      if (oauthFromRegister) {
+        parsedState.step = 7
+        parsedState.awaitingPostAuth = false
+      } else {
+        parsedState.step = 2
+        parsedState.awaitingPostAuth = false
+      }
     } else if (shouldForcePostAuthStep) {
       parsedState.step = 7
       parsedState.awaitingPostAuth = true
+    } else if (
+      user &&
+      (parsedState.awaitingPostAuth || localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1") &&
+      parsedState.step !== "name"
+    ) {
+      parsedState.step = 7
+      parsedState.awaitingPostAuth = false
     }
 
     const wasInAccountCreationFlow =
@@ -265,7 +287,7 @@ function RegisterPageContent() {
       parsedState.step === 7 ||
       parsedState.step === "name" ||
       parsedState.awaitingPostAuth
-    if (!user && wasInAccountCreationFlow) {
+    if (!user && wasInAccountCreationFlow && !parsedState.awaitingPostAuth) {
       parsedState = { ...defaultOnboardingState }
       if (typeof window !== "undefined") {
         localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
@@ -295,24 +317,25 @@ function RegisterPageContent() {
     return () => window.clearTimeout(timer)
   }, [onboardingState.step])
 
-  useEffect(() => {
-    if (onboardingState.step !== 7) return
-    const timer = window.setTimeout(() => {
-      setOnboardingState((prev) => ({
-        ...prev,
-        step: "name",
-        awaitingPostAuth: false,
-      }))
-    }, 4500)
-    return () => window.clearTimeout(timer)
-  }, [onboardingState.step])
+  const handlePostAuthContinue = () => {
+    setOnboardingState((prev) => ({
+      ...prev,
+      step: "name",
+      awaitingPostAuth: false,
+    }))
+  }
 
   useEffect(() => {
-    if (!hydrated || !user) return
+    if (!hydrated || !user || !needsOnboarding) return
+
+    const oauthFromRegister =
+      onboardingState.awaitingPostAuth ||
+      localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1"
 
     const isOnboardingFinalFlow =
       shouldForcePostAuthStep ||
       onboardingState.awaitingPostAuth ||
+      oauthFromRegister ||
       onboardingState.step === 7 ||
       onboardingState.step === "name"
     const isAuthenticatedOnboardingStep =
@@ -320,6 +343,16 @@ function RegisterPageContent() {
       onboardingState.step === 3 ||
       onboardingState.step === 4 ||
       onboardingState.step === "name"
+
+    if (oauthFromRegister && onboardingState.step !== 7 && onboardingState.step !== "name") {
+      clearOAuthFlag()
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: 7,
+        awaitingPostAuth: false,
+      }))
+      return
+    }
 
     if (needsOnboarding && !isOnboardingFinalFlow && !isAuthenticatedOnboardingStep) {
       setOnboardingState((prev) => ({ ...prev, step: 2 }))
@@ -338,11 +371,6 @@ function RegisterPageContent() {
     shouldForcePostAuthStep,
     user,
   ])
-
-  useEffect(() => {
-    if (!hydrated || user || onboardingState.step !== 7) return
-    setOnboardingState((prev) => ({ ...prev, step: 6, awaitingPostAuth: false }))
-  }, [hydrated, onboardingState.step, user])
 
   useEffect(() => {
     if (!hydrated || onboardingState.step !== 6) return
@@ -405,7 +433,7 @@ function RegisterPageContent() {
         if (!onboardingState.subject) {
           toast({
             title: "Alege o opțiune",
-            description: "Selectează Fizică sau Informatică ca să continuăm.",
+            description: "Selectează o materie ca să continuăm.",
             variant: "destructive",
           })
           return
@@ -470,7 +498,6 @@ function RegisterPageContent() {
   const markStateForOAuthReturn = () => {
     const nextState: OnboardingState = {
       ...onboardingState,
-      step: 7,
       awaitingPostAuth: true,
     }
     localStorage.setItem(REGISTER_ONBOARDING_STORAGE_KEY, JSON.stringify(nextState))
@@ -534,6 +561,10 @@ function RegisterPageContent() {
     if (result.cancelled) {
       clearOAuthFlag()
       setOauthLoading(null)
+      setOnboardingState((prev) => ({
+        ...prev,
+        awaitingPostAuth: false,
+      }))
       return
     }
 
@@ -580,11 +611,17 @@ function RegisterPageContent() {
 
     setNameSaving(true)
 
-    const payload: { name: string; grade?: string; onboarding_completed_at: string } = {
+    const payload: {
+      name: string
+      grade?: string
+      preferred_materie?: SubjectOption
+      onboarding_completed_at: string
+    } = {
       name: cleanName,
       onboarding_completed_at: new Date().toISOString(),
     }
     if (onboardingState.grade) payload.grade = onboardingState.grade
+    if (onboardingState.subject) payload.preferred_materie = onboardingState.subject
 
     const { error } = await supabase.from("profiles").update(payload).eq("user_id", user.id)
 
@@ -653,30 +690,21 @@ function RegisterPageContent() {
               {onboardingState.subject ? subjectHeadlines[onboardingState.subject] : "Ce te-a adus aici?"}
             </StepHeadingWithIcon>
             <div className="space-y-3">
-              <button
-                type="button"
-                className={`${choiceButtonClassName} opacity-0 ${
-                  onboardingState.subject === "fizica"
-                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
-                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
-                }`}
-                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "220ms" }}
-                onClick={() => handleSubjectSelect("fizica")}
-              >
-                Fizică
-              </button>
-              <button
-                type="button"
-                className={`${choiceButtonClassName} opacity-0 ${
-                  onboardingState.subject === "informatica"
-                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
-                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
-                }`}
-                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "320ms" }}
-                onClick={() => handleSubjectSelect("informatica")}
-              >
-                Informatică
-              </button>
+              {ONBOARDING_SUBJECT_OPTIONS.map((option, idx) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`${choiceButtonClassName} opacity-0 ${
+                    onboardingState.subject === option.id
+                      ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                      : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                  }`}
+                  style={{ animation: STEP_BUTTON_ANIM, animationDelay: `${220 + idx * 70}ms` }}
+                  onClick={() => handleSubjectSelect(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
         )
@@ -761,8 +789,8 @@ function RegisterPageContent() {
         )
 
       case 5: {
-        const selectedSubject = onboardingState.subject ?? "fizica"
         const selectedGrade = onboardingState.grade ?? "9"
+        const simulationSubject = onboardingState.subject ?? "fizica"
 
         return (
           <div className="mx-auto w-full max-w-[600px]">
@@ -777,7 +805,7 @@ function RegisterPageContent() {
               className="opacity-0"
               style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
             >
-              <OnboardingSimulationCard subject={selectedSubject} grade={selectedGrade} />
+              <OnboardingSimulationCard subject={simulationSubject} grade={selectedGrade} />
             </div>
           </div>
         )
@@ -826,17 +854,11 @@ function RegisterPageContent() {
 
       case 7:
         return (
-          <div className="relative flex h-[65vh] flex-col items-center justify-center">
-            <p
-              className="title-font text-[5rem] font-black text-[#121212] sm:text-[7rem] md:text-[8.5rem]"
-              style={{ animation: "registerScaleUp 4.5s ease-out forwards", transform: "scale(0.72)", fontWeight: 900 }}
-            >
-              PLANCK
-            </p>
-            <p className="absolute bottom-2 text-center text-sm font-medium text-[#555a66] sm:text-base">
-              Cream un Learning Path special pentru tine
-            </p>
-          </div>
+          <OnboardingPostAuthSplash
+            subject={onboardingState.subject}
+            grade={onboardingState.grade}
+            onContinue={handlePostAuthContinue}
+          />
         )
 
       case "name":
@@ -930,21 +952,6 @@ function RegisterPageContent() {
           100% {
             opacity: 1;
             transform: translateX(0) scale(1);
-          }
-        }
-
-        @keyframes registerScaleUp {
-          0% {
-            opacity: 0.5;
-            transform: scale(0.72);
-          }
-          70% {
-            opacity: 1;
-            transform: scale(1.04);
-          }
-          100% {
-            opacity: 1;
-            transform: scale(1);
           }
         }
       `}</style>
