@@ -1191,10 +1191,19 @@ export async function planPersonalizedCourse(
   const openai = getOpenAIClient()
   const { model, maxTokens } = getPlannerProviderConfig()
 
+  // Hard total deadline: 5 minutes across all attempts. Prevents "runs forever" if the
+  // model hangs or the retry loop stalls. The route runs this detached (afterResponse),
+  // but we still cap it so a stuck generation flips to "failed" rather than hanging.
+  const deadline = Date.now() + 5 * 60 * 1000
+
   let lastError: Error | null = null
   let validated: { success: true; data: PersonalizedCourseGeneratedPlan } | null = null
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (Date.now() >= deadline) {
+      lastError = lastError ?? new Error("Course generation timed out.")
+      break
+    }
     const repairNote =
       attempt === 0
         ? null

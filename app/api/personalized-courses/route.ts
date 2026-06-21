@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
@@ -300,119 +301,154 @@ export async function POST(request: Request) {
   const rateLimitError = await checkRateLimit(admin, user.id)
   if (rateLimitError) return NextResponse.json({ error: rateLimitError }, { status: 429 })
 
-  try {
-    const candidates = await searchPlanckContentForPrompt(supabase, prompt, 140)
-    const { plan, verification } = await planPersonalizedCourse(prompt, candidates)
-    const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
-    const planItems = plan.lessons.flatMap((lesson) => lesson.items)
-    const sourceItemsById = await getSourceLearningPathItems(admin, planItems, candidatesByKey)
-    const generationMetadata = {
-      lessonCount: plan.lessons.length,
-      itemCount: plan.lessons.reduce((total, lesson) => total + lesson.items.length, 0),
-      model: getPlannerModel(),
-      generatedAt: new Date().toISOString(),
-      backend: "learning_path",
-      verification,
-    }
+  // Phase 1: insert the chapter row IMMEDIATELY with status "creating" and return 202.
+  // This guarantees the course exists in the DB even if the client disconnects
+  // (tab switch / refresh) — the heavy AI generation runs detached via afterResponse.
+  const chapterSlug = makeUniqueSlug("ai", prompt.slice(0, 40) || "curs-personalizat", user.id)
+  const placeholderTitle = prompt.slice(0, 60).trim() || "Curs personalizat"
+  const { data: chapter, error: chapterError } = await admin
+    .from("learning_path_chapters")
+    .insert({
+      generated_by_user_id: user.id,
+      is_personalized: true,
+      original_prompt: prompt,
+      generation_status: "creating",
+      slug: chapterSlug,
+      title: placeholderTitle,
+      nav_title: placeholderTitle.slice(0, 32),
+      description: `Curs personalizat pentru: ${prompt}`,
+      icon_url: null,
+      accent_color: "#1f1f1f",
+      problem_category: "ai",
+      order_index: 900000 + Math.floor(Date.now() / 1000),
+      is_active: false,
+      source_summary: [],
+      generation_metadata: {
+        model: getPlannerModel(),
+        generatedAt: new Date().toISOString(),
+        backend: "learning_path",
+        status: "queued",
+      },
+    })
+    .select("*")
+    .single()
 
-    const chapterSlug = makeUniqueSlug("ai", plan.title, user.id)
-    const { data: chapter, error: chapterError } = await admin
-      .from("learning_path_chapters")
-      .insert({
-        generated_by_user_id: user.id,
-        is_personalized: true,
-        original_prompt: prompt,
-        generation_status: "creating",
-        slug: chapterSlug,
-        title: plan.title,
-        nav_title: plan.title.slice(0, 32),
-        description: plan.description,
-        icon_url: null,
-        accent_color: "#1f1f1f",
-        problem_category: "ai",
-        order_index: 900000 + Math.floor(Date.now() / 1000),
-        is_active: true,
-        source_summary: candidates.slice(0, 40).map((candidate) => ({
-          key: candidate.key,
-          source_type: candidate.source_type,
-          source_table: candidate.source_table,
-          source_id: candidate.source_id,
-          title: candidate.title,
-          summary: candidate.summary,
-          url: candidate.url ?? null,
-        })),
-        generation_metadata: generationMetadata,
-      })
-      .select("*")
-      .single()
-
-    if (chapterError || !chapter) {
-      console.error("learning path chapter insert:", chapterError)
-      return NextResponse.json({ error: "Nu am putut salva cursul personalizat." }, { status: 500 })
-    }
-
-    let firstLessonSlug: string | null = null
-
-    for (let lessonIndex = 0; lessonIndex < plan.lessons.length; lessonIndex += 1) {
-      const lesson = plan.lessons[lessonIndex]
-      const lessonSlug = makeUniqueSlug("lectie", lesson.title, user.id, String(lessonIndex + 1))
-      if (!firstLessonSlug) firstLessonSlug = lessonSlug
-
-      const { data: insertedLesson, error: lessonError } = await admin
-        .from("learning_path_lessons")
-        .insert({
-          chapter_id: chapter.id,
-          slug: lessonSlug,
-          title: lesson.title,
-          description: lesson.description ?? null,
-          image_url: null,
-          lesson_type: "text",
-          order_index: lessonIndex,
-          is_active: true,
-        })
-        .select("*")
-        .single()
-
-      if (lessonError || !insertedLesson) {
-        console.error("learning path lesson insert:", lessonError)
-        await markChapterFailed(admin, chapter.id, lessonError?.message ?? "lesson insert failed")
-        return NextResponse.json({ error: "Cursul a fost creat, dar lecțiile nu au putut fi salvate." }, { status: 500 })
-      }
-
-      const itemRows = lesson.items.map((item, itemIndex) =>
-        getOfficialItemInsertPayload(insertedLesson.id, item, itemIndex, candidatesByKey, sourceItemsById),
-      )
-      const { error: itemsError } = await admin.from("learning_path_lesson_items").insert(itemRows)
-      if (itemsError) {
-        console.error("learning path items insert:", itemsError)
-        await markChapterFailed(admin, chapter.id, itemsError.message ?? "item insert failed")
-        return NextResponse.json({ error: "Cursul a fost creat, dar itemii nu au putut fi salvați." }, { status: 500 })
-      }
-    }
-
-    const { data: readyChapter, error: readyError } = await admin
-      .from("learning_path_chapters")
-      .update({
-        generation_status: "ready",
-        generation_metadata: {
-          ...generationMetadata,
-          readyAt: new Date().toISOString(),
-        },
-      })
-      .eq("id", chapter.id)
-      .select("*")
-      .single()
-
-    if (readyError || !readyChapter) {
-      console.error("learning path chapter ready update:", readyError)
-      await markChapterFailed(admin, chapter.id, readyError?.message ?? "ready update failed")
-      return NextResponse.json({ error: "Cursul a fost generat, dar nu a putut fi activat." }, { status: 500 })
-    }
-
-    const href = firstLessonSlug ? `/invata/${chapterSlug}/${firstLessonSlug}` : `/invata/${chapterSlug}`
-    return NextResponse.json({ course: readyChapter, href }, { status: 201 })
-  } catch (error) {
-    console.error("personalized learning path generation:", error)
-    return NextResponse.json({ error: "Nu am putut genera cursul personalizat acum." }, { status: 502 })
+  if (chapterError || !chapter) {
+    console.error("learning path chapter insert:", chapterError)
+    return NextResponse.json({ error: "Nu am putut crea cursul personalizat." }, { status: 500 })
   }
+
+  const chapterId = chapter.id
+  const chapterHref = `/invata/${chapterSlug}`
+
+  // Phase 2: run the heavy generation detached, so it survives client disconnect.
+  // The chapter row (status "creating") is already saved; this fills in lessons/items
+  // and flips the chapter to "ready" (is_active=true) on success or "failed" on error.
+  after(async () => {
+    const adminBg = createAdminClient()
+    const supabaseBg = await createClient()
+    try {
+      const candidates = await searchPlanckContentForPrompt(supabaseBg, prompt, 140)
+      const { plan, verification } = await planPersonalizedCourse(prompt, candidates)
+      const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
+      const planItems = plan.lessons.flatMap((lesson) => lesson.items)
+      const sourceItemsById = await getSourceLearningPathItems(adminBg, planItems, candidatesByKey)
+      const generationMetadata = {
+        lessonCount: plan.lessons.length,
+        itemCount: plan.lessons.reduce((total, lesson) => total + lesson.items.length, 0),
+        model: getPlannerModel(),
+        generatedAt: new Date().toISOString(),
+        backend: "learning_path",
+        verification,
+      }
+
+      // Update chapter metadata + title/description from the AI plan.
+      const { error: metaError } = await adminBg
+        .from("learning_path_chapters")
+        .update({
+          title: plan.title,
+          nav_title: plan.title.slice(0, 32),
+          description: plan.description,
+          source_summary: candidates.slice(0, 40).map((candidate) => ({
+            key: candidate.key,
+            source_type: candidate.source_type,
+            source_table: candidate.source_table,
+            source_id: candidate.source_id,
+            title: candidate.title,
+            summary: candidate.summary,
+            url: candidate.url ?? null,
+          })),
+          generation_metadata: generationMetadata,
+        })
+        .eq("id", chapterId)
+      if (metaError) {
+        console.error("personalized course meta update:", metaError)
+      }
+
+      let firstLessonSlug: string | null = null
+
+      for (let lessonIndex = 0; lessonIndex < plan.lessons.length; lessonIndex += 1) {
+        const lesson = plan.lessons[lessonIndex]
+        const lessonSlug = makeUniqueSlug("lectie", lesson.title, user.id, String(lessonIndex + 1))
+        if (!firstLessonSlug) firstLessonSlug = lessonSlug
+
+        const { data: insertedLesson, error: lessonError } = await adminBg
+          .from("learning_path_lessons")
+          .insert({
+            chapter_id: chapterId,
+            slug: lessonSlug,
+            title: lesson.title,
+            description: lesson.description ?? null,
+            image_url: null,
+            lesson_type: "text",
+            order_index: lessonIndex,
+            is_active: true,
+          })
+          .select("*")
+          .single()
+
+        if (lessonError || !insertedLesson) {
+          console.error("learning path lesson insert:", lessonError)
+          await markChapterFailed(adminBg, chapterId, lessonError?.message ?? "lesson insert failed")
+          return
+        }
+
+        const itemRows = lesson.items.map((item, itemIndex) =>
+          getOfficialItemInsertPayload(insertedLesson.id, item, itemIndex, candidatesByKey, sourceItemsById),
+        )
+        const { error: itemsError } = await adminBg.from("learning_path_lesson_items").insert(itemRows)
+        if (itemsError) {
+          console.error("learning path items insert:", itemsError)
+          await markChapterFailed(adminBg, chapterId, itemsError.message ?? "item insert failed")
+          return
+        }
+      }
+
+      const { error: readyError } = await adminBg
+        .from("learning_path_chapters")
+        .update({
+          generation_status: "ready",
+          is_active: true,
+          generation_metadata: {
+            ...generationMetadata,
+            readyAt: new Date().toISOString(),
+          },
+        })
+        .eq("id", chapterId)
+      if (readyError) {
+        console.error("learning path chapter ready update:", readyError)
+        await markChapterFailed(adminBg, chapterId, readyError?.message ?? "ready update failed")
+      }
+    } catch (error) {
+      console.error("personalized learning path generation:", error)
+      await markChapterFailed(adminBg, chapterId, error instanceof Error ? error.message : "generation failed")
+    }
+  })
+
+  // Return immediately — the client redirects to the chapter page which shows a
+  // "generating" state; the page polls/refreshes until the chapter flips to "ready".
+  return NextResponse.json(
+    { course: { id: chapterId, href: chapterHref }, href: chapterHref, status: "creating" },
+    { status: 202 },
+  )
 }
