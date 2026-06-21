@@ -141,7 +141,7 @@ export function PersonalizedCourseGenerator({
           </h2>
           <p className="mt-1 text-sm text-[#707070] sm:text-base">
             Scrie un obiectiv liber (ex. „să înțeleg derivata și să rezolv probleme de BAC") și
-            Planck îți compune un curs personalizat din conținutul existent.
+            Planck îți va crea un curs personalizat.
           </p>
         </div>
       </div>
