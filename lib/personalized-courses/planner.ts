@@ -690,7 +690,7 @@ const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) �
 - table_fill: {"instructions": "...opțional", "headers": ["Mărime","Unitate"], "rows": [{"cells": [{"text":"Forță"},{"blank":true,"answer":"N"}]}]} — cells.length === headers.length; celulele blank au {"blank":true,"answer":"..."}.
 - swipe_classify: {"prompt": "...opțional", "leftLabel": "Adevărat", "rightLabel": "Fals", "cards": [{"text":"...","side":"left"}]} — 4-8 carduri; side "left" sau "right".
 - memory_flip: {"instructions": "...opțional", "pairs": [{"a":"$\\vec{F}$","b":"Forță"}]} — 3 perechi; a/b markdown sau LaTeX.
-- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"text","answer":"3"}]} — pentru inputMode "choice", answer trebuie să fie printre options și minim 2 opțiuni; lineIndex în raza lines (0..len-1). Preferă inputMode "text" ca în lecțiile oficiale. Folosește [CODINLINE]...[/CODINLINE] în prompt pentru variabile.
+- code_trace: {"language": "python", "lines": ["x = 1","y = x + 2","while i <= 4:"], "steps": [{"lineIndex":1,"prompt":"Ce valoare are y?","inputMode":"text","answer":"3"}]} — pentru inputMode "choice", answer trebuie să fie printre options și minim 2 opțiuni; lineIndex în raza lines (0..len-1). Preferă inputMode "text" ca în lecțiile oficiale. În lines poți folosi < > <= >= (codul se afișează monospaced). Folosește [CODINLINE]...[/CODINLINE] în prompt pentru variabile; nu folosi $...$ în lines (e cod, nu matematică).
 - test: {"icon": "Zap", "description": "...", "difficulty": 1-5, "timeLimitSeconds": 300, "problems": [{"id":"q1","statement":"...?","imageUrl":null,"options":[{"id":"q1_a","label":"..."}],"correctOptionId":"q1_a"}]} — minim 2 probleme, fiecare cu 2-4 opțiuni și correctOptionId printre ele; id-uri unice; imageUrl null sau URL http(s). Bine pentru mini-test de recapitulare la final de lecție.
 
 REGULI PENTRU ITEMI GENERAȚI:
@@ -698,7 +698,14 @@ REGULI PENTRU ITEMI GENERAȚI:
 - Ponderie naturală: folosește des poll (verificări cu feedback), match, code_trace, reveal_steps, swipe_classify, fill_slot, card_sort; mai rar memory_flip și table_fill. NU genera tipurile care nu sunt în lista de mai sus (flow_build, graph_build, slider_explore, speed_round).
 - La finalul ultimei lecții adaugă de obicei un item test (mini-test de recapitulare).
 - Conținutul generat trebuie să fie relevant pentru TITLUL lecției și obiectivul userului, calitate de manual, NU text generic de legătură.
-- Pentru matematică folosește LaTeX ($...$, $$...$$). NU folosi caractere < > & în câmpuri afișate ca text simplu (lines, options, answer, chips, label, statement, feedback).
+
+FORMAT MATEMATIC (CRITIC — fără excepții):
+- ORICE matematică (variabile, indici, exponenți, formule, fracții, inegalități, prime) TREBUIE încadrată cu delimitatori LaTeX: $...$ pentru matematică inline (în text) și $$...$$ pentru formule pe rând propriu (display). EXEMPLE CORECTE: „Derivata funcției $f$ în punctul $x_0$...”, „pentru $f(x)=x^2$, derivata în $x=3$ este $f'(3)=6$”, „dacă $f'(x_0)>0$ funcția este crescătoare”, „$$f'(x_0)=\\lim_{h\\to 0}\\frac{f(x_0+h)-f(x_0)}{h}$$”.
+- INTERZIS să scrii matematică ca text simplu: niciodată „x_0”, „f(x)=x^2”, „f'(x_0) > 0”, „x^2” în afara delimitatorilor $...$. Acestea se randează stricat (indici/exponenți nu se formatează, < > devin entități HTML). Scrie ÎNTOTDEAUNA $x_0$, $f(x)=x^2$, $f'(x_0)>0$, $x^2$.
+- În interiorul $...$ folosește sintaxa LaTeX: indici cu _ (x_0, a_1), exponenți cu ^ (x^2, 10^5), fracții cu \\frac{num}{den}, radicali cu \\sqrt{x}, limite cu \\lim_{h\\to 0}, prime cu ' (f'(x), f'').
+- În interiorul $...$ folosește \\lt și \\gt pentru inegalități (nu caracterele < >), sau scrie inegalitatea ca text inline natural ($f'(x_0)>0$ e acceptat și randează corect). NU folosi < > ca atare în text simplu în afara $...$.
+- Nu folosi delimitatori \(...\) sau \[...\]; folosește doar $...$ și $$...$$.
+- Pentru cod (code_trace.lines, [CODINLINE]...) poți folosi < > <= >= (codul se afișează ca text monospaced, nu se interpretează HTML).
 - Pentru itemii cu source_key, content_json = null. Nu inventa source_key — folosește doar cheile din listă sau null.`
 
 const SYSTEM_PROMPT = `Ești plannerul de cursuri personalizate PLANCK Academy.
