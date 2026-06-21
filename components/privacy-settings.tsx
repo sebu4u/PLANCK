@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useAuth } from '@/components/auth-provider'
 import { useCookieManager } from '@/lib/cookie-management'
 import { useAnalytics } from '@/lib/analytics'
 import { useToast } from '@/hooks/use-toast'
@@ -26,14 +27,61 @@ import Link from 'next/link'
 
 export function PrivacySettings() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const cookieManager = useCookieManager()
   const analytics = useAnalytics()
   const [preferences, setPreferences] = useState(cookieManager.preferences)
   const [isLoading, setIsLoading] = useState(false)
+  const [marketingEmailsOptOut, setMarketingEmailsOptOut] = useState(false)
+  const [marketingEmailsLoading, setMarketingEmailsLoading] = useState(false)
 
   useEffect(() => {
     setPreferences(cookieManager.preferences)
   }, [cookieManager.preferences])
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    fetch('/api/user/marketing-emails')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          setMarketingEmailsOptOut(data.marketing_emails_opt_out === true)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  const handleMarketingEmailsChange = async (optOut: boolean) => {
+    if (!user) return
+    setMarketingEmailsLoading(true)
+    try {
+      const res = await fetch('/api/user/marketing-emails', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opt_out: optOut }),
+      })
+      if (!res.ok) throw new Error('Update failed')
+      setMarketingEmailsOptOut(optOut)
+      toast({
+        title: 'Preferințe email actualizate',
+        description: optOut
+          ? 'Nu vei mai primi emailuri de marketing de la Planck.'
+          : 'Ai reactivat emailurile de marketing.',
+      })
+    } catch {
+      toast({
+        title: 'Eroare',
+        description: 'Nu am putut actualiza preferințele de email.',
+        variant: 'destructive',
+      })
+    } finally {
+      setMarketingEmailsLoading(false)
+    }
+  }
 
   const handlePreferenceChange = (key: 'analytics' | 'marketing', value: boolean) => {
     if (!preferences) return
@@ -286,6 +334,36 @@ export function PrivacySettings() {
           </div>
         </CardContent>
       </Card>
+
+      {user ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-purple-600" />
+              Emailuri de marketing
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
+                  Reminder-e și noutăți despre progres
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Emailuri personalizate despre unde ai rămas în traseele de învățare. Dezactivarea
+                  nu afectează emailurile tranzacționale (cont, abonament).
+                </p>
+              </div>
+              <Switch
+                checked={!marketingEmailsOptOut}
+                disabled={marketingEmailsLoading}
+                onCheckedChange={(checked) => handleMarketingEmailsChange(!checked)}
+                className="ml-4"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Drepturile tale */}
       <Card>
