@@ -304,6 +304,26 @@ Distribuie itemii pe lecții în ordine logică: prima lecție = introducere/baz
 
 Minim 60% din itemi trebuie să aibă source_key valid când există conținut relevant.`
 
+function normalizeParsedPlan(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeParsedPlan)
+  }
+  if (value && typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>
+    const result: Record<string, unknown> = {}
+    for (const key of Object.keys(obj)) {
+      if (key === "item_type" && Array.isArray(obj[key])) {
+        const first = obj[key][0]
+        result[key] = typeof first === "string" ? first : "custom_text"
+      } else {
+        result[key] = normalizeParsedPlan(obj[key])
+      }
+    }
+    return result
+  }
+  return value
+}
+
 export async function planPersonalizedCourse(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
@@ -330,7 +350,7 @@ export async function planPersonalizedCourse(
                   items: [
                     {
                       title: "string",
-                      item_type: PERSONALIZED_ITEM_TYPES,
+                      item_type: "text | grila | problem | ...",
                       source_key: "exact un source_key din listă sau null",
                       content_json: "null dacă ai source_key, {\"body\":\"text\"} dacă nu",
                     },
@@ -358,6 +378,8 @@ export async function planPersonalizedCourse(
   } catch {
     throw new Error("AI returned invalid JSON")
   }
+
+  parsed = normalizeParsedPlan(parsed)
 
   const validated = planSchema.safeParse(parsed)
   if (!validated.success) {
