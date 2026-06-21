@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("learning_path_chapters")
-    .select("id, generation_status, generated_by_user_id")
+    .select("id, generation_status, generated_by_user_id, generation_metadata")
     .eq("id", chapterId)
     .maybeSingle()
 
@@ -43,7 +43,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Nu ai acces la acest curs." }, { status: 403 })
   }
 
+  const metadata =
+    data.generation_metadata && typeof data.generation_metadata === "object" && !Array.isArray(data.generation_metadata)
+      ? (data.generation_metadata as Record<string, unknown>)
+      : {}
+  const progress =
+    metadata.progress && typeof metadata.progress === "object" && !Array.isArray(metadata.progress)
+      ? (metadata.progress as { stage?: string; percent?: number; message?: string })
+      : null
+
   return NextResponse.json({
     status: data.generation_status ?? "creating",
+    stage: progress?.stage ?? null,
+    percent: typeof progress?.percent === "number" ? progress.percent : 0,
+    message: progress?.message ?? null,
   })
 }

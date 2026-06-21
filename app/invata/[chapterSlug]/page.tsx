@@ -60,6 +60,16 @@ export default async function PersonalizedChapterStatusPage({
     redirect(`/invata`)
   }
 
+  // Extract initial progress from server-rendered metadata for instant display.
+  const meta =
+    chapter.generation_metadata && typeof chapter.generation_metadata === "object" && !Array.isArray(chapter.generation_metadata)
+      ? (chapter.generation_metadata as Record<string, unknown>)
+      : {}
+  const metaProgress =
+    meta.progress && typeof meta.progress === "object" && !Array.isArray(meta.progress)
+      ? (meta.progress as { stage?: string; percent?: number; message?: string })
+      : null
+
   // Show the generating/failed state. The client component polls until ready.
   return (
     <PersonalizedCourseGeneratingCard
@@ -74,6 +84,15 @@ export default async function PersonalizedChapterStatusPage({
             "reason" in chapter.generation_metadata
             ? String((chapter.generation_metadata as Record<string, unknown>).reason)
             : null
+          : null
+      }
+      initialProgress={
+        metaProgress
+          ? {
+              stage: metaProgress.stage ?? null,
+              percent: typeof metaProgress.percent === "number" ? metaProgress.percent : 0,
+              message: metaProgress.message ?? null,
+            }
           : null
       }
     />

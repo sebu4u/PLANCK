@@ -344,11 +344,36 @@ export async function POST(request: Request) {
   // Phase 2: run the heavy generation detached, so it survives client disconnect.
   // The chapter row (status "creating") is already saved; this fills in lessons/items
   // and flips the chapter to "ready" (is_active=true) on success or "failed" on error.
+  // Progress is reported to generation_metadata.progress at each stage so the UI can
+  // show a real-time progress bar.
   after(async () => {
     const adminBg = createAdminClient()
     const supabaseBg = await createClient()
+
+    const updateProgress = async (
+      stage: string,
+      percent: number,
+      message: string,
+      extra: Record<string, unknown> = {},
+    ) => {
+      await adminBg
+        .from("learning_path_chapters")
+        .update({
+          generation_metadata: {
+            model: getPlannerModel(),
+            backend: "learning_path",
+            ...extra,
+            progress: { stage, percent, message, updatedAt: new Date().toISOString() },
+          },
+        })
+        .eq("id", chapterId)
+    }
+
     try {
+      await updateProgress("searching", 5, "Caut conținut Planck relevant...")
       const candidates = await searchPlanckContentForPrompt(supabaseBg, prompt, 140)
+
+      await updateProgress("planning", 15, "AI analizează obiectivul și planifică lecțiile...")
       const { plan, verification } = await planPersonalizedCourse(prompt, candidates)
       const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
       const planItems = plan.lessons.flatMap((lesson) => lesson.items)
@@ -362,7 +387,8 @@ export async function POST(request: Request) {
         verification,
       }
 
-      // Update chapter metadata + title/description from the AI plan.
+      // Update chapter title/description from the AI plan + save progress.
+      await updateProgress("saving", 65, `Salvez ${plan.lessons.length} lecții și ${generationMetadata.itemCount} itemi...`, generationMetadata)
       const { error: metaError } = await adminBg
         .from("learning_path_chapters")
         .update({
@@ -378,7 +404,6 @@ export async function POST(request: Request) {
             summary: candidate.summary,
             url: candidate.url ?? null,
           })),
-          generation_metadata: generationMetadata,
         })
         .eq("id", chapterId)
       if (metaError) {
@@ -391,6 +416,15 @@ export async function POST(request: Request) {
         const lesson = plan.lessons[lessonIndex]
         const lessonSlug = makeUniqueSlug("lectie", lesson.title, user.id, String(lessonIndex + 1))
         if (!firstLessonSlug) firstLessonSlug = lessonSlug
+
+        // Per-lesson progress: 65% → 95% across all lessons.
+        const lessonPercent = 65 + Math.round((lessonIndex / plan.lessons.length) * 30)
+        await updateProgress(
+          "saving_lessons",
+          lessonPercent,
+          `Salvez lecția ${lessonIndex + 1}/${plan.lessons.length}: ${lesson.title}`,
+          generationMetadata,
+        )
 
         const { data: insertedLesson, error: lessonError } = await adminBg
           .from("learning_path_lessons")
@@ -424,6 +458,7 @@ export async function POST(request: Request) {
         }
       }
 
+      await updateProgress("finalizing", 97, "Verific și activez cursul...", generationMetadata)
       const { error: readyError } = await adminBg
         .from("learning_path_chapters")
         .update({
@@ -431,6 +466,7 @@ export async function POST(request: Request) {
           is_active: true,
           generation_metadata: {
             ...generationMetadata,
+            progress: { stage: "ready", percent: 100, message: "Curs gata!", updatedAt: new Date().toISOString() },
             readyAt: new Date().toISOString(),
           },
         })

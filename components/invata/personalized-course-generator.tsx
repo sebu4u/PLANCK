@@ -11,17 +11,6 @@ interface PersonalizedCourseGeneratorProps {
   loginHref?: string
 }
 
-type GenerationStage = {
-  id: string
-  label: string
-}
-
-const GENERATION_STAGES: GenerationStage[] = [
-  { id: "search", label: "Caut conținut Planck relevant pentru obiectivul tău…" },
-  { id: "plan", label: "Planific lecțiile și exercițiile de practică…" },
-  { id: "create", label: "Creez lecțiile și exercițiile de practică…" },
-]
-
 const MIN_PROMPT_LENGTH = 3
 const MAX_PROMPT_LENGTH = 500
 
@@ -33,35 +22,14 @@ export function PersonalizedCourseGenerator({
   const [prompt, setPrompt] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "done">("idle")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [activeStageIndex, setActiveStageIndex] = useState(0)
   const [createdHref, setCreatedHref] = useState<string | null>(null)
-  const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     return () => {
-      if (stageTimerRef.current) clearInterval(stageTimerRef.current)
       abortRef.current?.abort()
     }
   }, [])
-
-  const stopStageCycling = useCallback(() => {
-    if (stageTimerRef.current) {
-      clearInterval(stageTimerRef.current)
-      stageTimerRef.current = null
-    }
-  }, [])
-
-  const startStageCycling = useCallback(() => {
-    stopStageCycling()
-    setActiveStageIndex(0)
-    stageTimerRef.current = setInterval(() => {
-      setActiveStageIndex((index) => {
-        if (index >= GENERATION_STAGES.length - 1) return index
-        return index + 1
-      })
-    }, 1400)
-  }, [stopStageCycling])
 
   const handleSubmit = useCallback(
     async (event?: React.FormEvent) => {
@@ -89,7 +57,6 @@ export function PersonalizedCourseGenerator({
       setStatus("loading")
       setErrorMessage(null)
       setCreatedHref(null)
-      startStageCycling()
 
       abortRef.current?.abort()
       const controller = new AbortController()
@@ -124,8 +91,6 @@ export function PersonalizedCourseGenerator({
         }
 
         const targetHref = data?.href ?? data?.course?.href ?? null
-        stopStageCycling()
-        setActiveStageIndex(GENERATION_STAGES.length - 1)
         setStatus("done")
         setCreatedHref(targetHref)
 
@@ -137,11 +102,9 @@ export function PersonalizedCourseGenerator({
         if ((error as Error)?.name === "AbortError") return
         setStatus("error")
         setErrorMessage("Conexiunea a eșuat. Verifică internetul și încearcă din nou.")
-      } finally {
-        stopStageCycling()
       }
     },
-    [isAuthenticated, prompt, router, startStageCycling, stopStageCycling],
+    [isAuthenticated, prompt, router],
   )
 
   const isDisabled = status === "loading"
@@ -216,39 +179,6 @@ export function PersonalizedCourseGenerator({
           </div>
         </div>
       </form>
-
-      {status === "loading" ? (
-        <ul className="relative mt-4 space-y-2.5" aria-live="polite">
-          {GENERATION_STAGES.map((stage, index) => {
-            const isDone = index < activeStageIndex
-            const isActive = index === activeStageIndex
-            return (
-              <li
-                key={stage.id}
-                className={cn(
-                  "flex items-start gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-colors",
-                  isActive
-                    ? "border-[#cfcfcf] bg-white text-[#1f1f1f]"
-                    : isDone
-                      ? "border-[#e6e6e6] bg-[#f7f7f7] text-[#059669]"
-                      : "border-[#e6e6e6] bg-white text-[#9a9a9a]",
-                )}
-              >
-                <span className="mt-0.5 shrink-0">
-                  {isDone ? (
-                    <CheckCircle2 className="h-4 w-4 text-[#059669]" />
-                  ) : isActive ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-[#1f1f1f]" />
-                  ) : (
-                    <span className="block h-4 w-4 rounded-full border-2 border-[#d4d4d4]" />
-                  )}
-                </span>
-                <span className="leading-relaxed">{stage.label}</span>
-              </li>
-            )
-          })}
-        </ul>
-      ) : null}
 
       {status === "done" && createdHref ? (
         <div className="relative mt-4 flex items-start gap-3 rounded-xl border border-[#e6e6e6] bg-white px-3.5 py-3 text-sm text-[#1f1f1f]">

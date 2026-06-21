@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface PersonalizedCourseGeneratingCardProps {
   chapterId: string
@@ -10,65 +11,98 @@ interface PersonalizedCourseGeneratingCardProps {
   title: string
   status: "creating" | "ready" | "failed" | null
   failureReason: string | null
+  initialProgress?: ProgressState | null
 }
 
-const POLL_INTERVAL_MS = 4000
-const MAX_POLL_DURATION_MS = 10 * 60 * 1000 // 10 minutes max before showing a timeout hint
+const POLL_INTERVAL_MS = 3000
+const MAX_POLL_DURATION_MS = 10 * 60 * 1000 // 10 min timeout hint
+
+interface ProgressState {
+  stage: string | null
+  percent: number
+  message: string | null
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  searching: "Caut conținut Planck relevant",
+  planning: "AI planifică lecțiile și exercițiile",
+  saving: "Salvez lecțiile în baza de date",
+  saving_lessons: "Salvez lecțiile în baza de date",
+  finalizing: "Verific și activez cursul",
+  ready: "Curs gata!",
+}
 
 export function PersonalizedCourseGeneratingCard({
   chapterId,
-  chapterSlug,
-  title,
   status: initialStatus,
+  title,
   failureReason,
+  initialProgress,
 }: PersonalizedCourseGeneratingCardProps) {
   const router = useRouter()
   const [status, setStatus] = useState(initialStatus)
   const [reason] = useState(failureReason)
   const [timedOut, setTimedOut] = useState(false)
+  const [progress, setProgress] = useState<ProgressState>(
+    initialProgress ?? { stage: null, percent: 0, message: null },
+  )
+
+  const poll = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/personalized-courses/status?chapterId=${chapterId}`, {
+        credentials: "same-origin",
+      })
+      if (!res.ok) return
+      const data = (await res.json().catch(() => ({}))) as {
+        status?: "creating" | "ready" | "failed"
+        stage?: string | null
+        percent?: number
+        message?: string | null
+      }
+      if (typeof data.percent === "number") {
+        setProgress({
+          stage: data.stage ?? null,
+          percent: data.percent,
+          message: data.message ?? null,
+        })
+      }
+      if (data.status && data.status !== status) {
+        setStatus(data.status)
+        if (data.status === "ready") {
+          router.refresh()
+        }
+      }
+    } catch {
+      // Network blip — keep polling.
+    }
+  }, [chapterId, status, router])
 
   useEffect(() => {
     if (status === "ready") {
-      // The server component already redirects on ready, but if we polled into
-      // ready, refresh so the server redirect takes effect.
       router.refresh()
       return
     }
     if (status === "failed") return
 
     const start = Date.now()
-    const interval = window.setInterval(async () => {
+    const interval = window.setInterval(() => {
       if (Date.now() - start > MAX_POLL_DURATION_MS) {
         setTimedOut(true)
         window.clearInterval(interval)
         return
       }
-
-      try {
-        const res = await fetch(`/api/personalized-courses/status?chapterId=${chapterId}`, {
-          credentials: "same-origin",
-        })
-        if (!res.ok) return
-        const data = (await res.json().catch(() => ({}))) as {
-          status?: "creating" | "ready" | "failed"
-        }
-        if (data.status && data.status !== status) {
-          setStatus(data.status)
-          if (data.status === "ready") {
-            router.refresh()
-          }
-        }
-      } catch {
-        // Network blip — keep polling.
-      }
+      void poll()
     }, POLL_INTERVAL_MS)
 
+    // Poll immediately on mount so the bar shows real progress right away.
+    void poll()
+
     return () => window.clearInterval(interval)
-  }, [status, chapterId, router, chapterSlug])
+  }, [status, poll, router])
 
   if (status === "failed") {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center px-4 text-center">
         <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
         <h1 className="mb-2 text-xl font-bold text-[#111111]">Generarea a eșuat</h1>
         <p className="mb-6 text-sm text-[#555555]">
@@ -87,7 +121,7 @@ export function PersonalizedCourseGeneratingCard({
 
   if (timedOut) {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center px-4 text-center">
         <AlertCircle className="mb-4 h-12 w-12 text-amber-500" />
         <h1 className="mb-2 text-xl font-bold text-[#111111]">Generarea durează mai mult decât de obicei</h1>
         <p className="mb-6 text-sm text-[#555555]">
@@ -105,20 +139,91 @@ export function PersonalizedCourseGeneratingCard({
     )
   }
 
+  const percent = Math.max(0, Math.min(100, progress.percent))
+  const stageLabel = progress.message || STAGE_LABELS[progress.stage ?? ""] || "Pornire…"
+
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
-      <Loader2 className="mb-5 h-12 w-12 animate-spin text-[#7c3aed]" />
-      <h1 className="mb-2 text-xl font-bold text-[#111111]">Generăm cursul „{title}"</h1>
-      <p className="mb-1 text-sm text-[#555555]">
-        AI-ul pregătește lecțiile și exercițiile interactive. Asta poate dura 1-3 minute.
-      </p>
-      <p className="text-xs text-[#888888]">
-        Poți schimba tabul sau să dai refresh — cursul se salvează automat.
-      </p>
-      <div className="mt-6 flex items-center gap-2 text-xs text-[#999999]">
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-        <span>Cursul a fost creat — îl vei găsi și pe /invata când e gata.</span>
+    <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center px-4">
+      {/* Header */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] text-white shadow-sm">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+        <div className="text-left">
+          <h1 className="text-lg font-bold text-[#111111] sm:text-xl">Generăm cursul „{title}"</h1>
+          <p className="text-xs text-[#888888]">Se salvează automat — poți da refresh sau schimba tabul.</p>
+        </div>
       </div>
+
+      {/* Progress bar */}
+      <div className="w-full">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="font-medium text-[#333333]">{stageLabel}</span>
+          <span className="tabular-nums font-semibold text-[#7c3aed]">{percent}%</span>
+        </div>
+        <div className="h-3 w-full overflow-hidden rounded-full bg-[#e6e6e6]">
+          <div
+            className={cn(
+              "h-full rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] transition-all duration-700 ease-out",
+            )}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+
+        {/* Stage checkpoints */}
+        <div className="mt-5 flex items-center justify-between">
+          {[
+            { id: "search", label: "Căutare", threshold: 5 },
+            { id: "plan", label: "Planificare", threshold: 15 },
+            { id: "save", label: "Salvare", threshold: 65 },
+            { id: "ready", label: "Gata", threshold: 100 },
+          ].map((checkpoint) => {
+            const isDone = percent >= checkpoint.threshold
+            const isCurrent =
+              !isDone &&
+              ((checkpoint.id === "search" && percent < 5) ||
+                (checkpoint.id === "plan" && percent >= 5 && percent < 65) ||
+                (checkpoint.id === "save" && percent >= 65 && percent < 100))
+            return (
+              <div key={checkpoint.id} className="flex flex-1 flex-col items-center gap-1.5">
+                <div
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors",
+                    isDone
+                      ? "border-[#7c3aed] bg-[#7c3aed] text-white"
+                      : isCurrent
+                        ? "border-[#7c3aed] bg-white text-[#7c3aed]"
+                        : "border-[#d4d4d4] bg-white text-[#bbb]",
+                  )}
+                >
+                  {isDone ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : isCurrent ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-[#d4d4d4]" />
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    "text-[10px] font-medium sm:text-xs",
+                    isDone ? "text-[#7c3aed]" : isCurrent ? "text-[#555]" : "text-[#aaa]",
+                  )}
+                >
+                  {checkpoint.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Live message */}
+      {progress.message && (
+        <div className="mt-6 w-full rounded-xl border border-[#e6e6e6] bg-[#f7f7f7] px-4 py-3 text-center text-sm text-[#555555]">
+          {progress.message}
+        </div>
+      )}
     </div>
   )
 }
