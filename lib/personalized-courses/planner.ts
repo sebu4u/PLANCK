@@ -304,6 +304,21 @@ function validatePollContent(content: Record<string, unknown> | null): string | 
 }
 
 /**
+ * fill_slot latexTemplate must use {{id}} placeholders — NEVER the rendered output
+ * (\htmlId{fill-slot-...}{\boxed{\text{?}}}, \color{#...}). The AI occasionally emits
+ * the renderer's output format, which produces malformed KaTeX. Reject such templates so
+ * they fall back to rich custom_text instead of rendering as garbage.
+ */
+function hasForbiddenFillSlotMarkers(
+  itemType: string,
+  content: Record<string, unknown>,
+): boolean {
+  if (itemType !== "fill_slot") return false
+  const template = typeof content.latexTemplate === "string" ? content.latexTemplate : ""
+  return /(\\htmlId|fill-slot-|\\boxed|\\text\{\?\}|\\color\{#)/.test(template)
+}
+
+/**
  * Build a generated (non-source) item, preserving the AI-chosen type when its
  * content_json validates against the real parsers (interactive types, poll, test).
  * Falls back to a rich custom_text explanation when the content is missing or invalid —
@@ -323,10 +338,11 @@ function buildGeneratedItem(
 
   if (isInteractiveLessonItemType(requestedType) && rawContent) {
     const validationError = validateInteractiveItemContent(requestedType, rawContent)
-    if (!validationError) {
+    if (!validationError && !hasForbiddenFillSlotMarkers(requestedType, rawContent)) {
       return { title, item_type: requestedType, source_key: null, content_json: rawContent }
     }
-    // Invalid interactive content → fall back to rich custom_text (do not store a broken item).
+    // Invalid interactive content (or fill_slot template using rendered-output format)
+    // → fall back to rich custom_text (do not store a broken item).
   } else if (requestedType === "poll" && rawContent) {
     if (!validatePollContent(rawContent)) {
       return { title, item_type: "poll", source_key: null, content_json: rawContent }
@@ -666,7 +682,7 @@ const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) �
 - poll: {"imageSrc": "" (sau URL imagine, opțional), "imageAlt": "" (opțional), "question": "...?", "correctAnswerId": "id_răspuns_corect", "options": [{"id":"a","label":"...","feedback":"explicație afișată după răspuns"}]} — minim 2 opțiuni; FIECARE opțiune trebuie să aibă feedback (explicație scurtă, educativă); correctAnswerId trebuie să fie unul dintre id-urile opțiunilor. Folosește poll pentru verificări de înțelegere cu explicații.
 - match: {"instructions": "...opțional", "left": [{"id":"l1","text":"..."}], "right": [{"id":"r1","text":"..."}], "pairs": [{"leftId":"l1","rightId":"r1"}]} — left și right au aceeași lungime (2-6); pairs asociază fiecare element o singură dată. Bine pentru termen↔definiție.
 - card_sort: {"instructions": "...opțional", "cards": [{"id":"a","text":"..."}], "correctOrder": ["a",...]} — correctOrder este o permutare a id-urilor (4 carduri). Bine pentru ordonare de pași/nivele.
-- fill_slot: {"instructions": "...opțional", "latexTemplate": "F = {{m}} \\cdot a", "slots": [{"id":"m","answer":"2"}], "chips": ["1","2","5","10"]} — fiecare {{id}} apare în latexTemplate; chips include toate answer-urile + distractoare.
+- fill_slot: {"instructions": "...opțional", "latexTemplate": "F = {{m}} \\cdot a", "slots": [{"id":"m","answer":"2"}], "chips": ["1","2","5","10"]}. FORMAT CRITIC pentru latexTemplate: locurile goale se marchază cu placeholder-e {{id}} sau {{{id}}}, EXACT ca în exemple. Exemple corecte: "F = {{m}} \\cdot a", "v = \\frac{{{d}}}{{{t}}}", "P = {{{U}}} \\cdot {{{I}}}", "a^2 + b^2 = {{c}}^2". Pentru fracții folosește {{{id}}} (triple acolade) ca argument: \\frac{{{num}}}{{{den}}}. FIECARE {{id}} din slots trebuie să apară în latexTemplate; chips include toate answer-urile + distractoare. INTERZIS STRICT în latexTemplate: \htmlId, fill-slot-, \boxed, \text{?}, \color{#...} — acestea sunt OUTPUT-ul randat de Planck, NU formatul de intrare. Dacă le scrii, formula se strică. Folosești DOAR {{id}} ca placeholder.
 - reveal_steps: {"instructions": "...opțional", "steps": [{"kind":"markdown","content":"..."},{"kind":"quiz","content":"...?","options":["a","b","c"],"correctIndex":0}]} — minim 3 pași. Bine pentru exerciții rezolvate pas cu pas: folosește [ENUNT]...[/ENUNT] la primul pas, [FORMULA]$$...$$[/FORMULA] în pașii de calcul, [IMPORTANT]...[/IMPORTANT] la concluzie.
 - table_fill: {"instructions": "...opțional", "headers": ["Mărime","Unitate"], "rows": [{"cells": [{"text":"Forță"},{"blank":true,"answer":"N"}]}]} — cells.length === headers.length; celulele blank au {"blank":true,"answer":"..."}.
 - swipe_classify: {"prompt": "...opțional", "leftLabel": "Adevărat", "rightLabel": "Fals", "cards": [{"text":"...","side":"left"}]} — 4-8 carduri; side "left" sau "right".
