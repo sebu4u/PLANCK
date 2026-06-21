@@ -27,6 +27,14 @@ export const teamMembers = [
     image: "https://i.ibb.co/JRktCngW/Whats-App-Image-2025-06-15-at-22-05-38-efacef2e.jpg",
   },
   {
+    name: "Bercea Codrin",
+    role: "Head of Software",
+    badge: "Premiant Olimpiada Națională de Inteligență Artificială",
+    description:
+      "Cu viziune în AI și inginerie software, Codrin coordonează dezvoltarea tehnologiei din spatele platformei PLANCK și creează soluții educaționale intuitive și moderne.",
+    image: "/team/codrin-bercea.jpeg",
+  },
+  {
     name: "Voluntar 1",
     role: "Voluntar PLANCK",
     badge: "Contribuitor",
