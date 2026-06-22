@@ -4,7 +4,7 @@ import Link from "next/link"
 import { createPortal } from "react-dom"
 import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DependencyList } from "react"
-import { evaluate } from "mathjs"
+import { Parser } from "expr-eval"
 import { Reorder } from "framer-motion"
 import { motion, useMotionValue, useTransform } from "framer-motion"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
@@ -1791,7 +1791,7 @@ function SliderExploreView({
 
   const result = useMemo(() => {
     try {
-      const r = evaluate(data.formula, vals as Record<string, number>)
+      const r = Parser.parse(data.formula).evaluate(vals as Record<string, number>)
       return typeof r === "number" && Number.isFinite(r) ? r : NaN
     } catch {
       return NaN

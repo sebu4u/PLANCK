@@ -12,10 +12,14 @@ export async function GET(
     
     if (includeLessons) {
       const { chapter, lessons } = await getChapterWithLessons(id)
-      return NextResponse.json({ chapter, lessons })
+      return NextResponse.json({ chapter, lessons }, {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      })
     } else {
       const chapter = await getChapterById(id)
-      return NextResponse.json(chapter)
+      return NextResponse.json(chapter, {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      })
     }
   } catch (error) {
     console.error('Error in chapter API:', error)

@@ -228,9 +228,21 @@ export default function Orb({
     let currentRot = 0;
     const rotationSpeed = 0.1; // Slower rotation for better mobile performance
 
+    let isVisible = true;
+    const intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          isVisible = entry.isIntersecting;
+        }
+      },
+      { threshold: 0 }
+    );
+    intersectionObserver.observe(container);
+
     let rafId: number;
     const update = (t: number) => {
       rafId = requestAnimationFrame(update);
+      if (!isVisible || document.hidden) return;
       const dt = (t - lastTime) * 0.001;
       lastTime = t;
       program.uniforms.iTime.value = t * 0.001;
@@ -246,6 +258,7 @@ export default function Orb({
 
     return () => {
       cancelAnimationFrame(rafId);
+      intersectionObserver.disconnect();
       window.removeEventListener('resize', resize);
       if (container && glContext.canvas && container.contains(glContext.canvas)) {
         container.removeChild(glContext.canvas);

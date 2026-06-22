@@ -18,7 +18,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import Editor from "@monaco-editor/react"
+import dynamic from "next/dynamic"
+
+const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false })
 
 type ChatRole = "user" | "assistant" | "system"
 

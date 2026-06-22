@@ -54,20 +54,21 @@ type DevProfileRow = {
   dev_subjects: unknown
 }
 
-async function listAuthUsersById(service: ReturnType<typeof createServiceClient>) {
+async function listAuthUsersById(
+  service: ReturnType<typeof createServiceClient>,
+  userIds: string[]
+) {
   const usersById = new Map<string, { email?: string }>()
-  let page = 1
 
-  while (page <= 20) {
-    const { data, error } = await service.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) throw error
-
-    for (const user of data.users) {
-      usersById.set(user.id, { email: user.email ?? undefined })
+  for (const userId of userIds) {
+    try {
+      const { data, error } = await service.auth.admin.getUserById(userId)
+      if (!error && data.user) {
+        usersById.set(userId, { email: data.user.email ?? undefined })
+      }
+    } catch {
+      // Skip users that can't be fetched
     }
-
-    if (data.users.length < 1000) break
-    page += 1
   }
 
   return usersById
@@ -90,8 +91,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Nu am putut încărca utilizatorii dev." }, { status: 500 })
     }
 
-    const usersById = await listAuthUsersById(service)
-    const devUsers = ((profiles ?? []) as DevProfileRow[]).map((profile) => {
+    const profileRows = (profiles ?? []) as DevProfileRow[]
+    const usersById = await listAuthUsersById(
+      service,
+      profileRows.map((p) => p.user_id)
+    )
+    const devUsers = profileRows.map((profile) => {
       const devSubjects = normalizeDevSubjects(profile.dev_subjects)
       return {
         user_id: profile.user_id,

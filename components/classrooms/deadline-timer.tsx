@@ -26,7 +26,7 @@ export function DeadlineTimer({ deadline, className }: DeadlineTimerProps) {
   useEffect(() => {
     const timerId = window.setInterval(() => {
       setNow(Date.now())
-    }, 1000)
+    }, 60000)
     return () => window.clearInterval(timerId)
   }, [])
 

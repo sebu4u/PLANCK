@@ -15,8 +15,8 @@ export default function NewBoardPage() {
         // Folosim un format mai prietenos dar unic: timestamp + random
         const uniqueId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
         
-        // Redirecționăm către noul sistem bazat pe PartyKit
-        router.push(`/sketch/${uniqueId}`);
+        // Redirect to the boards list
+        router.push('/sketch/boards');
         
       } catch (error: any) {
         console.error('Failed to create board:', error);

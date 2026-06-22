@@ -10,7 +10,7 @@ import {
   getCompletedLearningPathLessonIdsForUser,
   getLearningPathChapters,
   getLearningPathLessonItemAggregates,
-  getLearningPathLessonsByChapterId,
+  getLearningPathLessonsByChapterIds,
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
@@ -31,7 +31,6 @@ import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-p
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
-export const revalidate = 21600
 
 function sortLearningPathChaptersForHub(chapters: LearningPathChapter[]): LearningPathChapter[] {
   return [...chapters].sort((a, b) => {
@@ -57,12 +56,9 @@ export default async function InvataPage() {
 
   const chapters = sortLearningPathChaptersForHub(await getLearningPathChapters(supabase))
 
-  const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
-
-  await Promise.all(
-    chapters.map(async (chapter) => {
-      lessonsByChapter[chapter.id] = await getLearningPathLessonsByChapterId(chapter.id, supabase)
-    })
+  const lessonsByChapter = await getLearningPathLessonsByChapterIds(
+    chapters.map((c) => c.id),
+    supabase
   )
   const allLessonIds = Object.values(lessonsByChapter).flatMap((lessons) => lessons.map((l) => l.id))
 

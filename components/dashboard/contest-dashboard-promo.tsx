@@ -65,7 +65,9 @@ export function ContestDashboardPromo({ variant }: { variant: Variant }) {
   }, [load])
 
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 1000)
+    const id = window.setInterval(() => {
+      if (!document.hidden) setTick((t) => t + 1)
+    }, 1000)
     return () => window.clearInterval(id)
   }, [])
 

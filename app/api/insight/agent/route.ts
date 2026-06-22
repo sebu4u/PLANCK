@@ -79,7 +79,8 @@ export async function GET(req: NextRequest) {
       .from('insight_agent_memory')
       .select('id, memory_key, memory_json, confidence, source, created_at, updated_at')
       .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .limit(50);
 
     let actionsQuery = supabase
       .from('insight_agent_actions')

@@ -7,8 +7,8 @@ import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import {
   getAllGrades,
-  getChaptersByGradeId,
-  getLessonSummariesByChapterId,
+  getChaptersByGradeIds,
+  getLessonSummariesByChapterIds,
   Grade,
   Chapter,
   LessonSummary
@@ -19,13 +19,14 @@ import { slugify } from "@/lib/slug"
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const grades = await getAllGrades()
-  let targetLesson: LessonSummary | null = null
+  const chaptersByGrade = await getChaptersByGradeIds(grades.map(g => g.id))
+  const allChapterIds = Object.values(chaptersByGrade).flat().map(c => c.id)
+  const lessonsByChapter = await getLessonSummariesByChapterIds(allChapterIds)
 
+  let targetLesson: LessonSummary | null = null
   for (const grade of grades) {
-    const chapters = await getChaptersByGradeId(grade.id)
-    for (const chapter of chapters) {
-      const lessons = await getLessonSummariesByChapterId(chapter.id)
-      const found = lessons.find(l => slugify(l.title) === slug)
+    for (const chapter of chaptersByGrade[grade.id] ?? []) {
+      const found = (lessonsByChapter[chapter.id] ?? []).find(l => slugify(l.title) === slug)
       if (found) {
         targetLesson = found
         break
@@ -74,13 +75,14 @@ export const revalidate = 2592000 // 30 days
 // Generate static params for all lesson slugs
 export async function generateStaticParams() {
   const grades = await getAllGrades()
-  const allLessons: LessonSummary[] = []
+  const chaptersByGrade = await getChaptersByGradeIds(grades.map(g => g.id))
+  const allChapterIds = Object.values(chaptersByGrade).flat().map(c => c.id)
+  const lessonsByChapter = await getLessonSummariesByChapterIds(allChapterIds)
 
+  const allLessons: LessonSummary[] = []
   for (const grade of grades) {
-    const chapters = await getChaptersByGradeId(grade.id)
-    for (const chapter of chapters) {
-      const lessons = await getLessonSummariesByChapterId(chapter.id)
-      allLessons.push(...lessons)
+    for (const chapter of chaptersByGrade[grade.id] ?? []) {
+      allLessons.push(...(lessonsByChapter[chapter.id] ?? []))
     }
   }
 
@@ -93,18 +95,14 @@ export default async function PhysicsLessonsBySlugPage({ params }: { params: Pro
   const { slug } = await params
   const grades = await getAllGrades()
 
-  const chaptersData: { [gradeId: string]: Chapter[] } = {}
-  for (const grade of grades) {
-    chaptersData[grade.id] = await getChaptersByGradeId(grade.id)
-  }
+  const chaptersData = await getChaptersByGradeIds(grades.map(g => g.id))
+  const allChapterIds = Object.values(chaptersData).flat().map(c => c.id)
+  const lessonsData = await getLessonSummariesByChapterIds(allChapterIds)
 
-  const lessonsData: { [chapterId: string]: LessonSummary[] } = {}
   let initialLessonId: string | undefined = undefined
   for (const grade of grades) {
-    for (const chapter of chaptersData[grade.id]) {
-      const summaries = await getLessonSummariesByChapterId(chapter.id)
-      lessonsData[chapter.id] = summaries
-      for (const l of summaries) {
+    for (const chapter of chaptersData[grade.id] ?? []) {
+      for (const l of lessonsData[chapter.id] ?? []) {
         if (slugify(l.title) === slug) {
           initialLessonId = l.id
         }

@@ -6,6 +6,11 @@ import { tmpdir } from 'os';
 import JSZip from 'jszip';
 import { platform } from 'os';
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const IS_VERCEL = !!process.env.VERCEL;
+
 interface FileItem {
   name: string;
   content: string;
@@ -89,8 +94,8 @@ export async function POST(request: NextRequest) {
           writeFileSync(filePath, file.content, 'utf-8');
         }
 
-        // Detect available compiler
-        const compiler = detectCompiler();
+        // Detect available compiler — skip on Vercel (no compiler available in serverless)
+        const compiler = IS_VERCEL ? null : detectCompiler();
         if (!compiler) {
           // No local compiler available - use Judge0 fallback
           // But we can't do true interactive execution, so we need to ask for all inputs upfront

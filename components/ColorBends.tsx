@@ -278,25 +278,38 @@ export default function ColorBends({
         (window as Window).addEventListener('resize', handleResize);
       }
 
+      let isVisible = true;
+      const intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            isVisible = entry.isIntersecting;
+          }
+        },
+        { threshold: 0 }
+      );
+      intersectionObserver.observe(container);
+
       const loop = () => {
         if (!renderer || !material) return;
         try {
           const dt = clock.getDelta();
           const elapsed = clock.elapsedTime;
-          material.uniforms.uTime.value = elapsed;
+          if (isVisible && !document.hidden) {
+            material.uniforms.uTime.value = elapsed;
 
-          const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed;
-          const rad = (deg * Math.PI) / 180;
-          const c = Math.cos(rad);
-          const s = Math.sin(rad);
-          (material.uniforms.uRot.value as THREE.Vector2).set(c, s);
+            const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed;
+            const rad = (deg * Math.PI) / 180;
+            const c = Math.cos(rad);
+            const s = Math.sin(rad);
+            (material.uniforms.uRot.value as THREE.Vector2).set(c, s);
 
-          const cur = pointerCurrentRef.current;
-          const tgt = pointerTargetRef.current;
-          const amt = Math.min(1, dt * pointerSmoothRef.current);
-          cur.lerp(tgt, amt);
-          (material.uniforms.uPointer.value as THREE.Vector2).copy(cur);
-          renderer.render(scene, camera);
+            const cur = pointerCurrentRef.current;
+            const tgt = pointerTargetRef.current;
+            const amt = Math.min(1, dt * pointerSmoothRef.current);
+            cur.lerp(tgt, amt);
+            (material.uniforms.uPointer.value as THREE.Vector2).copy(cur);
+            renderer.render(scene, camera);
+          }
           rafRef.current = requestAnimationFrame(loop);
         } catch (error) {
           console.error('Error in render loop:', error);
@@ -314,6 +327,7 @@ export default function ColorBends({
           cancelAnimationFrame(rafRef.current);
           rafRef.current = null;
         }
+        intersectionObserver.disconnect();
         if (resizeObserverRef.current) {
           resizeObserverRef.current.disconnect();
           resizeObserverRef.current = null;

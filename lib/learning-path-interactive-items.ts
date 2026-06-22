@@ -423,7 +423,7 @@ function parseFlow(c: Record<string, unknown>): Res<FlowBuildContent> {
 function parseSlider(c: Record<string, unknown>): Res<SliderExploreContent> {
   const instructions = asString(c.instructions) ?? undefined
   const formula = (asString(c.formula) || "").trim()
-  if (!formula) return err("slider_explore: formula obligatorie (mathjs).")
+  if (!formula) return err("slider_explore: formula obligatorie.")
   const rawSliders = c.sliders
   if (!Array.isArray(rawSliders) || rawSliders.length < 1) return err("slider_explore: sliders nevid.")
   const sliders: SliderExploreContent["sliders"] = []

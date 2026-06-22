@@ -40,7 +40,9 @@ export function ProblemOfTheDayCard({ challenge }: ProblemOfTheDayCardProps) {
         }
 
         updateTimeLeft()
-        const interval = setInterval(updateTimeLeft, 1000)
+        const interval = setInterval(() => {
+            if (!document.hidden) updateTimeLeft()
+        }, 1000)
         return () => clearInterval(interval)
     }, [])
 

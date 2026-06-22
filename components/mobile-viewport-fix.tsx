@@ -45,8 +45,8 @@ export function MobileViewportFix() {
       // Run safety check on page load and after any touch interaction
       ensureScrollable()
       
-      // Also run periodically as a fallback (every 2 seconds)
-      const intervalId = setInterval(ensureScrollable, 2000)
+      // Also run periodically as a fallback (every 5 seconds)
+      const intervalId = setInterval(ensureScrollable, 5000)
       
       // Run on touchend to catch cases where modals close
       const handleTouchEnd = () => {
