@@ -55,7 +55,7 @@ Never expose the service role key to the client. See the `planck-supabase` skill
 
 ## Runtime, `maxDuration`, and caching
 
-Add the right route-segment config up front. See `AGENTS.md` → "Performance & CPU patterns" for the full rationale.
+See `AGENTS.md` → "Performance & CPU patterns" for the full rationale and the route list that already has this. Add the right route-segment config up front:
 
 - **Long-running routes** (OpenAI streaming, Judge0 batching, `after()`-detached generation, code execution) must declare `runtime` and `maxDuration`, or Vercel will kill them on the default timeout:
   ```ts
@@ -68,7 +68,7 @@ Add the right route-segment config up front. See `AGENTS.md` → "Performance & 
     headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
   })
   ```
-  Examples: `app/api/physics/grades/route.ts`, `app/api/math-problems/route.ts`. Do **not** cache user-specific or auth-dependent responses.
+  Do **not** cache user-specific or auth-dependent responses.
 
 ## After scaffolding
 

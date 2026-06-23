@@ -1,4 +1,4 @@
-Run type checking on this repo and triage the results, following the "Type checking" section in AGENTS.md.
+Run type checking on this repo and triage the results, following the "Validation" section in AGENTS.md.
 
 In short:
 1. Run `pnpm exec tsc --noEmit` via bash.

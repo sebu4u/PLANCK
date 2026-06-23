@@ -54,13 +54,18 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except:
-         * - api/stripe/webhook (Stripe must hit raw webhook route directly)
-         * - Public read-only APIs (cached; no session refresh needed)
-         * - ISR catalog/marketing pages (client fetches auth state when needed)
-         * - _next/static, _next/image, favicon, static images
-         */
+    /*
+     * Match all request paths except:
+     * - api/stripe/webhook (Stripe must hit raw webhook route directly)
+     * - Public read-only APIs (cached; no session refresh needed)
+     * - ISR catalog/marketing pages (client fetches auth state when needed)
+     * - _next/static, _next/image, favicon, static images
+     *
+     * Note: `api/user/marketing-emails` is intentionally NOT excluded. It uses
+     * the cookie client (`@/lib/supabase/server`) whose `setAll` silently
+     * depends on the middleware session refresh — skipping it here breaks it.
+     * See AGENTS.md → planck-performance skill.
+     */
          '/((?!api/stripe/webhook|api/stripe/checkout|api/stripe/sync|api/stripe/portal|api/search(?:/|$)|api/physics(?:/|$)|api/admin(?:/|$)|api/insight(?:/|$)|api/dev(?:/|$)|api/coding-problems(?:/|$)|api/run(?:/|$)|api/run-interactive(?:/|$)|api/mailerlite/webhook(?:/|$)|probleme(?:/|$)|informatica/probleme(?:/|$)|matematica/probleme(?:/|$)|invata(?:/|$)|cursuri(?:/|$)|exerseaza(?:/|$)|simulari-bac(?:/|$)|grile(?:/|$)|biologie/grile(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
