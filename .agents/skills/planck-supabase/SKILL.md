@@ -13,10 +13,34 @@ This repo uses Supabase (Postgres + Auth + Realtime) with **four distinct client
 |---|---|---|
 | Browser component / hook (user session in cookies) | `createClient()` from `@supabase/ssr` `createBrowserClient` | `@/lib/supabase/client` (preferred) or the legacy singleton `supabase` from `@/lib/supabaseClient` |
 | Server Component / route handler reading the **user session** | `createClient()` (async, reads `next/headers` cookies) | `@/lib/supabase/server` |
+| Server Component / page that only reads **public, user-independent** data (ISR-friendly) | `createClient(url, anonKey)` from `@supabase/supabase-js` + `export const revalidate` | inline in the page (see example below) |
 | Route handler with a **forwarded JWT** (`authorization` header) | `createServerClientWithToken(accessToken)` | `@/lib/supabaseServer` |
 | Admin / anonymous Insight usage — **bypasses RLS** | `getServiceRoleSupabase()` (`server-only`) | `@/lib/supabaseServiceRole` |
 
-Critical rule: the **browser client must use `@supabase/ssr`'s `createBrowserClient`**, not plain `@supabase/supabase-js`. A plain client stores the session in `localStorage` only, so the server can't see it via cookies → `getUser()` returns null → protected routes bounce to `/`. This is documented in `lib/supabaseClient.ts`.
+Critical rules:
+- The **browser client must use `@supabase/ssr`'s `createBrowserClient`**, not plain `@supabase/supabase-js`. A plain client stores the session in `localStorage` only, so the server can't see it via cookies → `getUser()` returns null → protected routes bounce to `/`. This is documented in `lib/supabaseClient.ts`.
+- The cookie-based server client (`@/lib/supabase/server`) calls `cookies()` internally, which opts the page/route into **dynamic** rendering. Pages that only need public data should use the anon client below so they can be ISR/static.
+
+### Public ISR pages (anon client)
+
+For pages that only render public, user-independent data, use the anon client with `export const revalidate`. The page can then be prerendered and cached at the edge, saving Vercel function CPU. Example (`app/concurs/rezultate/page.tsx`):
+
+```ts
+import { createClient } from "@supabase/supabase-js"
+
+export const revalidate = 3600 // pick a TTL appropriate to how often the data changes
+
+async function getPublicData() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+  const { data } = await supabase.from("...").select("...").limit(...)
+  return data ?? []
+}
+```
+
+Only safe when the table's RLS policy grants `anon` SELECT (e.g. `USING (true)` or a permissive public-read policy). Always check the table's policies in `supabase/rls-policies.sql` or the relevant `supabase/*.sql` file before switching a page from the cookie client to the anon client.
 
 ## Auth in API routes (admin pattern)
 
