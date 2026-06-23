@@ -7,8 +7,15 @@ export const LEARNING_PATH_IMAGES_BUCKET = "lesson-images"
 const OFFICIAL_PREFIX = "official/"
 
 export const learningPathImageUploadSchema = z.object({
-  kind: z.enum(["chapter", "lesson"]),
+  kind: z.enum(["chapter", "lesson", "item"]),
   id: z.string().uuid(),
+  field: z.string().min(1).max(64).optional(),
+  index: z
+    .number()
+    .int()
+    .min(0)
+    .max(1000)
+    .optional(),
 })
 
 export type LearningPathImageUploadInput = z.infer<typeof learningPathImageUploadSchema>
@@ -100,6 +107,27 @@ export async function buildLessonCoverPath(
     throw new Error("Lecția nu a fost găsită.")
   }
   return `${OFFICIAL_PREFIX}${lesson.chapter_id}/lessons/${lessonId}.${extension}`
+}
+
+export async function buildItemImagePath(
+  itemId: string,
+  index: number,
+  extension: string,
+): Promise<string> {
+  const admin = createAdminClient()
+  const { data: item, error } = await admin
+    .from("learning_path_lesson_items")
+    .select("id, lesson_id, lessons:learning_path_lessons(chapter_id)")
+    .eq("id", itemId)
+    .maybeSingle()
+  if (error || !item) {
+    throw new Error("Itemul nu a fost găsit.")
+  }
+  const chapterId = (item as { lessons?: { chapter_id?: string } | null }).lessons?.chapter_id
+  if (!chapterId) {
+    throw new Error("Capitolul itemului nu a fost găsit.")
+  }
+  return `${OFFICIAL_PREFIX}${chapterId}/items/${itemId}/image-${index}.${extension}`
 }
 
 export function isOfficialPath(path: string): boolean {

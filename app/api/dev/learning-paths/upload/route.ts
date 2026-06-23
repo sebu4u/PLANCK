@@ -7,6 +7,7 @@ import { chapterVisibleForDev } from "@/lib/dev-chapter-access"
 import { logger } from "@/lib/logger"
 import {
   buildChapterCoverPath,
+  buildItemImagePath,
   buildLessonCoverPath,
   deleteLearningPathImage,
   isOfficialPath,
@@ -89,11 +90,16 @@ export async function POST(req: NextRequest) {
     const parsed = learningPathImageUploadSchema.safeParse({
       kind: form.get("kind"),
       id: form.get("id"),
+      field: form.get("field") ?? undefined,
+      index:
+        form.get("index") != null && form.get("index") !== ""
+          ? Number(form.get("index"))
+          : undefined,
     })
     if (!parsed.success) {
       return NextResponse.json({ error: "kind și id sunt obligatorii și trebuie să fie valide." }, { status: 400 })
     }
-    const { kind, id } = parsed.data
+    const { kind, id, field, index } = parsed.data
 
     const supabase = createServiceClient()
 
@@ -116,7 +122,7 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json({ error: "Capitolul nu este în domeniul tău dev." }, { status: 403 })
       }
-    } else {
+    } else if (kind === "lesson") {
       const { data: lesson, error: lErr } = await supabase
         .from("learning_path_lessons")
         .select("id, chapter_id")
@@ -143,6 +149,50 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json({ error: "Lecția nu este în domeniul tău dev." }, { status: 403 })
       }
+    } else {
+      const itemField = field ?? "image"
+      if (itemField !== "image") {
+        return NextResponse.json(
+          { error: "Pentru item, field trebuie să fie 'image'." },
+          { status: 400 },
+        )
+      }
+      if (typeof index !== "number") {
+        return NextResponse.json(
+          { error: "Pentru item, index este obligatoriu." },
+          { status: 400 },
+        )
+      }
+      const { data: item, error: iErr } = await supabase
+        .from("learning_path_lesson_items")
+        .select("id, lesson_id, lessons:learning_path_lessons(chapter_id)")
+        .eq("id", id)
+        .maybeSingle()
+      if (iErr || !item) {
+        return NextResponse.json({ error: "Itemul nu există." }, { status: 404 })
+      }
+      const chapterId = (item as { lessons?: { chapter_id?: string } | null }).lessons?.chapter_id
+      if (!chapterId) {
+        return NextResponse.json({ error: "Capitolul itemului nu a fost găsit." }, { status: 404 })
+      }
+      const { data: chapter, error: chErr } = await supabase
+        .from("learning_path_chapters")
+        .select("id, problem_category, allowed_dev_user_ids")
+        .eq("id", chapterId)
+        .maybeSingle()
+      if (chErr || !chapter) {
+        return NextResponse.json({ error: "Capitolul itemului nu a fost găsit." }, { status: 404 })
+      }
+      if (
+        !chapterVisibleForDev(
+          chapter,
+          accessSubject,
+          auth.permissions,
+          auth.userId,
+        )
+      ) {
+        return NextResponse.json({ error: "Itemul nu este în domeniul tău dev." }, { status: 403 })
+      }
     }
 
     let validated
@@ -153,10 +203,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    const path =
-      kind === "chapter"
-        ? buildChapterCoverPath(id, validated.extension)
-        : await buildLessonCoverPath(id, validated.extension)
+    let path: string
+    if (kind === "chapter") {
+      path = buildChapterCoverPath(id, validated.extension)
+    } else if (kind === "lesson") {
+      path = await buildLessonCoverPath(id, validated.extension)
+    } else {
+      path = await buildItemImagePath(id, index!, validated.extension)
+    }
 
     const publicUrl = await uploadLearningPathImage(path, validated.bytes, validated.contentType)
 
@@ -194,8 +248,45 @@ export async function DELETE(req: NextRequest) {
 
     const supabase = createServiceClient()
     const segments = path.split("/").filter(Boolean)
+    const isItemPath = segments.length >= 5 && segments[2] === "items"
     const isLessonPath = segments.length >= 4 && segments[2] === "lessons"
-    if (isLessonPath) {
+    if (isItemPath) {
+      const itemId = segments[3]
+      const { data: item } = await supabase
+        .from("learning_path_lesson_items")
+        .select("id, lesson_id, lessons:learning_path_lessons(chapter_id)")
+        .eq("id", itemId)
+        .maybeSingle()
+      const chapterId = (item as { lessons?: { chapter_id?: string } | null } | null)?.lessons?.chapter_id
+      if (chapterId) {
+        const { data: chapter } = await supabase
+          .from("learning_path_chapters")
+          .select("id, problem_category, allowed_dev_user_ids")
+          .eq("id", chapterId)
+          .maybeSingle()
+        if (chapter) {
+          const accessSubject = resolveDevAccessSubject(
+            "all",
+            auth.permissions.isAdmin,
+            auth.permissions.isDev,
+            auth.permissions.devSubjects,
+          )
+          if (
+            !chapterVisibleForDev(
+              chapter,
+              accessSubject,
+              auth.permissions,
+              auth.userId,
+            )
+          ) {
+            return NextResponse.json(
+              { error: "Itemul nu este în domeniul tău dev." },
+              { status: 403 },
+            )
+          }
+        }
+      }
+    } else if (isLessonPath) {
       const lessonId = segments[3]
       const { data: lesson } = await supabase
         .from("learning_path_lessons")

@@ -25,6 +25,7 @@ import {
 } from "@/lib/learning-path-test"
 import { InteractiveItemContentEditor } from "@/components/admin/interactive-item-content-editor"
 import { ImageUploadField } from "@/components/admin/image-upload-field"
+import { TextItemImageInserter } from "@/components/admin/text-item-image-inserter"
 import {
   getDefaultInteractiveItemContent,
   isInteractiveLessonItemType,
@@ -1987,7 +1988,7 @@ export function LearningPathsManager({
   }, [fetchQuizQuestions, form, quizClass, quizSearch])
 
   const renderMarkerToolbar = (field: "custom_text_body" | "simulation_intro_markdown") => (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {MARKERS.map((marker) => (
         <Button
           key={marker}
@@ -2031,6 +2032,14 @@ export function LearningPathsManager({
       >
         LaTeX $$
       </Button>
+      {form?.id ? (
+        <TextItemImageInserter
+          itemId={form.id}
+          mode={isDev ? "dev" : "admin"}
+          subject={isDev ? devSubject ?? undefined : undefined}
+          onInsert={(tag) => insertIntoField(field, tag)}
+        />
+      ) : null}
     </div>
   )
 

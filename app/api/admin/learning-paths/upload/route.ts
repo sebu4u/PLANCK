@@ -5,6 +5,7 @@ import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
 import {
   buildChapterCoverPath,
+  buildItemImagePath,
   buildLessonCoverPath,
   deleteLearningPathImage,
   extractStoragePathFromPublicUrl,
@@ -51,11 +52,16 @@ export async function POST(req: NextRequest) {
     const parsed = learningPathImageUploadSchema.safeParse({
       kind: form.get("kind"),
       id: form.get("id"),
+      field: form.get("field") ?? undefined,
+      index:
+        form.get("index") != null && form.get("index") !== ""
+          ? Number(form.get("index"))
+          : undefined,
     })
     if (!parsed.success) {
       return NextResponse.json({ error: "kind și id sunt obligatorii și trebuie să fie valide." }, { status: 400 })
     }
-    const { kind, id } = parsed.data
+    const { kind, id, field, index } = parsed.data
 
     let validated
     try {
@@ -65,10 +71,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    const path =
-      kind === "chapter"
-        ? buildChapterCoverPath(id, validated.extension)
-        : await buildLessonCoverPath(id, validated.extension)
+    let path: string
+    if (kind === "chapter") {
+      path = buildChapterCoverPath(id, validated.extension)
+    } else if (kind === "lesson") {
+      path = await buildLessonCoverPath(id, validated.extension)
+    } else {
+      const itemField = field ?? "image"
+      if (itemField !== "image") {
+        return NextResponse.json(
+          { error: "Pentru item, field trebuie să fie 'image'." },
+          { status: 400 },
+        )
+      }
+      if (typeof index !== "number") {
+        return NextResponse.json(
+          { error: "Pentru item, index este obligatoriu." },
+          { status: 400 },
+        )
+      }
+      path = await buildItemImagePath(id, index, validated.extension)
+    }
 
     const publicUrl = await uploadLearningPathImage(path, validated.bytes, validated.contentType)
 
