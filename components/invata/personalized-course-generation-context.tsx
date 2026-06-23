@@ -29,6 +29,7 @@ export interface ActiveGeneration {
   topicLabel: string
   overlayPhase: GenerationOverlayPhase
   progress: GenerationProgress
+  startedAt: number
 }
 
 export interface StartActiveGenerationInput {
@@ -79,6 +80,7 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
       topicLabel: input.topicLabel,
       overlayPhase: input.skipIntro ? "corner" : "intro",
       progress: input.initialProgress ?? { stage: null, percent: 0, message: null },
+      startedAt: Date.now(),
     })
   }, [])
 
@@ -196,6 +198,7 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
             topicLabel: chapter.title,
             overlayPhase: "corner",
             progress: chapter.progress ?? { stage: null, percent: 0, message: null },
+            startedAt: Date.now(),
           }
         })
       } catch {
@@ -224,6 +227,8 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
           message?: string | null
           failureReason?: string | null
           stale?: boolean
+          estimatedTotalMs?: number | null
+          generatedAt?: string | null
         }
 
         if (cancelled) return

@@ -334,8 +334,6 @@ export async function POST(request: Request) {
           startPercent: 5,
           endPercent: 15,
           messages: GENERATION_STAGE_FALLBACK_MESSAGES.searching,
-          intervalMs: 4000,
-          step: 2,
         },
         () => searchPlanckContentForPrompt(supabaseBg, prompt, 140),
       )
@@ -350,8 +348,6 @@ export async function POST(request: Request) {
           startPercent: 15,
           endPercent: 64,
           messages: GENERATION_STAGE_FALLBACK_MESSAGES.planning,
-          intervalMs: 5000,
-          step: 3,
         },
         () => planPersonalizedCourse(prompt, candidates),
       )
@@ -414,14 +410,20 @@ export async function POST(request: Request) {
         const lessonSlug = makeUniqueSlug("lectie", lesson.title, user.id, String(lessonIndex + 1))
         if (!firstLessonSlug) firstLessonSlug = lessonSlug
 
-        // Per-lesson progress: 65% → 95% across all lessons.
-        const lessonPercent =
+        // Per-lesson progress: 65% → 95% across all lessons. Push a "started"
+        // update before the inserts and an "ended" update after so the UI
+        // sees motion during the saving stage instead of a single jump.
+        const lessonStartPercent =
+          plan.lessons.length > 0
+            ? 65 + Math.round((lessonIndex / plan.lessons.length) * 30)
+            : 65
+        const lessonEndPercent =
           plan.lessons.length > 0
             ? 65 + Math.round(((lessonIndex + 1) / plan.lessons.length) * 30)
             : 95
         await updateProgress(
           "saving_lessons",
-          lessonPercent,
+          lessonStartPercent,
           `Salvez lecția ${lessonIndex + 1}/${plan.lessons.length}: ${lesson.title}`,
           generationMetadata,
         )
@@ -456,6 +458,13 @@ export async function POST(request: Request) {
           await markChapterFailed(adminBg, chapterId, itemsError.message ?? "item insert failed")
           return
         }
+
+        await updateProgress(
+          "saving_lessons",
+          lessonEndPercent,
+          `Lecția ${lessonIndex + 1}/${plan.lessons.length} salvată.`,
+          generationMetadata,
+        )
 
         insertedLessons.push({ id: insertedLesson.id, title: lesson.title, orderIndex: lessonIndex })
       }

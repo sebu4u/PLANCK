@@ -71,9 +71,9 @@ export async function runWithProgressHeartbeat<T>(
 ): Promise<T> {
   let currentPercent = config.startPercent
   let messageIndex = 0
-  const cap = Math.max(config.startPercent, config.endPercent - 1)
-  const step = config.step ?? 2
-  const intervalMs = config.intervalMs ?? 5000
+  const cap = Math.max(config.startPercent, config.endPercent)
+  const step = config.step ?? 1
+  const intervalMs = config.intervalMs ?? 3000
 
   const tick = setInterval(() => {
     if (currentPercent >= cap) return

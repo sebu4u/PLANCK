@@ -6,6 +6,7 @@ import { Check, Loader2, X } from "lucide-react"
 import { usePersonalizedCourseGeneration } from "@/components/invata/personalized-course-generation-context"
 import { LoadingVideo } from "@/components/loading-video-overlay"
 import { buildGenerationMessageCycle } from "@/lib/personalized-courses/generation-stage-messages"
+import { creepCapForStage, useCreepPercent } from "@/hooks/use-creep-percent"
 import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import { cn } from "@/lib/utils"
 
@@ -191,7 +192,10 @@ function PersonalizedCourseGenerationFloatingUI() {
   const currentMessage = INTRO_MESSAGES[messageIndex]?.(topicLabel) ?? ""
   const tooltipMessages = messageCycle.length > 0 ? messageCycle : ["Generare în curs…"]
   const currentTooltipMessage = tooltipMessages[tooltipLineIndex % tooltipMessages.length] ?? "Generare în curs…"
-  const progressPercent = progress?.percent ?? 0
+  const progressPercent = useCreepPercent(
+    progress?.stage,
+    activeGeneration?.startedAt ?? Date.now(),
+  )
 
   const advanceTooltipLine = useCallback(() => {
     setTooltipLineIndex((index) => (index + 1) % Math.max(1, tooltipMessages.length))
