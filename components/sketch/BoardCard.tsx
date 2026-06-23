@@ -113,13 +113,7 @@ export function BoardCard({ board, onUpdate }: BoardCardProps) {
   };
 
   const handleCardClick = () => {
-    // If board has a room_id (PartyKit board), navigate to the PartyKit page
-    // Otherwise, fall back to the legacy board page
-    if (board.room_id) {
-      router.push(`/sketch/${board.room_id}`);
-    } else {
-      router.push(`/sketch/board/${board.id}`);
-    }
+    router.push(`/sketch/board/${board.id}`);
   };
 
   return (

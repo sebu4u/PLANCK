@@ -86,7 +86,7 @@ function GoogleSignInButtonInner({
         setGoogleButtonReady(true)
         window.clearInterval(timer)
       }
-    }, 100)
+    }, 250)
 
     const timeout = window.setTimeout(() => {
       window.clearInterval(timer)

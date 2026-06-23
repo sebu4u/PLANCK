@@ -71,6 +71,7 @@ export default async function ClassroomStreamPage({
           .from("problems")
           .select("*")
           .order("created_at", { ascending: false })
+          .limit(200)
           .then(({ data }) => ((data || []) as Problem[]))
       : Promise.resolve([] as Problem[]),
     classroom.role === "teacher" ? getMonthlyFreeProblemSet(serverSupabase) : Promise.resolve(new Set<string>()),

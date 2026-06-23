@@ -338,7 +338,7 @@ export function FunctionPlot({
           } catch (err) {
             console.warn('[FunctionPlot] Error in domain check interval:', err);
           }
-        }, 200);
+        }, 500);
 
         return () => {
           clearInterval(interval);

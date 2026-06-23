@@ -61,6 +61,6 @@ export const config = {
          * - ISR catalog/marketing pages (client fetches auth state when needed)
          * - _next/static, _next/image, favicon, static images
          */
-        '/((?!api/stripe/webhook|api/search(?:/|$)|api/physics(?:/|$)|probleme(?:/|$)|informatica/probleme(?:/|$)|matematica/probleme(?:/|$)|invata(?:/|$)|cursuri(?:/|$)|exerseaza(?:/|$)|simulari-bac(?:/|$)|grile(?:/|$)|biologie/grile(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+         '/((?!api/stripe/webhook|api/stripe/checkout|api/stripe/sync|api/stripe/portal|api/search(?:/|$)|api/physics(?:/|$)|api/admin(?:/|$)|api/insight(?:/|$)|api/dev(?:/|$)|api/coding-problems(?:/|$)|api/run(?:/|$)|api/run-interactive(?:/|$)|api/mailerlite/webhook(?:/|$)|probleme(?:/|$)|informatica/probleme(?:/|$)|matematica/probleme(?:/|$)|invata(?:/|$)|cursuri(?:/|$)|exerseaza(?:/|$)|simulari-bac(?:/|$)|grile(?:/|$)|biologie/grile(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }

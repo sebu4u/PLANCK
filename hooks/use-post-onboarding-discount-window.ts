@@ -26,7 +26,9 @@ export function usePostOnboardingDiscountWindow(userId: string | undefined) {
   useLayoutEffect(() => {
     setNow(Date.now())
     if (!userId) return
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    const id = window.setInterval(() => {
+      if (!document.hidden) setNow(Date.now())
+    }, 1000)
     return () => window.clearInterval(id)
   }, [userId])
 

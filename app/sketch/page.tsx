@@ -72,9 +72,7 @@ export default function SketchPage() {
 
     setIsOpening(true)
     try {
-      // Generate a random room ID for the guest session
-      const roomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-      router.push(`/sketch/${roomId}`)
+      router.push('/sketch/boards')
     } catch (err: any) {
       console.error('Failed to open sketch for guest:', err)
       toast({
@@ -118,14 +116,12 @@ export default function SketchPage() {
         }
 
         const data = await response.json()
-        const boardRoomId = data.board.room_id || roomId
 
-        // Redirect to the new board
-        router.push(`/sketch/${boardRoomId}`)
+        // Redirect to the board editor
+        router.push(`/sketch/board/${data.board.id}`)
       } else {
-        // Guest user - generate random room ID and redirect
-        const roomId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
-        router.push(`/sketch/${roomId}`)
+        // Guest user - redirect to boards list
+        router.push('/sketch/boards')
       }
     } catch (err: any) {
       console.error('Failed to create board:', err)

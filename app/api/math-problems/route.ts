@@ -168,5 +168,7 @@ export async function GET(request: NextRequest) {
       hasPreviousPage: page > 1,
     },
     facets,
+  }, {
+    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
   })
 }

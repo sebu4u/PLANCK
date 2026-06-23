@@ -1,3 +1,6 @@
+export const runtime = "nodejs"
+export const maxDuration = 60
+
 import { createClient } from "@/lib/supabase/server"
 import { streamInvataAskAdvisor } from "@/lib/invata/ask-advisor"
 import type { InvataAskMessage } from "@/lib/invata/ask-types"

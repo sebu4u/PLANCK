@@ -1,3 +1,6 @@
+export const runtime = "nodejs"
+export const maxDuration = 60
+
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabaseAdmin"

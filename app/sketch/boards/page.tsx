@@ -136,10 +136,9 @@ export default function BoardsPage() {
       }
 
       const data = await response.json();
-      const boardRoomId = data.board.room_id || roomId;
 
-      // Redirect to the PartyKit board
-      router.push(`/sketch/${boardRoomId}`);
+      // Redirect to the board editor
+      router.push(`/sketch/board/${data.board.id}`);
     } catch (error: any) {
       console.error('Failed to create board:', error);
       toast.error(error.message || 'Failed to create board');

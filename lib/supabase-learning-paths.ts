@@ -379,6 +379,30 @@ export async function getLearningPathLessonsByChapterId(
   return data || []
 }
 
+export async function getLearningPathLessonsByChapterIds(
+  chapterIds: string[],
+  client: SupabaseClient = supabase
+): Promise<Record<string, LearningPathLesson[]>> {
+  if (!chapterIds.length) return {}
+  const { data, error } = await client
+    .from("learning_path_lessons")
+    .select("*")
+    .in("chapter_id", chapterIds)
+    .eq("is_active", true)
+    .order("order_index")
+
+  if (error) {
+    console.error("Error fetching lessons for chapters:", error)
+    return {}
+  }
+
+  const map: Record<string, LearningPathLesson[]> = {}
+  for (const row of data ?? []) {
+    (map[row.chapter_id] ??= []).push(row)
+  }
+  return map
+}
+
 export async function getLearningPathLessonBySlug(
   chapterSlug: string,
   lessonSlug: string,

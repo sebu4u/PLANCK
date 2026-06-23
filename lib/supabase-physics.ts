@@ -114,6 +114,27 @@ export async function getChaptersByGradeId(gradeId: string): Promise<Chapter[]> 
   return data || []
 }
 
+export async function getChaptersByGradeIds(gradeIds: string[]): Promise<Record<string, Chapter[]>> {
+  if (!gradeIds.length) return {}
+  const { data, error } = await supabase
+    .from('chapters')
+    .select('*')
+    .in('grade_id', gradeIds)
+    .eq('is_active', true)
+    .order('order_index')
+
+  if (error) {
+    console.error('Error fetching chapters batch:', error)
+    return {}
+  }
+
+  const map: Record<string, Chapter[]> = {}
+  for (const row of data ?? []) {
+    (map[row.grade_id] ??= []).push(row)
+  }
+  return map
+}
+
 export async function getChapterById(id: string): Promise<Chapter | null> {
   const { data, error } = await supabase
     .from('chapters')
@@ -161,6 +182,27 @@ export async function getLessonSummariesByChapterId(chapterId: string): Promise<
   }
 
   return (data || []) as LessonSummary[]
+}
+
+export async function getLessonSummariesByChapterIds(chapterIds: string[]): Promise<Record<string, LessonSummary[]>> {
+  if (!chapterIds.length) return {}
+  const { data, error } = await supabase
+    .from('lessons')
+    .select('id, chapter_id, title, order_index, difficulty_level, estimated_duration, is_active')
+    .in('chapter_id', chapterIds)
+    .eq('is_active', true)
+    .order('order_index')
+
+  if (error) {
+    console.error('Error fetching lesson summaries batch:', error)
+    return {}
+  }
+
+  const map: Record<string, LessonSummary[]> = {}
+  for (const row of (data ?? []) as LessonSummary[]) {
+    (map[row.chapter_id] ??= []).push(row)
+  }
+  return map
 }
 
 export async function getLessonById(id: string): Promise<Lesson | null> {

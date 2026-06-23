@@ -12,10 +12,14 @@ export async function GET(
     
     if (includeChapters) {
       const { grade, chapters } = await getGradeWithChapters(id)
-      return NextResponse.json({ grade, chapters })
+      return NextResponse.json({ grade, chapters }, {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      })
     } else {
       const grade = await getGradeById(id)
-      return NextResponse.json(grade)
+      return NextResponse.json(grade, {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      })
     }
   } catch (error) {
     console.error('Error in grade API:', error)
