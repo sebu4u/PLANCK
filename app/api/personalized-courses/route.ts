@@ -20,10 +20,8 @@ import { GENERATION_STAGE_FALLBACK_MESSAGES } from "@/lib/personalized-courses/g
 import { generateCourseCovers } from "@/lib/personalized-courses/image-gen"
 import { slugify } from "@/lib/slug"
 import type { LearningPathLessonItem } from "@/lib/supabase-learning-paths"
+import { checkPersonalizedCourseGenerationAccess } from "@/lib/personalized-courses/generation-access"
 import { MAX_PROMPT_LENGTH, normalizePrompt, validatePrompt } from "@/lib/personalized-courses/validate-prompt"
-
-const MAX_COURSES_PER_DAY = 3
-const MAX_COURSES_TOTAL = 20
 
 function makeUniqueSlug(prefix: string, title: string, userId: string, suffix = ""): string {
   const base = slugify(title).slice(0, 52) || "curs-personalizat"
@@ -163,37 +161,6 @@ async function markChapterFailed(admin: SupabaseAnyClient, chapterId: string, re
     .eq("id", chapterId)
 }
 
-async function checkRateLimit(admin: SupabaseAnyClient, userId: string, isDev: boolean): Promise<string | null> {
-  // Dev users can generate unlimited courses.
-  if (isDev) return null
-
-  const { count: totalCourses } = await admin
-    .from("learning_path_chapters")
-    .select("id", { count: "exact", head: true })
-    .eq("generated_by_user_id", userId)
-    .eq("is_personalized", true)
-    .neq("generation_status", "failed")
-
-  if ((totalCourses ?? 0) >= MAX_COURSES_TOTAL) {
-    return `Ai atins limita de ${MAX_COURSES_TOTAL} cursuri personalizate. Șterge unul vechi pentru a genera unul nou.`
-  }
-
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const { count: todayCount } = await admin
-    .from("learning_path_chapters")
-    .select("id", { count: "exact", head: true })
-    .eq("generated_by_user_id", userId)
-    .eq("is_personalized", true)
-    .neq("generation_status", "failed")
-    .gte("created_at", oneDayAgo)
-
-  if ((todayCount ?? 0) >= MAX_COURSES_PER_DAY) {
-    return `Poți genera maximum ${MAX_COURSES_PER_DAY} cursuri pe zi. Revino mâine.`
-  }
-
-  return null
-}
-
 export async function GET() {
   return NextResponse.json({ courses: [] })
 }
@@ -270,13 +237,7 @@ export async function POST(request: Request) {
 
   const access = await getLearningPathAccess(null)
   const isDev = await isDevFromDB(supabase, user.id)
-  // Dev users bypass the subscription requirement and rate limits.
-  if (access.mode !== "full" && !isDev) {
-    return NextResponse.json(
-      { error: "Generarea de cursuri personalizate este disponibilă pentru membrii Plus/Premium." },
-      { status: 403 },
-    )
-  }
+  const hasFullAccess = access.mode === "full" || isDev
 
   let body: unknown
   try {
@@ -292,8 +253,14 @@ export async function POST(request: Request) {
   if (promptError) return NextResponse.json({ error: promptError }, { status: 400 })
 
   const admin = createAdminClient()
-  const rateLimitError = await checkRateLimit(admin, user.id, isDev)
-  if (rateLimitError) return NextResponse.json({ error: rateLimitError }, { status: 429 })
+  const accessError = await checkPersonalizedCourseGenerationAccess(admin, user.id, {
+    isDev,
+    hasFullAccess,
+  })
+  if (accessError) {
+    const status = hasFullAccess ? 429 : 403
+    return NextResponse.json({ error: accessError }, { status })
+  }
 
   // Phase 1: insert the chapter row IMMEDIATELY with status "creating" and return 202.
   // This guarantees the course exists in the DB even if the client disconnects

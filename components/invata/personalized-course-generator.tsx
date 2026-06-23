@@ -15,6 +15,8 @@ import { INVATA_ASK_CARD_Z } from "@/components/invata/invata-hub-top-glow"
 
 interface PersonalizedCourseGeneratorProps {
   isAuthenticated: boolean
+  canGeneratePersonalizedPath?: boolean
+  personalizedPathBlockedReason?: string | null
   loginHref?: string
   className?: string
 }
@@ -98,6 +100,8 @@ function SearchPill({
 
 export function PersonalizedCourseGenerator({
   isAuthenticated,
+  canGeneratePersonalizedPath = true,
+  personalizedPathBlockedReason = null,
   loginHref = "/login?next=/invata",
   className,
 }: PersonalizedCourseGeneratorProps) {
@@ -221,9 +225,9 @@ export function PersonalizedCourseGenerator({
   )
 
   const handleAskSubmit = useCallback(
-    async (event?: React.FormEvent) => {
+    async (event?: React.FormEvent, overridePrompt?: string) => {
       event?.preventDefault()
-      const trimmed = prompt.trim()
+      const trimmed = (overridePrompt ?? prompt).trim()
       const validationError = validateBeforeSubmit(trimmed)
 
       if (validationError) {
@@ -368,6 +372,14 @@ export function PersonalizedCourseGenerator({
       return
     }
 
+    if (!canGeneratePersonalizedPath) {
+      setGenerateError(
+        personalizedPathBlockedReason ??
+          "Planul gratuit include un singur traseu personalizat. Treci la Plus pentru a genera mai multe.",
+      )
+      return
+    }
+
     setPhase("generating")
     setGenerateError(null)
 
@@ -397,7 +409,7 @@ export function PersonalizedCourseGenerator({
         setGenerateError(
           data?.error?.trim() ||
             (response.status === 403
-              ? "Generarea de cursuri personalizate este disponibilă pentru membrii Plus/Premium."
+              ? "Planul gratuit include un singur traseu personalizat. Treci la Plus pentru a genera mai multe."
               : "Nu am putut genera traseul personalizat acum. Încearcă din nou."),
         )
         return
@@ -425,7 +437,17 @@ export function PersonalizedCourseGenerator({
       setPhase("conversation")
       setGenerateError("Conexiunea a eșuat. Verifică internetul și încearcă din nou.")
     }
-  }, [topicPrompt, prompt, validateBeforeSubmit, topicLabel, startActiveGeneration, closeCard, router])
+  }, [
+    topicPrompt,
+    prompt,
+    validateBeforeSubmit,
+    canGeneratePersonalizedPath,
+    personalizedPathBlockedReason,
+    topicLabel,
+    startActiveGeneration,
+    closeCard,
+    router,
+  ])
 
   const isLoading = status === "loading" || phase === "thinking" || phase === "streaming"
   const isInputDisabled = isLoading || phase === "generating"
@@ -478,6 +500,8 @@ export function PersonalizedCourseGenerator({
             streamingMessage={streamingMessage}
             isStreaming={phase === "streaming"}
             showRecommendations={phase === "conversation" || phase === "generating"}
+            canGeneratePersonalizedPath={canGeneratePersonalizedPath}
+            personalizedPathBlockedReason={personalizedPathBlockedReason}
             isGeneratingPath={phase === "generating"}
             generateError={generateError}
             onGeneratePath={() => {
@@ -524,8 +548,8 @@ export function PersonalizedCourseGenerator({
                 <button
                   type="button"
                   onClick={() => {
-                    handlePromptChange(recentPrompt)
-                    inputRef.current?.focus()
+                    setPrompt(recentPrompt)
+                    void handleAskSubmit(undefined, recentPrompt)
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-sm text-[#707070] transition-colors hover:bg-[#f7f7f7] hover:text-[#111111]"
                 >

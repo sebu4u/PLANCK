@@ -27,8 +27,16 @@ import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
-import { isFreePreviewLearningPathChapterSlug } from "@/lib/learning-path-free-plan"
+import {
+  isFreePreviewLearningPathChapterSlug,
+  splitLearningPathChaptersForFreePlanHub,
+} from "@/lib/learning-path-free-plan"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
+import { createAdminClient } from "@/lib/supabaseAdmin"
+import {
+  canGeneratePersonalizedPathForFreePlan,
+  countUserPersonalizedCourses,
+} from "@/lib/personalized-courses/generation-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
 
@@ -112,8 +120,26 @@ export default async function InvataPage() {
         .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
         .map((chapter) => chapter.id)
 
-  const visibleChapters = chapters
-  const archivedChapters: LearningPathChapter[] = []
+  const { visibleChapters, archivedChapters } = hasFullAccess
+    ? { visibleChapters: chapters, archivedChapters: [] as LearningPathChapter[] }
+    : splitLearningPathChaptersForFreePlanHub(chapters)
+
+  let canGeneratePersonalizedPath = false
+  let personalizedPathBlockedReason: string | null = null
+
+  if (user) {
+    if (hasFullAccess) {
+      canGeneratePersonalizedPath = true
+    } else {
+      const admin = createAdminClient()
+      const personalizedCourseCount = await countUserPersonalizedCourses(admin, user.id)
+      canGeneratePersonalizedPath = canGeneratePersonalizedPathForFreePlan(personalizedCourseCount)
+      if (!canGeneratePersonalizedPath) {
+        personalizedPathBlockedReason =
+          "Planul gratuit include un singur traseu personalizat. Treci la Plus pentru a genera mai multe."
+      }
+    }
+  }
 
   return (
     <InvataHubNavProvider chapters={visibleChapters}>
@@ -138,6 +164,8 @@ export default async function InvataPage() {
               <div className="flex w-full max-w-[420px] flex-col items-start gap-3 sm:items-end">
                 <PersonalizedCourseGenerator
                   isAuthenticated={Boolean(user)}
+                  canGeneratePersonalizedPath={canGeneratePersonalizedPath}
+                  personalizedPathBlockedReason={personalizedPathBlockedReason}
                   className="hidden w-full sm:block"
                 />
                 <InvataAdminLearningPathsLink />
@@ -146,6 +174,8 @@ export default async function InvataPage() {
 
             <PersonalizedCourseGenerator
               isAuthenticated={Boolean(user)}
+              canGeneratePersonalizedPath={canGeneratePersonalizedPath}
+              personalizedPathBlockedReason={personalizedPathBlockedReason}
               className="mb-6 sm:hidden"
             />
 

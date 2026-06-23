@@ -593,67 +593,121 @@ function InvataChapterSection({
   )
 }
 
+function getArchivedChapterProgress(
+  chapterLessons: LearningPathLesson[],
+  completedLessonIds: string[],
+): number {
+  if (!chapterLessons.length) return 0
+  const completed = new Set(completedLessonIds)
+  const doneCount = chapterLessons.filter((lesson) => completed.has(lesson.id)).length
+  return doneCount / chapterLessons.length
+}
+
 function InvataArchivedLearningPathsSection({
   chapters,
+  lessonsByChapter,
+  completedLessonIds,
 }: {
   chapters: LearningPathChapter[]
+  lessonsByChapter: Record<string, LearningPathLesson[]>
+  completedLessonIds: string[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsMounted(true)
+      const frame = requestAnimationFrame(() => setIsVisible(true))
+      return () => cancelAnimationFrame(frame)
+    }
+
+    setIsVisible(false)
+    const timeout = window.setTimeout(() => setIsMounted(false), 300)
+    return () => window.clearTimeout(timeout)
+  }, [isOpen])
 
   if (!chapters.length) return null
 
   return (
-    <section
-      className="border-t border-[#ececec] pt-8 sm:pt-10"
-      aria-label="Arhivă trasee de învățare"
-    >
+    <section className="pt-8 sm:pt-10" aria-label="Arhivă trasee de învățare">
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
-        className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#e6e6e6] bg-[#f7f7f7] px-4 py-3.5 text-left transition-colors hover:bg-[#f0f0f0] sm:px-5"
+        className="flex w-full items-center gap-3 text-left"
       >
-        <div>
-          <p className="text-sm font-semibold text-[#6b6b6b]">Arhivă trasee</p>
-          <p className="mt-0.5 text-xs text-[#9a9a9a]">
-            {chapters.length} trase{chapters.length === 1 ? "" : "e"} disponibile cu planul Plus
-          </p>
-        </div>
+        <span className="shrink-0 text-base font-semibold text-[#6d6d6d] sm:text-lg">Arhivă</span>
         <ChevronDown
-          className={`h-5 w-5 shrink-0 text-[#8a8a8a] transition-transform duration-200 ${
+          className={`h-4 w-4 shrink-0 text-[#8a8a8a] transition-transform duration-200 sm:h-5 sm:w-5 ${
             isOpen ? "rotate-180" : ""
           }`}
           aria-hidden="true"
         />
+        <div className="h-px flex-1 bg-[#e4e4e4]" aria-hidden="true" />
       </button>
 
-      {isOpen ? (
-        <div className="mt-4 overflow-x-auto scrollbar-hide -mx-5 px-5 sm:mx-0 sm:px-0">
-          <div className="flex min-w-max items-start gap-5 pb-2 sm:gap-6">
-            {chapters.map((chapter) => (
-              <div
-                key={chapter.id}
-                className="flex w-[108px] shrink-0 flex-col items-center opacity-55 sm:w-[120px]"
-                aria-hidden="true"
-              >
-                {chapter.icon_url ? (
-                  <img
-                    src={chapter.icon_url}
-                    alt=""
-                    className="h-[72px] w-[72px] object-contain grayscale sm:h-20 sm:w-20"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                ) : (
-                  <div className="flex h-[72px] w-[72px] items-center justify-center rounded-xl bg-[#ececec] text-[#a8a8a8] grayscale sm:h-20 sm:w-20">
-                    <BookOpen className="h-9 w-9 sm:h-10 sm:w-10" aria-hidden="true" />
+      {isMounted ? (
+        <div
+          className={`mt-5 rounded-2xl bg-[#f3f3f3] p-5 transition-all duration-300 ease-out sm:mt-6 sm:p-6 ${
+            isVisible ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
+          }`}
+        >
+          <div className="-mx-1 overflow-x-auto px-1 scrollbar-hide">
+            <div className="flex min-w-max items-start gap-6 pb-1 sm:gap-8">
+              {chapters.map((chapter, chapterIndex) => {
+                const chapterLessons = lessonsByChapter[chapter.id] ?? []
+                const progress = getArchivedChapterProgress(chapterLessons, completedLessonIds)
+
+                return (
+                  <div
+                    key={chapter.id}
+                    className="relative flex w-[120px] shrink-0 flex-col items-center sm:w-[132px]"
+                  >
+                    <div className="relative">
+                      {chapterIndex < chapters.length - 1 ? (
+                        <div
+                          className="pointer-events-none absolute left-[108px] top-[60px] z-0 h-[2px] w-[40px] bg-[#dddddd] sm:left-[118px] sm:top-[66px] sm:w-[44px]"
+                          aria-hidden="true"
+                        />
+                      ) : null}
+
+                      <div className="relative z-10 flex h-[120px] w-[120px] flex-col overflow-hidden rounded-2xl bg-white sm:h-[132px] sm:w-[132px]">
+                        <div className="flex flex-1 items-center justify-center p-4 sm:p-5">
+                          {chapter.icon_url ? (
+                            <img
+                              src={chapter.icon_url}
+                              alt=""
+                              className="h-full w-full object-contain grayscale"
+                              loading="lazy"
+                              draggable={false}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-xl bg-[#f5f5f5] text-[#b0b0b0]">
+                              <BookOpen className="h-10 w-10 sm:h-11 sm:w-11" aria-hidden="true" />
+                            </div>
+                          )}
+                        </div>
+
+                        {progress > 0 ? (
+                          <div className="h-[3px] w-full bg-[#e8e8e8]" aria-hidden="true">
+                            <div
+                              className="h-full bg-[#22c55e] transition-[width] duration-300"
+                              style={{ width: `${Math.round(progress * 100)}%` }}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <p className="mt-3 line-clamp-3 text-center text-sm font-medium leading-snug text-[#1f1f1f]">
+                      {chapter.title}
+                    </p>
                   </div>
-                )}
-                <p className="mt-2.5 line-clamp-3 text-center text-xs font-medium leading-snug text-[#9a9a9a] sm:text-sm">
-                  {chapter.title}
-                </p>
-              </div>
-            ))}
+                )
+              })}
+            </div>
           </div>
         </div>
       ) : null}
@@ -751,7 +805,11 @@ export function LearningPathsList({
         ))}
       </div>
 
-      <InvataArchivedLearningPathsSection chapters={visibleArchivedChapters} />
+      <InvataArchivedLearningPathsSection
+        chapters={visibleArchivedChapters}
+        lessonsByChapter={lessonsByChapter}
+        completedLessonIds={completedLessonIds}
+      />
     </div>
   )
 }
