@@ -3,6 +3,7 @@ export const GENERATION_STAGE_LABELS: Record<string, string> = {
   planning: "AI planifică lecțiile și exercițiile",
   saving: "Salvez lecțiile în baza de date",
   saving_lessons: "Salvez lecțiile în baza de date",
+  generating_images: "Generez imaginile de copertă",
   finalizing: "Verific și activez cursul",
   ready: "Curs gata!",
 }
@@ -28,6 +29,11 @@ export const GENERATION_STAGE_FALLBACK_MESSAGES: Record<string, string[]> = {
     "Salvez lecțiile și itemii în baza de date…",
     "Generez conținutul fiecărui item…",
     "Aplic verificările de calitate…",
+  ],
+  generating_images: [
+    "Compun prompturile pentru fiecare lecție…",
+    "Generez coperta cursului și ilustrațiile lecțiilor…",
+    "Încărc imaginile în stocarea Planck…",
   ],
   finalizing: [
     "Verific că toate itemii sunt validați…",

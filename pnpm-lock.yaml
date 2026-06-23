@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@fal-ai/client':
+        specifier: ^1.10.1
+        version: 1.10.1
       '@gsap/react':
         specifier: ^2.1.2
         version: 2.1.2(gsap@3.13.0)(react@19.2.1)
@@ -314,6 +317,10 @@ packages:
   '@emnapi/runtime@1.7.1':
     resolution: {integrity: sha512-PVtJr5CmLwYAU9PZDMITZoR5iAOShYREoR45EyyLrbntV50mdePTgUn4AmOw90Ifcj+x2kRjdzr1HP3RrNiHGA==}
 
+  '@fal-ai/client@1.10.1':
+    resolution: {integrity: sha512-c3AVeH31OioiI2J1BfW8Cryi1DhUYldnY3X35nv6xLMq3fU2NQOo+eYaR5mL2O8MoHHh+HzXdQuIyanIyeq+ug==}
+    engines: {node: '>=18.0.0'}
+
   '@floating-ui/core@1.7.3':
     resolution: {integrity: sha512-sGnvb5dmrJaKEZ+LDIpguvdX3bDlEllmv4/ClQ9awcmCZrlx5jQyyMWFM5kBI+EyNOCDDiKk8il0zeuX3Zlg/w==}
 
@@ -515,6 +522,10 @@ packages:
       monaco-editor: '>= 0.25.0 < 1'
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@msgpack/msgpack@3.1.3':
+    resolution: {integrity: sha512-47XIizs9XZXvuJgoaJUIE2lFoID8ugvc0jzSHP+Ptfk8nTbnR8g788wv48N03Kx0UkAv559HWRQ3yzOgzlRNUA==}
+    engines: {node: '>= 18'}
 
   '@next/env@16.0.7':
     resolution: {integrity: sha512-gpaNgUh5nftFKRkRQGnVi5dpcYSKGcZZkQffZ172OrG/XkrnS7UBTQ648YY+8ME92cC4IojpI2LqTC8sTDhAaw==}
@@ -2641,6 +2652,10 @@ packages:
     resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
     engines: {node: '>=0.8.x'}
 
+  eventsource-parser@1.1.2:
+    resolution: {integrity: sha512-v0eOBUbiaFojBu2s2NPBfYUoRR9GjcDNvCXVaqEf5vVfpIAh9f8RCo4vXTP8c63QRKCFwoLpMpTdPwwhEKVgzA==}
+    engines: {node: '>=14.18'}
+
   expr-eval@2.0.2:
     resolution: {integrity: sha512-4EMSHGOPSwAfBiibw3ndnP0AvjDWLsMvGOvWEZ2F96IGk0bIVdjQisOHxReSkE13mHcfbuCiXw+G4y0zv6N8Eg==}
 
@@ -3530,6 +3545,9 @@ packages:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
 
+  robot3@0.4.1:
+    resolution: {integrity: sha512-hzjy826lrxzx8eRgv80idkf8ua1JAepRc9Efdtj03N3KNJuznQCPlyCJ7gnUmDFwZCLQjxy567mQVKmdv2BsXQ==}
+
   rope-sequence@1.3.4:
     resolution: {integrity: sha512-UT5EDe2cu2E/6O4igUr5PSFs23nvvukicWHx6GnOPlHAiiYbzNuCRQCuiUdHJQcqKalLKlrYJnjY0ySGsXNQXQ==}
 
@@ -3808,6 +3826,12 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@fal-ai/client@1.10.1':
+    dependencies:
+      '@msgpack/msgpack': 3.1.3
+      eventsource-parser: 1.1.2
+      robot3: 0.4.1
+
   '@floating-ui/core@1.7.3':
     dependencies:
       '@floating-ui/utils': 0.2.10
@@ -3955,6 +3979,8 @@ snapshots:
       monaco-editor: 0.55.1
       react: 19.2.1
       react-dom: 19.2.1(react@19.2.1)
+
+  '@msgpack/msgpack@3.1.3': {}
 
   '@next/env@16.0.7': {}
 
@@ -6178,6 +6204,8 @@ snapshots:
 
   events@3.3.0: {}
 
+  eventsource-parser@1.1.2: {}
+
   expr-eval@2.0.2: {}
 
   extend@3.0.2: {}
@@ -7435,6 +7463,8 @@ snapshots:
       supports-preserve-symlinks-flag: 1.0.0
 
   reusify@1.1.0: {}
+
+  robot3@0.4.1: {}
 
   rope-sequence@1.3.4: {}
 

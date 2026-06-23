@@ -17,6 +17,7 @@ import {
   runWithProgressHeartbeat,
 } from "@/lib/personalized-courses/generation-progress"
 import { GENERATION_STAGE_FALLBACK_MESSAGES } from "@/lib/personalized-courses/generation-stage-messages"
+import { generateCourseCovers } from "@/lib/personalized-courses/image-gen"
 import { slugify } from "@/lib/slug"
 import type { LearningPathLessonItem } from "@/lib/supabase-learning-paths"
 import { MAX_PROMPT_LENGTH, normalizePrompt, validatePrompt } from "@/lib/personalized-courses/validate-prompt"
@@ -437,6 +438,7 @@ export async function POST(request: Request) {
       }
 
       let firstLessonSlug: string | null = null
+      const insertedLessons: Array<{ id: string; title: string; orderIndex: number }> = []
 
       for (let lessonIndex = 0; lessonIndex < plan.lessons.length; lessonIndex += 1) {
         if (!(await ensureStillCreating())) return
@@ -487,11 +489,87 @@ export async function POST(request: Request) {
           await markChapterFailed(adminBg, chapterId, itemsError.message ?? "item insert failed")
           return
         }
+
+        insertedLessons.push({ id: insertedLesson.id, title: lesson.title, orderIndex: lessonIndex })
       }
 
       if (!(await ensureStillCreating())) return
 
-      await updateProgress("finalizing", 97, "Verific și activez cursul...", generationMetadata)
+      // Generate cover images for the chapter + each lesson in parallel.
+      // Every image in a single course shares the same 2-3 color palette
+      // (one palette per chapter, deterministic from chapterId) so the whole
+      // course reads as one visual family. fal.ai GPT Image 2 (low quality,
+      // 816x816): ~$0.005/image. Per-image failures are non-fatal — the
+      // lesson still saves, it just won't have an image.
+      await updateProgress(
+        "generating_images",
+        95,
+        `Generez ${insertedLessons.length + 1} imagini de copertă (paletă ${"unică"})...`,
+        generationMetadata,
+      )
+      try {
+        const { chapterIconUrl, lessonImageUrls, palette } = await runWithProgressHeartbeat(
+          (progress) => updateProgress(progress.stage, progress.percent, progress.message),
+          {
+            stage: "generating_images",
+            startPercent: 95,
+            endPercent: 99,
+            messages: GENERATION_STAGE_FALLBACK_MESSAGES.generating_images,
+            intervalMs: 8000,
+            step: 1,
+          },
+          () => generateCourseCovers(user.id, chapterId, plan.title, insertedLessons),
+        )
+
+        // Persist the chosen palette as `accent_color` so the UI can render
+        // a colored ribbon matching the cover image. The whole course (chapter
+        // + every lesson) shares this color, so it stays consistent in lists.
+        const chapterUpdate: Record<string, unknown> = { accent_color: palette.accent }
+        if (chapterIconUrl) chapterUpdate.icon_url = chapterIconUrl
+        const { error: chapterImgUpdateError } = await adminBg
+          .from("learning_path_chapters")
+          .update(chapterUpdate)
+          .eq("id", chapterId)
+        if (chapterImgUpdateError) {
+          console.error("[image-gen] chapter cover update failed:", chapterImgUpdateError)
+        }
+        if (chapterIconUrl) {
+          console.log(
+            `[image-gen] chapter icon saved (palette=${palette.name}): ${chapterIconUrl}`,
+          )
+        } else {
+          console.warn(
+            `[image-gen] chapter icon generation failed (palette=${palette.name}); course will use default icon but accent_color was saved`,
+          )
+        }
+
+        const lessonEntries = Object.entries(lessonImageUrls)
+        for (const [lessonId, imageUrl] of lessonEntries) {
+          const { error: imgUpdateError } = await adminBg
+            .from("learning_path_lessons")
+            .update({ image_url: imageUrl })
+            .eq("id", lessonId)
+          if (imgUpdateError) {
+            console.error(`[image-gen] lesson image_url update failed (${lessonId}):`, imgUpdateError)
+          }
+        }
+        if (lessonEntries.length < insertedLessons.length) {
+          console.warn(
+            `[image-gen] ${insertedLessons.length - lessonEntries.length}/${insertedLessons.length} lesson images failed; lessons saved without covers`,
+          )
+        } else {
+          console.log(
+            `[image-gen] ${lessonEntries.length} lesson images saved (palette=${palette.name})`,
+          )
+        }
+      } catch (imgErr) {
+        // Non-fatal — the course is still ready, just without cover art.
+        console.error("[image-gen] cover generation failed:", imgErr)
+      }
+
+      if (!(await ensureStillCreating())) return
+
+      await updateProgress("finalizing", 99, "Activez cursul...", generationMetadata)
       const { error: readyError } = await adminBg
         .from("learning_path_chapters")
         .update({
