@@ -24,6 +24,7 @@ import {
   type TestProblemOption,
 } from "@/lib/learning-path-test"
 import { InteractiveItemContentEditor } from "@/components/admin/interactive-item-content-editor"
+import { ImageUploadField } from "@/components/admin/image-upload-field"
 import {
   getDefaultInteractiveItemContent,
   isInteractiveLessonItemType,
@@ -2914,7 +2915,7 @@ export function LearningPathsManager({
             <Input
               value={chapterForm.icon_url}
               onChange={(e) => setChapterForm((f) => ({ ...f, icon_url: e.target.value }))}
-              placeholder="Icon URL (opțional)"
+              placeholder="Icon URL (opțional — poți încărca o imagine din computer după ce creezi capitolul)"
               className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
             />
             <Input
@@ -3092,7 +3093,7 @@ export function LearningPathsManager({
                               </select>
                             </label>
                             <label className="block text-[11px] text-gray-400">
-                              Imagine lecție (URL, opțional)
+                              Imagine lecție (URL, opțional — poți încărca o imagine din computer după ce creezi lecția)
                               <Input
                                 value={newLessonImageUrl}
                                 onChange={(e) => setNewLessonImageUrl(e.target.value)}
@@ -3290,17 +3291,20 @@ export function LearningPathsManager({
 
                         <div className="border-t border-white/10 px-3 py-3 pl-9 space-y-2">
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                            Imagine capitol (URL)
+                            Imagine capitol
                           </p>
+                          <ImageUploadField
+                            value={chapterIconDrafts[chapter.id] ?? chapter.icon_url ?? null}
+                            onChange={(next) =>
+                              setChapterIconDrafts((prev) => ({ ...prev, [chapter.id]: next ?? "" }))
+                            }
+                            kind="chapter"
+                            id={chapter.id}
+                            mode={isDev ? "dev" : "admin"}
+                            subject={isDev ? devSubject ?? undefined : undefined}
+                            previewSize="sm"
+                          />
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Input
-                              value={chapterIconDrafts[chapter.id] ?? chapter.icon_url ?? ""}
-                              onChange={(e) =>
-                                setChapterIconDrafts((prev) => ({ ...prev, [chapter.id]: e.target.value }))
-                              }
-                              placeholder="https://..."
-                              className="h-9 flex-1 border-white/20 bg-black/40 text-sm text-gray-100"
-                            />
                             <Button
                               type="button"
                               size="sm"
@@ -3315,19 +3319,6 @@ export function LearningPathsManager({
                               Salvează
                             </Button>
                           </div>
-                          {(() => {
-                            const preview = (chapterIconDrafts[chapter.id] ?? chapter.icon_url ?? "").trim()
-                            if (!preview.startsWith("http")) return null
-                            return (
-                              <img
-                                src={preview}
-                                alt=""
-                                className="h-14 w-14 rounded-md border border-white/15 object-cover"
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                              />
-                            )
-                          })()}
                         </div>
 
                         {!isDev && devUsers.length > 0 ? (
@@ -3448,14 +3439,17 @@ export function LearningPathsManager({
               </div>
 
               <div className="rounded-md border border-white/10 bg-black/20 p-4 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Imagine lecție (URL)</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Imagine lecție</p>
+                <ImageUploadField
+                  value={lessonImageUrlInput.trim() ? lessonImageUrlInput.trim() : null}
+                  onChange={(next) => setLessonImageUrlInput(next ?? "")}
+                  kind="lesson"
+                  id={selectedLesson.id}
+                  mode={isDev ? "dev" : "admin"}
+                  subject={isDev ? devSubject ?? undefined : undefined}
+                  previewSize="md"
+                />
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Input
-                    value={lessonImageUrlInput}
-                    onChange={(e) => setLessonImageUrlInput(e.target.value)}
-                    placeholder="https://..."
-                    className="h-9 flex-1 border-white/20 bg-black/40 text-sm text-gray-100"
-                  />
                   <Button
                     type="button"
                     size="sm"
@@ -3469,15 +3463,6 @@ export function LearningPathsManager({
                     Salvează imagine
                   </Button>
                 </div>
-                {lessonImageUrlInput.trim().startsWith("http") ? (
-                  <img
-                    src={lessonImageUrlInput.trim()}
-                    alt=""
-                    className="h-20 max-w-[200px] rounded-md border border-white/15 object-cover"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : null}
               </div>
 
               <div className="rounded-md border border-white/10 bg-black/20 p-4">
