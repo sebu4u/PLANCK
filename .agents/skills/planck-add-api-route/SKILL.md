@@ -53,6 +53,23 @@ Never expose the service role key to the client. See the `planck-supabase` skill
 - Use `logger` from `@/lib/logger` for server-side logging, not raw `console.log`.
 - Keep user-facing error messages in Romanian where they surface to the UI.
 
+## Runtime, `maxDuration`, and caching
+
+Add the right route-segment config up front. See `AGENTS.md` → "Performance & CPU patterns" for the full rationale.
+
+- **Long-running routes** (OpenAI streaming, Judge0 batching, `after()`-detached generation, code execution) must declare `runtime` and `maxDuration`, or Vercel will kill them on the default timeout:
+  ```ts
+  export const runtime = "nodejs"
+  export const maxDuration = 60 // 300 for the personalized-courses planner
+  ```
+- **Public, user-independent GET responses** should set `Cache-Control` so Vercel's CDN can serve repeat requests:
+  ```ts
+  return NextResponse.json(data, {
+    headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+  })
+  ```
+  Examples: `app/api/physics/grades/route.ts`, `app/api/math-problems/route.ts`. Do **not** cache user-specific or auth-dependent responses.
+
 ## After scaffolding
 
 Run `/typecheck` (pi) or `pnpm exec tsc --noEmit` and confirm the new route is type-clean.
