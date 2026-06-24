@@ -52,6 +52,7 @@ export function InvataAskConversation({
 }) {
   const assistantMessages = messages.filter((entry) => entry.role === "assistant")
   const previousAssistantMessages = isStreaming ? assistantMessages : assistantMessages.slice(0, -1)
+  const hasRelevantResources = Boolean(primary || secondary)
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -75,17 +76,21 @@ export function InvataAskConversation({
               <p className="text-sm leading-relaxed text-[#111111]">{entry.content}</p>
               {showRecommendations ? (
                 <>
-                  {primary ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[#111111]">Iată ce recomand:</p>
-                      <InvataAskResourceCard resource={primary} />
-                    </div>
-                  ) : null}
-                  {secondary ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[#111111]">Poți începe și cu:</p>
-                      <InvataAskResourceCard resource={secondary} />
-                    </div>
+                  {hasRelevantResources ? (
+                    <>
+                      {primary ? (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-[#111111]">Iată ce recomand:</p>
+                          <InvataAskResourceCard resource={primary} />
+                        </div>
+                      ) : null}
+                      {secondary ? (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-[#111111]">Poți începe și cu:</p>
+                          <InvataAskResourceCard resource={secondary} />
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
                   <div className="rounded-xl border border-[#bfe6c8] bg-gradient-to-br from-[#e9fbef] via-[#d8f5e2] to-[#c2eecf] p-3">
                     {canGeneratePersonalizedPath ? (

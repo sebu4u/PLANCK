@@ -106,6 +106,41 @@ function scoreCandidate(promptTerms: string[], haystack: string): number {
   return score
 }
 
+/**
+ * Item titles that have appeared as low-content "template" titles in past
+ * personalized courses. We drop these from the catalog search results so the
+ * planner doesn't try to reuse them — they're almost always off-topic
+ * (e.g. "Exercitiu intelegere" with whatever the AI filled in last time).
+ * Mirrors the verifier's GENERIC_LEARNED_ITEM_TITLES set.
+ */
+const GENERIC_ITEM_TITLES_FOR_SEARCH = new Set([
+  "exercitiu intelegere",
+  "exercițiu intelegere",
+  "grila intelegere",
+  "grilă intelegere",
+  "obiectivul lectiei",
+  "obiectivul lecției",
+  "intrebare de control",
+  "întrebare de control",
+  "mini-recapitulare",
+  "pasii de lucru",
+  "pașii de lucru",
+  "verificare de intelegere",
+  "verificare de înțelegere",
+  "conexiune cu practica",
+  "gresala frecventa",
+  "greșeală frecventă",
+  "vocabular esential",
+  "vocabular esențial",
+  "ideea centrala",
+  "ideea centrală",
+  "intuitie rapida",
+  "intuiție rapidă",
+  "de ce conteaza",
+  "de ce contează",
+  "exemplu ghidat",
+])
+
 function compactSummary(...parts: unknown[]): string {
   return parts
     .map((part) => String(part ?? "").trim())
@@ -136,7 +171,13 @@ function sortAndLimit(
         `${candidate.title} ${candidate.summary} ${Object.values(candidate.metadata ?? {}).join(" ")}`,
       ),
     }))
-    .filter((row) => row.score > 0 || terms.length === 0)
+    // Require a score of 3+ to include: that's either one 6+ char term (3
+    // points) or two 3-5 char terms (2 each). A single 2-point match (one
+    // short word like "totul", "tot", "intr", "plm") is not enough — it
+    // catches every generic item, which is exactly how the off-topic
+    // pollution happens in the first place. If the prompt yielded zero
+    // terms, accept everything (we have no signal to filter on).
+    .filter((row) => row.score >= 3 || terms.length === 0)
     .sort((a, b) => b.score - a.score || a.candidate.title.localeCompare(b.candidate.title))
     .slice(0, candidateLimit(limit))
     .map((row) => row.candidate)
@@ -159,6 +200,14 @@ function addLearningPathItemCandidate(
   row: LearningPathItemSearchRow,
   context: Record<string, unknown> = {},
 ) {
+  // Drop items whose title is one of the known generic-template titles
+  // (e.g. "Exercitiu intelegere", "Pasii de lucru"). These almost always have
+  // placeholder content from a previous personalized course and are the #1
+  // source of off-topic items in newly-generated courses.
+  const normalizedTitle = normalizeText(row.title ?? "")
+  if (normalizedTitle && GENERIC_ITEM_TITLES_FOR_SEARCH.has(normalizedTitle)) {
+    return
+  }
   candidates.push({
     key: `learning_path_item:${row.id}`,
     source_type: "learning_path_item",
@@ -198,8 +247,14 @@ async function fetchLearningPathCandidates(
     const pattern = `%${escapeIlike(term)}%`
     const { data: chapters } = await supabase
       .from("learning_path_chapters")
-      .select("id, slug, title, description, problem_category, materie")
+      .select("id, slug, title, description, problem_category, materie, is_personalized")
       .eq("is_active", true)
+      // Drop personalized chapters — they were AI-generated for a previous
+      // user prompt and their items usually have generic titles + random
+      // content. Reusing them is the #1 cause of off-topic items sneaking
+      // into a new personalized course (e.g. a grammar question inside
+      // a Jujutsu Kaisen chapter).
+      .eq("is_personalized", false)
       .or(`title.ilike.${pattern},description.ilike.${pattern},problem_category.ilike.${pattern}`)
       .limit(20)
 
@@ -252,10 +307,28 @@ async function fetchLearningPathCandidates(
       .limit(25)
 
     const lessonRows = lessons ?? []
-    const lessonIds = lessonRows.map((row) => String(row.id)).filter(Boolean)
+    if (!lessonRows.length) continue
+
+    // Look up each lesson's chapter to drop items from personalized chapters.
+    const chapterIds = Array.from(
+      new Set(lessonRows.map((row) => row.chapter_id).filter((id): id is string => Boolean(id))),
+    )
+    const { data: chapterRows } = chapterIds.length
+      ? await supabase
+          .from("learning_path_chapters")
+          .select("id, is_personalized")
+          .in("id", chapterIds)
+      : { data: [] as Array<{ id: string; is_personalized: boolean | null }> }
+    const personalizedChapters = new Set<string>(
+      (chapterRows ?? []).filter((c) => c.is_personalized === true).map((c) => String(c.id)),
+    )
+    const safeLessonRows = lessonRows.filter(
+      (row) => !row.chapter_id || !personalizedChapters.has(String(row.chapter_id)),
+    )
+    const lessonIds = safeLessonRows.map((row) => String(row.id)).filter(Boolean)
     if (!lessonIds.length) continue
 
-    const lessonById = new Map(lessonRows.map((row) => [String(row.id), row]))
+    const lessonById = new Map(safeLessonRows.map((row) => [String(row.id), row]))
     const { data: items } = await supabase
       .from("learning_path_lesson_items")
       .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
@@ -274,7 +347,11 @@ async function fetchLearningPathCandidates(
     }
   }
 
-  // Search lesson items with each term
+  // Search lesson items with each term. We must filter out items whose
+  // chapter is `is_personalized = true` — otherwise a previous personalized
+  // course's items (e.g. an old "Jujutsu Kaisen" run) leak into the
+  // candidate pool of a new course on the same topic, polluting it with
+  // stale content.
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
     const { data: items } = await supabase
@@ -282,9 +359,49 @@ async function fetchLearningPathCandidates(
       .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
       .eq("is_active", true)
       .or(`title.ilike.${pattern},cursuri_lesson_slug.ilike.${pattern}`)
-      .limit(30)
-    for (const row of items ?? []) {
-      addLearningPathItemCandidate(candidates, row, { matched_by: "item" })
+      .limit(80)
+
+    const itemRows = items ?? []
+    if (!itemRows.length) continue
+
+    // Look up each item's lesson + chapter to drop items from personalized
+    // chapters. We do a single batched chapter query.
+    const lessonIds = Array.from(
+      new Set(itemRows.map((row) => row.lesson_id).filter((id): id is string => Boolean(id))),
+    )
+    const { data: lessonRows } = lessonIds.length
+      ? await supabase.from("learning_path_lessons").select("id, chapter_id").in("id", lessonIds)
+      : { data: [] as Array<{ id: string; chapter_id: string | null }> }
+    const lessonToChapter = new Map(
+      (lessonRows ?? []).map((row) => [String(row.id), row.chapter_id]),
+    )
+    const chapterIds = Array.from(
+      new Set(
+        (lessonRows ?? [])
+          .map((row) => row.chapter_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    )
+    const { data: chapterRows } = chapterIds.length
+      ? await supabase
+          .from("learning_path_chapters")
+          .select("id, is_personalized")
+          .in("id", chapterIds)
+      : { data: [] as Array<{ id: string; is_personalized: boolean | null }> }
+    const personalizedChapters = new Set<string>(
+      (chapterRows ?? []).filter((c) => c.is_personalized === true).map((c) => String(c.id)),
+    )
+    const safeItemRows = itemRows.filter((row) => {
+      const chId = row.lesson_id ? lessonToChapter.get(String(row.lesson_id)) : null
+      return !chId || !personalizedChapters.has(String(chId))
+    })
+
+    for (const row of safeItemRows) {
+      const lesson = row.lesson_id ? lessonToChapter.get(String(row.lesson_id)) : null
+      addLearningPathItemCandidate(candidates, row, {
+        matched_by: "item",
+        chapter_id: lesson ?? null,
+      })
     }
   }
 

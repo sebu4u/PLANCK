@@ -7,6 +7,11 @@ import { AlertCircle, CornerDownRight, Loader2, LogIn, Search, X } from "lucide-
 import { cn } from "@/lib/utils"
 import { pushRecentPrompt, readRecentPrompts } from "@/lib/personalized-courses/recent-prompts"
 import { MAX_PROMPT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/personalized-courses/validate-prompt"
+import {
+  getCachedAskResponse,
+  setCachedAskResponse,
+} from "@/lib/invata/ask-cache"
+import { readShownRecommendationKeys, trackShownRecommendations } from "@/lib/invata/shown-recommendations"
 import type { PlanckResourceReference } from "@/lib/insight/agent/types"
 import type { InvataAskMessage, InvataAskStreamEvent } from "@/lib/invata/ask-types"
 import { InvataAskConversation } from "@/components/invata/invata-ask-conversation"
@@ -251,12 +256,45 @@ export function PersonalizedCourseGenerator({
       abortRef.current = controller
 
       const history = messages
+      const excludeKeys = readShownRecommendationKeys()
+      const cachedDone = getCachedAskResponse<
+        Extract<InvataAskStreamEvent, { type: "done" }>
+      >(trimmed, history.length)
+
+      if (cachedDone) {
+        const assistantMessage =
+          cachedDone.message.trim() ||
+          "Iată câteva resurse care te pot ajuta."
+        const cachedMessages: InvataAskMessage[] = [
+          ...history,
+          { role: "user", content: trimmed },
+          { role: "assistant", content: assistantMessage },
+        ]
+        if (!topicPrompt) setTopicPrompt(trimmed)
+        const cachedLabel =
+          cachedDone.intent?.topic?.trim() || trimmed.slice(0, 60) || "acest subiect"
+        setTopicLabel(cachedLabel)
+        const cachedPrimary = cachedDone.primary ?? null
+        const cachedSecondary = cachedDone.secondary ?? null
+        setResources({ primary: cachedPrimary, secondary: cachedSecondary })
+        trackShownRecommendations(
+          [cachedPrimary, cachedSecondary].filter(Boolean) as PlanckResourceReference[],
+        )
+        setMessages(cachedMessages)
+        setRecentPrompts(pushRecentPrompt(trimmed))
+        setPrompt("")
+        setLockedPrompt(null)
+        setStreamingMessage(null)
+        setPhase("conversation")
+        setStatus("idle")
+        return
+      }
 
       try {
         const response = await fetch("/api/invata/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: trimmed, messages: history }),
+          body: JSON.stringify({ prompt: trimmed, messages: history, excludeKeys }),
           credentials: "same-origin",
           signal: controller.signal,
         })
@@ -320,6 +358,8 @@ export function PersonalizedCourseGenerator({
           throw new Error("Răspuns incomplet de la advisor.")
         }
 
+        setCachedAskResponse(trimmed, history.length, doneEvent)
+
         const assistantMessage = doneEvent.message.trim() || streamedText.trim() || "Iată câteva resurse care te pot ajuta."
         const updatedMessages: InvataAskMessage[] = [
           ...history,
@@ -336,10 +376,13 @@ export function PersonalizedCourseGenerator({
           trimmed.slice(0, 60) ||
           "acest subiect"
         setTopicLabel(label)
+        const nextPrimary = doneEvent.primary ?? null
+        const nextSecondary = doneEvent.secondary ?? null
         setResources({
-          primary: doneEvent.primary ?? null,
-          secondary: doneEvent.secondary ?? null,
+          primary: nextPrimary,
+          secondary: nextSecondary,
         })
+        trackShownRecommendations([nextPrimary, nextSecondary].filter(Boolean) as PlanckResourceReference[])
         setMessages(updatedMessages)
         setRecentPrompts(pushRecentPrompt(trimmed))
         setPrompt("")

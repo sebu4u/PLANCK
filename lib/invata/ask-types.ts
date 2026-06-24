@@ -8,6 +8,7 @@ export type InvataAskMessage = {
 export type InvataAskRequest = {
   prompt: string
   messages?: InvataAskMessage[]
+  excludeKeys?: string[]
 }
 
 export type InvataAskResponse = {

@@ -7,6 +7,7 @@ type SearchInput = {
   userInput: string;
   requestText?: string;
   limit?: number;
+  skipTables?: ReadonlyArray<string>;
 };
 
 type RequestedResourceKind = 'problem' | 'lesson' | 'quiz' | 'any';
@@ -165,8 +166,8 @@ function inferPreferences(input: SearchInput): SearchPreferences {
   if (/\belectricitate|circuit|ohm|kirchhoff|rezistor|curent|tensiune\b/.test(normalized)) {
     topicAliases.push('electricitate', 'circuit', 'ohm', 'kirchhoff', 'rezistor', 'curent', 'tensiune');
   }
-  if (/\btermodinamica|caldura|gaz|izobar|izocor|izoterm\b/.test(normalized)) {
-    topicAliases.push('termodinamica', 'caldura', 'gaz ideal', 'energie interna');
+  if (/\btermodinamica|caldura|calorimetrie|termometrie|gaz|izobar|izocor|izoterm|entropie|capacitate[ ]?termica\b/.test(normalized)) {
+    topicAliases.push('termodinamica', 'caldura', 'calorimetrie', 'gaz ideal', 'energie interna');
   }
   if (/\boptica|lentila|oglinda|lumina|refractie|reflexie\b/.test(normalized)) {
     topicAliases.push('optica', 'lumina', 'lentila', 'oglinda', 'refractie', 'reflexie');
@@ -336,7 +337,17 @@ function scoreCandidate(candidate: Candidate, terms: string[], subject: InsightA
     medium: false,
     advanced: false,
     topicAliases: [],
-  });
+  }).score;
+}
+
+function escapeForBoundaryRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function wordBoundaryMatch(text: string, term: string): boolean {
+  if (!term) return false
+  const pattern = new RegExp(`(^|[^a-z0-9+])${escapeForBoundaryRegex(term)}([^a-z0-9+]|$)`)
+  return pattern.test(text)
 }
 
 function scoreCandidateWithPreferences(
@@ -346,19 +357,20 @@ function scoreCandidateWithPreferences(
   preferences: SearchPreferences
 ) {
   let score = candidate.baseScore;
+  let hasMatch = false;
   const haystack = normalizeText(candidate.searchable);
   const title = normalizeText(candidate.title);
   const difficulty = normalizeText(candidate.difficulty);
 
   for (const term of terms) {
-    if (title.includes(term)) score += 8;
-    else if (haystack.includes(term)) score += 3;
+    if (wordBoundaryMatch(title, term)) { score += 8; hasMatch = true; }
+    else if (wordBoundaryMatch(haystack, term)) { score += 3; hasMatch = true; }
   }
 
   for (const alias of preferences.topicAliases) {
-    const normalizedAlias = normalizeText(alias);
-    if (title.includes(normalizedAlias)) score += 9;
-    else if (haystack.includes(normalizedAlias)) score += 5;
+    const normalizedAlias = normalizeText(alias)
+    if (wordBoundaryMatch(title, normalizedAlias)) { score += 9; hasMatch = true; }
+    else if (wordBoundaryMatch(haystack, normalizedAlias)) { score += 5; hasMatch = true; }
   }
 
   const sourceTable =
@@ -366,19 +378,19 @@ function scoreCandidateWithPreferences(
   if (
     (sourceTable === 'learning_path_lessons' || sourceTable === 'fizica_lessons') &&
     preferences.requestedKind === 'problem' &&
-    preferences.topicAliases.some((alias) => haystack.includes(normalizeText(alias)))
+    preferences.topicAliases.some((alias) => wordBoundaryMatch(haystack, normalizeText(alias)))
   ) {
     score += 30;
   }
   if (
     sourceTable === 'fizica_lessons' &&
     preferences.requestedKind === 'lesson' &&
-    preferences.topicAliases.some((alias) => haystack.includes(normalizeText(alias)))
+    preferences.topicAliases.some((alias) => wordBoundaryMatch(haystack, normalizeText(alias)))
   ) {
     score += 40;
   }
 
-  if (subject !== 'general' && normalizeText(candidate.subject).includes(normalizeText(subject))) {
+  if (subject !== 'general' && wordBoundaryMatch(normalizeText(candidate.subject ?? ''), normalizeText(subject))) {
     score += 5;
   }
 
@@ -415,7 +427,7 @@ function scoreCandidateWithPreferences(
     if (difficulty.includes('avansat') || difficulty.includes('concurs') || difficulty.includes('greu')) score += 8;
   }
 
-  return score;
+  return { score, hasMatch };
 }
 
 function uniqByTypeId(resources: PlanckResourceReference[]) {
@@ -473,8 +485,20 @@ function limitText(value: unknown, max = 160) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function scoreTiebreakJitter(candidate: Candidate): number {
+  const seed = `${candidate.type}:${candidate.id}`;
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const normalized = (hash >>> 0) / 0xffffffff;
+  return normalized * 0.5;
+}
+
 /** Max rows fetched per table before in-memory scoring (keeps Active CPU low on Vercel). */
 const CATALOG_QUERY_LIMIT = 40;
+const CATALOG_QUERY_LIMIT_FLOOR = 16;
 
 async function readTable<T = any>(
   supabase: SupabaseClient,
@@ -533,8 +557,13 @@ export async function searchPlanckContentCatalog(
   const subjectLabel = getSubjectLabel(input.intent.subject);
   if ((input.limit ?? 6) <= 0) return [];
   const limit = Math.max(1, Math.min(input.limit ?? 6, 12));
+  const perTableLimit = Math.max(CATALOG_QUERY_LIMIT_FLOOR, Math.min(limit * 4, CATALOG_QUERY_LIMIT));
+  const skipTables = new Set(input.skipTables ?? []);
 
   const catalogStartedAt = Date.now();
+
+  const readOptional = <T,>(table: string, reader: () => Promise<T[]>): Promise<T[]> =>
+    skipTables.has(table) ? Promise.resolve([] as T[]) : reader();
 
   const [
     physicsProblems,
@@ -547,37 +576,49 @@ export async function searchPlanckContentCatalog(
     learningPathLessons,
     courseLessons,
   ] = await Promise.all([
-    readFilteredTable<any>(
-      supabase,
-      'problems',
-      'id,title,description,statement,difficulty,category,tags,class,created_at',
-      (query) => query.order('created_at', { ascending: false }),
-      terms,
-      ['title', 'description', 'category']
+    readOptional<any>('problems', () =>
+      readFilteredTable<any>(
+        supabase,
+        'problems',
+        'id,title,description,statement,difficulty,category,tags,class,created_at',
+        (query) => query.order('created_at', { ascending: false }),
+        terms,
+        ['title', 'description', 'category'],
+        perTableLimit
+      )
     ),
-    readFilteredTable<any>(
-      supabase,
-      'math_problems',
-      'id,title,description,statement,tags,class,difficulty,chapter,created_at',
-      (query) => query.eq('is_active', true).order('created_at', { ascending: false }),
-      terms,
-      ['title', 'description', 'chapter']
+    readOptional<any>('math_problems', () =>
+      readFilteredTable<any>(
+        supabase,
+        'math_problems',
+        'id,title,description,statement,tags,class,difficulty,chapter,created_at',
+        (query) => query.eq('is_active', true).order('created_at', { ascending: false }),
+        terms,
+        ['title', 'description', 'chapter'],
+        perTableLimit
+      )
     ),
-    readFilteredTable<any>(
-      supabase,
-      'coding_problems',
-      'id,slug,title,statement_markdown,difficulty,class,chapter,tags,created_at',
-      (query) => query.eq('is_active', true).order('created_at', { ascending: false }),
-      terms,
-      ['title', 'chapter']
+    readOptional<any>('coding_problems', () =>
+      readFilteredTable<any>(
+        supabase,
+        'coding_problems',
+        'id,slug,title,statement_markdown,difficulty,class,chapter,tags,created_at',
+        (query) => query.eq('is_active', true).order('created_at', { ascending: false }),
+        terms,
+        ['title', 'chapter'],
+        perTableLimit
+      )
     ),
-    readFilteredTable<any>(
-      supabase,
-      'quiz_questions',
-      'id,question_id,class,statement,difficulty,materie,title,description,tags,created_at',
-      (query) => query.order('created_at', { ascending: false }),
-      terms,
-      ['title', 'description']
+    readOptional<any>('quiz_questions', () =>
+      readFilteredTable<any>(
+        supabase,
+        'quiz_questions',
+        'id,question_id,class,statement,difficulty,materie,title,description,tags,created_at',
+        (query) => query.order('created_at', { ascending: false }),
+        terms,
+        ['title', 'description'],
+        perTableLimit
+      )
     ),
     readTable<any>(
       supabase,
@@ -589,33 +630,42 @@ export async function searchPlanckContentCatalog(
     readTable<any>(
       supabase,
       'fizica_chapters',
-      'id,route_id,slug,title,order_index,is_active',
+      'id,route_id,slug,title,order_index,is_active,icon_url',
       (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
       200
     ),
-    readFilteredTable<any>(
-      supabase,
-      'fizica_lessons',
-      'id,chapter_id,title,duration_minutes,lesson_type,order_index,is_active',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
-      terms,
-      ['title']
+    readOptional<any>('fizica_lessons', () =>
+      readFilteredTable<any>(
+        supabase,
+        'fizica_lessons',
+        'id,chapter_id,title,duration_minutes,lesson_type,order_index,is_active',
+        (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+        terms,
+        ['title'],
+        perTableLimit
+      )
     ),
-    readFilteredTable<any>(
-      supabase,
-      'learning_path_lessons',
-      'id,slug,title,description,lesson_type,order_index,chapter_id,learning_path_chapters(id,slug,title,description,problem_category)',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
-      terms,
-      ['title', 'description']
+    readOptional<any>('learning_path_lessons', () =>
+      readFilteredTable<any>(
+        supabase,
+        'learning_path_lessons',
+        'id,slug,title,description,lesson_type,order_index,chapter_id,learning_path_chapters(id,slug,title,description,problem_category,icon_url)',
+        (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+        terms,
+        ['title', 'description'],
+        perTableLimit
+      )
     ),
-    readFilteredTable<any>(
-      supabase,
-      'lessons',
-      'id,title,content,difficulty_level,estimated_duration,chapter_id,chapters(id,title,description)',
-      (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
-      terms,
-      ['title']
+    readOptional<any>('lessons', () =>
+      readFilteredTable<any>(
+        supabase,
+        'lessons',
+        'id,title,content,difficulty_level,estimated_duration,chapter_id,chapters(id,title,description)',
+        (query) => query.eq('is_active', true).order('order_index', { ascending: true }),
+        terms,
+        ['title'],
+        perTableLimit
+      )
     ),
   ]);
 
@@ -702,6 +752,7 @@ export async function searchPlanckContentCatalog(
     const routeTitle = route?.title || 'Fizică';
     const routeSlug = route?.slug || 'mecanica';
     const chapterSlug = chapter?.slug || row.chapter_id;
+    const iconUrl = typeof chapter?.icon_url === 'string' ? chapter.icon_url : null;
 
     candidates.push({
       type: isPracticeItem ? 'problem' : 'lesson',
@@ -722,6 +773,7 @@ export async function searchPlanckContentCatalog(
         lesson_type: row.lesson_type,
         duration_minutes: row.duration_minutes,
         source_table: 'fizica_lessons',
+        ...(iconUrl ? { icon_url: iconUrl } : {}),
       },
       searchable: `${row.title} ${row.lesson_type} ${chapterTitle} ${routeTitle}`,
       baseScore: isPracticeItem ? 24 : 14,
@@ -735,6 +787,7 @@ export async function searchPlanckContentCatalog(
     const chapterSegment = chapter?.slug || chapter?.id || row.chapter_id;
     const lessonSegment = row.slug || row.id;
     const isPracticeItem = row.lesson_type === 'exerseaza';
+    const iconUrl = typeof chapter?.icon_url === 'string' ? chapter.icon_url : null;
     candidates.push({
       type: isPracticeItem ? 'problem' : 'learning_path',
       id: String(row.id),
@@ -747,7 +800,13 @@ export async function searchPlanckContentCatalog(
       reason: isPracticeItem
         ? 'Exercițiu existent din traseul curent Planck.'
         : 'Lecție existentă din traseele Planck.',
-      metadata: { chapter_id: row.chapter_id, chapter_title: chapter?.title, lesson_type: row.lesson_type, source_table: 'learning_path_lessons' },
+      metadata: {
+        chapter_id: row.chapter_id,
+        chapter_title: chapter?.title,
+        lesson_type: row.lesson_type,
+        source_table: 'learning_path_lessons',
+        ...(iconUrl ? { icon_url: iconUrl } : {}),
+      },
       searchable: `${row.title} ${row.description} ${row.lesson_type} ${chapter?.title} ${chapter?.description} ${chapter?.problem_category}`,
       baseScore: isPracticeItem ? 9 : 5,
     });
@@ -772,8 +831,15 @@ export async function searchPlanckContentCatalog(
   }
 
   const ranked = candidates
-    .map((candidate) => ({ candidate, score: scoreCandidateWithPreferences(candidate, terms, input.intent.subject, preferences) }))
-    .filter(({ score }) => score > 0 || terms.length === 0 || preferences.requestedKind !== 'any')
+    .map((candidate) => {
+      const { score, hasMatch } = scoreCandidateWithPreferences(candidate, terms, input.intent.subject, preferences)
+      return { candidate, score, hasMatch }
+    })
+    .filter(({ hasMatch }) => {
+      if (terms.length === 0) return true
+      return hasMatch
+    })
+    .map((entry) => ({ ...entry, score: entry.score + scoreTiebreakJitter(entry.candidate) }))
     .sort((a, b) => b.score - a.score)
     .map(({ candidate }) => {
       const { searchable: _searchable, baseScore: _baseScore, ...resource } = candidate;

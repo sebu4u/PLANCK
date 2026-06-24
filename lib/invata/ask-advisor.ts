@@ -42,26 +42,80 @@ function resourceChapterKey(resource: PlanckResourceReference): string | null {
   return typeof chapterId === "string" && chapterId ? chapterId : null
 }
 
+function resourceSourceKey(resource: PlanckResourceReference): string | null {
+  const sourceTable = resource.metadata?.source_table
+  return typeof sourceTable === "string" && sourceTable ? sourceTable : null
+}
+
+function resourceKey(resource: PlanckResourceReference): string {
+  return `${resource.type}:${resource.id}`
+}
+
+function isDifferentEnough(
+  candidate: PlanckResourceReference,
+  primary: PlanckResourceReference,
+): boolean {
+  if (candidate.type !== primary.type) return true
+  const candidateChapter = resourceChapterKey(candidate)
+  const primaryChapter = resourceChapterKey(primary)
+  if (candidateChapter && primaryChapter && candidateChapter === primaryChapter) return false
+  const candidateSource = resourceSourceKey(candidate)
+  const primarySource = resourceSourceKey(primary)
+  if (candidateSource && primarySource && candidateSource === primarySource) {
+    return Boolean(candidateChapter && primaryChapter && candidateChapter !== primaryChapter)
+  }
+  return true
+}
+
+export function buildSubjectSkipTables(
+  subject: InsightAgentIntent["subject"],
+  userInput: string,
+): ReadonlyArray<string> {
+  const asksForProblem = /\b(probleme?|exerci[țt]ii)\b/i.test(userInput)
+  if (subject === "fizica") {
+    return ["math_problems", "coding_problems"]
+  }
+  if (subject === "matematica") {
+    return asksForProblem ? ["problems", "coding_problems"] : []
+  }
+  if (subject === "informatica") {
+    return asksForProblem ? ["problems", "math_problems"] : []
+  }
+  return []
+}
+
 export function pickPrimaryAndSecondaryResources(
   resources: PlanckResourceReference[],
+  options: { excludeKeys?: Iterable<string> } = {},
 ): InvataAskResources {
   if (!resources.length) {
     return { primary: null, secondary: null }
   }
 
-  const primary = resources[0] ?? null
+  const excluded = options.excludeKeys ? new Set(options.excludeKeys) : null
+  const filtered = excluded?.size
+    ? resources.filter((resource) => !excluded.has(resourceKey(resource)))
+    : resources
+
+  if (!filtered.length) {
+    return { primary: null, secondary: null }
+  }
+
+  const primary = filtered[0] ?? null
   if (!primary) {
     return { primary: null, secondary: null }
   }
 
-  const primaryChapter = resourceChapterKey(primary)
+  const primaryKey = resourceKey(primary)
   const secondary =
-    resources.slice(1).find((candidate) => {
-      if (candidate.type !== primary.type) return true
-      const chapter = resourceChapterKey(candidate)
-      return Boolean(chapter && chapter !== primaryChapter)
-    }) ??
-    resources[1] ??
+    filtered
+      .slice(1)
+      .find((candidate) => resourceKey(candidate) !== primaryKey && isDifferentEnough(candidate, primary)) ??
+    filtered.find(
+      (candidate) =>
+        resourceKey(candidate) !== primaryKey &&
+        candidate.type !== primary.type,
+    ) ??
     null
 
   return { primary, secondary }
@@ -118,9 +172,14 @@ async function enrichResourceIcons(
   supabase: SupabaseClient,
   resources: PlanckResourceReference[],
 ): Promise<PlanckResourceReference[]> {
+  if (resources.every((resource) => typeof resource.metadata?.icon_url === "string")) {
+    return resources
+  }
+
   const chapterIds = Array.from(
     new Set(
       resources
+        .filter((resource) => typeof resource.metadata?.icon_url !== "string")
         .map((resource) => resource.metadata?.chapter_id)
         .filter((id): id is string => typeof id === "string" && Boolean(id)),
     ),
@@ -130,7 +189,7 @@ async function enrichResourceIcons(
 
   const { data } = await supabase
     .from("learning_path_chapters")
-    .select("id, icon_url, title")
+    .select("id, icon_url")
     .in("id", chapterIds)
 
   const iconByChapterId = new Map(
@@ -138,6 +197,7 @@ async function enrichResourceIcons(
   )
 
   return resources.map((resource) => {
+    if (typeof resource.metadata?.icon_url === "string") return resource
     const chapterId = resource.metadata?.chapter_id
     if (typeof chapterId !== "string" || !chapterId) return resource
     const iconUrl = iconByChapterId.get(chapterId)
@@ -156,6 +216,7 @@ async function prepareInvataAskContext(
   supabase: SupabaseClient,
   prompt: string,
   history: InvataAskMessage[] = [],
+  excludeKeys: Iterable<string> = [],
 ): Promise<{
   intent: InsightAgentIntent
   primary: PlanckResourceReference | null
@@ -164,15 +225,17 @@ async function prepareInvataAskContext(
   llmMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
 }> {
   const intent = resolveInsightAgentIntent(prompt)
+  const skipTables = buildSubjectSkipTables(intent.subject, prompt)
   const catalogResults = await searchPlanckContentCatalog(supabase, {
     intent,
     userInput: prompt,
     requestText: history.length ? history.map((entry) => entry.content).join("\n") : undefined,
     limit: 8,
+    skipTables,
   })
 
   const enrichedCatalog = await enrichResourceIcons(supabase, catalogResults)
-  const { primary, secondary } = pickPrimaryAndSecondaryResources(enrichedCatalog)
+  const { primary, secondary } = pickPrimaryAndSecondaryResources(enrichedCatalog, { excludeKeys })
   const displayResources = [primary, secondary].filter(
     (resource): resource is PlanckResourceReference => Boolean(resource),
   )
@@ -201,8 +264,9 @@ export async function* streamInvataAskAdvisor(
   supabase: SupabaseClient,
   prompt: string,
   history: InvataAskMessage[] = [],
+  excludeKeys: Iterable<string> = [],
 ): AsyncGenerator<InvataAskStreamEvent> {
-  const context = await prepareInvataAskContext(supabase, prompt, history)
+  const context = await prepareInvataAskContext(supabase, prompt, history, excludeKeys)
   const { model } = getAdvisorProviderConfig()
 
   let message = context.fallbackMessage
