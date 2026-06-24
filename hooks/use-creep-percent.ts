@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 const CREEP_TICK_MS = 100
 const CREEP_STEP_PERCENT = 0.1
 const MAX_DISPLAYED_PERCENT = 100
-const DEFAULT_ESTIMATED_TOTAL_MS = 120_000
+const DEFAULT_ESTIMATED_TOTAL_MS = 150_000
 
 export function creepCapForStage(stage: string | null | undefined): number {
   switch (stage) {
