@@ -193,6 +193,12 @@ export function getPlannerModel(): string {
   return getPlannerProviderConfig().model
 }
 
+// Exposed for unit tests in scripts/test-*.mjs. Internal helpers only.
+export const _internal = {
+  isPlanckCatalogSubject,
+  buildPlannerMessages,
+}
+
 function stringifyCandidates(candidates: PersonalizedCourseCatalogCandidate[]): string {
   if (!candidates.length) return "Nu s-a găsit conținut Planck relevant. Generează iteme de legătură (doar custom_text cu explicații scurte)."
   return candidates
@@ -214,6 +220,92 @@ function normalizeText(value: unknown): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+}
+
+/**
+ * Detect whether a user prompt is about a subject the Planck catalog covers.
+ * The catalog has quality content for a fixed set of academic / curricular
+ * topics (math, physics, chemistry, biology, informatics, language, history,
+ * earth science). Anything else — anime, cooking, travel, pop culture,
+ * personal finance, hobby — is "off-catalog" and the planner should generate
+ * the whole course from scratch instead of trying to reuse source items that
+ * don't exist in the catalog.
+ *
+ * Detection is keyword-based: if the prompt (after stop-word removal)
+ * contains any term from PLANCK_CATALOG_SUBJECTS, we treat it as on-catalog.
+ * Otherwise we treat it as off-catalog. The list is intentionally inclusive
+ * (covers most of the Romanian school curriculum) and is updated as new
+ * subject areas are added to the catalog.
+ */
+const PLANCK_CATALOG_SUBJECTS: ReadonlyArray<string> = [
+  // Math
+  "matematica", "algebra", "geometrie", "analiza", "trigonometrie", "trigonometri",
+  "integrala", "integrale", "derivata", "derivate", "ecuatie", "ecuatii", "ecuați",
+  "functie", "functii", "progresie", "progresii", "inegalitate", "inegalitati",
+  "logaritm", "logaritmi", "matrice", "matrici", "determinant", "determinanti",
+  "vector", "vectori", "polinom", "polinoame", "sir", "siruri", "limita", "limite",
+  "probabilitate", "statistica", "combinatorica", "permutare", "combinare",
+  // Physics
+  "fizica", "mecanica", "termodinamica", "electricitate", "magnetism", "magnet",
+  "optica", "unda", "unde", "sunet", "oscilatie", "oscilatii", "cinematica",
+  "dinamica", "elastica", "elasticitate", "hooke", "gravitatie", "gravitat",
+  "circuit", "circuite", "rezistenta", "tensiune", "curent", "putere", "energie",
+  "lucru", "forta", "forte", "moment", "impuls", "presiune", "temperatura",
+  "caldura", "calorimetrie", "frecare", "pendul", "lentila", "lentile",
+  // Chemistry
+  "chimie", "chimi", "atom", "atomi", "molecula", "molecule", "reactie", "reactii",
+  "compus", "compusi", "acid", "acizi", "baza", "baze", "ph", "solutie", "solutii",
+  "hidrocarbura", "hidrocarburi", "alcool", "alcooli", "polimer", "polimeri",
+  "sare", "saruri", "oxizi", "hidroxizi", "tabelul", "periodic", "element", "elemente",
+  "ion", "ioni", "cation", "anion", "legaturi", "legatura", "covalenta", "covalent",
+  "ionic", "izomeri", "izomerie",
+  // Biology
+  "biologie", "biolog", "celula", "celule", "tesut", "tesuturi", "organ", "organe",
+  "sistem", "sisteme", "fotosinteza", "fotosintez", "clorofila", "cloroplast",
+  "respiratie", "reproducere", "genetica", "dna", "adn", "cromozom", "cromozomi",
+  "gene", "evolutie", "selectie", "ecosistem", "ecosisteme", "habitat", "biodiversitate",
+  "nervos", "neuron", "creier", "digestiv", "circulator", "imunitar", "hormon",
+  "virus", "bacterie", "bacterii", "mitocondrie", "ribozom", "membrana", "organita",
+  // Informatics / ASD
+  "algoritm", "algoritmi", "programare", "program", "structuri de date",
+  "complexitate", "graf", "grafuri", "arbore", "arbori", "sortare", "cautare",
+  "binar", "liniar", "bubble", "merge", "quick", "hash", "stiva", "coada", "lista",
+  "lantuit", "bfs", "dfs", "dijkstra", "binar de cautare", "bst", "recursiv",
+  "recursi", "dinamica", "dynamic programming", "memorie", "stiva de apeluri",
+  "python", "java", "c++", "javascript", "code", "oop", "clasa", "obiect", "interfata",
+  "baza de date", "sql", "retele", "protocol", "api", "os", "sistem de operare",
+  "compilator", "interpreto", "regex", "automat", "masina turing",
+  // Earth science
+  "geografie", "geolog", "geolog", "tectonica", "miner", "roci", "roci sedimentare",
+  "atmosfera", "clima", "vreme", "hidro", "ocean", "fluviu", "relief", "munte",
+  "campie", "deal", "podis", "populatie", "economie geografica", "mediu",
+  // History
+  "istorie", "istori", "antic", "evul mediu", "renastere", "revolutie", "industrial",
+  "razboi", "razboaie", "imperi", "imperiu", "regat", "republica", "dictatura",
+  "democratie", "comunism", "capitalism", "feud", "feudali", "modernitate",
+  // Language / grammar / communication
+  "romana", "român", "gramatica", "gramatic", "vocabular", "comunicare",
+  "redactare", "scriere", "lectura", "literatura", "literar", "poezie", "proză",
+  "proz", "roman", "nuvela", "nuvel", "dramaturgie", "teatru", "eseu", "eseuri",
+  "ortografie", "ortogram", "lexic", "morfologie", "sintaxa", "stilistica",
+  "figura de stil", "retoric", "fonetic", "interjectie", "prepozitie",
+  // Other school subjects
+  "fizica", "filozofie", "filosofie", "filozo", "psihologie", "sociologie",
+  "religie", "economie", "economie", "finante", "contabilitate", "marketing",
+  "management", "antreprenoriat", "drept", "legislatie", "constitutie",
+]
+
+function isPlanckCatalogSubject(prompt: string): boolean {
+  const terms = extractPlannerTerms(prompt)
+  if (!terms.length) return false
+  // Build a set of catalog stems for fast matching. We use a substring check
+  // on the normalized prompt (not per-term) so a phrase like "matematica de
+  // clasa a 11-a" still matches.
+  const normalized = normalizeText(prompt)
+  for (const keyword of PLANCK_CATALOG_SUBJECTS) {
+    if (normalized.includes(keyword)) return true
+  }
+  return false
 }
 
 function extractPlannerTerms(value: string): string[] {
@@ -736,6 +828,8 @@ export interface VerificationReport {
   byType: Record<string, number>
   issues: VerificationIssue[]
   bareMathFlags: number
+  /** Source-keyed items that the on-topic check rejected and converted to generated items. */
+  offTopicSourceDrops: number
   passed: boolean
 }
 
@@ -974,31 +1068,167 @@ function applyBareMathWrap(item: PersonalizedCourseGeneratedPlanItem): Personali
 }
 
 /**
- * Verify every generated item in the plan. Broken items are replaced with a safe
- * custom_text connector; the report tracks what was replaced and why.
+ * Generic / template item titles that have appeared in past personalized courses
+ * with random, off-topic content. The planner loves to emit "Exercitiu intelegere",
+ * "Pasii de lucru" etc. for any subject — including anime, cooking, history — and
+ * then fill them with whatever the model invents (often grammar, fake math, etc.).
+ * For these titles we apply a stricter relevance check: the actual content must
+ * contain at least one of the prompt's non-stop terms, otherwise we treat the item
+ * as off-topic and drop the source_key.
+ */
+const GENERIC_LEARNED_ITEM_TITLES = new Set([
+  "exercitiu intelegere",
+  "exercițiu intelegere",
+  "grila intelegere",
+  "grilă intelegere",
+  "obiectivul lectiei",
+  "obiectivul lecției",
+  "obiectivul lectiei (2)",
+  "obiectivul lecției (2)",
+  "intrebare de control",
+  "întrebare de control",
+  "mini-recapitulare",
+  "pasii de lucru",
+  "pașii de lucru",
+  "pasii de lucru (2)",
+  "pașii de lucru (2)",
+  "verificare de intelegere",
+  "verificare de înțelegere",
+  "verificare de intelegere (2)",
+  "verificare de înțelegere (2)",
+  "conexiune cu practica",
+  "conexiune cu practica",
+  "gresala frecventa",
+  "greșeală frecventă",
+  "vocabular esential",
+  "vocabular esențial",
+  "ideea centrala",
+  "ideea centrală",
+  "intuitie rapida",
+  "intuiție rapidă",
+  "de ce conteaza",
+  "de ce contează",
+  "exemplu ghidat",
+])
+
+function extractItemHaystack(
+  item: PersonalizedCourseGeneratedPlanItem,
+  contentJson: Record<string, unknown>,
+): string {
+  // Concatenate every text field of the item so we can score it against the user prompt.
+  const parts: string[] = [item.title]
+  for (const v of Object.values(contentJson)) {
+    if (typeof v === "string") parts.push(v)
+    else if (Array.isArray(v)) {
+      for (const entry of v) {
+        if (typeof entry === "string") parts.push(entry)
+        else if (entry && typeof entry === "object") {
+          for (const ev of Object.values(entry as Record<string, unknown>)) {
+            if (typeof ev === "string") parts.push(ev)
+          }
+        }
+      }
+    } else if (v && typeof v === "object") {
+      for (const ev of Object.values(v as Record<string, unknown>)) {
+        if (typeof ev === "string") parts.push(ev)
+      }
+    }
+  }
+  return parts.filter(Boolean).join(" ")
+}
+
+/**
+ * Decide whether an item is on-topic for the user's prompt.
+ *
+ *   - Returns a positive score when the item's haystack mentions the same terms
+ *     as the prompt.
+ *   - Returns 0 when there's NO term overlap and the item is clearly off-topic
+ *     (used for items with generic titles like "Exercitiu intelegere" which the
+ *     AI happily fills with random subjects).
+ *   - For items with a SPECIFIC, non-generic title, we trust the title (the AI
+ *     would not name a chapter-specific concept in a generic way).
+ *
+ * The function is intentionally lenient: an item about a directly-related
+ * concept (e.g. "cursed energy" for a Jujutsu Kaisen prompt) scores positive
+ * even if it doesn't share exact nouns. An item about a completely unrelated
+ * concept (e.g. a Romanian grammar question) scores 0.
+ */
+function scoreItemOnTopic(
+  item: PersonalizedCourseGeneratedPlanItem,
+  userPrompt: string,
+  contentJson: Record<string, unknown>,
+): number {
+  const promptTerms = extractPlannerTerms(userPrompt)
+  // If the user prompt is generic / couldn't extract terms, accept everything.
+  if (!promptTerms.length) return 1
+
+  const normalizedTitle = normalizeText(item.title)
+  // Generic-template items need content matching the prompt.
+  if (GENERIC_LEARNED_ITEM_TITLES.has(normalizedTitle)) {
+    return scoreTextByTerms(promptTerms, extractItemHaystack(item, contentJson))
+  }
+  // Specific-title items: the title itself is the proof. Score any overlap.
+  return scoreTextByTerms(promptTerms, extractItemHaystack(item, contentJson))
+}
+
+/**
+ * Verify every item in the plan. For GENERATED items, we check structural
+ * validity (existing checks). For SOURCE-KEYED items, we now ALSO check that
+ * the resolved content (from the route handler) is on-topic — if not, we drop
+ * the source_key and let the post-verification filler replace it with an
+ * on-topic generated item. The route handler is responsible for actually
+ * passing the source content; when it isn't available, we conservatively
+ * trust source items.
  */
 function verifyGeneratedPlan(
   plan: PersonalizedCourseGeneratedPlan,
   userPrompt: string,
+  sourceContentByKey?: Map<string, Record<string, unknown> | null>,
 ): { plan: PersonalizedCourseGeneratedPlan; report: VerificationReport } {
   const issues: VerificationIssue[] = []
   const byType: Record<string, number> = {}
   let replaced = 0
   let bareMathFlags = 0
+  let offTopicSourceDrops = 0
 
   const lessons = plan.lessons.map((lesson, lessonIndex) => ({
     ...lesson,
     items: lesson.items.map((item, itemIndex) => {
       byType[item.item_type] = (byType[item.item_type] ?? 0) + 1
-      // Only verify generated items; source-key items are official content (assumed valid).
-      if (item.source_key) return item
 
-      // REPAIR: auto-wrap bare subscript/superscript math tokens (L_0, x^2) in $...$.
+      // ON-TOPIC CHECK for source-keyed items. The route handler hands us the
+      // actual content of each source item; if the item's content has no term
+      // overlap with the user prompt (and the title is one of the known
+      // generic template titles), we drop the source_key so the post-verification
+      // filler / next round can replace it with a generated item.
+      if (item.source_key) {
+        const sourceContent = sourceContentByKey?.get(item.source_key)
+        if (sourceContent !== undefined) {
+          const score = scoreItemOnTopic(item, userPrompt, sourceContent ?? {})
+          const isGeneric = GENERIC_LEARNED_ITEM_TITLES.has(normalizeText(item.title))
+          if (isGeneric && score === 0) {
+            offTopicSourceDrops += 1
+            issues.push({
+              lessonIndex,
+              itemIndex,
+              itemType: item.item_type,
+              title: item.title,
+              reason: "source off-topic (generic title, no content overlap with prompt)",
+            })
+            const dropped = { ...item, source_key: null, content_json: null }
+            return buildGeneratedItem(
+              dropped,
+              userPrompt,
+              lesson.title,
+            )
+          }
+        }
+        return item
+      }
+
+      // Generated item: repair + structural validation as before.
       const repairedItem = applyBareMathWrap(item)
-
       const issue = findItemIssue(repairedItem)
-      // Bare math is a SOFT flag (rendering quality, addressed by the guide + auto-wrap):
-      // count it but do NOT replace the item — replacing would destroy the lesson content.
       if (issue.bareMath) {
         bareMathFlags += 1
         return repairedItem
@@ -1013,7 +1243,6 @@ function verifyGeneratedPlan(
         reason: issue.reason,
       })
       replaced += 1
-      // Replace with a safe custom_text connector (keeps lesson length/variety).
       return makeGeneratedConnectorItem(
         makeFallbackItemTitle(itemIndex),
         userPrompt,
@@ -1030,6 +1259,7 @@ function verifyGeneratedPlan(
     issues,
     bareMathFlags,
     passed: issues.length === 0,
+    offTopicSourceDrops,
   }
   return { plan: { ...plan, lessons }, report }
 }
@@ -1065,6 +1295,21 @@ FORMAT MATEMATIC (CRITIC — fără excepții):
 - Pentru cod (code_trace.lines, [CODINLINE]...) poți folosi < > <= >= (codul se afișează ca text monospaced, nu se interpretează HTML).
 - Pentru itemii cu source_key, content_json = null. Nu inventa source_key — folosește doar cheile din listă sau null.`
 
+/**
+ * Subject-specific on-topic rules. Selected at planner-call time based on
+ * isPlanckCatalogSubject(userPrompt). The non-catalog variant is much stricter
+ * because the source-item path is the #1 way off-topic content sneaks into
+ * a non-STEM course.
+ */
+const ON_TOPIC_RULES_CATALOG = `DECIZIA source_key vs GENERAT (subiect din CATALOG):
+- O sursă Planck se folosește DOAR dacă e o potrivire evidentă: titlul ei specific se referă la un concept central al lecției (de ex. o problemă de fizică cu titlu specific se potrivește cu o lecție de fizică).
+- Pentru itemi de umplutură, itemi introductivi sau recapitulare, folosește GENERAT nu sursă.`
+
+const ON_TOPIC_RULES_NON_CATALOG = `DECIZIA source_key vs GENERAT (subiect NON-CATALOG):
+- ACEST SUBIECT NU FACE PARTE DIN CATALOGUL PLANCK. Catalogul conține DOAR conținut pentru matematică, fizică, chimie, biologie, informatică, gramatică și istorie. Orice alt subiect (anime, filme, sport, bucătărie, călătorii, hobby-uri, muzică, jocuri, manhwa, seriale, parenting, fitness, orice cultură pop, orice domeniu non-academic) este NON-CATALOG.
+- REGULĂ ABSOLUTĂ: NU FOLOSI source_key. Setează întotdeauna source_key: null. Chiar dacă vezi surse în available_planck_content (sunt candidate nepotrivite rămase din căutare), NU le folosi. Itemii trebuie să fie 100% GENERAȚI pe acest subiect.
+- Orice încercare de a reutiliza un source_key pentru un subiect non-catalog produce conținut off-topic (itemi generici de legătură, probleme de matematică fabricate, exerciții de gramatică străine de subiect) și va fi respinsă de validator.`
+
 const SYSTEM_PROMPT = `Ești plannerul de cursuri personalizate PLANCK Academy.
 Răspunzi DOAR cu JSON valid, fără Markdown în afara valorilor din content_json.
 
@@ -1076,11 +1321,21 @@ Pentru itemii FĂRĂ source_key (generați): creează conținut rich și variat,
 
 ${GENERATED_CONTENT_GUIDE}
 
-Creează un traseu complet, cu 3-5 lecții. FIECARE lecție trebuie să aibă 20-25 itemi relevanți pentru titlul lecției. Folosește întâi itemele reale relevante din listă (fără duplicate), apoi completează cu itemi generați rich și variați (explicații custom_text + itemi interactivi), NU cu text generic de legătură.
+REGULI ON-TOPIC (FOARTE IMPORTANTE — fără excepții):
+- OBIECTIVUL utilizatorului este descris în mesajul user mai jos (câmpul user_learning_goal). FIE CARE item din curs (cu sau fără source_key) TREBUIE să fie despre acest subiect. Nu introduce itemi despre alte domenii (de ex. matematică, gramatică, probleme de logică abstractă) decât dacă fac parte natural din subiect.
+- {{ON_TOPIC_RULES}}
+- Dacă folosești o sursă și titlul ei e generic ("Exercitiu intelegere", "Obiectivul lectiei", "Grila intelegere", "Mini-recapitulare", "Intrebare de control", "Pasii de lucru", "Verificare de intelegere", "Conexiune cu practica", "Gresala frecventa", "Vocabular esential", "Ideea centrala", "Intuitie rapida", "De ce conteaza", "Exemplu ghidat"), verifică dacă conținutul ei (din summary) se potrivește cu subiectul. Dacă nu se potrivește, NU folosi sursa — generează în schimb un item propriu pe subiect.
+- Pentru itemii cu schemă matematică (fill_slot, table_fill) folosește-i DOAR dacă subiectul este unul în care formulele au sens natural (matematică, fizică, chimie, informatică). Pentru orice alt subiect, folosește în schimb match, swipe_classify, custom_text cu explicație, sau alt tip non-matematic. Inventarea de formule pentru subiecte unde matematica nu e naturală (ex. "P_Gojo = E × k" pe un curs despre anime) este INTERZISĂ.
+- ID-uri HALUCINATE INTERZISE: nu inventa niciodată ID-uri precum problem_id, quiz_question_id, cursuri_lesson_slug. Schema itemului conține DOAR source_key (unul din lista de mai sus sau null) și content_json (null dacă ai source_key; altfel obiectul complet). Orice referință la ID-uri externe va fi respinsă de validator.
+
+Creează un traseu complet, cu 3-5 lecții. FIECARE lecție trebuie să aibă 20-25 itemi relevanți pentru titlul lecției. Pentru surse Planck folosește cele care sunt potriviri clare (fără duplicate), apoi completează cu itemi generați rich și variați (explicații custom_text + itemi interactivi), NU cu text generic de legătură.
 
 Distribuie itemii pe lecții în ordine logică: prima lecție = introducere/baze, ultimele = aplicare/probleme. Fiecare lecție trebuie să arate ca o lecție oficială Planck: explicații clare urmate de practică interactivă.
 
-Minim 50% din itemi trebuie să aibă source_key valid când există conținut relevant. Restul sunt itemi generați rich și variați (nu doar custom_text).`
+Ponderi orientative (nu sunt reguli dure, urmărește calitatea conținutului pe subiect):
+- Subiect din catalog Planck (matematică, fizică, chimie, biologie, informatică, gramatică, istorie): include câteva surse Planck reale pentru itemi concreți (definiții, probleme, exerciții din lecțiile oficiale), restul generează.
+- Subiect non-catalog (anime, filme, sport, bucătărie, călătorii, hobby, orice cultură pop): 100% generat, nicio sursă. Itemii trebuie să fie creați din zero pe subiect.
+- Itemii generați trebuie să fie un MIX VARIAT, exact ca în lecțiile oficiale: minim 2 custom_text cu explicații substanțiale + minim 4 itemi interactivi/de verificare de tipuri DIFERITE per lecție (poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, code_trace, test). NU genera doar custom_text.`
 
 function normalizeParsedPlan(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -1107,15 +1362,33 @@ function buildPlannerMessages(
   candidates: PersonalizedCourseCatalogCandidate[],
   repairNote: string | null,
 ): { role: "system" | "user"; content: string }[] {
+  const isCatalogSubject = isPlanckCatalogSubject(userPrompt)
+  // For non-catalog subjects (anime, cooking, pop culture, etc.), explicitly
+  // tell the planner NOT to use source items. The catalog has no relevant
+  // content for those topics and any candidate it found is a false positive
+  // (e.g. a previous personalized course's items). The planner should
+  // generate 100% of the items from scratch.
+  const subjectKind = isCatalogSubject ? "catalog" : "non-catalog"
+  const systemPrompt = SYSTEM_PROMPT.replace(
+    "{{ON_TOPIC_RULES}}",
+    isCatalogSubject ? ON_TOPIC_RULES_CATALOG : ON_TOPIC_RULES_NON_CATALOG,
+  )
   const base: { role: "system" | "user"; content: string }[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt },
     {
       role: "user",
       content: JSON.stringify(
         {
           user_learning_goal: userPrompt,
-          available_planck_content: stringifyCandidates(candidates),
-          instruction: "Alege iteme prin source_key din lista de mai sus (fără duplicate). Fiecare lecție trebuie să aibă 20-25 itemi. Completează restul cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text și nu genera tipurile care nu sunt în ghid (flow_build, graph_build, slider_explore, speed_round).",
+          subject_kind: subjectKind,
+          // For non-catalog subjects, omit the candidate list entirely so the
+          // planner doesn't try to reuse items from unrelated past courses.
+          available_planck_content: isCatalogSubject
+            ? stringifyCandidates(candidates)
+            : "Nu există conținut Planck relevant. Generează toți itemii de la zero pe acest subiect.",
+          instruction: isCatalogSubject
+            ? "Alege iteme prin source_key din lista de mai sus (fără duplicate) DOAR pentru itemi unde titlul sursei e o potrivire evidentă cu conceptul central al lecției (de ex. o problemă de fizică cu titlu specific se potrivește cu o lecție de fizică). Pentru itemi de umplutură, itemi introductivi, sau itemi de recapitulare, folosește GENERAT nu sursă. Fiecare lecție trebuie să aibă 20-25 itemi. Completează cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substanțiale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, code_trace, test), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text."
+            : "NU folosi surse Planck. Generează toți itemii de la zero pe acest subiect. Fiecare lecție trebuie să aibă 20-25 itemi — minim 2 custom_text cu explicații substanțiale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, code_trace, test), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text și nu genera tipurile care nu sunt în ghid (flow_build, graph_build, slider_explore, speed_round). IMPORTANT: pentru acest subiect, folosește DOAR tipuri non-matematice (custom_text, poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, test, code_trace). NU folosi fill_slot sau table_fill deoarece subiectul nu e unul în care formulele matematice au sens.",
           required_json_shape: {
             title: "string",
             description: "string",
@@ -1127,8 +1400,12 @@ function buildPlannerMessages(
                   {
                     title: "string",
                     item_type: "custom_text | poll | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | code_trace | test | text | grila | problem | ...",
-                    source_key: "exact un source_key din listă sau null",
-                    content_json: "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului",
+                    source_key: isCatalogSubject
+                      ? "exact un source_key din listă sau null"
+                      : "întotdeauna null (subiect non-catalog — nu folosi surse)",
+                    content_json: isCatalogSubject
+                      ? "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului"
+                      : "mereu obiectul content_json complet (nu folosi source_key)",
                   },
                 ],
               },
@@ -1187,6 +1464,7 @@ function parseJsonTolerant(raw: string): unknown | null {
 export async function planPersonalizedCourse(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
+  sourceContentByKey?: Map<string, Record<string, unknown> | null>,
 ): Promise<{ plan: PersonalizedCourseGeneratedPlan; verification: VerificationReport }> {
   const openai = getOpenAIClient()
   const { model, maxTokens } = getPlannerProviderConfig()
@@ -1262,6 +1540,6 @@ export async function planPersonalizedCourse(
   if (!validated) throw lastError ?? new Error("AI course generation failed")
 
   const normalizedPlan = normalizePlan(validated.data, candidates, userPrompt)
-  const { plan: verifiedPlan, report: verification } = verifyGeneratedPlan(normalizedPlan, userPrompt)
-  return { plan: verifiedPlan, verification }
+  const { plan: verifiedPlan, report } = verifyGeneratedPlan(normalizedPlan, userPrompt, sourceContentByKey)
+  return { plan: verifiedPlan, verification: report }
 }

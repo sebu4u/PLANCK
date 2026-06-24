@@ -41,12 +41,83 @@ function sourceFallbackContent(candidate: PersonalizedCourseCatalogCandidate | u
   }
 }
 
+/**
+ * Build a Map<source_key, parsed content_json> for every candidate that points
+ * at a `learning_path_item`. Used by the planner's verifier to do an on-topic
+ * check on source-keyed items BEFORE inserting them — generic-title items like
+ * "Exercitiu intelegere" with random content would otherwise sneak in and pollute
+ * a non-STEM course (e.g. a grammar question inside a Jujutsu Kaisen chapter).
+ *
+ * The `summary` field of each candidate already includes the first 300 chars of
+ * the source item's `content_json`, so for the verifier's purpose (matching a
+ * few terms against the user prompt) it is sufficient. When `summary` is missing
+ * or empty, we return null and the verifier falls back to trusting the item.
+ */
+function buildSourceContentByKey(
+  candidates: PersonalizedCourseCatalogCandidate[],
+): Map<string, Record<string, unknown> | null> {
+  const map = new Map<string, Record<string, unknown> | null>()
+  for (const c of candidates) {
+    if (c.source_type !== "learning_path_item") continue
+    // summary is "chapter_title · lesson_title · content_json.slice(0, 300)" — enough
+    // for the on-topic term check. We synthesize a pseudo content_json so the
+    // verifier's `extractItemHaystack` can find terms inside it.
+    map.set(c.key, { haystack: c.summary ?? c.title, _summary: c.summary, _title: c.title })
+  }
+  return map
+}
+
+/**
+ * Validate that the problem_id / quiz_question_id references stamped on a
+ * learning_path_item candidate actually resolve in their target tables. We
+ * pre-load a single batch of `id`s per source and return a Set of valid ids.
+ * If a candidate's id is NOT in the valid set, the route handler MUST drop it
+ * before inserting the new item — otherwise the renderer would show an empty
+ * / broken problem when it tried to join the foreign key.
+ */
+async function buildValidIdSets(
+  admin: SupabaseAnyClient,
+  candidates: PersonalizedCourseCatalogCandidate[],
+): Promise<{ problems: Set<string>; quizzes: Set<string> }> {
+  const problemIds = new Set<string>()
+  const quizIds = new Set<string>()
+  for (const c of candidates) {
+    if (c.source_type !== "learning_path_item") continue
+    const problemId = c.metadata?.problem_id
+    if (typeof problemId === "string" && problemId) problemIds.add(problemId)
+    const quizId = c.metadata?.quiz_question_id
+    if (typeof quizId === "string" && quizId) quizIds.add(quizId)
+  }
+
+  const problems = new Set<string>()
+  const quizzes = new Set<string>()
+
+  if (problemIds.size) {
+    const { data } = await admin
+      .from("problems")
+      .select("id")
+      .in("id", Array.from(problemIds))
+    for (const row of data ?? []) problems.add(String(row.id))
+  }
+  if (quizIds.size) {
+    const { data } = await admin
+      .from("quiz_questions")
+      .select("id")
+      .in("id", Array.from(quizIds))
+    for (const row of data ?? []) quizzes.add(String(row.id))
+  }
+
+  return { problems, quizzes }
+}
+
 function getOfficialItemInsertPayload(
   lessonId: string,
   item: PersonalizedCourseGeneratedPlanItem,
   orderIndex: number,
   candidatesByKey: Map<string, PersonalizedCourseCatalogCandidate>,
   sourceItemsById: Map<string, LearningPathLessonItem>,
+  validProblemIds: Set<string>,
+  validQuizIds: Set<string>,
 ) {
   const sourceKey = item.source_key?.trim() || ""
   const candidate = sourceKey ? candidatesByKey.get(sourceKey) : undefined
@@ -54,14 +125,24 @@ function getOfficialItemInsertPayload(
   if (candidate?.source_type === "learning_path_item") {
     const sourceItem = sourceItemsById.get(candidate.source_id)
     if (sourceItem) {
+      // Only stamp foreign keys that actually resolve. If the AI reused a
+      // stale source row whose problem_id / quiz_question_id no longer
+      // exists in the live catalog, fall through to the generated branch
+      // and use the source item's inline content_json instead. This is the
+      // safety net for "M331" / "M330" type pollution that the planner
+      // couldn't detect.
+      const rawProblemId = typeof sourceItem.problem_id === "string" ? sourceItem.problem_id : null
+      const rawQuizId = typeof sourceItem.quiz_question_id === "string" ? sourceItem.quiz_question_id : null
+      const problemId = rawProblemId && validProblemIds.has(rawProblemId) ? rawProblemId : null
+      const quizId = rawQuizId && validQuizIds.has(rawQuizId) ? rawQuizId : null
       return {
         lesson_id: lessonId,
         item_type: sourceItem.item_type,
         title: sourceItem.title ?? item.title,
         cursuri_lesson_slug: sourceItem.cursuri_lesson_slug,
         youtube_url: sourceItem.youtube_url,
-        quiz_question_id: sourceItem.quiz_question_id,
-        problem_id: sourceItem.problem_id,
+        quiz_question_id: quizId,
+        problem_id: problemId,
         content_json: sourceItem.content_json ?? null,
         order_index: orderIndex,
         is_active: true,
@@ -101,16 +182,15 @@ function getOfficialItemInsertPayload(
   if (typeof youtubeUrl === "string" && youtubeUrl) row.youtube_url = youtubeUrl
 
   if (candidate?.source_type === "quiz_question") {
-    row.quiz_question_id = candidate.source_id
-  } else if (candidate?.source_type === "problem") {
-    row.problem_id = candidate.source_id
-  } else if (candidate?.source_type === "math_problem" || candidate?.source_type === "coding_problem") {
-    row.problem_id = candidate.source_id
+    const id = String(candidate.source_id ?? "")
+    if (validQuizIds.has(id)) row.quiz_question_id = id
+  } else if (candidate?.source_type === "problem" || candidate?.source_type === "math_problem" || candidate?.source_type === "coding_problem") {
+    const id = String(candidate.source_id ?? "")
+    if (validProblemIds.has(id)) row.problem_id = id
   } else if (candidate?.source_type === "learning_path_item") {
-    const quizQuestionId = candidate.metadata?.quiz_question_id
-    const problemId = candidate.metadata?.problem_id
-    if (typeof quizQuestionId === "string" && quizQuestionId) row.quiz_question_id = quizQuestionId
-    if (typeof problemId === "string" && problemId) row.problem_id = problemId
+    // Already handled above (foreign keys stamped on the learning_path_item
+    // branch). Reaching here means the source row wasn't found, so the row
+    // stays without foreign keys — the inline content_json will render.
   }
 
   return row
@@ -341,6 +421,8 @@ export async function POST(request: Request) {
       if (!(await ensureStillCreating())) return
 
       await updateProgress("planning", 15, "AI analizează obiectivul și planifică lecțiile...")
+      const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
+      const sourceContentByKey = buildSourceContentByKey(candidates)
       const { plan, verification } = await runWithProgressHeartbeat(
         (progress) => updateProgress(progress.stage, progress.percent, progress.message),
         {
@@ -349,7 +431,7 @@ export async function POST(request: Request) {
           endPercent: 64,
           messages: GENERATION_STAGE_FALLBACK_MESSAGES.planning,
         },
-        () => planPersonalizedCourse(prompt, candidates),
+        () => planPersonalizedCourse(prompt, candidates, sourceContentByKey),
       )
       if (!(await ensureStillCreating())) return
 
@@ -363,9 +445,13 @@ export async function POST(request: Request) {
         },
       )
 
-      const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
       const planItems = plan.lessons.flatMap((lesson) => lesson.items)
-      const sourceItemsById = await getSourceLearningPathItems(adminBg, planItems, candidatesByKey)
+      // Load source items + validate any foreign-key references in parallel —
+      // both are O(N) on the candidate set, but neither depends on the other.
+      const [sourceItemsById, validIdSets] = await Promise.all([
+        getSourceLearningPathItems(adminBg, planItems, candidatesByKey),
+        buildValidIdSets(adminBg, candidates),
+      ])
       const generationMetadata = {
         lessonCount: plan.lessons.length,
         itemCount: plan.lessons.reduce((total, lesson) => total + lesson.items.length, 0),
@@ -450,7 +536,15 @@ export async function POST(request: Request) {
         }
 
         const itemRows = lesson.items.map((item, itemIndex) =>
-          getOfficialItemInsertPayload(insertedLesson.id, item, itemIndex, candidatesByKey, sourceItemsById),
+          getOfficialItemInsertPayload(
+            insertedLesson.id,
+            item,
+            itemIndex,
+            candidatesByKey,
+            sourceItemsById,
+            validIdSets.problems,
+            validIdSets.quizzes,
+          ),
         )
         const { error: itemsError } = await adminBg.from("learning_path_lesson_items").insert(itemRows)
         if (itemsError) {
