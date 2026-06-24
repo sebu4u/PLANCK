@@ -122,7 +122,8 @@ export function pickPrimaryAndSecondaryResources(
 }
 
 function formatResourceLine(resource: PlanckResourceReference, index: number): string {
-  return `${index + 1}. ${resource.type}: ${resource.title} | ${resource.subtitle ?? resource.topic ?? ""} | ${resource.url}`
+  const subtitle = resource.subtitle ?? resource.topic ?? ""
+  return `${index + 1}. ${resource.type}: ${resource.title}${subtitle ? ` — ${subtitle}` : ""}`
 }
 
 function buildCatalogAppendix(resources: PlanckResourceReference[]): string {
@@ -133,8 +134,19 @@ function buildCatalogAppendix(resources: PlanckResourceReference[]): string {
   return [
     "Folosește DOAR aceste resurse când menționezi trasee, lecții, cursuri sau probleme existente:",
     ...resources.slice(0, 4).map(formatResourceLine),
-    "Nu inventa resurse. Nu propune generarea unui traseu personalizat — interfața are un buton separat pentru asta.",
+    "Nu inventa resurse, titluri sau linkuri. Nu propune generarea unui traseu personalizat — interfața are un buton separat pentru asta.",
   ].join("\n")
+}
+
+const URL_PATTERN = /\bhttps?:\/\/\S+|\bwww\.\S+|\/invata\/\S+|\/exerseaza\/\S+|\/insight\/\S+/gi
+const URL_TRAILING_PUNCTUATION = /[)\].,;!?]+$/g
+
+function stripUrlsFromAdvisorText(text: string): string {
+  return text
+    .replace(URL_PATTERN, (match) => match.replace(URL_TRAILING_PUNCTUATION, ""))
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,!?])/g, "$1")
+    .trim()
 }
 
 function buildConversationMessages(
@@ -165,7 +177,7 @@ function fallbackAdvisorMessage(
   const secondary = resources.secondary
     ? ` Poți continua apoi cu „${resources.secondary.title}”.`
     : ""
-  return `${intro} ${primary}${secondary}`
+  return stripUrlsFromAdvisorText(`${intro} ${primary}${secondary}`)
 }
 
 async function enrichResourceIcons(
@@ -240,11 +252,12 @@ async function prepareInvataAskContext(
     (resource): resource is PlanckResourceReference => Boolean(resource),
   )
 
-  const systemPrompt = `Ești advisorul Planck de pe pagina /invata. Răspunde în română, prietenos și concis (2-3 propoziții).
-Descrie pe scurt ce vrea elevul să învețe și orientează-l spre resursele existente din catalog când există.
+  const systemPrompt = `Ești advisorul Planck de pe pagina /invata. Răspunde în română, prietenos și foarte concis: maxim 2 propoziții scurte (ideal 1-2).
+Confirmă pe scurt ce vrea elevul să învețe și menționează UNA sau DOUĂ resurse concrete din catalogul de mai jos, doar ca titlu, fără linkuri și fără URL-uri.
+Linkurile către resurse sunt afișate automat de interfață sub mesajul tău — nu le scrie tu în text.
 NU propune generarea unui traseu personalizat — există un buton separat în interfață.
-NU inventa resurse, linkuri sau cursuri.
-Răspunde direct în text simplu, fără JSON, fără markdown, fără liste numerotate.
+NU inventa resurse, titluri, capitole, URL-uri sau cursuri. NU copia URL-uri în răspuns.
+Răspunde DOAR în text simplu, fără JSON, fără markdown, fără liste numerotate, fără linkuri, fără paranteze cu adrese.
 
 ${buildCatalogAppendix(displayResources)}`
 
@@ -276,7 +289,7 @@ export async function* streamInvataAskAdvisor(
     const stream = await client.chat.completions.create({
       model,
       temperature: 0.4,
-      max_tokens: 600,
+      max_tokens: 180,
       stream: true,
       messages: context.llmMessages,
     })
@@ -291,7 +304,7 @@ export async function* streamInvataAskAdvisor(
 
     const trimmed = streamed.trim()
     if (trimmed) {
-      message = trimmed.slice(0, 1200)
+      message = stripUrlsFromAdvisorText(trimmed).slice(0, 600)
     }
   } catch (error) {
     console.error("invata ask advisor LLM stream:", error)
