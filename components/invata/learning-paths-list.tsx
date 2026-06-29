@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
 } from "react"
@@ -616,16 +617,18 @@ export function LearningPathsList({
 
   const visibleChapters = useMemo(
     () =>
-      hubChapters
-        .filter((chapter) => !deletedChapterIds.has(chapter.id))
-        .filter((chapter) => !isHiddenGeneratingChapter(chapter)),
+      hubChapters.filter(
+        (chapter) => !deletedChapterIds.has(chapter.id) && !isHiddenGeneratingChapter(chapter),
+      ),
     [hubChapters, deletedChapterIds],
   )
   const visibleArchivedChapters = useMemo(
     () =>
-      hubArchivedChapters
-        .filter((chapter) => !deletedChapterIds.has(chapter.id))
-        .filter((chapter) => !isHiddenGeneratingChapter(chapter)),
+      hubArchivedChapters.length === 0
+        ? []
+        : hubArchivedChapters.filter(
+            (chapter) => !deletedChapterIds.has(chapter.id) && !isHiddenGeneratingChapter(chapter),
+          ),
     [hubArchivedChapters, deletedChapterIds],
   )
 
@@ -642,15 +645,24 @@ export function LearningPathsList({
   }, [lessonProgressByLessonId])
 
   const progressRequest = useMemo(() => {
-    const allLessonIds = Object.values(hubLessonsByChapter).flatMap((lessons) =>
-      lessons.map((lesson) => lesson.id)
-    )
-    const publicVisibleLessonIds = visibleChapters
-      .filter((chapter) => chapter.is_personalized !== true)
-      .flatMap((chapter) => (hubLessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
-    const personalizedVisibleLessonIds = visibleChapters
-      .filter((chapter) => chapter.is_personalized === true)
-      .flatMap((chapter) => (hubLessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
+    const allLessonIds: string[] = []
+    const publicVisibleLessonIds: string[] = []
+    const personalizedVisibleLessonIds: string[] = []
+
+    for (const lessons of Object.values(hubLessonsByChapter)) {
+      for (const lesson of lessons) {
+        allLessonIds.push(lesson.id)
+      }
+    }
+
+    for (const chapter of visibleChapters) {
+      const target = chapter.is_personalized
+        ? personalizedVisibleLessonIds
+        : publicVisibleLessonIds
+      for (const lesson of hubLessonsByChapter[chapter.id] ?? []) {
+        target.push(lesson.id)
+      }
+    }
 
     return {
       allLessonIds,
@@ -659,20 +671,29 @@ export function LearningPathsList({
     }
   }, [hubLessonsByChapter, visibleChapters])
 
-  const progressRequestKey = [
-    progressRequest.allLessonIds.join(","),
-    progressRequest.publicVisibleLessonIds.join(","),
-    progressRequest.personalizedVisibleLessonIds.join(","),
-  ].join("|")
+  // The effect re-fires only when this signature actually changes. Reading the
+  // request body through a ref keeps the dep array at a constant length and
+  // primitive-friendly for React's diff.
+  const progressRequestKey = useMemo(
+    () =>
+      `${progressRequest.allLessonIds.length}|${progressRequest.publicVisibleLessonIds.join(",")}|${progressRequest.personalizedVisibleLessonIds.join(",")}`,
+    [progressRequest],
+  )
+  const progressRequestRef = useRef(progressRequest)
+  useEffect(() => {
+    progressRequestRef.current = progressRequest
+  }, [progressRequest])
 
   useEffect(() => {
     if (authLoading) return
     if (user && hubSessionReadyUserId !== user.id) return
     if (!user && !hasGuestLearningPathProgressCookie()) return
+
+    const request = progressRequestRef.current
     if (
-      progressRequest.allLessonIds.length === 0 &&
-      progressRequest.publicVisibleLessonIds.length === 0 &&
-      progressRequest.personalizedVisibleLessonIds.length === 0
+      request.allLessonIds.length === 0 &&
+      request.publicVisibleLessonIds.length === 0 &&
+      request.personalizedVisibleLessonIds.length === 0
     ) {
       return
     }
@@ -683,7 +704,7 @@ export function LearningPathsList({
         const response = await fetch("/api/invata/hub-progress", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(progressRequest),
+          body: JSON.stringify(request),
           credentials: "same-origin",
           signal: controller.signal,
         })
@@ -703,7 +724,7 @@ export function LearningPathsList({
     })()
 
     return () => controller.abort()
-  }, [authLoading, hubSessionReadyUserId, progressRequest, progressRequestKey, user])
+  }, [authLoading, hubSessionReadyUserId, progressRequestKey, user])
 
   const handleDeletePersonalizedChapter = useCallback(
     async (chapter: LearningPathHubChapter) => {
