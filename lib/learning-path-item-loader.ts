@@ -2,6 +2,7 @@ import type { Problem } from "@/data/problems"
 import type { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import type { Lesson as PhysicsLesson } from "@/lib/supabase-physics"
 import type { QuizQuestion } from "@/lib/types/quiz-questions"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { unstable_cache } from "next/cache"
 import { supabase } from "@/lib/supabaseClient"
 import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
@@ -84,6 +85,7 @@ type StaticLearningPathItemPayload = Omit<
 type StaticLearningPathItemLoadResult =
   | { status: "not_found" }
   | { status: "invalid_index" }
+  | { status: "personalized" }
   | { status: "ok"; payload: StaticLearningPathItemPayload }
 
 const LEARNING_PATH_ITEM_STATIC_CACHE_SECONDS = 60 * 60
@@ -275,24 +277,34 @@ function isBlockedByFreePlan(
   return blockedBySkip || blockedByLimit
 }
 
-async function loadStaticLearningPathItemPayloadUncached(
+function isPersonalizedLearningPathChapter(chapter: LearningPathChapter): boolean {
+  return chapter.is_personalized === true || Boolean(chapter.generated_by_user_id)
+}
+
+async function loadStaticLearningPathItemPayloadWithClient(
+  client: SupabaseClient,
   chapterSlug: string,
   lessonSlug: string,
   itemIndex: number,
   fizicaRouteSlug: string,
   fizicaChapterSlug: string,
   fizicaLessonId: string,
+  options?: { allowPersonalized?: boolean },
 ): Promise<StaticLearningPathItemLoadResult> {
   if (!Number.isFinite(itemIndex) || itemIndex < 1) {
     return { status: "invalid_index" }
   }
 
-  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
+  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug, client)
   if (!chapter || !lesson) {
     return { status: "not_found" }
   }
 
-  const items = await getLearningPathLessonItems(lesson.id)
+  if (!options?.allowPersonalized && isPersonalizedLearningPathChapter(chapter)) {
+    return { status: "personalized" }
+  }
+
+  const items = await getLearningPathLessonItems(lesson.id, client)
   const item = items[itemIndex - 1]
   if (!item) {
     return { status: "not_found" }
@@ -362,9 +374,28 @@ async function loadStaticLearningPathItemPayloadUncached(
   }
 }
 
+async function loadCacheableStaticLearningPathItemPayload(
+  chapterSlug: string,
+  lessonSlug: string,
+  itemIndex: number,
+  fizicaRouteSlug: string,
+  fizicaChapterSlug: string,
+  fizicaLessonId: string,
+): Promise<StaticLearningPathItemLoadResult> {
+  return loadStaticLearningPathItemPayloadWithClient(
+    supabase,
+    chapterSlug,
+    lessonSlug,
+    itemIndex,
+    fizicaRouteSlug,
+    fizicaChapterSlug,
+    fizicaLessonId,
+  )
+}
+
 const loadCachedStaticLearningPathItemPayload = unstable_cache(
-  loadStaticLearningPathItemPayloadUncached,
-  ["learning-path-item-static-payload-v1"],
+  loadCacheableStaticLearningPathItemPayload,
+  ["learning-path-item-static-payload-v2"],
   { revalidate: LEARNING_PATH_ITEM_STATIC_CACHE_SECONDS },
 )
 
@@ -379,7 +410,7 @@ export async function loadLearningPathItemPayload(
   }
 
   const fizicaMapContext = options?.fizicaMapContext ?? null
-  const staticResult = await loadCachedStaticLearningPathItemPayload(
+  const cachedStaticResult = await loadCachedStaticLearningPathItemPayload(
     chapterSlug,
     lessonSlug,
     itemIndex,
@@ -387,6 +418,24 @@ export async function loadLearningPathItemPayload(
     fizicaMapContext?.chapterSlug ?? "",
     fizicaMapContext?.fizicaLessonId ?? "",
   )
+
+  const staticResult =
+    cachedStaticResult.status === "personalized" || cachedStaticResult.status === "not_found"
+      ? await loadStaticLearningPathItemPayloadWithClient(
+          await createClient(),
+          chapterSlug,
+          lessonSlug,
+          itemIndex,
+          fizicaMapContext?.routeSlug ?? "",
+          fizicaMapContext?.chapterSlug ?? "",
+          fizicaMapContext?.fizicaLessonId ?? "",
+          { allowPersonalized: true },
+        )
+      : cachedStaticResult
+
+  if (staticResult.status === "personalized") {
+    return { status: "not_found" }
+  }
 
   if (staticResult.status !== "ok") {
     return staticResult

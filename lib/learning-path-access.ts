@@ -21,6 +21,8 @@ export interface LearningPathAccess {
 
 interface ChapterLike {
   slug: string | null
+  generated_by_user_id?: string | null
+  is_personalized?: boolean | null
 }
 
 /**
@@ -52,6 +54,10 @@ export async function getLearningPathAccess(chapter?: ChapterLike | null): Promi
       }
     }
     return { mode: "locked", itemsSolved: 0, itemsRemaining: 0, userId: null }
+  }
+
+  if (chapter?.is_personalized === true && chapter.generated_by_user_id === user.id) {
+    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: user.id }
   }
 
   const { data: profile } = await supabase
