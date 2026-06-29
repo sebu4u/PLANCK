@@ -1,396 +1,198 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent, type TouchEvent } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowRight, BookOpen, ChevronDown, Loader2, Trash2 } from "lucide-react"
 import {
-  getLearningPathLessonHref,
-  type LearningPathChapter,
-  type LearningPathLesson,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+} from "react"
+import Link from "next/link"
+import { BookOpen, ChevronDown, Loader2, Trash2 } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { getLearningPathLessonHref } from "@/lib/learning-path-routes"
+import type {
+  LearningPathHubChapter,
+  LearningPathHubLesson,
 } from "@/lib/supabase-learning-paths"
+import type { ElasticLessonsScrollerProps } from "@/components/invata/elastic-lessons-scroller"
+import { GUEST_LEARNING_PATH_PROGRESS_COOKIE } from "@/lib/guest-learning-path-cookie"
+import { dispatchInvataHubRefresh, INVATA_HUB_REFRESH_EVENT } from "@/lib/invata/hub-events"
 import { LearningPathSegmentedProgress } from "@/components/invata/learning-path-segmented-progress"
 import { InvataMobileLessonList } from "@/components/invata/invata-mobile-lesson-card"
 import {
   INVATA_HUB_CHAPTER_IMAGE_Z,
   INVATA_HUB_LESSON_CARDS_Z,
-} from "@/components/invata/invata-hub-top-glow"
-import {
-  InvataChapterSectionIndicator,
-  invataChapterSectionDomId,
-} from "@/components/invata/invata-chapter-section-indicator"
+} from "@/components/invata/invata-hub-layout-constants"
+import { invataChapterSectionDomId } from "@/lib/invata/chapter-section-dom"
 import {
   InvataDeferredImage,
   useInvataChapterImagesEnabled,
   useRegisterInvataChapterSection,
 } from "@/components/invata/invata-chapter-image-load-context"
+import { useSetInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
 
 export type LessonProgressByLessonId = Record<string, { completed: number; total: number }>
 
 interface LearningPathsListProps {
-  chapters: LearningPathChapter[]
-  archivedChapters?: LearningPathChapter[]
-  lessonsByChapter: Record<string, LearningPathLesson[]>
+  chapters: LearningPathHubChapter[]
+  archivedChapters?: LearningPathHubChapter[]
+  lessonsByChapter: Record<string, LearningPathHubLesson[]>
   lockedChapterIds?: string[]
   completedLessonIds?: string[]
   lessonProgressByLessonId?: LessonProgressByLessonId
 }
 
-function ElasticLessonsScroller({
-  children,
-  bleedMargins = true,
-}: {
-  children: ReactNode
-  /** When false, parent already breaks out to viewport edges (e.g. full-bleed section). */
-  bleedMargins?: boolean
-}) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const trackRef = useRef<HTMLDivElement | null>(null)
-  const animationFrameRef = useRef<number | null>(null)
-  const [showDesktopButton, setShowDesktopButton] = useState(false)
-  const [isAtStart, setIsAtStart] = useState(true)
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false)
-  const [isPointerDragging, setIsPointerDragging] = useState(false)
-  const dragRef = useRef({
-    isDragging: false,
-    startX: 0,
-    startScrollLeft: 0,
-  })
-  const pointerDragRef = useRef({
-    isDragging: false,
-    pointerId: -1,
-    startX: 0,
-    startScrollLeft: 0,
-    lastX: 0,
-    lastTs: 0,
-    velocityX: 0,
-    hadElasticOverdrag: false,
-  })
+type HubProgressResponse = {
+  completedLessonIds?: string[]
+  lessonProgressByLessonId?: LessonProgressByLessonId
+  error?: string
+}
 
-  const isMobileViewport = () => typeof window !== "undefined" && window.innerWidth < 640
-  const isDesktop = () => typeof window !== "undefined" && window.innerWidth >= 640
+type HubSessionResponse = {
+  chapters?: LearningPathHubChapter[]
+  archivedChapters?: LearningPathHubChapter[]
+  lessonsByChapter?: Record<string, LearningPathHubLesson[]>
+  lockedChapterIds?: string[]
+  lessonProgressByLessonId?: LessonProgressByLessonId
+  error?: string
+}
 
-  const syncScrollerState = useCallback(() => {
-    const container = containerRef.current
-    if (!container || typeof window === "undefined") return
+function hasGuestLearningPathProgressCookie() {
+  if (typeof document === "undefined") return false
+  return document.cookie
+    .split(";")
+    .some((part) => part.trim().startsWith(`${GUEST_LEARNING_PATH_PROGRESS_COOKIE}=`))
+}
 
-    const desktop = isDesktop()
-    const canScroll = container.scrollWidth - container.clientWidth > 8
-    setIsDesktopViewport(desktop)
-    setShowDesktopButton(desktop && canScroll)
-    setIsAtStart(container.scrollLeft <= 8)
-  }, [])
+function useShouldLoadMediaQuery(mediaQueryText: string) {
+  const [shouldLoad, setShouldLoad] = useState(false)
 
   useEffect(() => {
-    syncScrollerState()
-    const container = containerRef.current
-    if (!container) return
+    if (shouldLoad || typeof window === "undefined") return
 
-    container.addEventListener("scroll", syncScrollerState, { passive: true })
-    window.addEventListener("resize", syncScrollerState)
-
-    return () => {
-      container.removeEventListener("scroll", syncScrollerState)
-      window.removeEventListener("resize", syncScrollerState)
-    }
-  }, [syncScrollerState, children])
-
-  const applyTrackOffset = (offsetPx: number, animated: boolean) => {
-    const track = trackRef.current
-    if (!track) return
-
-    track.style.transition = animated
-      ? "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)"
-      : "none"
-    track.style.transform = `translateX(${offsetPx}px)`
-  }
-
-  const stopScrollAnimation = useCallback(() => {
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current)
-      animationFrameRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => stopScrollAnimation()
-  }, [stopScrollAnimation])
-
-  const animateScrollTo = useCallback(
-    (targetLeft: number, duration = 430) => {
-      const container = containerRef.current
-      if (!container) return
-      stopScrollAnimation()
-
-      const startLeft = container.scrollLeft
-      const maxScroll = Math.max(container.scrollWidth - container.clientWidth, 0)
-      const clampedTarget = Math.max(0, Math.min(targetLeft, maxScroll))
-      const distance = clampedTarget - startLeft
-      if (Math.abs(distance) < 1) return
-
-      const startTs = performance.now()
-      const easeOutCubic = (t: number) => 1 - (1 - t) * (1 - t) * (1 - t)
-
-      const step = (now: number) => {
-        const elapsed = now - startTs
-        const progress = Math.min(elapsed / duration, 1)
-        container.scrollLeft = startLeft + distance * easeOutCubic(progress)
-
-        if (progress < 1) {
-          animationFrameRef.current = requestAnimationFrame(step)
-        } else {
-          animationFrameRef.current = null
-        }
-      }
-
-      animationFrameRef.current = requestAnimationFrame(step)
-    },
-    [stopScrollAnimation]
-  )
-
-  const startMomentumScroll = useCallback(
-    (initialVelocity: number) => {
-      const container = containerRef.current
-      if (!container) return
-      stopScrollAnimation()
-
-      let velocity = initialVelocity
-      let lastTs = performance.now()
-
-      const step = (now: number) => {
-        const currentContainer = containerRef.current
-        if (!currentContainer) {
-          animationFrameRef.current = null
-          return
-        }
-
-        const dt = Math.max(now - lastTs, 1)
-        lastTs = now
-
-        const maxScroll = Math.max(currentContainer.scrollWidth - currentContainer.clientWidth, 0)
-        const nextLeft = currentContainer.scrollLeft + velocity * dt
-
-        if (nextLeft <= 0 || nextLeft >= maxScroll) {
-          currentContainer.scrollLeft = Math.max(0, Math.min(nextLeft, maxScroll))
-          animationFrameRef.current = null
-          return
-        }
-
-        currentContainer.scrollLeft = nextLeft
-
-        const friction = Math.pow(0.93, dt / 16)
-        velocity *= friction
-
-        if (Math.abs(velocity) < 0.02) {
-          animationFrameRef.current = null
-          return
-        }
-
-        animationFrameRef.current = requestAnimationFrame(step)
-      }
-
-      animationFrameRef.current = requestAnimationFrame(step)
-    },
-    [stopScrollAnimation]
-  )
-
-  const onTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    if (!isMobileViewport()) return
-    if ((event.target as HTMLElement)?.closest?.("a")) return
-    const container = containerRef.current
-    if (!container) return
-
-    dragRef.current.isDragging = true
-    dragRef.current.startX = event.touches[0].clientX
-    dragRef.current.startScrollLeft = container.scrollLeft
-    applyTrackOffset(0, false)
-  }
-
-  const onTouchMove = (event: TouchEvent<HTMLDivElement>) => {
-    if (!isMobileViewport()) return
-    const container = containerRef.current
-    if (!container || !dragRef.current.isDragging) return
-
-    const currentX = event.touches[0].clientX
-    const deltaX = currentX - dragRef.current.startX
-    const desiredScrollLeft = dragRef.current.startScrollLeft - deltaX
-    const maxScroll = Math.max(container.scrollWidth - container.clientWidth, 0)
-
-    let offset = 0
-    if (desiredScrollLeft < 0) {
-      const overdrag = -desiredScrollLeft
-      offset = Math.min(overdrag * 0.34, 72)
-    } else if (desiredScrollLeft > maxScroll) {
-      const overdrag = desiredScrollLeft - maxScroll
-      offset = -Math.min(overdrag * 0.34, 72)
-    } else {
-      container.scrollLeft = desiredScrollLeft
-    }
-
-    if (offset !== 0) {
-      event.preventDefault()
-    }
-
-    applyTrackOffset(offset, false)
-  }
-
-  const releaseElastic = () => {
-    if (!dragRef.current.isDragging) return
-    dragRef.current.isDragging = false
-    applyTrackOffset(0, true)
-  }
-
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (!isDesktopViewport || event.pointerType === "touch" || event.button !== 0) return
-    if ((event.target as HTMLElement)?.closest?.("a")) return
-    const container = containerRef.current
-    if (!container) return
-
-    stopScrollAnimation()
-    pointerDragRef.current.isDragging = true
-    pointerDragRef.current.pointerId = event.pointerId
-    pointerDragRef.current.startX = event.clientX
-    pointerDragRef.current.startScrollLeft = container.scrollLeft
-    pointerDragRef.current.lastX = event.clientX
-    pointerDragRef.current.lastTs = performance.now()
-    pointerDragRef.current.velocityX = 0
-    pointerDragRef.current.hadElasticOverdrag = false
-    container.setPointerCapture(event.pointerId)
-    setIsPointerDragging(true)
-    applyTrackOffset(0, false)
-  }
-
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const container = containerRef.current
-    if (!container || !pointerDragRef.current.isDragging) return
-
-    const now = performance.now()
-    const dt = Math.max(now - pointerDragRef.current.lastTs, 1)
-    const stepVelocity = (event.clientX - pointerDragRef.current.lastX) / dt
-    pointerDragRef.current.velocityX = pointerDragRef.current.velocityX * 0.6 + stepVelocity * 0.4
-    pointerDragRef.current.lastX = event.clientX
-    pointerDragRef.current.lastTs = now
-
-    const deltaX = event.clientX - pointerDragRef.current.startX
-    const desiredScrollLeft = pointerDragRef.current.startScrollLeft - deltaX
-    const maxScroll = Math.max(container.scrollWidth - container.clientWidth, 0)
-
-    let offset = 0
-    if (desiredScrollLeft < 0) {
-      const overdrag = -desiredScrollLeft
-      offset = Math.min(overdrag * 0.34, 72)
-      pointerDragRef.current.hadElasticOverdrag = true
-    } else if (desiredScrollLeft > maxScroll) {
-      const overdrag = desiredScrollLeft - maxScroll
-      offset = -Math.min(overdrag * 0.34, 72)
-      pointerDragRef.current.hadElasticOverdrag = true
-    } else {
-      container.scrollLeft = desiredScrollLeft
-      pointerDragRef.current.hadElasticOverdrag = false
-    }
-
-    applyTrackOffset(offset, false)
-    event.preventDefault()
-  }
-
-  const releasePointerDrag = () => {
-    if (!pointerDragRef.current.isDragging) return
-    const hadElasticOverdrag = pointerDragRef.current.hadElasticOverdrag
-    const velocityX = pointerDragRef.current.velocityX
-    pointerDragRef.current.isDragging = false
-    pointerDragRef.current.pointerId = -1
-    pointerDragRef.current.velocityX = 0
-    pointerDragRef.current.hadElasticOverdrag = false
-    setIsPointerDragging(false)
-
-    applyTrackOffset(0, true)
-    if (!hadElasticOverdrag) {
-      const scrollVelocity = -velocityX
-      if (Math.abs(scrollVelocity) > 0.08) {
-        startMomentumScroll(scrollVelocity)
-      }
-    }
-  }
-
-  const onScrollButtonClick = () => {
-    const container = containerRef.current
-    if (!container) return
-
-    if (isAtStart) {
-      const maxScroll = Math.max(container.scrollWidth - container.clientWidth, 0)
-      const nextPosition = Math.min(container.scrollLeft + container.clientWidth * 0.9, maxScroll)
-      animateScrollTo(nextPosition, 460)
+    const mediaQuery = window.matchMedia(mediaQueryText)
+    if (mediaQuery.matches) {
+      setShouldLoad(true)
       return
     }
 
-    animateScrollTo(0, 420)
-  }
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setShouldLoad(true)
+    }
 
-  const edgeGradientClass = isAtStart
-    ? "right-0 bg-gradient-to-l from-[#f7f7f7] via-[#f7f7f7]/92 to-transparent"
-    : "left-0 bg-gradient-to-r from-[#f7f7f7] via-[#f7f7f7]/92 to-transparent"
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
+  }, [mediaQueryText, shouldLoad])
+
+  return shouldLoad
+}
+
+function useShouldEnhanceDesktopScroller() {
+  return useShouldLoadMediaQuery("(min-width: 640px)")
+}
+
+function useShouldLoadDesktopChapterIndicator() {
+  return useShouldLoadMediaQuery("(min-width: 1024px)")
+}
+
+type ElasticScrollerComponent = ComponentType<ElasticLessonsScrollerProps>
+type ChapterSectionIndicatorComponent = ComponentType<{ chapterIds: string[] }>
+
+function LazyInvataChapterSectionIndicator({
+  chapterIds,
+  enabled,
+}: {
+  chapterIds: string[]
+  enabled: boolean
+}) {
+  const [Indicator, setIndicator] = useState<ChapterSectionIndicatorComponent | null>(null)
+
+  useEffect(() => {
+    if (!enabled || Indicator) return
+
+    let cancelled = false
+    void import("@/components/invata/invata-chapter-section-indicator").then((mod) => {
+      if (!cancelled) {
+        setIndicator(() => mod.InvataChapterSectionIndicator)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, Indicator])
+
+  if (!Indicator) return null
+
+  return <Indicator chapterIds={chapterIds} />
+}
+
+interface LazyElasticLessonsScrollerProps extends ElasticLessonsScrollerProps {
+  enabled: boolean
+}
+
+function LazyElasticLessonsScroller({
+  children,
+  bleedMargins = true,
+  enabled,
+}: LazyElasticLessonsScrollerProps) {
+  const [Scroller, setScroller] = useState<ElasticScrollerComponent | null>(null)
+
+  useEffect(() => {
+    if (!enabled || Scroller) return
+
+    let cancelled = false
+    void import("@/components/invata/elastic-lessons-scroller").then((mod) => {
+      if (!cancelled) {
+        setScroller(() => mod.ElasticLessonsScroller)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, Scroller])
+
+  if (Scroller) {
+    return <Scroller bleedMargins={bleedMargins}>{children}</Scroller>
+  }
 
   return (
     <div className="relative">
       <div
-        ref={containerRef}
         className={
           bleedMargins
-            ? `-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 ${isPointerDragging ? "select-none" : ""}`
-            : `overflow-x-auto scrollbar-hide px-5 pb-2 ${isPointerDragging ? "select-none" : ""}`
+            ? "-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0"
+            : "overflow-x-auto scrollbar-hide px-5 pb-2"
         }
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={releaseElastic}
-        onTouchCancel={releaseElastic}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={releasePointerDrag}
-        onPointerCancel={releasePointerDrag}
       >
         <div
-          ref={trackRef}
-          className={`flex min-w-max items-start gap-4 sm:gap-5 ${bleedMargins ? "pr-5 sm:pr-0" : "pr-5"}`}
+          className={`flex min-w-max items-start gap-4 sm:gap-5 ${
+            bleedMargins ? "pr-5 sm:pr-0" : "pr-5"
+          }`}
         >
           {children}
         </div>
       </div>
-
-      {showDesktopButton ? (
-        <>
-          <div
-            aria-hidden="true"
-            className={`pointer-events-none absolute inset-y-0 hidden w-24 sm:block ${edgeGradientClass}`}
-          />
-          <button
-            type="button"
-            aria-label={isAtStart ? "Arată mai multe lecții" : "Înapoi la început"}
-            onClick={onScrollButtonClick}
-            className={`absolute top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-[#2f2f2f] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition-transform duration-200 hover:scale-110 sm:flex ${
-              isAtStart ? "right-2" : "left-2"
-            }`}
-          >
-            <ArrowRight className={`h-5 w-5 ${isAtStart ? "" : "rotate-180"}`} />
-          </button>
-        </>
-      ) : null}
     </div>
   )
 }
 
-function isHiddenGeneratingChapter(chapter: LearningPathChapter): boolean {
+function isHiddenGeneratingChapter(chapter: LearningPathHubChapter): boolean {
   return chapter.generation_status === "creating" || chapter.generation_status === "failed"
 }
 
 interface InvataChapterSectionProps {
-  chapter: LearningPathChapter
+  chapter: LearningPathHubChapter
   chapterIndex: number
-  chapterLessons: LearningPathLesson[]
+  chapterLessons: LearningPathHubLesson[]
   isLocked: boolean
   completedLessonIds: string[]
   lessonProgressByLessonId: LessonProgressByLessonId
+  shouldEnhanceDesktopScroller: boolean
   isDeletingPersonalizedChapter?: boolean
-  onDeletePersonalizedChapter?: (chapter: LearningPathChapter) => void
+  onDeletePersonalizedChapter?: (chapter: LearningPathHubChapter) => void
 }
 
 function InvataChapterSection({
@@ -400,6 +202,7 @@ function InvataChapterSection({
   isLocked,
   completedLessonIds,
   lessonProgressByLessonId,
+  shouldEnhanceDesktopScroller,
   isDeletingPersonalizedChapter = false,
   onDeletePersonalizedChapter,
 }: InvataChapterSectionProps) {
@@ -547,7 +350,7 @@ function InvataChapterSection({
       <div className="hidden sm:block">
         <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
           {chapterLessons.length ? (
-            <ElasticLessonsScroller>
+            <LazyElasticLessonsScroller enabled={shouldEnhanceDesktopScroller}>
               {chapterLessons.map((lesson, lessonIndex) => {
                 const lessonHref = getLearningPathLessonHref(chapter, lesson)
                 const cardContent = (
@@ -583,7 +386,7 @@ function InvataChapterSection({
                   </Link>
                 )
               })}
-            </ElasticLessonsScroller>
+            </LazyElasticLessonsScroller>
           ) : (
             <p className="text-sm text-[#7a7a7a]">Acest capitol nu are încă lecții.</p>
           )}
@@ -594,7 +397,7 @@ function InvataChapterSection({
 }
 
 function getArchivedChapterProgress(
-  chapterLessons: LearningPathLesson[],
+  chapterLessons: LearningPathHubLesson[],
   completedLessonIds: string[],
 ): number {
   if (!chapterLessons.length) return 0
@@ -608,8 +411,8 @@ function InvataArchivedLearningPathsSection({
   lessonsByChapter,
   completedLessonIds,
 }: {
-  chapters: LearningPathChapter[]
-  lessonsByChapter: Record<string, LearningPathLesson[]>
+  chapters: LearningPathHubChapter[]
+  lessonsByChapter: Record<string, LearningPathHubLesson[]>
   completedLessonIds: string[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -723,20 +526,187 @@ export function LearningPathsList({
   completedLessonIds = [],
   lessonProgressByLessonId = {},
 }: LearningPathsListProps) {
-  const router = useRouter()
-  const lockedChapterIdSet = new Set(lockedChapterIds)
+  const { loading: authLoading, user } = useAuth()
+  const setInvataHubChapters = useSetInvataHubChapters()
+  const shouldEnhanceDesktopScroller = useShouldEnhanceDesktopScroller()
+  const shouldLoadDesktopChapterIndicator = useShouldLoadDesktopChapterIndicator()
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null)
   const [deletedChapterIds, setDeletedChapterIds] = useState<Set<string>>(() => new Set())
+  const [hubChapters, setHubChapters] = useState(chapters)
+  const [hubArchivedChapters, setHubArchivedChapters] = useState(archivedChapters)
+  const [hubLessonsByChapter, setHubLessonsByChapter] = useState(lessonsByChapter)
+  const [hubLockedChapterIds, setHubLockedChapterIds] = useState(lockedChapterIds)
+  const [hubSessionReadyUserId, setHubSessionReadyUserId] = useState<string | null>(null)
+  const [hubRefreshToken, setHubRefreshToken] = useState(0)
+  const lockedChapterIdSet = useMemo(
+    () => new Set(hubLockedChapterIds),
+    [hubLockedChapterIds],
+  )
+  const [hydratedCompletedLessonIds, setHydratedCompletedLessonIds] = useState(completedLessonIds)
+  const [hydratedLessonProgressByLessonId, setHydratedLessonProgressByLessonId] =
+    useState(lessonProgressByLessonId)
 
-  const visibleChapters = chapters
-    .filter((chapter) => !deletedChapterIds.has(chapter.id))
-    .filter((chapter) => !isHiddenGeneratingChapter(chapter))
-  const visibleArchivedChapters = archivedChapters
-    .filter((chapter) => !deletedChapterIds.has(chapter.id))
-    .filter((chapter) => !isHiddenGeneratingChapter(chapter))
+  useEffect(() => {
+    const refresh = () => setHubRefreshToken((token) => token + 1)
+    window.addEventListener(INVATA_HUB_REFRESH_EVENT, refresh)
+    return () => window.removeEventListener(INVATA_HUB_REFRESH_EVENT, refresh)
+  }, [])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (user) return
+
+    setHubChapters(chapters)
+    setHubArchivedChapters(archivedChapters)
+    setHubLessonsByChapter(lessonsByChapter)
+    setHubLockedChapterIds(lockedChapterIds)
+    setHubSessionReadyUserId(null)
+    setHydratedCompletedLessonIds(completedLessonIds)
+    setHydratedLessonProgressByLessonId(lessonProgressByLessonId)
+  }, [
+    archivedChapters,
+    authLoading,
+    chapters,
+    completedLessonIds,
+    lessonProgressByLessonId,
+    lessonsByChapter,
+    lockedChapterIds,
+    user,
+  ])
+
+  useEffect(() => {
+    if (authLoading || !user?.id) return
+
+    const controller = new AbortController()
+    setHubSessionReadyUserId(null)
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/invata/hub-session", {
+          credentials: "same-origin",
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          setHubSessionReadyUserId(user.id)
+          return
+        }
+
+        const data = (await response.json().catch(() => ({}))) as HubSessionResponse
+        if (controller.signal.aborted) return
+
+        if (Array.isArray(data.chapters)) setHubChapters(data.chapters)
+        if (Array.isArray(data.archivedChapters)) setHubArchivedChapters(data.archivedChapters)
+        if (data.lessonsByChapter && typeof data.lessonsByChapter === "object") {
+          setHubLessonsByChapter(data.lessonsByChapter)
+        }
+        if (Array.isArray(data.lockedChapterIds)) setHubLockedChapterIds(data.lockedChapterIds)
+        if (data.lessonProgressByLessonId && typeof data.lessonProgressByLessonId === "object") {
+          setHydratedLessonProgressByLessonId(data.lessonProgressByLessonId)
+        }
+        setHydratedCompletedLessonIds([])
+        setHubSessionReadyUserId(user.id)
+      } catch (error) {
+        if ((error as Error)?.name === "AbortError") return
+        setHubSessionReadyUserId(user.id)
+      }
+    })()
+
+    return () => controller.abort()
+  }, [authLoading, hubRefreshToken, user?.id])
+
+  const visibleChapters = useMemo(
+    () =>
+      hubChapters
+        .filter((chapter) => !deletedChapterIds.has(chapter.id))
+        .filter((chapter) => !isHiddenGeneratingChapter(chapter)),
+    [hubChapters, deletedChapterIds],
+  )
+  const visibleArchivedChapters = useMemo(
+    () =>
+      hubArchivedChapters
+        .filter((chapter) => !deletedChapterIds.has(chapter.id))
+        .filter((chapter) => !isHiddenGeneratingChapter(chapter)),
+    [hubArchivedChapters, deletedChapterIds],
+  )
+
+  useEffect(() => {
+    setInvataHubChapters?.(visibleChapters)
+  }, [setInvataHubChapters, visibleChapters])
+
+  useEffect(() => {
+    setHydratedCompletedLessonIds(completedLessonIds)
+  }, [completedLessonIds])
+
+  useEffect(() => {
+    setHydratedLessonProgressByLessonId(lessonProgressByLessonId)
+  }, [lessonProgressByLessonId])
+
+  const progressRequest = useMemo(() => {
+    const allLessonIds = Object.values(hubLessonsByChapter).flatMap((lessons) =>
+      lessons.map((lesson) => lesson.id)
+    )
+    const publicVisibleLessonIds = visibleChapters
+      .filter((chapter) => chapter.is_personalized !== true)
+      .flatMap((chapter) => (hubLessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
+    const personalizedVisibleLessonIds = visibleChapters
+      .filter((chapter) => chapter.is_personalized === true)
+      .flatMap((chapter) => (hubLessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
+
+    return {
+      allLessonIds,
+      publicVisibleLessonIds,
+      personalizedVisibleLessonIds,
+    }
+  }, [hubLessonsByChapter, visibleChapters])
+
+  const progressRequestKey = [
+    progressRequest.allLessonIds.join(","),
+    progressRequest.publicVisibleLessonIds.join(","),
+    progressRequest.personalizedVisibleLessonIds.join(","),
+  ].join("|")
+
+  useEffect(() => {
+    if (authLoading) return
+    if (user && hubSessionReadyUserId !== user.id) return
+    if (!user && !hasGuestLearningPathProgressCookie()) return
+    if (
+      progressRequest.allLessonIds.length === 0 &&
+      progressRequest.publicVisibleLessonIds.length === 0 &&
+      progressRequest.personalizedVisibleLessonIds.length === 0
+    ) {
+      return
+    }
+
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const response = await fetch("/api/invata/hub-progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(progressRequest),
+          credentials: "same-origin",
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const data = (await response.json().catch(() => ({}))) as HubProgressResponse
+        if (controller.signal.aborted) return
+
+        if (Array.isArray(data.completedLessonIds)) {
+          setHydratedCompletedLessonIds(data.completedLessonIds)
+        }
+        if (data.lessonProgressByLessonId && typeof data.lessonProgressByLessonId === "object") {
+          setHydratedLessonProgressByLessonId(data.lessonProgressByLessonId)
+        }
+      } catch (error) {
+        if ((error as Error)?.name === "AbortError") return
+      }
+    })()
+
+    return () => controller.abort()
+  }, [authLoading, hubSessionReadyUserId, progressRequest, progressRequestKey, user])
 
   const handleDeletePersonalizedChapter = useCallback(
-    async (chapter: LearningPathChapter) => {
+    async (chapter: LearningPathHubChapter) => {
       if (chapter.is_personalized !== true || deletingChapterId) return
 
       const confirmed = window.confirm(
@@ -764,14 +734,14 @@ export function LearningPathsList({
           next.add(chapter.id)
           return next
         })
-        router.refresh()
+        dispatchInvataHubRefresh()
       } catch {
         window.alert("Conexiunea a eșuat. Încearcă din nou.")
       } finally {
         setDeletingChapterId(null)
       }
     },
-    [deletingChapterId, router],
+    [deletingChapterId],
   )
 
   if (!visibleChapters.length) {
@@ -787,7 +757,10 @@ export function LearningPathsList({
 
   return (
     <div className="pb-14">
-      <InvataChapterSectionIndicator chapterIds={visibleChapters.map((c) => c.id)} />
+      <LazyInvataChapterSectionIndicator
+        chapterIds={visibleChapters.map((c) => c.id)}
+        enabled={shouldLoadDesktopChapterIndicator}
+      />
 
       <div className="space-y-12 sm:space-y-10">
         {visibleChapters.map((chapter, chapterIndex) => (
@@ -795,10 +768,11 @@ export function LearningPathsList({
             key={chapter.id}
             chapter={chapter}
             chapterIndex={chapterIndex}
-            chapterLessons={lessonsByChapter[chapter.id] || []}
+            chapterLessons={hubLessonsByChapter[chapter.id] || []}
             isLocked={lockedChapterIdSet.has(chapter.id)}
-            completedLessonIds={completedLessonIds}
-            lessonProgressByLessonId={lessonProgressByLessonId}
+            completedLessonIds={hydratedCompletedLessonIds}
+            lessonProgressByLessonId={hydratedLessonProgressByLessonId}
+            shouldEnhanceDesktopScroller={shouldEnhanceDesktopScroller}
             isDeletingPersonalizedChapter={deletingChapterId === chapter.id}
             onDeletePersonalizedChapter={handleDeletePersonalizedChapter}
           />
@@ -807,8 +781,8 @@ export function LearningPathsList({
 
       <InvataArchivedLearningPathsSection
         chapters={visibleArchivedChapters}
-        lessonsByChapter={lessonsByChapter}
-        completedLessonIds={completedLessonIds}
+        lessonsByChapter={hubLessonsByChapter}
+        completedLessonIds={hydratedCompletedLessonIds}
       />
     </div>
   )

@@ -1,46 +1,30 @@
 import type { Metadata } from "next"
-import { cookies } from "next/headers"
 import { Navigation } from "@/components/navigation"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
+import type { LearningPathHubChapter } from "@/lib/supabase-learning-paths"
 import {
-  getCompletedLearningPathItemIdsForUser,
-  getCompletedLearningPathLessonIdsForUser,
-  getLearningPathChapters,
-  getLearningPathLessonItemAggregates,
-  getLearningPathLessonsByChapterIds,
-  type LearningPathChapter,
-  type LearningPathLesson,
-} from "@/lib/supabase-learning-paths"
-import {
-  GUEST_LEARNING_PATH_PROGRESS_COOKIE,
-  getGuestCompletedItemIdsForLesson,
-  parseGuestLearningPathProgress,
-} from "@/lib/guest-learning-path-cookie"
-import { createClient } from "@/lib/supabase/server"
+  getCachedPublicLearningPathHubCatalog,
+  getCachedPublicLearningPathLessonItemCounts,
+} from "@/lib/learning-path-hub-cache"
 import { InvataChapterImageLoadProvider } from "@/components/invata/invata-chapter-image-load-context"
 import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context"
 import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
-import { PersonalizedCourseGenerator } from "@/components/invata/personalized-course-generator"
+import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import {
   isFreePreviewLearningPathChapterSlug,
   splitLearningPathChaptersForFreePlanHub,
 } from "@/lib/learning-path-free-plan"
-import { getLearningPathAccess } from "@/lib/learning-path-access"
-import { createAdminClient } from "@/lib/supabaseAdmin"
-import {
-  canGeneratePersonalizedPathForFreePlan,
-  countUserPersonalizedCourses,
-} from "@/lib/personalized-courses/generation-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
+export const revalidate = 300
 
-function sortLearningPathChaptersForHub(chapters: LearningPathChapter[]): LearningPathChapter[] {
+function sortLearningPathChaptersForHub(chapters: LearningPathHubChapter[]): LearningPathHubChapter[] {
   return [...chapters].sort((a, b) => {
     const aPersonalized = a.is_personalized === true
     const bPersonalized = b.is_personalized === true
@@ -55,90 +39,25 @@ function sortLearningPathChaptersForHub(chapters: LearningPathChapter[]): Learni
 }
 
 export default async function InvataPage() {
-  const access = await getLearningPathAccess(null)
-  const hasFullAccess = access.mode === "full"
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const publicCatalog = await getCachedPublicLearningPathHubCatalog()
+  const chapters = sortLearningPathChaptersForHub(publicCatalog.chapters)
+  const lessonsByChapter = publicCatalog.lessonsByChapter
 
-  const chapters = sortLearningPathChaptersForHub(await getLearningPathChapters(supabase))
+  const lockedChapterIds = chapters
+    .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
+    .map((chapter) => chapter.id)
 
-  const lessonsByChapter = await getLearningPathLessonsByChapterIds(
-    chapters.map((c) => c.id),
-    supabase
-  )
-  const allLessonIds = Object.values(lessonsByChapter).flatMap((lessons) => lessons.map((l) => l.id))
+  const { visibleChapters, archivedChapters } = splitLearningPathChaptersForFreePlanHub(chapters)
 
-  const completedLessonIds = user
-    ? await getCompletedLearningPathLessonIdsForUser(supabase, user.id, allLessonIds)
-    : []
+  const visiblePublicLessonIds = visibleChapters
+    .flatMap((chapter) => (lessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
 
-  const { counts: itemCountsByLessonId, itemIdsByLessonId } =
-    await getLearningPathLessonItemAggregates(allLessonIds, supabase)
-  const allItemIds = Object.values(itemIdsByLessonId).flat()
+  const itemCountsByLessonId = await getCachedPublicLearningPathLessonItemCounts(visiblePublicLessonIds)
 
-  let completedItemIdSet = new Set<string>()
-  if (user && allItemIds.length > 0) {
-    const completedItemIds = await getCompletedLearningPathItemIdsForUser(
-      supabase,
-      user.id,
-      allItemIds
-    )
-    completedItemIdSet = new Set(completedItemIds)
-  } else if (!user) {
-    const cookieStore = await cookies()
-    const guestMap = parseGuestLearningPathProgress(
-      cookieStore.get(GUEST_LEARNING_PATH_PROGRESS_COOKIE)?.value
-    )
-    for (const lessonId of allLessonIds) {
-      for (const itemId of getGuestCompletedItemIdsForLesson(guestMap, lessonId)) {
-        completedItemIdSet.add(itemId)
-      }
-    }
-  }
-
-  const completedLessonIdSet = new Set(completedLessonIds)
   const lessonProgressByLessonId: Record<string, { completed: number; total: number }> = {}
-  for (const lessonId of allLessonIds) {
+  for (const lessonId of visiblePublicLessonIds) {
     const total = itemCountsByLessonId[lessonId] ?? 0
-    if (total === 0) {
-      lessonProgressByLessonId[lessonId] = {
-        completed: completedLessonIdSet.has(lessonId) ? 1 : 0,
-        total: 0,
-      }
-      continue
-    }
-    const lessonItemIds = itemIdsByLessonId[lessonId] ?? []
-    const completed = lessonItemIds.filter((id) => completedItemIdSet.has(id)).length
-    lessonProgressByLessonId[lessonId] = { completed, total }
-  }
-
-  const lockedChapterIds = hasFullAccess
-    ? []
-    : chapters
-        .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
-        .map((chapter) => chapter.id)
-
-  const { visibleChapters, archivedChapters } = hasFullAccess
-    ? { visibleChapters: chapters, archivedChapters: [] as LearningPathChapter[] }
-    : splitLearningPathChaptersForFreePlanHub(chapters)
-
-  let canGeneratePersonalizedPath = false
-  let personalizedPathBlockedReason: string | null = null
-
-  if (user) {
-    if (hasFullAccess) {
-      canGeneratePersonalizedPath = true
-    } else {
-      const admin = createAdminClient()
-      const personalizedCourseCount = await countUserPersonalizedCourses(admin, user.id)
-      canGeneratePersonalizedPath = canGeneratePersonalizedPathForFreePlan(personalizedCourseCount)
-      if (!canGeneratePersonalizedPath) {
-        personalizedPathBlockedReason =
-          "Planul gratuit include un singur traseu personalizat. Treci la Plus pentru a genera mai multe."
-      }
-    }
+    lessonProgressByLessonId[lessonId] = { completed: 0, total }
   }
 
   return (
@@ -162,29 +81,19 @@ export default async function InvataPage() {
                 </p>
               </div>
               <div className="flex w-full max-w-[420px] flex-col items-start gap-3 sm:items-end">
-                <PersonalizedCourseGenerator
-                  isAuthenticated={Boolean(user)}
-                  canGeneratePersonalizedPath={canGeneratePersonalizedPath}
-                  personalizedPathBlockedReason={personalizedPathBlockedReason}
-                  className="hidden w-full sm:block"
-                />
+                <InvataPersonalizedCourseEntry className="hidden w-full sm:block" />
                 <InvataAdminLearningPathsLink />
               </div>
             </header>
 
-            <PersonalizedCourseGenerator
-              isAuthenticated={Boolean(user)}
-              canGeneratePersonalizedPath={canGeneratePersonalizedPath}
-              personalizedPathBlockedReason={personalizedPathBlockedReason}
-              className="mb-6 sm:hidden"
-            />
+            <InvataPersonalizedCourseEntry className="mb-6 sm:hidden" />
 
             <LearningPathsList
               chapters={visibleChapters}
               archivedChapters={archivedChapters}
               lessonsByChapter={lessonsByChapter}
               lockedChapterIds={lockedChapterIds}
-              completedLessonIds={completedLessonIds}
+              completedLessonIds={[]}
               lessonProgressByLessonId={lessonProgressByLessonId}
             />
 

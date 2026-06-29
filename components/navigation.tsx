@@ -1,6 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useTransition, type CSSProperties } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ComponentType,
+  type CSSProperties,
+} from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users } from "lucide-react"
@@ -21,7 +29,7 @@ import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
-import { InvataMobilePathNav } from "@/components/invata/invata-mobile-path-nav"
+import type { InvataMobilePathNavProps } from "@/components/invata/invata-mobile-path-nav"
 import { useInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
 import {
   getMobileTopBarContent,
@@ -39,6 +47,7 @@ function isInsideMonacoEditor(element: EventTarget | null): boolean {
 }
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
+type InvataMobilePathNavComponent = ComponentType<InvataMobilePathNavProps>
 
 /** Desktop: ca butonul „Start” din dashboard (gradient + glow). */
 const GUEST_REGISTER_CTA_CLASS =
@@ -76,6 +85,8 @@ export function Navigation() {
   const [hasMore, setHasMore] = useState(false)
   const [nextOffset, setNextOffset] = useState(0)
   const [highlightIndex, setHighlightIndex] = useState(-1)
+  const [LoadedInvataMobilePathNav, setLoadedInvataMobilePathNav] =
+    useState<InvataMobilePathNavComponent | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const resultsRef = useRef<HTMLDivElement | null>(null)
   const cacheRef = useRef<Map<string, { results: SearchResultItem[]; hasMore: boolean }>>(new Map())
@@ -535,6 +546,21 @@ export function Navigation() {
     isMobile && isInvataHubRoute(pathname) && Boolean(invataHubChapters?.length)
 
   useEffect(() => {
+    if (!showInvataHubMobileNav || LoadedInvataMobilePathNav) return
+
+    let cancelled = false
+    void import("@/components/invata/invata-mobile-path-nav").then((mod) => {
+      if (!cancelled) {
+        setLoadedInvataMobilePathNav(() => mod.InvataMobilePathNav)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [LoadedInvataMobilePathNav, showInvataHubMobileNav])
+
+  useEffect(() => {
     if (showMobileAppShell) {
       document.body.classList.add("mobile-app-shell")
     } else {
@@ -577,7 +603,29 @@ export function Navigation() {
                 }`}
               >
                 {showInvataHubMobileNav && invataHubChapters ? (
-                  <InvataMobilePathNav chapters={invataHubChapters} embeddedInNavbar />
+                  LoadedInvataMobilePathNav ? (
+                    <LoadedInvataMobilePathNav chapters={invataHubChapters} embeddedInNavbar />
+                  ) : (
+                    <nav
+                      aria-label="Learning paths"
+                      className="relative flex h-full min-h-0 w-full flex-col"
+                    >
+                      <div className="flex min-h-0 flex-1 items-start gap-3 overflow-x-auto pt-1.5 scrollbar-hide">
+                        {invataHubChapters.map((chapter) => (
+                          <a
+                            key={chapter.id}
+                            href={`#invata-chapter-${chapter.id}`}
+                            className="relative flex w-[104px] shrink-0 flex-col items-center gap-1.5"
+                          >
+                            <span className="h-[52px] w-full rounded-xl border-2 border-[#e6e6e6] bg-white" />
+                            <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight text-[#4f4f4f]">
+                              {chapter.title}
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    </nav>
+                  )
                 ) : isGuestProblemeOrCursuri ? (
                   <div className="flex min-w-0 flex-1 items-center gap-2 pr-1">
                     <Link
