@@ -497,21 +497,27 @@ export async function getLearningPathLessonItemCountsByLessonIds(
 ): Promise<Record<string, number>> {
   if (!lessonIds.length) return {}
 
-  const counts: Record<string, number> = {}
-
+  const chunks: string[][] = []
   for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
-    const chunk = lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE)
-    const { data, error } = await client
-      .from("learning_path_lesson_items")
-      .select("lesson_id")
-      .in("lesson_id", chunk)
-      .eq("is_active", true)
+    chunks.push(lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE))
+  }
 
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      client
+        .from("learning_path_lesson_items")
+        .select("lesson_id")
+        .in("lesson_id", chunk)
+        .eq("is_active", true)
+    ),
+  )
+
+  const counts: Record<string, number> = {}
+  for (const { data, error } of results) {
     if (error) {
       console.error("Error fetching learning path lesson item counts:", error)
       continue
     }
-
     for (const row of data ?? []) {
       const lessonId = row.lesson_id as string
       counts[lessonId] = (counts[lessonId] ?? 0) + 1
@@ -530,28 +536,33 @@ export async function getLearningPathLessonItemAggregates(
     return { counts: {}, itemIdsByLessonId: {} }
   }
 
+  const chunks: string[][] = []
+  for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
+    chunks.push(lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE))
+  }
+
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      client
+        .from("learning_path_lesson_items")
+        .select("id, lesson_id")
+        .in("lesson_id", chunk)
+        .eq("is_active", true)
+    ),
+  )
+
   const counts: Record<string, number> = {}
   const itemIdsByLessonId: Record<string, string[]> = {}
-
-  for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
-    const chunk = lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE)
-    const { data, error } = await client
-      .from("learning_path_lesson_items")
-      .select("id, lesson_id")
-      .in("lesson_id", chunk)
-      .eq("is_active", true)
-
+  for (const { data, error } of results) {
     if (error) {
       console.error("Error fetching learning path lesson item aggregates:", error)
       continue
     }
-
     for (const row of data ?? []) {
       const lessonId = row.lesson_id as string
       const itemId = row.id as string
       counts[lessonId] = (counts[lessonId] ?? 0) + 1
-      if (!itemIdsByLessonId[lessonId]) itemIdsByLessonId[lessonId] = []
-      itemIdsByLessonId[lessonId].push(itemId)
+      ;(itemIdsByLessonId[lessonId] ??= []).push(itemId)
     }
   }
 
