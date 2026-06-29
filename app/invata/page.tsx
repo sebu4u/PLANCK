@@ -4,11 +4,16 @@ import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
-import type { LearningPathHubChapter } from "@/lib/supabase-learning-paths"
+import {
+  getLearningPathLessonItemCountsByLessonIds,
+  type LearningPathHubChapter,
+} from "@/lib/supabase-learning-paths"
 import {
   getCachedPublicLearningPathHubCatalog,
   getCachedPublicLearningPathLessonItemCounts,
 } from "@/lib/learning-path-hub-cache"
+import { loadSsrPersonalizedLearningPathHub, sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-ssr"
+import { createClient } from "@/lib/supabase/server"
 import { InvataChapterImageLoadProvider } from "@/components/invata/invata-chapter-image-load-context"
 import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context"
 import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
@@ -20,42 +25,66 @@ import {
   isFreePreviewLearningPathChapterSlug,
   splitLearningPathChaptersForFreePlanHub,
 } from "@/lib/learning-path-free-plan"
+import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
-export const revalidate = 300
-
-function sortLearningPathChaptersForHub(chapters: LearningPathHubChapter[]): LearningPathHubChapter[] {
-  return [...chapters].sort((a, b) => {
-    const aPersonalized = a.is_personalized === true
-    const bPersonalized = b.is_personalized === true
-    if (aPersonalized !== bPersonalized) return aPersonalized ? -1 : 1
-
-    if (aPersonalized && bPersonalized) {
-      return Date.parse(b.created_at) - Date.parse(a.created_at)
-    }
-
-    return a.order_index - b.order_index
-  })
-}
+// The page renders user-specific personalized chapters when authenticated, so it cannot
+// be statically cached. The public catalog + item counts are still cached via
+// unstable_cache inside learning-path-hub-cache.ts.
+export const dynamic = "force-dynamic"
 
 export default async function InvataPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const publicCatalog = await getCachedPublicLearningPathHubCatalog()
-  const chapters = sortLearningPathChaptersForHub(publicCatalog.chapters)
-  const lessonsByChapter = publicCatalog.lessonsByChapter
+  // Personalized chapters for the signed-in user are loaded in the same SSR pass so
+  // they render together with the premade chapters, instead of popping in later.
+  const personalizedHub = await loadSsrPersonalizedLearningPathHub(supabase, user)
 
-  const lockedChapterIds = chapters
-    .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
-    .map((chapter) => chapter.id)
+  const allChapters = sortLearningPathChaptersForHub([
+    ...personalizedHub.chapters,
+    ...publicCatalog.chapters,
+  ])
+  const allLessonsByChapter = {
+    ...publicCatalog.lessonsByChapter,
+    ...personalizedHub.lessonsByChapter,
+  }
 
-  const { visibleChapters, archivedChapters } = splitLearningPathChaptersForFreePlanHub(chapters)
+  const access = await getLearningPathAccessForUser(supabase, user, null)
+  const hasFullAccess = access.mode === "full"
+
+  const lockedChapterIds = hasFullAccess
+    ? []
+    : allChapters
+        .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
+        .map((chapter) => chapter.id)
+
+  const { visibleChapters, archivedChapters } = hasFullAccess
+    ? { visibleChapters: allChapters, archivedChapters: [] as LearningPathHubChapter[] }
+    : splitLearningPathChaptersForFreePlanHub(allChapters)
 
   const visiblePublicLessonIds = visibleChapters
-    .flatMap((chapter) => (lessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
+    .filter((chapter) => chapter.is_personalized !== true)
+    .flatMap((chapter) => (allLessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
+  const visiblePersonalizedLessonIds = visibleChapters
+    .filter((chapter) => chapter.is_personalized === true)
+    .flatMap((chapter) => (allLessonsByChapter[chapter.id] ?? []).map((lesson) => lesson.id))
 
-  const itemCountsByLessonId = await getCachedPublicLearningPathLessonItemCounts(visiblePublicLessonIds)
+  const publicItemCounts = await getCachedPublicLearningPathLessonItemCounts(visiblePublicLessonIds)
+  const personalizedItemCounts =
+    visiblePersonalizedLessonIds.length > 0
+      ? await getLearningPathLessonItemCountsByLessonIds(
+          visiblePersonalizedLessonIds,
+          supabase,
+        )
+      : {}
+  const itemCountsByLessonId = { ...publicItemCounts, ...personalizedItemCounts }
 
   const lessonProgressByLessonId: Record<string, { completed: number; total: number }> = {}
-  for (const lessonId of visiblePublicLessonIds) {
+  for (const lessonId of [...visiblePublicLessonIds, ...visiblePersonalizedLessonIds]) {
     const total = itemCountsByLessonId[lessonId] ?? 0
     lessonProgressByLessonId[lessonId] = { completed: 0, total }
   }
@@ -91,7 +120,7 @@ export default async function InvataPage() {
             <LearningPathsList
               chapters={visibleChapters}
               archivedChapters={archivedChapters}
-              lessonsByChapter={lessonsByChapter}
+              lessonsByChapter={allLessonsByChapter}
               lockedChapterIds={lockedChapterIds}
               completedLessonIds={[]}
               lessonProgressByLessonId={lessonProgressByLessonId}

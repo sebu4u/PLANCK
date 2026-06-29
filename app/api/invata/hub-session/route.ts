@@ -15,6 +15,7 @@ import {
   getCachedPublicLearningPathHubCatalog,
   getCachedPublicLearningPathLessonItemCounts,
 } from "@/lib/learning-path-hub-cache"
+import { sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-ssr"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
@@ -23,20 +24,6 @@ function noStoreJson(data: unknown, init?: ResponseInit) {
   const headers = new Headers(init?.headers)
   headers.set("Cache-Control", "no-store")
   return NextResponse.json(data, { ...init, headers })
-}
-
-function sortLearningPathChaptersForHub(chapters: LearningPathHubChapter[]): LearningPathHubChapter[] {
-  return [...chapters].sort((a, b) => {
-    const aPersonalized = a.is_personalized === true
-    const bPersonalized = b.is_personalized === true
-    if (aPersonalized !== bPersonalized) return aPersonalized ? -1 : 1
-
-    if (aPersonalized && bPersonalized) {
-      return Date.parse(b.created_at) - Date.parse(a.created_at)
-    }
-
-    return a.order_index - b.order_index
-  })
 }
 
 export async function GET(_req: NextRequest) {
