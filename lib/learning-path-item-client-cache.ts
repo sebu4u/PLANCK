@@ -121,6 +121,8 @@ export function prefetchLearningPathItem(
   })
 }
 
+const LEARNING_PATH_PREFETCH_RADIUS = 1
+
 function isSameItemRoute(
   a: { chapterSlug: string; lessonSlug: string; itemIndex: number },
   b: { chapterSlug: string; lessonSlug: string; itemIndex: number },
@@ -128,10 +130,22 @@ function isSameItemRoute(
   return a.chapterSlug === b.chapterSlug && a.lessonSlug === b.lessonSlug && a.itemIndex === b.itemIndex
 }
 
-export function prefetchAllLearningPathItems(payload: LearningPathItemPayload): void {
+export function prefetchNearbyLearningPathItems(payload: LearningPathItemPayload): void {
   if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
-    for (const item of payload.fizicaAssignmentItems) {
-      if (isSameItemRoute(item, payload)) continue
+    const currentIndex = payload.fizicaAssignmentItems.findIndex((item) =>
+      isSameItemRoute(item, payload),
+    )
+    if (currentIndex < 0) return
+
+    const firstAssignmentIndex = Math.max(0, currentIndex - LEARNING_PATH_PREFETCH_RADIUS)
+    const lastAssignmentIndex = Math.min(
+      payload.fizicaAssignmentItems.length - 1,
+      currentIndex + LEARNING_PATH_PREFETCH_RADIUS,
+    )
+
+    for (let index = firstAssignmentIndex; index <= lastAssignmentIndex; index += 1) {
+      const item = payload.fizicaAssignmentItems[index]
+      if (!item || isSameItemRoute(item, payload)) continue
       prefetchLearningPathItem(
         item.chapterSlug,
         item.lessonSlug,
@@ -142,7 +156,10 @@ export function prefetchAllLearningPathItems(payload: LearningPathItemPayload): 
     return
   }
 
-  for (let index = 1; index <= payload.items.length; index += 1) {
+  const firstIndex = Math.max(1, payload.itemIndex - LEARNING_PATH_PREFETCH_RADIUS)
+  const lastIndex = Math.min(payload.items.length, payload.itemIndex + LEARNING_PATH_PREFETCH_RADIUS)
+
+  for (let index = firstIndex; index <= lastIndex; index += 1) {
     if (index === payload.itemIndex) continue
     prefetchLearningPathItem(payload.chapterSlug, payload.lessonSlug, index)
   }
