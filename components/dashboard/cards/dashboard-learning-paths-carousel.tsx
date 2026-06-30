@@ -12,6 +12,8 @@ import {
 import {
   getLearningPathChapterNavTitle,
   getLearningPathLessonHref,
+} from "@/lib/learning-path-routes"
+import {
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"

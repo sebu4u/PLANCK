@@ -8,10 +8,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentType,
   type ReactNode,
 } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
 import { toast } from "@/lib/sonner"
+import { dispatchInvataHubRefresh } from "@/lib/invata/hub-events"
 import { PERSONALIZED_GENERATION_STALE_REASON } from "@/lib/personalized-courses/generation-stale"
 
 export type GenerationOverlayPhase = "intro" | "videoCenter" | "corner" | null
@@ -56,15 +59,37 @@ const PersonalizedCourseGenerationContext = createContext<PersonalizedCourseGene
 export function PersonalizedCourseGenerationProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const { loading: authLoading, user } = useAuth()
   const [activeGeneration, setActiveGeneration] = useState<ActiveGeneration | null>(null)
+  const [GenerationShell, setGenerationShell] = useState<ComponentType | null>(null)
   const handledTerminalRef = useRef<string | null>(null)
-  const hydratedRef = useRef(false)
+  const hydratedUserIdRef = useRef<string | null>(null)
   const userInitiatedRef = useRef(false)
   const activeGenerationRef = useRef<ActiveGeneration | null>(null)
 
   useEffect(() => {
     activeGenerationRef.current = activeGeneration
   }, [activeGeneration])
+
+  useEffect(() => {
+    if (!activeGeneration || GenerationShell) return
+
+    let cancelled = false
+    void import("@/components/invata/personalized-course-generation-shell").then((mod) => {
+      if (!cancelled) setGenerationShell(() => mod.PersonalizedCourseGenerationShell)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [GenerationShell, activeGeneration])
+
+  useEffect(() => {
+    if (authLoading || user) return
+    hydratedUserIdRef.current = null
+    userInitiatedRef.current = false
+    setActiveGeneration(null)
+  }, [authLoading, user])
 
   const clearActiveGeneration = useCallback(() => {
     setActiveGeneration(null)
@@ -106,6 +131,7 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
 
       userInitiatedRef.current = false
       setActiveGeneration(null)
+      dispatchInvataHubRefresh()
 
       if (pathname === "/invata") {
         router.refresh()
@@ -160,6 +186,7 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
       handledTerminalRef.current = current.chapterId
       userInitiatedRef.current = false
       setActiveGeneration(null)
+      dispatchInvataHubRefresh()
       toast.success("Generarea traseului a fost oprită.")
 
       if (pathname === "/invata") {
@@ -171,8 +198,8 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
   }, [pathname, router])
 
   useEffect(() => {
-    if (hydratedRef.current) return
-    hydratedRef.current = true
+    if (authLoading || !user?.id || hydratedUserIdRef.current === user.id) return
+    hydratedUserIdRef.current = user.id
 
     void (async () => {
       try {
@@ -205,7 +232,7 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
         // ignore hydration errors
       }
     })()
-  }, [])
+  }, [authLoading, user?.id])
 
   useEffect(() => {
     const chapterId = activeGeneration?.chapterId
@@ -286,6 +313,7 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
   return (
     <PersonalizedCourseGenerationContext.Provider value={value}>
       {children}
+      {GenerationShell ? <GenerationShell /> : null}
     </PersonalizedCourseGenerationContext.Provider>
   )
 }

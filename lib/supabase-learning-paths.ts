@@ -3,9 +3,23 @@ import {
   FREE_LEARNING_PATH_CHAPTER_SLUG,
   FREE_PREVIEW_CHAPTER_SLUG_ALIASES,
 } from "@/lib/learning-path-free-plan"
+import {
+  getLearningPathItemHref,
+  getLearningPathLessonHref,
+} from "@/lib/learning-path-routes"
 import type { LearningPathInteractiveItemType } from "@/lib/learning-path-interactive-items"
 import { supabase } from "@/lib/supabaseClient"
 import type { Problem } from "@/data/problems"
+
+export {
+  getCanonicalLearningPathLessonPath,
+  getLearningPathChapterNavTitle,
+  getLearningPathItemHref,
+  getLearningPathLessonHref,
+  getLearningPathRouteSegments,
+  learningPathLessonShowsHubNouBadge,
+  learningPathUrlNeedsCanonicalRedirect,
+} from "@/lib/learning-path-routes"
 
 /** Row-level `learning_path_lessons.lesson_type` (subset). */
 export type LearningPathLessonKind = "text" | "video" | "grila" | "problem"
@@ -46,10 +60,19 @@ export interface LearningPathChapter {
   updated_at: string
 }
 
-export function getLearningPathChapterNavTitle(chapter: Pick<LearningPathChapter, "title" | "nav_title">): string {
-  const navTitle = chapter.nav_title?.trim()
-  return navTitle || chapter.title
-}
+export type LearningPathHubChapter = Pick<
+  LearningPathChapter,
+  | "id"
+  | "slug"
+  | "title"
+  | "nav_title"
+  | "description"
+  | "icon_url"
+  | "order_index"
+  | "is_personalized"
+  | "generation_status"
+  | "created_at"
+>
 
 export interface LearningPathLesson {
   id: string
@@ -71,11 +94,16 @@ export interface LearningPathLesson {
   updated_at: string
 }
 
-export function learningPathLessonShowsHubNouBadge(
-  lesson: Pick<LearningPathLesson, "hub_show_nou_badge">,
-): boolean {
-  return lesson.hub_show_nou_badge === true
-}
+export type LearningPathHubLesson = Pick<
+  LearningPathLesson,
+  | "id"
+  | "chapter_id"
+  | "slug"
+  | "title"
+  | "image_url"
+  | "order_index"
+  | "hub_show_nou_badge"
+>
 
 export interface LearningPathLessonItem {
   id: string
@@ -91,78 +119,6 @@ export interface LearningPathLessonItem {
   created_at: string
   updated_at: string
   content_json?: Record<string, unknown> | null
-}
-
-function normalizeLearningPathSlug(slug: string | null | undefined): string | null {
-  const trimmed = slug?.trim()
-  return trimmed ? trimmed : null
-}
-
-export function getLearningPathRouteSegments(
-  chapter: LearningPathChapter,
-  lesson: LearningPathLesson
-): { chapterSegment: string; lessonSegment: string } {
-  const chapterSlug = normalizeLearningPathSlug(chapter.slug)
-  const lessonSlug = normalizeLearningPathSlug(lesson.slug)
-  return {
-    chapterSegment: chapterSlug ?? chapter.id,
-    lessonSegment: lessonSlug ?? lesson.id,
-  }
-}
-
-/** Calea canonică `/invata/...` cu slug-uri din DB (fallback la id doar când lipsește slug-ul). */
-export function getCanonicalLearningPathLessonPath(
-  chapter: LearningPathChapter,
-  lesson: LearningPathLesson,
-  itemIndex?: number
-): string {
-  const href = getLearningPathLessonHref(chapter, lesson)
-  if (itemIndex == null || !Number.isFinite(itemIndex) || itemIndex < 1) {
-    return href
-  }
-  return `${href}/${itemIndex}`
-}
-
-export function learningPathUrlNeedsCanonicalRedirect(
-  chapterSlug: string,
-  lessonSlug: string,
-  chapter: LearningPathChapter,
-  lesson: LearningPathLesson,
-  itemIndex?: string
-): string | null {
-  const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
-  const parsedItemIndex =
-    itemIndex == null ? null : Number.parseInt(itemIndex, 10)
-  const normalizedItemIndex =
-    parsedItemIndex != null && Number.isFinite(parsedItemIndex) && parsedItemIndex >= 1
-      ? parsedItemIndex
-      : null
-
-  const canonicalPath = getCanonicalLearningPathLessonPath(
-    chapter,
-    lesson,
-    normalizedItemIndex ?? undefined
-  )
-
-  const currentPath =
-    normalizedItemIndex != null
-      ? `/invata/${chapterSlug}/${lessonSlug}/${normalizedItemIndex}`
-      : `/invata/${chapterSlug}/${lessonSlug}`
-
-  return currentPath === canonicalPath ? null : canonicalPath
-}
-
-export function getLearningPathLessonHref(chapter: LearningPathChapter, lesson: LearningPathLesson): string {
-  const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
-  return `/invata/${chapterSegment}/${lessonSegment}`
-}
-
-export function getLearningPathItemHref(
-  chapter: LearningPathChapter,
-  lesson: LearningPathLesson,
-  itemIndex: number
-): string {
-  return `${getLearningPathLessonHref(chapter, lesson)}/${itemIndex + 1}`
 }
 
 export function getNextIncompleteLearningPathItem(
@@ -281,6 +237,30 @@ export async function getLearningPathChapters(client: SupabaseClient = supabase)
   }
 
   return data || []
+}
+
+export async function getUserPersonalizedLearningPathHubChapters(
+  userId: string,
+  client: SupabaseClient = supabase
+): Promise<LearningPathHubChapter[]> {
+  if (!userId) return []
+
+  const { data, error } = await client
+    .from("learning_path_chapters")
+    .select(
+      "id, slug, title, nav_title, description, icon_url, order_index, is_personalized, generation_status, created_at"
+    )
+    .eq("generated_by_user_id", userId)
+    .eq("is_personalized", true)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error fetching personalized learning path hub chapters:", error)
+    return []
+  }
+
+  return (data || []) as LearningPathHubChapter[]
 }
 
 /**
@@ -403,6 +383,32 @@ export async function getLearningPathLessonsByChapterIds(
   return map
 }
 
+export async function getLearningPathHubLessonsByChapterIds(
+  chapterIds: string[],
+  client: SupabaseClient = supabase
+): Promise<Record<string, LearningPathHubLesson[]>> {
+  if (!chapterIds.length) return {}
+  const { data, error } = await client
+    .from("learning_path_lessons")
+    .select("id, chapter_id, slug, title, image_url, order_index, hub_show_nou_badge")
+    .in("chapter_id", chapterIds)
+    .eq("is_active", true)
+    .order("order_index")
+
+  if (error) {
+    console.error("Error fetching hub lessons for chapters:", error)
+    return {}
+  }
+
+  const map: Record<string, LearningPathHubLesson[]> = {}
+  for (const row of (data ?? []) as LearningPathHubLesson[]) {
+    const chapterLessons = map[row.chapter_id] ?? []
+    chapterLessons.push(row)
+    map[row.chapter_id] = chapterLessons
+  }
+  return map
+}
+
 export async function getLearningPathLessonBySlug(
   chapterSlug: string,
   lessonSlug: string,
@@ -484,6 +490,43 @@ export type LearningPathLessonItemAggregates = {
 
 const LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE = 80
 
+/** Active item counts per lesson (batched queries for hub totals). */
+export async function getLearningPathLessonItemCountsByLessonIds(
+  lessonIds: string[],
+  client: SupabaseClient = supabase
+): Promise<Record<string, number>> {
+  if (!lessonIds.length) return {}
+
+  const chunks: string[][] = []
+  for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
+    chunks.push(lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE))
+  }
+
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      client
+        .from("learning_path_lesson_items")
+        .select("lesson_id")
+        .in("lesson_id", chunk)
+        .eq("is_active", true)
+    ),
+  )
+
+  const counts: Record<string, number> = {}
+  for (const { data, error } of results) {
+    if (error) {
+      console.error("Error fetching learning path lesson item counts:", error)
+      continue
+    }
+    for (const row of data ?? []) {
+      const lessonId = row.lesson_id as string
+      counts[lessonId] = (counts[lessonId] ?? 0) + 1
+    }
+  }
+
+  return counts
+}
+
 /** Active item counts and IDs per lesson (batched queries for hub progress). */
 export async function getLearningPathLessonItemAggregates(
   lessonIds: string[],
@@ -493,28 +536,33 @@ export async function getLearningPathLessonItemAggregates(
     return { counts: {}, itemIdsByLessonId: {} }
   }
 
+  const chunks: string[][] = []
+  for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
+    chunks.push(lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE))
+  }
+
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      client
+        .from("learning_path_lesson_items")
+        .select("id, lesson_id")
+        .in("lesson_id", chunk)
+        .eq("is_active", true)
+    ),
+  )
+
   const counts: Record<string, number> = {}
   const itemIdsByLessonId: Record<string, string[]> = {}
-
-  for (let i = 0; i < lessonIds.length; i += LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE) {
-    const chunk = lessonIds.slice(i, i + LEARNING_PATH_LESSON_ITEMS_IN_CHUNK_SIZE)
-    const { data, error } = await client
-      .from("learning_path_lesson_items")
-      .select("id, lesson_id")
-      .in("lesson_id", chunk)
-      .eq("is_active", true)
-
+  for (const { data, error } of results) {
     if (error) {
       console.error("Error fetching learning path lesson item aggregates:", error)
       continue
     }
-
     for (const row of data ?? []) {
       const lessonId = row.lesson_id as string
       const itemId = row.id as string
       counts[lessonId] = (counts[lessonId] ?? 0) + 1
-      if (!itemIdsByLessonId[lessonId]) itemIdsByLessonId[lessonId] = []
-      itemIdsByLessonId[lessonId].push(itemId)
+      ;(itemIdsByLessonId[lessonId] ??= []).push(itemId)
     }
   }
 
@@ -524,8 +572,7 @@ export async function getLearningPathLessonItemAggregates(
 export async function getLearningPathItemCountsByLessonIds(
   lessonIds: string[]
 ): Promise<Record<string, number>> {
-  const { counts } = await getLearningPathLessonItemAggregates(lessonIds)
-  return counts
+  return getLearningPathLessonItemCountsByLessonIds(lessonIds)
 }
 
 export async function getRandomProblemsByCategory(category: string, limit = 3): Promise<Problem[]> {

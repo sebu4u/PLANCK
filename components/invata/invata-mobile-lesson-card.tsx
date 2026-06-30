@@ -2,8 +2,10 @@ import Link from "next/link"
 import {
   getLearningPathLessonHref,
   learningPathLessonShowsHubNouBadge,
-  type LearningPathChapter,
-  type LearningPathLesson,
+} from "@/lib/learning-path-routes"
+import type {
+  LearningPathHubChapter,
+  LearningPathHubLesson,
 } from "@/lib/supabase-learning-paths"
 import { LessonItemProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { InvataDeferredImage } from "@/components/invata/invata-chapter-image-load-context"
@@ -18,8 +20,8 @@ export type LessonProgress = {
 }
 
 interface InvataMobileLessonListProps {
-  chapter: LearningPathChapter
-  lessons: LearningPathLesson[]
+  chapter: LearningPathHubChapter
+  lessons: LearningPathHubLesson[]
   lessonProgressByLessonId: Record<string, LessonProgress>
   loadImages?: boolean
 }

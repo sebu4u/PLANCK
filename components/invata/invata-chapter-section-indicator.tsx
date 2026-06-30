@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
+import { invataChapterSectionDomId } from "@/lib/invata/chapter-section-dom"
 
-export function invataChapterSectionDomId(chapterId: string) {
-  return `invata-chapter-${chapterId}`
-}
-
-type InvataChapterSectionIndicatorProps = {
+export type InvataChapterSectionIndicatorProps = {
   chapterIds: string[]
 }
 

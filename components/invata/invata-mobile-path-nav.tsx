@@ -2,16 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { BookOpen } from "lucide-react"
-import {
-  getLearningPathChapterNavTitle,
-  type LearningPathChapter,
-} from "@/lib/supabase-learning-paths"
-import { invataChapterSectionDomId } from "@/components/invata/invata-chapter-section-indicator"
+import { getLearningPathChapterNavTitle } from "@/lib/learning-path-routes"
+import type { LearningPathHubChapter } from "@/lib/supabase-learning-paths"
+import { invataChapterSectionDomId } from "@/lib/invata/chapter-section-dom"
 import { InvataDeferredImage } from "@/components/invata/invata-chapter-image-load-context"
 import { cn } from "@/lib/utils"
 
 interface InvataMobilePathNavChapterButtonProps {
-  chapter: LearningPathChapter
+  chapter: LearningPathHubChapter
   index: number
   isActive: boolean
   onSelect: (chapterId: string, index: number) => void
@@ -64,8 +62,8 @@ function InvataMobilePathNavChapterButton({
   )
 }
 
-interface InvataMobilePathNavProps {
-  chapters: LearningPathChapter[]
+export interface InvataMobilePathNavProps {
+  chapters: LearningPathHubChapter[]
   /** When true, renders inside the fixed site navbar (always visible). */
   embeddedInNavbar?: boolean
 }
