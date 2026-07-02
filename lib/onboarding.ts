@@ -1,6 +1,21 @@
+import {
+  GUARDIAN_ONBOARDING_PATH,
+  hasGuardianOAuthReturnPending,
+  hasGuardianOnboardingInProgress,
+} from "@/lib/guardian-onboarding"
+
 export const OAUTH_ONBOARDING_PARAM = "oauth"
 export const REGISTER_ONBOARDING_PATH = `/register?onboarding=${OAUTH_ONBOARDING_PARAM}`
 export const ONBOARDING_REDIRECT_STORAGE_KEY = "planck_onboarding_redirect_after_complete"
+
+export {
+  GUARDIAN_ONBOARDING_PATH,
+  GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY,
+  GUARDIAN_ONBOARDING_STORAGE_KEY,
+  hasGuardianOAuthReturnPending,
+  hasGuardianOnboardingInProgress,
+  isGuardianOnboardingRoute,
+} from "@/lib/guardian-onboarding"
 
 export {
   USER_TYPES,
@@ -37,7 +52,15 @@ export function needsOnboarding(profile: OnboardingProfile): boolean {
 }
 
 export function isOnboardingRoute(pathname: string | null | undefined): boolean {
-  return pathname === "/register"
+  return pathname === "/register" || pathname === "/register/guardian"
+}
+
+export function resolveIncompleteOnboardingPath(): string {
+  if (typeof window === "undefined") return REGISTER_ONBOARDING_PATH
+  if (hasGuardianOnboardingInProgress() || hasGuardianOAuthReturnPending()) {
+    return GUARDIAN_ONBOARDING_PATH
+  }
+  return REGISTER_ONBOARDING_PATH
 }
 
 export function savePostOnboardingRedirect(redirectTo: string | null | undefined) {

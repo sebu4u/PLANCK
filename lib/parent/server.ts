@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import { estimateGradeFromElo } from "@/lib/parent/grade-estimate"
 import { generateParentInviteCode, normalizeParentInviteCode } from "@/lib/parent/invite-code"
+import { normalizeUserType } from "@/lib/user-types"
 import type { UserType } from "@/lib/user-types"
 
 export interface ParentChildSummary {
@@ -13,6 +14,23 @@ export interface ParentChildSummary {
   target_grade: number
   status: "pending" | "active"
   accepted_at: string | null
+}
+
+export type ParentChildAssignmentStatus = "completed" | "in_progress" | "not_started"
+
+export interface ParentChildAssignmentItem {
+  assignment_id: string
+  classroom_id: string
+  classroom_name: string
+  child_id: string
+  child_name: string
+  title: string
+  description: string
+  deadline: string | null
+  created_at: string
+  problem_count: number
+  submitted_count: number
+  status: ParentChildAssignmentStatus
 }
 
 export interface ChildProgressSnapshot {
@@ -123,38 +141,70 @@ export async function requireAuthenticatedUser() {
 export async function ensureParentInviteCode(userId: string): Promise<string> {
   const admin = createAdminClient()
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("user_type, parent_invite_code")
-    .eq("user_id", userId)
-    .maybeSingle()
+  const readExistingCode = async (): Promise<string | null> => {
+    const { data: profile, error } = await admin
+      .from("profiles")
+      .select("user_type, parent_invite_code")
+      .eq("user_id", userId)
+      .maybeSingle()
 
-  if (!profile || profile.user_type !== "parinte") {
-    throw new Error("NOT_PARENT")
+    if (error) {
+      throw new Error(`PROFILE_LOOKUP_FAILED:${error.message}`)
+    }
+
+    if (!profile || normalizeUserType(profile.user_type) !== "parinte") {
+      throw new Error("NOT_PARENT")
+    }
+
+    const existingCode =
+      typeof profile.parent_invite_code === "string" ? profile.parent_invite_code.trim() : ""
+    return existingCode || null
   }
 
-  if (profile.parent_invite_code) {
-    return profile.parent_invite_code
+  const existing = await readExistingCode()
+  if (existing) {
+    return existing
+  }
+
+  const persistCode = async (candidate: string): Promise<string | null> => {
+    const normalizedCandidate = normalizeParentInviteCode(candidate)
+    const { data, error } = await admin
+      .from("profiles")
+      .update({ parent_invite_code: normalizedCandidate })
+      .eq("user_id", userId)
+      .select("parent_invite_code")
+      .maybeSingle()
+
+    if (error) {
+      if (error.code === "23505") {
+        return null
+      }
+      throw new Error(`INVITE_CODE_UPDATE_FAILED:${error.message}`)
+    }
+
+    const savedCode =
+      typeof data?.parent_invite_code === "string" ? data.parent_invite_code.trim() : ""
+    return savedCode || null
+  }
+
+  const { data: dbCode, error: rpcError } = await admin.rpc("generate_parent_invite_code")
+  if (!rpcError && typeof dbCode === "string" && dbCode.trim()) {
+    const saved = await persistCode(dbCode)
+    if (saved) {
+      return saved
+    }
   }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const candidate = generateParentInviteCode()
-    const { error } = await admin
-      .from("profiles")
-      .update({ parent_invite_code: candidate })
-      .eq("user_id", userId)
-      .is("parent_invite_code", null)
-
-    if (!error) {
-      const { data: updated } = await admin
-        .from("profiles")
-        .select("parent_invite_code")
-        .eq("user_id", userId)
-        .maybeSingle()
-      if (updated?.parent_invite_code) {
-        return updated.parent_invite_code
-      }
+    const saved = await persistCode(generateParentInviteCode())
+    if (saved) {
+      return saved
     }
+  }
+
+  const afterRace = await readExistingCode()
+  if (afterRace) {
+    return afterRace
   }
 
   throw new Error("INVITE_CODE_GENERATION_FAILED")
@@ -448,6 +498,137 @@ export async function getChildrenProgressForParent(parentId: string): Promise<Ch
       recent_work: activitySummary?.recentWork ?? [],
     }
   })
+}
+
+export async function getChildAssignmentsForParent(
+  parentId: string,
+): Promise<ParentChildAssignmentItem[]> {
+  const children = await getParentChildren(parentId)
+  if (children.length === 0) return []
+
+  const admin = createAdminClient()
+  const childIds = children.map((child) => child.child_id)
+  const childNameById = new Map(children.map((child) => [child.child_id, child.name]))
+
+  const { data: membershipRows } = await admin
+    .from("classroom_members")
+    .select("user_id, classroom_id, role, classrooms!inner(id, name)")
+    .in("user_id", childIds)
+    .eq("role", "student")
+
+  const memberships = (membershipRows ?? []).filter(isObject)
+  if (memberships.length === 0) return []
+
+  const classroomNameById = new Map<string, string>()
+  const childClassroomPairs: Array<{ childId: string; classroomId: string }> = []
+
+  for (const row of memberships) {
+    const childId = asString(row.user_id)
+    const classroom = isObject(row.classrooms) ? row.classrooms : null
+    const classroomId = asString(classroom?.id)
+    if (!childId || !classroomId) continue
+
+    childClassroomPairs.push({ childId, classroomId })
+    classroomNameById.set(classroomId, asString(classroom?.name, "Clasă"))
+  }
+
+  const classroomIds = [...new Set(childClassroomPairs.map((pair) => pair.classroomId))]
+  if (classroomIds.length === 0) return []
+
+  const { data: assignmentRows } = await admin
+    .from("assignments")
+    .select("id, classroom_id, title, description, deadline, created_at")
+    .in("classroom_id", classroomIds)
+    .order("created_at", { ascending: false })
+
+  const assignments = (assignmentRows ?? []).filter(isObject)
+  if (assignments.length === 0) return []
+
+  const assignmentIds = assignments.map((row) => asString(row.id)).filter(Boolean)
+
+  const problemCountByAssignment = new Map<string, number>()
+  if (assignmentIds.length > 0) {
+    const { data: problemRows } = await admin
+      .from("assignment_problems")
+      .select("assignment_id")
+      .in("assignment_id", assignmentIds)
+
+    for (const row of problemRows ?? []) {
+      if (!isObject(row)) continue
+      const assignmentId = asString(row.assignment_id)
+      if (!assignmentId) continue
+      problemCountByAssignment.set(
+        assignmentId,
+        (problemCountByAssignment.get(assignmentId) ?? 0) + 1,
+      )
+    }
+  }
+
+  const submissionCountByKey = new Map<string, number>()
+  if (assignmentIds.length > 0) {
+    const { data: submissionRows } = await admin
+      .from("submissions")
+      .select("assignment_id, student_id, problem_id")
+      .in("assignment_id", assignmentIds)
+      .in("student_id", childIds)
+
+    const submittedProblemsByKey = new Map<string, Set<string>>()
+
+    for (const row of submissionRows ?? []) {
+      if (!isObject(row)) continue
+      const assignmentId = asString(row.assignment_id)
+      const studentId = asString(row.student_id)
+      const problemId = asString(row.problem_id)
+      if (!assignmentId || !studentId || !problemId) continue
+
+      const key = `${studentId}:${assignmentId}`
+      const bucket = submittedProblemsByKey.get(key) ?? new Set<string>()
+      bucket.add(problemId)
+      submittedProblemsByKey.set(key, bucket)
+    }
+
+    for (const [key, problems] of submittedProblemsByKey) {
+      submissionCountByKey.set(key, problems.size)
+    }
+  }
+
+  const results: ParentChildAssignmentItem[] = []
+
+  for (const { childId, classroomId } of childClassroomPairs) {
+    for (const row of assignments) {
+      if (asString(row.classroom_id) !== classroomId) continue
+
+      const assignmentId = asString(row.id)
+      const problemCount = problemCountByAssignment.get(assignmentId) ?? 0
+      const submittedCount = submissionCountByKey.get(`${childId}:${assignmentId}`) ?? 0
+
+      let status: ParentChildAssignmentStatus = "not_started"
+      if (problemCount > 0 && submittedCount >= problemCount) {
+        status = "completed"
+      } else if (submittedCount > 0) {
+        status = "in_progress"
+      }
+
+      results.push({
+        assignment_id: assignmentId,
+        classroom_id: classroomId,
+        classroom_name: classroomNameById.get(classroomId) ?? "Clasă",
+        child_id: childId,
+        child_name: childNameById.get(childId) ?? "Elev",
+        title: asString(row.title, "Temă"),
+        description: asString(row.description),
+        deadline: asNullableString(row.deadline),
+        created_at: asString(row.created_at),
+        problem_count: problemCount,
+        submitted_count: submittedCount,
+        status,
+      })
+    }
+  }
+
+  return results.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
 }
 
 export async function updateChildTargetGrade(params: {

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import {
   isOnboardingRoute,
-  REGISTER_ONBOARDING_PATH,
+  resolveIncompleteOnboardingPath,
   savePostOnboardingRedirect,
 } from "@/lib/onboarding"
 
@@ -25,7 +25,7 @@ export function OnboardingGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!shouldRedirect) return
     savePostOnboardingRedirect(pathname)
-    router.replace(REGISTER_ONBOARDING_PATH)
+    router.replace(resolveIncompleteOnboardingPath())
   }, [pathname, router, shouldRedirect])
 
   if (shouldRedirect) return null

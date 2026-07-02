@@ -233,8 +233,6 @@ export function ParentDashboard() {
 
   return (
     <DashboardSidebarProvider>
-      <Navigation />
-
       <div className="relative flex h-[100dvh] flex-row overflow-hidden bg-[#ffffff] pt-16">
         <DashboardClientWrapper user={userData} dashboardHomeHref="/dashboard/parent" />
 

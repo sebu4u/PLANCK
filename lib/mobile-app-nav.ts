@@ -69,6 +69,30 @@ export function isProfesorResurseRoute(pathname: string | null | undefined): boo
   return pathname === "/profesor/resurse" || pathname.startsWith("/profesor/resurse/")
 }
 
+export function isParentDashboardRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/dashboard/parent" || pathname === "/dashboard/parent/"
+}
+
+export function isParentTemeRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/dashboard/parent/teme" || pathname.startsWith("/dashboard/parent/teme/")
+}
+
+export function isParentCatalogRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/dashboard/parent/catalog" || pathname.startsWith("/dashboard/parent/catalog/")
+}
+
+export function isParentRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return (
+    isParentDashboardRoute(pathname) ||
+    isParentTemeRoute(pathname) ||
+    isParentCatalogRoute(pathname)
+  )
+}
+
 export function isClassroomsRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return pathname === "/classrooms" || pathname.startsWith("/classrooms/")
@@ -125,6 +149,14 @@ export function getMobileTopBarContent(
   pathname: string | null | undefined,
   displayName: string,
 ): MobileTopBarContent {
+  if (isParentTemeRoute(pathname)) {
+    return { primary: "Teme" }
+  }
+
+  if (isParentCatalogRoute(pathname)) {
+    return { primary: "Catalog" }
+  }
+
   const isDashboard =
     pathname === "/dashboard" || pathname?.startsWith("/dashboard/") === true
 
@@ -245,6 +277,39 @@ export const MOBILE_BOTTOM_NAV_TEACHER_ITEMS: MobileBottomNavItem[] = [
     label: "Resurse",
     icon: Library,
     isActive: (pathname) => isProfesorResurseRoute(pathname),
+  },
+  {
+    href: "/profil",
+    label: "Profil",
+    icon: User,
+    isActive: (pathname) => Boolean(pathname?.startsWith("/profil")),
+  },
+]
+
+export const MOBILE_BOTTOM_NAV_PARENT_ITEMS: MobileBottomNavItem[] = [
+  {
+    href: "/dashboard/parent",
+    label: "Acasa",
+    icon: Home,
+    isActive: (pathname) => isParentDashboardRoute(pathname),
+  },
+  {
+    href: "/dashboard/parent/teme",
+    label: "Teme",
+    icon: NotebookPen,
+    isActive: (pathname) => isParentTemeRoute(pathname),
+  },
+  {
+    href: "/dashboard/parent/catalog",
+    label: "Catalog",
+    icon: BookOpen,
+    isActive: (pathname) => isParentCatalogRoute(pathname),
+  },
+  {
+    href: "/abonament",
+    label: "Abonament",
+    icon: KeyRound,
+    isActive: (pathname) => Boolean(pathname?.startsWith("/abonament")),
   },
   {
     href: "/profil",

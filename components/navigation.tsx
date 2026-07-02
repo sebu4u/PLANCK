@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type CSSProperties } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users, NotebookPen, Library } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -33,6 +33,9 @@ import {
   isMobileLessonItemsShellRoute,
   isProfesorResurseRoute,
   isProfesorTemeRoute,
+  isParentCatalogRoute,
+  isParentDashboardRoute,
+  isParentTemeRoute,
   shouldShowMobileBottomNav,
 } from "@/lib/mobile-app-nav"
 
@@ -55,7 +58,7 @@ export function Navigation() {
   const lastScrollY = useRef(0)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
-  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo, isTeacher } = useAuth()
+  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo, isTeacher, isParent } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
@@ -426,6 +429,10 @@ export function Navigation() {
   const isProblemPage = Boolean(pathname?.match(/^\/probleme\/[^/]+$/)) || isProblemsCatalog
   const isProfesorTemeActive = isProfesorTemeRoute(pathname)
   const isProfesorResurseActive = isProfesorResurseRoute(pathname)
+  const isParentTemeActive = isParentTemeRoute(pathname)
+  const isParentCatalogActive = isParentCatalogRoute(pathname)
+  const isParentAbonamentActive = Boolean(pathname?.startsWith("/abonament"))
+  const isParentHomeActive = isParentDashboardRoute(pathname)
   const useLightNav =
     isDashboard ||
     isExerseazaHub ||
@@ -649,7 +656,7 @@ export function Navigation() {
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                      <Link href={isParent ? "/dashboard/parent" : isTeacher ? "/dashboard" : "/"} className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage || isParentHomeActive) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                         <Home className="h-5 w-5" />
                       </Link>
                       {isTeacher ? (
@@ -674,6 +681,30 @@ export function Navigation() {
                             className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProfesorResurseActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <Library className="h-5 w-5" />
+                          </Link>
+                        </>
+                      ) : isParent ? (
+                        <>
+                          <Link
+                            href="/dashboard/parent/teme"
+                            aria-label="Teme"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <NotebookPen className="h-5 w-5" />
+                          </Link>
+                          <Link
+                            href="/dashboard/parent/catalog"
+                            aria-label="Catalog"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentCatalogActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <BookOpen className="h-5 w-5" />
+                          </Link>
+                          <Link
+                            href="/abonament"
+                            aria-label="Abonamentul elevului"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentAbonamentActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <KeyRound className="h-5 w-5" />
                           </Link>
                         </>
                       ) : (
@@ -795,6 +826,32 @@ export function Navigation() {
                     >
                       <Library size={16} />
                       Resurse de predare
+                    </Link>
+                  </div>
+                ) : isParent ? (
+                  <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                    <Link
+                      href="/dashboard/parent/teme"
+                      className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isParentTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <NotebookPen size={16} />
+                      Teme
+                    </Link>
+
+                    <Link
+                      href="/dashboard/parent/catalog"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isParentCatalogActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <BookOpen size={16} />
+                      Catalog
+                    </Link>
+
+                    <Link
+                      href="/abonament"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isParentAbonamentActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <KeyRound size={16} />
+                      Abonamentul elevului
                     </Link>
                   </div>
                 ) : (

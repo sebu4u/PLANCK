@@ -34,7 +34,13 @@ export async function GET(request: NextRequest) {
       connect_url: buildParentConnectUrl(code, origin),
     })
   } catch (error) {
+    const message = error instanceof Error ? error.message : "UNKNOWN"
     console.error("[parent/invite] GET error:", error)
+
+    if (message.startsWith("PROFILE_LOOKUP_FAILED:") || message.startsWith("INVITE_CODE_UPDATE_FAILED:")) {
+      return NextResponse.json({ error: "Parent invite is not configured" }, { status: 503 })
+    }
+
     return NextResponse.json({ error: "Failed to generate invite" }, { status: 500 })
   }
 }

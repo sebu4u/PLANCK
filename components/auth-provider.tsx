@@ -9,9 +9,13 @@ import { isSuperDev as resolveIsSuperDev, normalizeDevSubjects, type DevSubjectK
 import {
   isOnboardingRoute,
   needsOnboarding as profileNeedsOnboarding,
-  REGISTER_ONBOARDING_PATH,
+  resolveIncompleteOnboardingPath,
   savePostOnboardingRedirect,
 } from "@/lib/onboarding"
+import {
+  GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY,
+  GUARDIAN_ONBOARDING_STORAGE_KEY,
+} from "@/lib/guardian-onboarding"
 import { normalizeUserType, type UserType } from "@/lib/user-types"
 import {
   AUTH_MESSAGE_ERROR,
@@ -378,7 +382,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
       const redirectTo = new URLSearchParams(window.location.search).get("redirect")
       savePostOnboardingRedirect(redirectTo)
     }
-    router.push(REGISTER_ONBOARDING_PATH)
+    router.push(resolveIncompleteOnboardingPath())
   }, [
     needsOnboarding,
     pathname,
@@ -417,6 +421,8 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
     if (typeof window !== "undefined") {
       localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
       localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+      localStorage.removeItem(GUARDIAN_ONBOARDING_STORAGE_KEY)
+      localStorage.removeItem(GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY)
     }
     setLoading(false)
   }
