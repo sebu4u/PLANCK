@@ -50,7 +50,7 @@ interface MatematicaCatalogClientProps {
 }
 
 export function MatematicaCatalogClient({ initialProblems, initialChapter }: MatematicaCatalogClientProps) {
-  const { user, profile } = useAuth()
+  const { user, profile, isAdmin } = useAuth()
 
   const normalizedInitialChapter = typeof initialChapter === "string" ? initialChapter.trim() : ""
   const defaultFilters: FilterState = {
@@ -213,6 +213,10 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
     [chapterOptions, problems, solvedProblems],
   )
 
+  const handleProblemUpdated = useCallback((updated: MathProblem) => {
+    setProblems((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+  }, [])
+
   const handleFilterChange = useCallback((nextFilters: FilterState) => {
     setFilters(nextFilters)
     setCurrentPage(1)
@@ -300,6 +304,8 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
                     key={problem.id}
                     problem={problem}
                     solved={solvedProblems.includes(problem.id)}
+                    isAdmin={isAdmin}
+                    onUpdated={handleProblemUpdated}
                   />
                 ))}
               </div>

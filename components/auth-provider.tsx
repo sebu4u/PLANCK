@@ -12,6 +12,7 @@ import {
   REGISTER_ONBOARDING_PATH,
   savePostOnboardingRedirect,
 } from "@/lib/onboarding"
+import { normalizeUserType, type UserType } from "@/lib/user-types"
 import {
   AUTH_MESSAGE_ERROR,
   AUTH_MESSAGE_SUCCESS,
@@ -45,6 +46,12 @@ interface AuthContextType {
    * Cât timp `profileSyncedUserId !== user.id`, nu te baza pe `isDev` pentru redirect (ex. către /dashboard/dev).
    */
   profileSyncedUserId: string | null
+  userType: UserType
+  isStudent: boolean
+  isParent: boolean
+  isTeacher: boolean
+  parentInviteCode: string | null
+  teachingMaterie: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -54,7 +61,7 @@ const REFERRAL_CODE_STORAGE_KEY = "planck_referral_code"
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
 const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
 const PROFILE_SELECT =
-  "name, nickname, user_icon, grade, preferred_materie, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at"
+  "name, nickname, user_icon, grade, preferred_materie, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at, user_type, parent_invite_code, teaching_materie"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (
@@ -79,6 +86,10 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
   const [profileSyncedUserId, setProfileSyncedUserId] = useState<string | null>(null)
   const [pendingOAuthOnboardingCheck, setPendingOAuthOnboardingCheck] = useState(false)
   const needsOnboarding = user ? profileNeedsOnboarding(profile) : false
+  const userType = normalizeUserType(profile?.user_type)
+  const isStudent = userType === "elev"
+  const isParent = userType === "parinte"
+  const isTeacher = userType === "profesor"
 
   const isInvalidRefreshTokenError = (message?: string) => {
     if (!message) return false
@@ -460,6 +471,12 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
         isSuperDev: resolveIsSuperDev(isDev, devSubjects),
         needsOnboarding,
         profileSyncedUserId,
+        userType,
+        isStudent,
+        isParent,
+        isTeacher,
+        parentInviteCode: profile?.parent_invite_code ?? null,
+        teachingMaterie: profile?.teaching_materie ?? null,
       }}
     >
       {children}

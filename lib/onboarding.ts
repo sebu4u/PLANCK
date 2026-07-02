@@ -2,6 +2,14 @@ export const OAUTH_ONBOARDING_PARAM = "oauth"
 export const REGISTER_ONBOARDING_PATH = `/register?onboarding=${OAUTH_ONBOARDING_PARAM}`
 export const ONBOARDING_REDIRECT_STORAGE_KEY = "planck_onboarding_redirect_after_complete"
 
+export {
+  USER_TYPES,
+  USER_TYPE_LABELS,
+  isUserType,
+  normalizeUserType,
+  type UserType,
+} from "@/lib/user-types"
+
 export const ONBOARDING_SUBJECT_OPTIONS = [
   { id: "matematica", label: "Matematică" },
   { id: "fizica", label: "Fizică" },

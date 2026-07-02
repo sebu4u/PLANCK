@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Rocket, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { LoginButton } from "@/components/LoginButton"
 import { REGISTER_ONBOARDING_PATH } from "@/lib/onboarding"
@@ -39,6 +39,8 @@ function LoginPageContent() {
     // Check for "error" query param from Supabase Auth redirect
     const { toast } = useToast()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const redirectTo = searchParams.get("redirect")
     const { user, needsOnboarding, profileSyncedUserId } = useAuth()
 
     // Redirect if already logged in
@@ -46,10 +48,14 @@ function LoginPageContent() {
         if (!user || profileSyncedUserId !== user.id) return
         if (needsOnboarding) {
             router.push(REGISTER_ONBOARDING_PATH)
-        } else {
-            router.push("/dashboard")
+            return
         }
-    }, [needsOnboarding, profileSyncedUserId, user, router])
+        if (redirectTo && redirectTo.startsWith("/")) {
+            router.push(redirectTo)
+            return
+        }
+        router.push("/dashboard")
+    }, [needsOnboarding, profileSyncedUserId, redirectTo, user, router])
 
     const handleEmailSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

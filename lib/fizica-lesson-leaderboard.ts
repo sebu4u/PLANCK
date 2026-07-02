@@ -71,6 +71,25 @@ export function buildInitialFizicaLeaderboard(
   return entries.sort((a, b) => a.rank - b.rank)
 }
 
+export function sliceLeaderboardAroundUser(
+  entries: FizicaLeaderboardEntry[],
+  radius = 2,
+): { visible: FizicaLeaderboardEntry[]; hasAbove: boolean; hasBelow: boolean } {
+  const userIndex = entries.findIndex((entry) => entry.isUser)
+  if (userIndex === -1) {
+    return { visible: entries.slice(0, radius * 2 + 1), hasAbove: false, hasBelow: entries.length > radius * 2 + 1 }
+  }
+
+  const start = Math.max(0, userIndex - radius)
+  const end = Math.min(entries.length, userIndex + radius + 1)
+
+  return {
+    visible: entries.slice(start, end),
+    hasAbove: start > 0,
+    hasBelow: end < entries.length,
+  }
+}
+
 export function applyFizicaLeaderboardClimb(
   entries: FizicaLeaderboardEntry[],
 ): FizicaLeaderboardEntry[] {

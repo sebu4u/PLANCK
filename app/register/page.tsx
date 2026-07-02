@@ -74,10 +74,12 @@ const mainCtaClassName =
 const choiceButtonClassName =
   "w-full rounded-full border px-5 py-3 text-left text-sm font-semibold transition-colors"
 
-const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 => typeof step === "number"
+const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 =>
+  typeof step === "number"
 
 const sanitizeStep = (value: unknown): RegisterStep => {
   if (value === "name") return "name"
+  if (value === 0 || value === "coming_soon") return 1
   if (typeof value === "number" && value >= 1 && value <= 7) return value as RegisterStep
   return 1
 }
