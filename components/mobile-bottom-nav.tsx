@@ -3,16 +3,20 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { MOBILE_BOTTOM_NAV_ITEMS } from "@/lib/mobile-app-nav"
+import { MOBILE_BOTTOM_NAV_ITEMS, MOBILE_BOTTOM_NAV_TEACHER_ITEMS } from "@/lib/mobile-app-nav"
+import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const { isTeacher } = useAuth()
   const { isPaid } = useSubscriptionPlan()
 
-  const navItems = isPaid
-    ? MOBILE_BOTTOM_NAV_ITEMS.filter((item) => item.href !== "/abonament")
-    : MOBILE_BOTTOM_NAV_ITEMS
+  const navItems = isTeacher
+    ? MOBILE_BOTTOM_NAV_TEACHER_ITEMS
+    : isPaid
+      ? MOBILE_BOTTOM_NAV_ITEMS.filter((item) => item.href !== "/abonament")
+      : MOBILE_BOTTOM_NAV_ITEMS
 
   return (
     <nav

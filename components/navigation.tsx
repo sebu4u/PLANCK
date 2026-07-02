@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type CSSProperties } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users, NotebookPen, Library } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -25,11 +25,14 @@ import { InvataMobilePathNav } from "@/components/invata/invata-mobile-path-nav"
 import { useInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
 import {
   getMobileTopBarContent,
+  isClassroomsRoute,
   isExerseazaRoute,
   isGrileRoute as matchGrileRoute,
   isInvataHubRoute,
   isMobileAppShellRoute,
   isMobileLessonItemsShellRoute,
+  isProfesorResurseRoute,
+  isProfesorTemeRoute,
   shouldShowMobileBottomNav,
 } from "@/lib/mobile-app-nav"
 
@@ -52,7 +55,7 @@ export function Navigation() {
   const lastScrollY = useRef(0)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
-  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo } = useAuth()
+  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo, isTeacher } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
@@ -420,8 +423,9 @@ export function Navigation() {
   const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
   const isInvataFizicaHub = pathname === "/invata/fizica"
   const isExerseazaActive = isExerseazaRoute(pathname)
-  const isProblemPage = (pathname?.match(/^\/probleme\/[^/]+$/) ?? false) || isProblemsCatalog
-  const isClassroomsRoute = pathname?.startsWith("/classrooms") ?? false
+  const isProblemPage = Boolean(pathname?.match(/^\/probleme\/[^/]+$/)) || isProblemsCatalog
+  const isProfesorTemeActive = isProfesorTemeRoute(pathname)
+  const isProfesorResurseActive = isProfesorResurseRoute(pathname)
   const useLightNav =
     isDashboard ||
     isExerseazaHub ||
@@ -430,7 +434,9 @@ export function Navigation() {
     isProblemPage ||
     isMatematicaProblemsCatalog ||
     isMatematicaProblemDetail ||
-    isClassroomsRoute ||
+    isClassroomsRoute(pathname) ||
+    isProfesorTemeRoute(pathname) ||
+    isProfesorResurseRoute(pathname) ||
     isGrileRoute ||
     isProfileRoute
   const isCoursePage = pathname?.startsWith('/cursuri') ?? false
@@ -646,19 +652,47 @@ export function Navigation() {
                       <Link href="/" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                         <Home className="h-5 w-5" />
                       </Link>
-                      <Link href="/invata" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                        <BookOpen className="h-5 w-5" />
-                      </Link>
-                      <Link href="/exerseaza" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isExerseazaActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
-                        <Calculator className="h-5 w-5" />
-                      </Link>
-                      <Link
-                        href="/classrooms"
-                        aria-label="Clasa mea"
-                        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
-                      >
-                        <Users className="h-5 w-5" />
-                      </Link>
+                      {isTeacher ? (
+                        <>
+                          <Link
+                            href="/classrooms"
+                            aria-label="Clasele mele"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <Users className="h-5 w-5" />
+                          </Link>
+                          <Link
+                            href="/profesor/teme"
+                            aria-label="Teme"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProfesorTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <NotebookPen className="h-5 w-5" />
+                          </Link>
+                          <Link
+                            href="/profesor/resurse"
+                            aria-label="Resurse de predare"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProfesorResurseActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <Library className="h-5 w-5" />
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link href="/invata" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                            <BookOpen className="h-5 w-5" />
+                          </Link>
+                          <Link href="/exerseaza" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isExerseazaActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                            <Calculator className="h-5 w-5" />
+                          </Link>
+                          <Link
+                            href="/classrooms"
+                            aria-label="Clasa mea"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                          >
+                            <Users className="h-5 w-5" />
+                          </Link>
+                        </>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {user ? (
@@ -737,6 +771,32 @@ export function Navigation() {
                       </span>
                     </Link>
                   </div>
+                ) : isTeacher ? (
+                  <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                    <Link
+                      href="/classrooms"
+                      className={`relative h-full pl-2.5 pr-1.5 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <Users size={16} />
+                      Clasele mele
+                    </Link>
+
+                    <Link
+                      href="/profesor/teme"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isProfesorTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <NotebookPen size={16} />
+                      Teme
+                    </Link>
+
+                    <Link
+                      href="/profesor/resurse"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isProfesorResurseActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                    >
+                      <Library size={16} />
+                      Resurse de predare
+                    </Link>
+                  </div>
                 ) : (
                   <div className={`self-stretch flex items-stretch gap-1 animate-fade-in-delay-1 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
                     <Link
@@ -765,7 +825,7 @@ export function Navigation() {
 
                     <Link
                       href="/classrooms"
-                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isClassroomsRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
                       <Users size={16} />
                       Clasa mea

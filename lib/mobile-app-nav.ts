@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { BookOpen, Calculator, Home, KeyRound, User } from "lucide-react"
+import { BookOpen, Calculator, Home, KeyRound, Library, NotebookPen, User, Users } from "lucide-react"
 
 export const MOBILE_BOTTOM_NAV_HEIGHT = "4.5rem"
 
@@ -59,6 +59,26 @@ export function isGrileRoute(pathname: string | null | undefined): boolean {
   return pathname === "/grile" || pathname.startsWith("/grile/")
 }
 
+export function isProfesorTemeRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/profesor/teme" || pathname.startsWith("/profesor/teme/")
+}
+
+export function isProfesorResurseRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/profesor/resurse" || pathname.startsWith("/profesor/resurse/")
+}
+
+export function isClassroomsRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/classrooms" || pathname.startsWith("/classrooms/")
+}
+
+export function isProfesorRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/profesor" || pathname.startsWith("/profesor/")
+}
+
 export function isMobileAppShellRoute(
   pathname: string | null | undefined,
   isAuthenticated: boolean,
@@ -75,6 +95,8 @@ export function isMobileAppShellRoute(
     pathname.startsWith("/probleme") ||
     pathname.startsWith("/abonament") ||
     pathname.startsWith("/profil") ||
+    isClassroomsRoute(pathname) ||
+    isProfesorRoute(pathname) ||
     isGrileRoute(pathname)
   )
 }
@@ -141,6 +163,18 @@ export function getMobileTopBarContent(
     return { primary: "Grile" }
   }
 
+  if (isClassroomsRoute(pathname)) {
+    return { primary: "Clasele mele" }
+  }
+
+  if (isProfesorTemeRoute(pathname)) {
+    return { primary: "Teme" }
+  }
+
+  if (isProfesorResurseRoute(pathname)) {
+    return { primary: "Resurse de predare" }
+  }
+
   return { primary: "PLANCK" }
 }
 
@@ -177,6 +211,40 @@ export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
     label: "Premium",
     icon: KeyRound,
     isActive: (pathname) => Boolean(pathname?.startsWith("/abonament")),
+  },
+  {
+    href: "/profil",
+    label: "Profil",
+    icon: User,
+    isActive: (pathname) => Boolean(pathname?.startsWith("/profil")),
+  },
+]
+
+export const MOBILE_BOTTOM_NAV_TEACHER_ITEMS: MobileBottomNavItem[] = [
+  {
+    href: "/dashboard",
+    label: "Acasa",
+    icon: Home,
+    isActive: (pathname) =>
+      pathname === "/dashboard" || pathname?.startsWith("/dashboard/") === true,
+  },
+  {
+    href: "/classrooms",
+    label: "Clasele mele",
+    icon: Users,
+    isActive: (pathname) => isClassroomsRoute(pathname),
+  },
+  {
+    href: "/profesor/teme",
+    label: "Teme",
+    icon: NotebookPen,
+    isActive: (pathname) => isProfesorTemeRoute(pathname),
+  },
+  {
+    href: "/profesor/resurse",
+    label: "Resurse",
+    icon: Library,
+    isActive: (pathname) => isProfesorResurseRoute(pathname),
   },
   {
     href: "/profil",

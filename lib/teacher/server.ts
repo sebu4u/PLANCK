@@ -4,6 +4,7 @@ import {
   getClassroomMembers,
   getClassroomsForUser,
 } from "@/lib/classrooms/server"
+import { estimateGradeFromElo, formatGrade } from "@/lib/parent/grade-estimate"
 
 export interface TeacherStudentStat {
   user_id: string
@@ -87,10 +88,10 @@ export async function getTeacherDashboardOverview(userId: string): Promise<Teach
 
       for (const row of activityRows ?? []) {
         if (!isObject(row)) continue
-        const userId = asString(row.user_id)
+        const activityUserId = asString(row.user_id)
         activityByUser.set(
-          userId,
-          (activityByUser.get(userId) ?? 0) + asNumber(row.time_minutes)
+          activityUserId,
+          (activityByUser.get(activityUserId) ?? 0) + asNumber(row.time_minutes)
         )
       }
     }
@@ -140,6 +141,72 @@ export async function getTeacherDashboardOverview(userId: string): Promise<Teach
   }
 
   return overview
+}
+
+export interface TeacherAssignmentOverviewItem {
+  id: string
+  classroom_id: string
+  classroom_name: string
+  title: string
+  description: string
+  deadline: string | null
+  created_at: string
+  problem_count: number
+}
+
+export async function getTeacherAssignmentsOverview(
+  userId: string,
+): Promise<TeacherAssignmentOverviewItem[]> {
+  const classrooms = (await getClassroomsForUser(userId)).filter(
+    (classroom) => classroom.role === "teacher",
+  )
+
+  if (classrooms.length === 0) return []
+
+  const admin = createAdminClient()
+  const classroomIds = classrooms.map((classroom) => classroom.id)
+  const classroomNameById = new Map(classrooms.map((classroom) => [classroom.id, classroom.name]))
+
+  const { data: assignmentRows } = await admin
+    .from("assignments")
+    .select("id, classroom_id, title, description, deadline, created_at")
+    .in("classroom_id", classroomIds)
+    .order("created_at", { ascending: false })
+
+  const assignments = (assignmentRows ?? []).filter(isObject)
+  if (assignments.length === 0) return []
+
+  const assignmentIds = assignments.map((row) => asString(row.id)).filter(Boolean)
+  const countsByAssignment = new Map<string, number>()
+
+  if (assignmentIds.length > 0) {
+    const { data: problemRows } = await admin
+      .from("assignment_problems")
+      .select("assignment_id")
+      .in("assignment_id", assignmentIds)
+
+    for (const row of problemRows ?? []) {
+      if (!isObject(row)) continue
+      const assignmentId = asString(row.assignment_id)
+      if (!assignmentId) continue
+      countsByAssignment.set(assignmentId, (countsByAssignment.get(assignmentId) ?? 0) + 1)
+    }
+  }
+
+  return assignments.map((row) => {
+    const id = asString(row.id)
+    const classroomId = asString(row.classroom_id)
+    return {
+      id,
+      classroom_id: classroomId,
+      classroom_name: classroomNameById.get(classroomId) ?? "Clasă",
+      title: asString(row.title, "Temă"),
+      description: asString(row.description),
+      deadline: asNullableString(row.deadline),
+      created_at: asString(row.created_at),
+      problem_count: countsByAssignment.get(id) ?? 0,
+    }
+  })
 }
 
 export interface TeacherPendingHomeworkReview {
@@ -332,4 +399,111 @@ export async function markSubmissionReviewed(
   if (error) {
     throw new Error("UPDATE_FAILED")
   }
+}
+
+export interface TeacherStudentProfileSnapshot {
+  user_id: string
+  display_name: string
+  username: string | null
+  user_icon: string | null
+  school_grade: string | null
+  classroom_name: string
+  estimated_grade: number
+  stats: {
+    elo: number
+    rank: string
+    current_streak: number
+    problems_solved_total: number
+    total_time_minutes: number
+    last_activity_date: string | null
+  }
+}
+
+export async function getTeacherStudentProfilesForClassroom(
+  teacherId: string,
+  classroomId: string,
+): Promise<TeacherStudentProfileSnapshot[]> {
+  const admin = createAdminClient()
+
+  const { data: classroomRow } = await admin
+    .from("classrooms")
+    .select("id, name, teacher_id")
+    .eq("id", classroomId)
+    .maybeSingle()
+
+  if (!isObject(classroomRow) || asString(classroomRow.teacher_id) !== teacherId) {
+    return []
+  }
+
+  const classroomName = asString(classroomRow.name, "Clasă")
+  const members = await getClassroomMembers(classroomId)
+  const students = members.filter((member) => member.role === "student")
+
+  if (students.length === 0) return []
+
+  const studentIds = students.map((student) => student.user_id)
+
+  const [{ data: profileRows }, { data: statsRows }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("user_id, name, nickname, user_icon, grade")
+      .in("user_id", studentIds),
+    admin
+      .from("user_stats")
+      .select(
+        "user_id, elo, rank, current_streak, problems_solved_total, total_time_minutes, last_activity_date",
+      )
+      .in("user_id", studentIds),
+  ])
+
+  const profileByUserId = new Map<
+    string,
+    { name: string; nickname: string; user_icon: string | null; grade: string | null }
+  >()
+  for (const row of profileRows ?? []) {
+    if (!isObject(row)) continue
+    const userId = asString(row.user_id)
+    if (!userId) continue
+    const rawIcon = asNullableString(row.user_icon)
+    profileByUserId.set(userId, {
+      name: asString(row.name),
+      nickname: asString(row.nickname),
+      user_icon: rawIcon && rawIcon.trim() ? rawIcon.trim() : null,
+      grade: asNullableString(row.grade),
+    })
+  }
+
+  const statsByUserId = new Map<string, Record<string, unknown>>()
+  for (const row of statsRows ?? []) {
+    if (!isObject(row)) continue
+    const userId = asString(row.user_id)
+    if (!userId) continue
+    statsByUserId.set(userId, row)
+  }
+
+  return students.map((student) => {
+    const profile = profileByUserId.get(student.user_id)
+    const stats = statsByUserId.get(student.user_id)
+    const elo = asNumber(stats?.elo, student.elo)
+    const nickname = profile?.nickname.trim() || null
+    const name = profile?.name.trim() || student.name
+
+    return {
+      user_id: student.user_id,
+      display_name: nickname || name || "Elev",
+      username: nickname,
+      user_icon: profile?.user_icon ?? student.user_icon,
+      school_grade: profile?.grade ?? null,
+      classroom_name: classroomName,
+      estimated_grade: estimateGradeFromElo(elo),
+      stats: {
+        elo,
+        rank: asString(stats?.rank, student.rank),
+        current_streak: asNumber(stats?.current_streak),
+        problems_solved_total: asNumber(stats?.problems_solved_total),
+        total_time_minutes: asNumber(stats?.total_time_minutes),
+        last_activity_date: asNullableString(stats?.last_activity_date),
+      },
+    }
+  })
 }
