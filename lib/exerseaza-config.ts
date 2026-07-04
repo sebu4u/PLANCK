@@ -1,22 +1,16 @@
 import type { LucideIcon } from "lucide-react"
-import { Atom, Calculator, ClipboardList, Layers, ListChecks } from "lucide-react"
+import { Calculator, ClipboardList, Layers, ListChecks } from "lucide-react"
+import {
+  PRACTICE_SUBJECTS,
+  type PracticeSubjectConfig,
+  type PracticeSubjectId,
+} from "@/lib/practice-subject"
 
-export type ExerseazaSubjectId = "fizica"
+export type ExerseazaSubjectId = PracticeSubjectId
+export type ExerseazaSubjectConfig = PracticeSubjectConfig
 
-export interface ExerseazaSubjectConfig {
-  id: ExerseazaSubjectId
-  label: string
-  icon: LucideIcon
-}
-
-/** Materii disponibile în hub — extinde lista când se adaugă noi cataloage. */
-export const EXERSEAZA_SUBJECTS: ExerseazaSubjectConfig[] = [
-  {
-    id: "fizica",
-    label: "Fizică",
-    icon: Atom,
-  },
-]
+/** Materii disponibile în hub Exersează. */
+export const EXERSEAZA_SUBJECTS = PRACTICE_SUBJECTS
 
 export type ExerseazaCardId = "exercitii" | "grile" | "teste" | "flashcard"
 

@@ -37,6 +37,7 @@ export interface SubjectCatalogLayoutProps {
   onProblemsScroll: (event: UIEvent<HTMLDivElement>) => void
   children: ReactNode
   topSlot?: ReactNode
+  headerPrefix?: ReactNode
 }
 
 export function SubjectCatalogLayout({
@@ -63,6 +64,7 @@ export function SubjectCatalogLayout({
   onProblemsScroll,
   children,
   topSlot,
+  headerPrefix,
 }: SubjectCatalogLayoutProps) {
   const hasActiveFilters =
     Boolean(filters.search) ||
@@ -178,6 +180,7 @@ export function SubjectCatalogLayout({
                   </section>
                 ) : (
                   <>
+                    {headerPrefix}
                     <div className="space-y-2">
                       <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">{title}</h1>
                       <p className="text-sm text-[#2c2f33]/75 sm:text-base">{subtitle}</p>

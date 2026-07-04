@@ -16,6 +16,8 @@ import { RealVHProvider } from "@/components/real-vh-provider"
 import { EngagementProvider } from "@/components/engagement/notification-provider"
 import { EngagementNotificationToaster } from "@/components/engagement/notification-toaster"
 import { PersonalizedCourseGenerationProvider } from "@/components/invata/personalized-course-generation-context"
+import { PlanckCodeFloatingShell } from "@/components/planckcode-floating-shell"
+import { SubjectChangeCelebrationProvider } from "@/components/exerseaza/subject-change-celebration-provider"
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
@@ -119,26 +121,30 @@ export default function RootLayout({
           <DashboardStartGlowClickSound />
           <TopLoader />
           <AuthProvider>
-            <GlobalLoadingOverlay />
-            <AnalyticsProvider>
-              <KatexProvider>
-                <EngagementProvider>
-                  <PersonalizedCourseGenerationProvider>
-                    <AuthSessionGate>{children}</AuthSessionGate>
-                  </PersonalizedCourseGenerationProvider>
-                </EngagementProvider>
-              </KatexProvider>
-              <Toaster />
-              <EngagementNotificationToaster />
-              <CookieConsentBanner />
+            <SubjectChangeCelebrationProvider>
+              <GlobalLoadingOverlay />
+              <AnalyticsProvider>
+                <KatexProvider>
+                  <EngagementProvider>
+                    <PersonalizedCourseGenerationProvider>
+                      <PlanckCodeFloatingShell>
+                        <AuthSessionGate>{children}</AuthSessionGate>
+                      </PlanckCodeFloatingShell>
+                    </PersonalizedCourseGenerationProvider>
+                  </EngagementProvider>
+                </KatexProvider>
+                <Toaster />
+                <EngagementNotificationToaster />
+                <CookieConsentBanner />
 
-              <div
-                className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
-                aria-label="Versiunea site-ului"
-              >
-                v1.04.52
-              </div>
-            </AnalyticsProvider>
+                <div
+                  className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
+                  aria-label="Versiunea site-ului"
+                >
+                  v1.04.52
+                </div>
+              </AnalyticsProvider>
+            </SubjectChangeCelebrationProvider>
           </AuthProvider>
         </ErrorBoundary>
         <Analytics />

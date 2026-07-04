@@ -40,6 +40,12 @@ import {
   validateInsightAttachmentPathsForSession,
   type InsightMessageAttachment,
 } from '@/lib/insight-attachments';
+import {
+  buildIdeAgentSystemPrompt,
+  getIdeAgentClient,
+  normalizeIdeConversation,
+  resolveIdeAgentModel,
+} from '@/lib/planckcode/ide-agent';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -257,7 +263,7 @@ export async function POST(req: NextRequest) {
     // Block Deep Thinking (Raptor1 heavy) for Free plan
     if (userPlan === 'free' && modelToUseParam === 'deep-thinking') {
       return NextResponse.json(
-        { error: 'Modelul Raptor1 heavy este disponibil doar în planul Plus. Fă upgrade pentru a-l folosi.' },
+        { error: 'Modelul Planck gânditor este disponibil doar în planul Plus. Fă upgrade pentru a-l folosi.' },
         { status: 403 }
       );
     }
@@ -334,10 +340,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Load message history from database for context (last 30 messages)
-    // For IDE requests, skip loading history as they maintain their own local state
+    // Load message history: DB for Insight chat, client messages for IDE
     let history: InsightHistoryRow[] = [];
-    if (!isIdeRequest && resolvedSessionId) {
+    if (isIdeRequest && Array.isArray(messages) && messages.length > 0) {
+      history = normalizeIdeConversation(messages, userInput).map((row) => ({
+        role: row.role,
+        content: row.content,
+        attachments: null,
+      }));
+    } else if (!isIdeRequest && resolvedSessionId) {
       const { data: historyData, error: historyErr } = await supabase
         .from('insight_chat_messages')
         .select('role, content, attachments')
@@ -480,13 +491,7 @@ export async function POST(req: NextRequest) {
       'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.\n\nIMPORTANT:\n- OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu (ex: nu scrie "t_1 = 0,5", scrie "$t_1 = 0,5$").\n- Răspunde DOAR la întrebări care țin de fizică, informatică sau matematică. Dacă utilizatorul întreabă despre altceva (istorie, literatură, sport, etc.), refuză politicos explicând că ești specializat doar în domeniile științifice menționate.';
 
     if (personaKey === 'ide') {
-      systemContent =
-        'Ești Insight, co-pilotul din PlanckCode IDE. Ajută utilizatorii să scrie, să explici și să refactorizezi cod (în special C++), să depanezi erori și să oferi exemple practice. Menține răspunsurile concentrate pe programare și algoritmică; dacă utilizatorul cere altceva, redirecționează-l respectuos către subiecte tehnice.\n\nIMPORTANT - Cum răspunzi:\n1. Dacă utilizatorul îți cere în mod clar să **aplici/actualizezi/înlocuiești/rezolvi** codul din editor (ex: „corectează în IDE", „repară programul", „rescrie fișierul"), răspunde EXCLUSIV cu un obiect JSON valid, fără text suplimentar înainte sau după. Structura obligatorie este:\n{\n  "type": "code_edit",\n  "target": { "file_name": "<nume_fisier>" },\n  "explanation": "<scurtă explicație a modificărilor>",\n  "full_content": "<TOT codul final, complet, folosind \\n pentru linii noi>",\n  "changes": []\n}\n\nREGULI PENTRU JSON:\n- Include întotdeauna în `full_content` varianta completă și corectă a întregului fișier (inclusiv linii nemodificate).\n- `changes` poate rămâne gol sau poate sumariza modificările (nu trimite patch-uri linie cu linie).\n- Nu adăuga explicații în afara câmpului `explanation`.\n- Dacă nu ești sigur că utilizatorul dorește aplicarea automată, întreabă-l sau furnizează codul în chat, nu trimite JSON.\n\n2. Dacă utilizatorul solicită doar explicații, exemple, sugestii sau nu menționează clar că vrea modificări directe în editor, răspunde în text normal (Markdown) și oferă codul în blocuri ` ```limbaj ... ``` `. Aceste blocuri vor putea fi inserate manual din interfață.\n\nDacă utilizatorul cere explicit să NU modifici editorul, respectă cererea și răspunde doar cu explicații/cod în chat.';
-
-      // Adaugă instrucțiuni extra pentru modul Agent
-      if (mode === 'agent') {
-        systemContent += '\n\nINSTRUCȚIUNI SPECIALE PENTRU MODUL AGENT (când generezi cod direct în IDE - fie în JSON code_edit, fie în blocuri de cod Markdown):\n- Folosește DOAR următoarele biblioteci standard C++: <iostream>, <fstream>, <algorithm>, <cmath>, <cstring>. NU folosi alte biblioteci sau header-e (ex: <vector>, <string>, <map>, etc.).\n- NU adăuga comentarii în codul generat (nici inline cu //, nici pe blocuri cu /* */). Codul trebuie să fie complet curat, fără nicio formă de comentarii.\n- NU folosi cout sau orice alt mesaj înainte de cin. Când utilizatorul trebuie să introducă date, folosește direct cin fără mesaje prompt (ex: NU scrie "cout << \"Introdu un numar: \";" înainte de "cin >> numar;", ci doar "cin >> numar;").\n- Aceste restricții se aplică la orice cod generat care va fi inserat în IDE (în câmpul full_content din JSON sau în blocuri de cod Markdown).';
-      }
+      systemContent = buildIdeAgentSystemPrompt(mode, modelToUseParam);
     }
 
     const systemMessage = {
@@ -675,13 +680,17 @@ Asigură-te că JSON-ul este valid.`;
     const hasAnyImagesInContext =
       threadHasVisionAttachments(history) || rawAttachmentPaths.length > 0;
 
-    let activeModel = modelToUseParam === 'deep-thinking' ? 'gpt-4o' : modelToUseParam;
+    let activeModel = isIdeRequest
+      ? resolveIdeAgentModel(modelToUseParam)
+      : modelToUseParam === 'deep-thinking'
+        ? 'gpt-4o'
+        : modelToUseParam;
     if (hasAnyImagesInContext && !isIdeRequest) {
       activeModel = 'gpt-4o';
     }
 
-    // For "deep-thinking" mode, inject Chain of Thought instructions
-    if (modelToUseParam === 'deep-thinking') {
+    // For "deep-thinking" mode on non-IDE personas, inject Chain of Thought instructions
+    if (!isIdeRequest && modelToUseParam === 'deep-thinking') {
       const deepBlock =
         '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
       systemMessage.content += deepBlock;
@@ -703,11 +712,11 @@ Asigură-te că JSON-ul este valid.`;
       return NextResponse.json(usageReserve.body, { status: usageReserve.status });
     }
 
-    // Call OpenAI Chat Completions API with streaming
+    // Call Chat Completions API with streaming (DeepSeek for IDE, OpenAI otherwise)
     const t0 = Date.now();
     let stream: any;
     try {
-      const openai = getOpenAIClient();
+      const openai = isIdeRequest ? getIdeAgentClient() : getOpenAIClient();
 
       const completionParams: any = {
         model: activeModel,
@@ -888,6 +897,7 @@ Asigură-te că JSON-ul este valid.`;
           }
           const costUSD = estimateCostUSD(inputTokens, outputTokens, {
             insightVisionImagesApprox: imagesInThread,
+            ideAgent: isIdeRequest,
           });
 
           // Log individual request

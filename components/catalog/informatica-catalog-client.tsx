@@ -37,6 +37,7 @@ import {
   InformaticaCatalogCard,
   InformaticaCatalogCardSkeleton,
 } from "@/components/coding-problems/informatica-catalog-card"
+import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 const STORAGE_PREFIX = "informaticaCatalog"
@@ -337,6 +338,7 @@ export function InformaticaCatalogClient({
       sidebarScrolling={sidebarScrolling}
       onSidebarScroll={handleSidebarScroll}
       onProblemsScroll={() => {}}
+      headerPrefix={<PracticeSubjectSwitcher currentSubject="informatica" />}
     >
       <div className="relative pt-2">
         <div
@@ -352,7 +354,7 @@ export function InformaticaCatalogClient({
 
         <div className="relative z-10">
           {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 8 }).map((_, index) => (
                 <InformaticaCatalogCardSkeleton key={index} />
               ))}

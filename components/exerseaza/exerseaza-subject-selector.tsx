@@ -12,12 +12,18 @@ import {
 interface ExerseazaSubjectSelectorProps {
   selectedId: ExerseazaSubjectId
   onSelect: (id: ExerseazaSubjectId) => void
+  /** Hides the trailing “Schimbă materia” hint — for compact mobile nav. */
+  compact?: boolean
+  size?: "default" | "navbar"
 }
 
 export function ExerseazaSubjectSelector({
   selectedId,
   onSelect,
+  compact = false,
+  size = "default",
 }: ExerseazaSubjectSelectorProps) {
+  const isNavbar = size === "navbar" || compact
   const [open, setOpen] = useState(false)
   const selected =
     EXERSEAZA_SUBJECTS.find((subject) => subject.id === selectedId) ?? EXERSEAZA_SUBJECTS[0]
@@ -28,25 +34,40 @@ export function ExerseazaSubjectSelector({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-3 text-left"
+          className={cn("inline-flex items-center text-left", isNavbar ? "gap-0" : "gap-3")}
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-label={`Materia selectată: ${selected.label}. Schimbă materia.`}
         >
-          <span className="inline-flex items-center gap-2 rounded-xl border border-[#0b0c0f]/10 bg-white px-2.5 py-2 shadow-[0_4px_16px_-10px_rgba(11,12,15,0.2)] transition-colors hover:border-[#0b0c0f]/16 active:scale-[0.99]">
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f5f4f2] text-[#2c2f33]">
-              <SelectedIcon className="h-4 w-4" aria-hidden />
+          <span
+            className={cn(
+              "inline-flex items-center rounded-xl border border-[#0b0c0f]/10 bg-white shadow-[0_4px_16px_-10px_rgba(11,12,15,0.2)] transition-colors hover:border-[#0b0c0f]/16 active:scale-[0.99]",
+              isNavbar ? "gap-1.5 rounded-lg px-2 py-1" : "gap-2 px-2.5 py-2",
+            )}
+          >
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center justify-center rounded-lg bg-[#f5f4f2] text-[#2c2f33]",
+                isNavbar ? "h-6 w-6" : "h-8 w-8",
+              )}
+            >
+              <SelectedIcon className={cn(isNavbar ? "h-3 w-3" : "h-4 w-4")} aria-hidden />
             </span>
-            <span className="text-sm font-bold text-[#0b0c0f]">{selected.label}</span>
+            <span className={cn("font-bold text-[#0b0c0f]", isNavbar ? "text-xs" : "text-sm")}>
+              {selected.label}
+            </span>
             <ChevronDown
               className={cn(
-                "h-4 w-4 shrink-0 text-[#2c2f33]/45 transition-transform duration-200",
+                "shrink-0 text-[#2c2f33]/45 transition-transform duration-200",
+                isNavbar ? "h-3 w-3" : "h-4 w-4",
                 open && "rotate-180",
               )}
               aria-hidden
             />
           </span>
-          <span className="text-sm font-medium text-[#2c2f33]/55">Schimbă materia</span>
+          {!isNavbar ? (
+            <span className="text-sm font-medium text-[#2c2f33]/55">Schimbă materia</span>
+          ) : null}
         </button>
       </PopoverTrigger>
 

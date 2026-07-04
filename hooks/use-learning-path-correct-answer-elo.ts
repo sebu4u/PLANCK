@@ -3,6 +3,7 @@
 import { useCallback } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
+import { awardGuestLearningPathItemElo } from "@/lib/guest-learning-path-elo"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import { PLANCK_STREAK_UPDATED_EVENT } from "@/hooks/use-learning-path-item-completion"
 
@@ -27,7 +28,11 @@ export function useLearningPathCorrectAnswerElo({
   const { user } = useAuth()
 
   return useCallback(async (): Promise<LearningPathEloAward | null> => {
-    if (!user?.id || !itemId) return null
+    if (!itemId) return null
+
+    if (!user?.id) {
+      return awardGuestLearningPathItemElo(itemId)
+    }
 
     const { data, error } = await supabase.rpc("award_learning_path_item_elo", {
       item_id_param: itemId,

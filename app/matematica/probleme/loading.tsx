@@ -1,5 +1,5 @@
 import { Navigation } from "@/components/navigation"
-import { InformaticaCatalogCardSkeleton } from "@/components/coding-problems/informatica-catalog-card-skeleton"
+import { MatematicaCatalogCardSkeleton } from "@/components/math-problems/matematica-catalog-card-skeleton"
 import { Skeleton } from "@/components/ui/skeleton"
 
 function CatalogSidebarSkeleton() {
@@ -24,7 +24,7 @@ function CatalogSidebarSkeleton() {
   )
 }
 
-export default function LoadingInformaticaProblems() {
+export default function LoadingMatematicaProblems() {
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#ffffff] pt-16">
       <Navigation />
@@ -48,7 +48,7 @@ export default function LoadingInformaticaProblems() {
 
                 <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
                   {Array.from({ length: 6 }).map((_, index) => (
-                    <InformaticaCatalogCardSkeleton key={index} />
+                    <MatematicaCatalogCardSkeleton key={index} />
                   ))}
                 </div>
 

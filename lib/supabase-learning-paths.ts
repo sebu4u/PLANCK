@@ -3,6 +3,7 @@ import {
   FREE_LEARNING_PATH_CHAPTER_SLUG,
   FREE_PREVIEW_CHAPTER_SLUG_ALIASES,
 } from "@/lib/learning-path-free-plan"
+import { getDashboardPrimaryLearningPathSlug } from "@/lib/practice-subject"
 import {
   getLearningPathItemHref,
   getLearningPathLessonHref,
@@ -918,6 +919,18 @@ export async function getCinematicaFirstLearningPathItemHref(): Promise<string |
     if (href) return href
   }
   return null
+}
+
+/** După onboarding elev: traseul intro pentru matematică/informatică, altfel Cinematică. */
+export async function getPostOnboardingLearningPathItemHref(
+  preferredMaterie: unknown,
+): Promise<string | null> {
+  const slug = getDashboardPrimaryLearningPathSlug(preferredMaterie)
+  if (slug) {
+    const href = await getFirstLearningPathItemHrefForChapterSlug(slug)
+    if (href) return href
+  }
+  return getCinematicaFirstLearningPathItemHref()
 }
 
 /** Unde continuă userul într-un capitol: primul item necompletat, sau ultima lecție dacă totul e parcurs. */

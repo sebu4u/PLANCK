@@ -16,6 +16,12 @@ import {
 } from '@/lib/anonymous-insight';
 import { getServiceRoleSupabase } from '@/lib/supabaseServiceRole';
 import { createAnonymousLimitExceededStream } from '@/lib/anonymous-limit-fake-stream';
+import {
+  buildIdeAgentSystemPrompt,
+  getIdeAgentClient,
+  normalizeIdeConversation,
+  resolveIdeAgentModel,
+} from '@/lib/planckcode/ide-agent';
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -139,14 +145,16 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
     return new Response(
       JSON.stringify({
         error:
-          'Modelul Raptor1 heavy este disponibil doar în planul Plus. Creează un cont și fă upgrade pentru a-l folosi.',
+          'Modelul Planck gânditor este disponibil doar în planul Plus. Creează un cont și fă upgrade pentru a-l folosi.',
       }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
   let history: Array<{ role: string; content: string }> = [];
-  if (!isIdeRequest) {
+  if (isIdeRequest && Array.isArray(messages) && messages.length > 0) {
+    history = normalizeIdeConversation(messages, userInput);
+  } else if (!isIdeRequest) {
     history = normalizeGuestConversation(messages, userInput);
   }
 
@@ -155,13 +163,7 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
     'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.\n\nIMPORTANT:\n- OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu (ex: nu scrie "t_1 = 0,5", scrie "$t_1 = 0,5$").\n- Răspunde DOAR la întrebări care țin de fizică, informatică sau matematică. Dacă utilizatorul întreabă despre altceva (istorie, literatură, sport, etc.), refuză politicos explicând că ești specializat doar în domeniile științifice menționate.';
 
   if (personaKey === 'ide') {
-    systemContent =
-      'Ești Insight, co-pilotul din PlanckCode IDE. Ajută utilizatorii să scrie, să explici și să refactorizezi cod (în special C++), să depanezi erori și să oferi exemple practice. Menține răspunsurile concentrate pe programare și algoritmică; dacă utilizatorul cere altceva, redirecționează-l respectuos către subiecte tehnice.\n\nIMPORTANT - Cum răspunzi:\n1. Dacă utilizatorul îți cere în mod clar să **aplici/actualizezi/înlocuiești/rezolvi** codul din editor (ex: „corectează în IDE", „repară programul", „rescrie fișierul"), răspunde EXCLUSIV cu un obiect JSON valid, fără text suplimentar înainte sau după. Structura obligatorie este:\n{\n  "type": "code_edit",\n  "target": { "file_name": "<nume_fisier>" },\n  "explanation": "<scurtă explicație a modificărilor>",\n  "full_content": "<TOT codul final, complet, folosind \\n pentru linii noi>",\n  "changes": []\n}\n\nREGULI PENTRU JSON:\n- Include întotdeauna în `full_content` varianta completă și corectă a întregului fișier (inclusiv linii nemodificate).\n- `changes` poate rămâne gol sau poate sumariza modificările (nu trimite patch-uri linie cu linie).\n- Nu adăuga explicații în afara câmpului `explanation`.\n- Dacă nu ești sigur că utilizatorul dorește aplicarea automată, întreabă-l sau furnizează codul în chat, nu trimite JSON.\n\n2. Dacă utilizatorul solicită doar explicații, exemple, sugestii sau nu menționează clar că vrea modificări directe în editor, răspunde în text normal (Markdown) și oferă codul în blocuri ` ```limbaj ... ``` `. Aceste blocuri vor putea fi inserate manual din interfață.\n\nDacă utilizatorul cere explicit să NU modifici editorul, respectă cererea și răspunde doar cu explicații/cod în chat.';
-
-    if (mode === 'agent') {
-      systemContent +=
-        '\n\nINSTRUCȚIUNI SPECIALE PENTRU MODUL AGENT (când generezi cod direct în IDE - fie în JSON code_edit, fie în blocuri de cod Markdown):\n- Folosește DOAR următoarele biblioteci standard C++: <iostream>, <fstream>, <algorithm>, <cmath>, <cstring>. NU folosi alte biblioteci sau header-e (ex: <vector>, <string>, <map>, etc.).\n- NU adăuga comentarii în codul generat (nici inline cu //, nici pe blocuri cu /* */). Codul trebuie să fie complet curat, fără nicio formă de comentarii.\n- NU folosi cout sau orice alt mesaj înainte de cin. Când utilizatorul trebuie să introducă date, folosește direct cin fără mesaje prompt (ex: NU scrie "cout << \"Introdu un numar: \";" înainte de "cin >> numar;", ci doar "cin >> numar;").\n- Aceste restricții se aplică la orice cod generat care va fi inserat în IDE (în câmpul full_content din JSON sau în blocuri de cod Markdown).';
-    }
+    systemContent = buildIdeAgentSystemPrompt(mode, modelToUseParam);
   }
 
   const systemMessage = {
@@ -296,7 +298,9 @@ Asigură-te că JSON-ul este valid.`;
     });
   }
 
-  const activeModel = modelToUseParam as 'gpt-4o' | 'gpt-4o-mini';
+  const activeModel = isIdeRequest
+    ? resolveIdeAgentModel(modelToUseParam)
+    : (modelToUseParam as 'gpt-4o' | 'gpt-4o-mini');
 
   const maxTokensParam = {
     max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
@@ -329,7 +333,7 @@ Asigură-te că JSON-ul este valid.`;
   const t0 = Date.now();
   let stream: AsyncIterable<any>;
   try {
-    const openai = getOpenAIClient();
+    const openai = isIdeRequest ? getIdeAgentClient() : getOpenAIClient();
     stream = await openai.chat.completions.create({
       model: activeModel,
       messages: chatMessages,
@@ -407,7 +411,7 @@ Asigură-te că JSON-ul este valid.`;
         const totalTokens = usage?.total_tokens ?? 0;
         const latencyMs = Date.now() - t0;
 
-        const costUSD = estimateCostUSD(inputTokens, outputTokens);
+        const costUSD = estimateCostUSD(inputTokens, outputTokens, { ideAgent: isIdeRequest });
 
         await admin.from('insight_logs').insert({
           user_id: null,

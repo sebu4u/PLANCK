@@ -18,6 +18,8 @@ export interface LearningPathAccess {
   itemsSolved: number
   itemsRemaining: number
   userId: string | null
+  isAdmin: boolean
+  isDev: boolean
 }
 
 interface ChapterLike {
@@ -29,7 +31,7 @@ interface ChapterLike {
 /**
  * Determina nivelul de acces al userului curent pentru un capitol learning-path.
  *
- * - `full`: admini, planuri platite (plus/premium), useri cu `plus_months_remaining > 0`.
+ * - `full`: admini, dev (`profiles.is_dev`), planuri platite (plus/premium), useri cu `plus_months_remaining > 0`.
  * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru capitolele din
  *   `FREE_PREVIEW_LEARNING_PATH_CHAPTER_SLUGS`; pot parcurge secvențial până la limita globală de itemi.
  * - `locked`: orice alt scenariu (afiseaza preview-ul placeholder).
@@ -56,23 +58,60 @@ export async function getLearningPathAccessForUser(
         itemsSolved: 0,
         itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
         userId: null,
+        isAdmin: false,
+        isDev: false,
       }
     }
-    return { mode: "locked", itemsSolved: 0, itemsRemaining: 0, userId: null }
+    return {
+      mode: "locked",
+      itemsSolved: 0,
+      itemsRemaining: 0,
+      userId: null,
+      isAdmin: false,
+      isDev: false,
+    }
   }
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin, plan, plus_months_remaining")
+    .select("is_admin, is_dev, plan, plus_months_remaining")
     .eq("user_id", user.id)
     .maybeSingle()
 
-  if (profile?.is_admin === true || isAdmin(user)) {
-    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: null }
+  const userIsAdmin = profile?.is_admin === true || isAdmin(user)
+  const userIsDev = profile?.is_dev === true
+
+  if (userIsAdmin) {
+    return {
+      mode: "full",
+      itemsSolved: 0,
+      itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+      userId: user.id,
+      isAdmin: true,
+      isDev: userIsDev,
+    }
+  }
+
+  if (userIsDev) {
+    return {
+      mode: "full",
+      itemsSolved: 0,
+      itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+      userId: user.id,
+      isAdmin: false,
+      isDev: true,
+    }
   }
 
   if (chapter?.is_personalized === true && chapter.generated_by_user_id === user.id) {
-    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: user.id }
+    return {
+      mode: "full",
+      itemsSolved: 0,
+      itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+      userId: user.id,
+      isAdmin: false,
+      isDev: false,
+    }
   }
 
   const appMetadata = (user.app_metadata as Record<string, unknown>) ?? {}
@@ -86,12 +125,26 @@ export async function getLearningPathAccessForUser(
   const plusMonthsRemaining = Number(profile?.plus_months_remaining ?? 0)
 
   if (isPaidPlan(resolvedPlan) || plusMonthsRemaining > 0) {
-    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: user.id }
+    return {
+      mode: "full",
+      itemsSolved: 0,
+      itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+      userId: user.id,
+      isAdmin: false,
+      isDev: false,
+    }
   }
 
   const isFreeChapter = isFreePreviewLearningPathChapterSlug(chapter?.slug ?? null)
   if (!isFreeChapter) {
-    return { mode: "locked", itemsSolved: 0, itemsRemaining: 0, userId: user.id }
+    return {
+      mode: "locked",
+      itemsSolved: 0,
+      itemsRemaining: 0,
+      userId: user.id,
+      isAdmin: false,
+      isDev: false,
+    }
   }
 
   const { count } = await supabase
@@ -102,7 +155,14 @@ export async function getLearningPathAccessForUser(
   const itemsSolved = Number(count ?? 0)
   const itemsRemaining = Math.max(0, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT - itemsSolved)
 
-  return { mode: "free-preview", itemsSolved, itemsRemaining, userId: user.id }
+  return {
+    mode: "free-preview",
+    itemsSolved,
+    itemsRemaining,
+    userId: user.id,
+    isAdmin: false,
+    isDev: false,
+  }
 }
 
 /**

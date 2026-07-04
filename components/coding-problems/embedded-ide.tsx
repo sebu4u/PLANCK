@@ -221,6 +221,9 @@ interface RunResponse {
 
 export interface EmbeddedIDEProps {
   initialCode?: string
+  /** Fișiere inițiale (ex. sesiune floating sau restore). */
+  initialFiles?: FileItem[]
+  initialActiveFileId?: string
   /** Limbajul problemei — controlează fișierul implicit (main.cpp vs main.py). */
   defaultLanguage?: "cpp" | "python"
   /** Dacă e setat (slug), apare butonul „Trimite” pentru evaluare oficială Python. */
@@ -229,28 +232,44 @@ export interface EmbeddedIDEProps {
   onAcceptedSubmit?: () => void
   /** După Continuă pe cardul de rezultat acceptat — navigare la itemul următor. */
   onAcceptedContinue?: () => Promise<void> | void
+  /** Sincronizează workspace-ul (ex. card floating). */
+  onWorkspaceChange?: (files: FileItem[], activeFileId: string) => void
   /** Controlează doar cromatica/layout-ul exterior; logica editorului și terminalului rămâne aceeași. */
-  presentation?: "default" | "learning-path"
+  presentation?: "default" | "learning-path" | "floating"
+  /** Ascunde Run Code / Trimite (ex. card floating mini). */
+  hideRunActions?: boolean
 }
 
 export default function EmbeddedIDE({
   initialCode,
+  initialFiles,
+  initialActiveFileId,
   defaultLanguage = "cpp",
   problemSlug = null,
   onAcceptedSubmit,
   onAcceptedContinue,
+  onWorkspaceChange,
   presentation = "default",
+  hideRunActions = false,
 }: EmbeddedIDEProps) {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
   const [files, setFiles] = useState<FileItem[]>(() =>
-    createInitialFiles(defaultLanguage, initialCode)
+    initialFiles && initialFiles.length > 0
+      ? initialFiles
+      : createInitialFiles(defaultLanguage, initialCode),
   )
-  const [activeFileId, setActiveFileId] = useState<string>("1")
+  const [activeFileId, setActiveFileId] = useState<string>(() => {
+    if (initialActiveFileId && initialFiles?.some((file) => file.id === initialActiveFileId)) {
+      return initialActiveFileId
+    }
+    if (initialFiles && initialFiles.length > 0) return initialFiles[0].id
+    return "1"
+  })
   const [output, setOutput] = useState<RunResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(true)
+  const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(presentation !== "floating")
   const [stdin, setStdin] = useState<string>("")
   const [pythonLiveStdout, setPythonLiveStdout] = useState<string | null>(null)
   const [pythonLiveStderr, setPythonLiveStderr] = useState<string | null>(null)
@@ -337,6 +356,17 @@ export default function EmbeddedIDE({
     ensureMonacoThemes(monaco)
     monaco.editor.setTheme(settings.theme)
   }, [settings.theme])
+
+  const onWorkspaceChangeRef = useRef(onWorkspaceChange)
+  onWorkspaceChangeRef.current = onWorkspaceChange
+  const lastWorkspaceNotifyRef = useRef("")
+
+  useEffect(() => {
+    const snapshot = JSON.stringify({ files, activeFileId })
+    if (snapshot === lastWorkspaceNotifyRef.current) return
+    lastWorkspaceNotifyRef.current = snapshot
+    onWorkspaceChangeRef.current?.(files, activeFileId)
+  }, [files, activeFileId])
 
   const handleEditorChange = (value: string | undefined) => {
     if (!activeFile) return
@@ -640,12 +670,14 @@ export default function EmbeddedIDE({
       ? "Python rulează în browser (prima rulare poate descărca interpretorul)."
       : "Compiling and running your code..."
   const isLearningPathPresentation = presentation === "learning-path"
+  const isFloatingPresentation = presentation === "floating"
 
   const fileTabs = (
     <div
       className={cn(
         "flex items-center justify-between gap-1 overflow-x-auto border-b border-[#3b3b3b] bg-[#1e1e1e] px-4 py-2",
         isLearningPathPresentation && "border-white/10 bg-[#0f141c]",
+        isFloatingPresentation && "px-2 py-1",
       )}
     >
         <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -696,7 +728,7 @@ export default function EmbeddedIDE({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 ml-4 shrink-0">
+        <div className={cn("flex items-center gap-2 ml-4 shrink-0", hideRunActions && "hidden")}>
           <Button
             onClick={handleRunCode}
             disabled={loading}
@@ -1067,6 +1099,26 @@ export default function EmbeddedIDE({
           <section className="flex min-h-[min(34dvh,260px)] flex-col overflow-hidden rounded-[18px] border border-white/10 bg-[#141820] shadow-[0_6px_20px_rgba(3,7,18,0.1)] max-xl:h-[min(34dvh,260px)] sm:rounded-[22px] xl:min-h-[240px] xl:flex-[1]">
             {isTerminalOpen ? terminalPanel : collapsedTerminal}
           </section>
+        </div>
+        {submitOverlay}
+        {newFileDialog}
+      </>
+    )
+  }
+
+  if (isFloatingPresentation) {
+    return (
+      <>
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#060b10]">
+          {fileTabs}
+          <div className="min-h-0 flex-1">{editorPane}</div>
+          {isTerminalOpen ? (
+            <div className="h-[min(120px,30%)] shrink-0 border-t border-[#3b3b3b]">
+              {terminalPanel}
+            </div>
+          ) : (
+            collapsedTerminal
+          )}
         </div>
         {submitOverlay}
         {newFileDialog}

@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { MouseEventHandler } from "react"
@@ -132,13 +134,4 @@ export function InformaticaCatalogCard({
   )
 }
 
-export function InformaticaCatalogCardSkeleton() {
-  return (
-    <Card className="flex h-full flex-col gap-4 rounded-2xl border border-[#0b0c0f]/10 bg-white p-5">
-      <div className="h-10 w-10 animate-pulse rounded-xl bg-[#f5f4f2]" />
-      <div className="h-4 w-2/3 animate-pulse rounded bg-[#f5f4f2]" />
-      <div className="h-16 w-full animate-pulse rounded bg-[#f5f4f2]" />
-      <div className="mt-auto h-10 w-40 animate-pulse rounded-full bg-[#f5f4f2]" />
-    </Card>
-  )
-}
+export { InformaticaCatalogCardSkeleton } from "@/components/coding-problems/informatica-catalog-card-skeleton"

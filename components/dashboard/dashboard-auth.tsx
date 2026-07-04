@@ -1,6 +1,6 @@
 "use client"
 
-import { type CSSProperties, useEffect, useRef, useState, useMemo } from "react"
+import { type CSSProperties, useCallback, useEffect, useRef, useState, useMemo } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
@@ -48,10 +48,16 @@ import {
   getPostOnboardingDiscountMobilePromoDismissedKey,
   usePostOnboardingDiscountWindow,
 } from "@/hooks/use-post-onboarding-discount-window"
+import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
+import { getDashboardPrimaryLearningPathSlug, normalizePracticeSubject } from "@/lib/practice-subject"
+import {
+  SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
+  type SubjectChangeCelebrationCompleteDetail,
+} from "@/lib/subject-change-celebration"
 
 export function DashboardAuth() {
   const router = useRouter()
-  const { user, loading: authLoading, profile } = useAuth()
+  const { user, loading: authLoading, profile, isStudent } = useAuth()
   const { isFree, isPaid } = useSubscriptionPlan()
   const postOnboardingDiscount = usePostOnboardingDiscountWindow(user?.id)
   const [loading, setLoading] = useState(true)
@@ -100,6 +106,50 @@ export function DashboardAuth() {
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
 
+  const refreshDashboardLearningPaths = useCallback(
+    async (preferredMaterie: string | null | undefined) => {
+      if (!user?.id) return
+
+      try {
+        const learningPathsData = await fetchDashboardLearningPaths(user.id, preferredMaterie)
+        setDashboardData((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            dashboardLearningPaths: learningPathsData.chapters,
+            dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
+            dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
+            dashboardLevelByChapter: learningPathsData.levelByChapterId,
+            dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
+          }
+        })
+      } catch (error) {
+        console.error("[dashboard] Failed to refresh learning paths after subject change:", error)
+      }
+    },
+    [user?.id],
+  )
+
+  useEffect(() => {
+    const handleSubjectChangeCelebrationComplete = (event: Event) => {
+      const detail = (event as CustomEvent<SubjectChangeCelebrationCompleteDetail>).detail
+      if (!detail?.to) return
+      void refreshDashboardLearningPaths(detail.to)
+    }
+
+    window.addEventListener(
+      SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
+      handleSubjectChangeCelebrationComplete,
+    )
+
+    return () => {
+      window.removeEventListener(
+        SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
+        handleSubjectChangeCelebrationComplete,
+      )
+    }
+  }, [refreshDashboardLearningPaths])
+
   useEffect(() => {
     if (authLoading) return
 
@@ -129,7 +179,7 @@ export function DashboardAuth() {
               isInitialLoadRef.current = false
               isFetchingRef.current = false
               // Still fetch in background to update cache (but don't update UI)
-              fetchDashboardDataBackground(user.id, cacheKey, true)
+              fetchDashboardDataBackground(user.id, cacheKey, true, profile?.preferred_materie)
               return
             }
           }
@@ -164,7 +214,7 @@ export function DashboardAuth() {
           fetchEloQuickStats(user.id),
           fetchEloHistory(user.id),
           fetchLastFiveStreakDays(user.id),
-          fetchDashboardLearningPaths(user.id),
+              fetchDashboardLearningPaths(user.id, profile?.preferred_materie),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -217,7 +267,12 @@ export function DashboardAuth() {
       }
     }
 
-    const fetchDashboardDataBackground = async (userId: string, cacheKey: string, silent: boolean = false) => {
+    const fetchDashboardDataBackground = async (
+      userId: string,
+      cacheKey: string,
+      silent: boolean = false,
+      preferredMaterie?: string | null,
+    ) => {
       try {
         // Fetch all data in parallel for cache update
         const [
@@ -247,7 +302,7 @@ export function DashboardAuth() {
           fetchEloQuickStats(userId),
           fetchEloHistory(userId),
           fetchLastFiveStreakDays(userId),
-          fetchDashboardLearningPaths(userId),
+          fetchDashboardLearningPaths(userId, preferredMaterie),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -578,6 +633,15 @@ export function DashboardAuth() {
               ) : null}
               <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:block md:h-auto md:overflow-visible md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="mx-auto flex h-full min-h-0 w-full max-w-[1000px] flex-col md:h-auto md:min-h-0">
+                  {isStudent ? (
+                    <div className="mb-6 hidden md:block">
+                      <PracticeSubjectSwitcher
+                        currentSubject={normalizePracticeSubject(profile?.preferred_materie)}
+                        className="flex justify-start"
+                        navigateOnChange={false}
+                      />
+                    </div>
+                  ) : null}
                   <div className={`grid min-h-0 flex-1 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[340px_minmax(0,1fr)] md:flex-none ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
                     <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
                       <DashboardStreakCard
@@ -658,6 +722,7 @@ export function DashboardAuth() {
 
                     <div className="order-2 flex min-h-0 flex-col overflow-hidden md:order-3 md:overflow-visible xl:order-none xl:col-start-2 xl:row-span-2 md:min-h-0">
                       <DashboardLearningPathsCarousel
+                        key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
                         chapters={dashboardData.dashboardLearningPaths}
                         lessonsByChapter={dashboardData.dashboardLessonsByChapter}
                         startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
@@ -1323,14 +1388,28 @@ interface DashboardLearningPathsData {
   hasStartedByChapterId: Record<string, boolean>
 }
 
-function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): LearningPathChapter[] {
-  const preferredSlugs = ["cinematica-punctului-material", "dinamica", "optica-geometrica"]
+function findDashboardChapterBySlug(
+  chapters: LearningPathChapter[],
+  slug: string,
+): LearningPathChapter | undefined {
+  return (
+    chapters.find((chapter) => chapter.slug === slug) ??
+    chapters.find((chapter) => chapter.slug?.toLowerCase() === slug.toLowerCase())
+  )
+}
+
+function selectDashboardLearningPathChapters(
+  chapters: LearningPathChapter[],
+  primarySlug: string | null,
+): LearningPathChapter[] {
+  const physicsSlugs = ["cinematica-punctului-material", "dinamica", "optica-geometrica"]
+  const preferredSlugs = primarySlug ? [primarySlug, ...physicsSlugs] : physicsSlugs
   const picked: LearningPathChapter[] = []
   const pickedIds = new Set<string>()
 
   for (const slug of preferredSlugs) {
-    const chapter = chapters.find((item) => item.slug === slug && !pickedIds.has(item.id))
-    if (!chapter) continue
+    const chapter = findDashboardChapterBySlug(chapters, slug)
+    if (!chapter || pickedIds.has(chapter.id)) continue
     picked.push(chapter)
     pickedIds.add(chapter.id)
   }
@@ -1366,38 +1445,56 @@ function selectDashboardLearningPathChapters(chapters: LearningPathChapter[]): L
 function orderDashboardLearningPathChapters(
   selectedChapters: LearningPathChapter[],
   allChapters: LearningPathChapter[],
-  lastWorkedChapterId: string | null
+  lastWorkedChapterId: string | null,
+  primarySlug: string | null,
 ): LearningPathChapter[] {
-  if (!lastWorkedChapterId || selectedChapters.length === 0) {
-    return selectedChapters
+  if (selectedChapters.length === 0) return selectedChapters
+
+  const ordered: LearningPathChapter[] = []
+  const usedIds = new Set<string>()
+
+  const pushChapter = (chapter: LearningPathChapter | null | undefined) => {
+    if (!chapter || usedIds.has(chapter.id)) return
+    ordered.push(chapter)
+    usedIds.add(chapter.id)
   }
 
-  const lastWorkedChapter =
-    selectedChapters.find((chapter) => chapter.id === lastWorkedChapterId) ??
-    allChapters.find((chapter) => chapter.id === lastWorkedChapterId)
-
-  if (!lastWorkedChapter) {
-    return selectedChapters
+  if (primarySlug) {
+    pushChapter(
+      findDashboardChapterBySlug(selectedChapters, primarySlug) ??
+        findDashboardChapterBySlug(allChapters, primarySlug),
+    )
   }
 
-  const isInSelected = selectedChapters.some((chapter) => chapter.id === lastWorkedChapterId)
-  if (isInSelected) {
-    const others = selectedChapters.filter((chapter) => chapter.id !== lastWorkedChapterId)
-    return [lastWorkedChapter, ...others]
+  if (lastWorkedChapterId) {
+    pushChapter(
+      selectedChapters.find((chapter) => chapter.id === lastWorkedChapterId) ??
+        allChapters.find((chapter) => chapter.id === lastWorkedChapterId),
+    )
   }
 
-  return [lastWorkedChapter, ...selectedChapters.slice(0, 2)]
+  for (const chapter of selectedChapters) {
+    pushChapter(chapter)
+    if (ordered.length >= 3) break
+  }
+
+  return ordered.slice(0, 3)
 }
 
-async function fetchDashboardLearningPaths(userId: string): Promise<DashboardLearningPathsData> {
+async function fetchDashboardLearningPaths(
+  userId: string,
+  preferredMaterie?: string | null,
+): Promise<DashboardLearningPathsData> {
+  const primarySlug = getDashboardPrimaryLearningPathSlug(preferredMaterie)
   const [chapters, lastWorkedChapterId] = await Promise.all([
     getLearningPathChapters(),
     getLastWorkedLearningPathChapterIdForUser(supabase, userId),
   ])
   const selectedChapters = orderDashboardLearningPathChapters(
-    selectDashboardLearningPathChapters(chapters),
+    selectDashboardLearningPathChapters(chapters, primarySlug),
     chapters,
-    lastWorkedChapterId
+    lastWorkedChapterId,
+    primarySlug,
   )
   const lessonsByChapter: Record<string, LearningPathLesson[]> = {}
   const startHrefByChapterId: Record<string, string> = {}

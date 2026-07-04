@@ -20,13 +20,13 @@ export function ProblemStatementSection({
   theme = "dark",
 }: ProblemStatementSectionProps) {
   const isLight = theme === "light"
-  const bodyFontClass = isLight ? "" : "font-vt323"
+  const bodyFontClass = ""
   const textClass = isLight ? "text-[#2b2433]" : "text-white/80"
   const headingClass = isLight ? "text-[#111111]" : "text-white"
   const eyebrowClass = isLight ? "text-[#6f657b]" : "text-white/50"
   const sectionLabelClass = isLight
     ? "text-sm font-semibold text-[#111111]"
-    : "text-lg font-semibold uppercase tracking-[0.2em]"
+    : "text-sm font-semibold text-white"
   const sectionCardClass = isLight
     ? "rounded-2xl border border-[#ece7f2] bg-[#ffffff] px-4 py-3"
     : "rounded-md border border-white/12 bg-[#161616] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
@@ -112,7 +112,7 @@ export function ProblemStatementSection({
       {problem.constraints_markdown && (
         <section className="space-y-2">
           <h2 className={cn(bodyFontClass, sectionLabelClass, headingClass)}>Restricții</h2>
-          <div className={cn("prose max-w-none", isLight ? "prose-neutral text-[#2b2433]" : "prose-invert text-white/85")}>
+          <div className={sectionCardClass}>
             <ReactMarkdown
               className={cn(bodyFontClass, "text-base leading-relaxed", textClass)}
               remarkPlugins={[remarkMath, remarkGfm]}
@@ -131,12 +131,12 @@ export function ProblemStatementSection({
           <div className="space-y-6">
             {examples.map((example, idx) => (
               <div key={example.id} className="space-y-3">
-                <div className={cn(bodyFontClass, "text-sm font-semibold", isLight ? "text-[#6f657b]" : "uppercase tracking-[0.2em] text-white/60")}>
+                <div className={cn(bodyFontClass, "text-sm font-semibold", isLight ? "text-[#6f657b]" : "text-white/60")}>
                   Exemplu {idx + 1}
                 </div>
                 {example.sample_input && (
                   <div>
-                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "" : "uppercase tracking-[0.2em]", eyebrowClass)}>
+                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", eyebrowClass)}>
                       Intrare
                     </div>
                     <pre className={preClass}>
@@ -146,7 +146,7 @@ export function ProblemStatementSection({
                 )}
                 {example.sample_output && (
                   <div>
-                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "" : "uppercase tracking-[0.2em]", eyebrowClass)}>
+                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", eyebrowClass)}>
                       Ieșire
                     </div>
                     <pre className={preClass}>
@@ -156,7 +156,7 @@ export function ProblemStatementSection({
                 )}
                 {example.explanation && (
                   <div className={cn("rounded-lg border p-4", isLight ? "border-[#cbd5ff] bg-[#eef2ff]" : "border-blue-500/20 bg-blue-500/10")}>
-                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "text-[#4251b5]" : "uppercase tracking-[0.2em] text-blue-200")}>
+                    <div className={cn(bodyFontClass, "mb-2 text-xs font-semibold", isLight ? "text-[#4251b5]" : "text-blue-200")}>
                       Explicație
                     </div>
                     <p className={cn(bodyFontClass, "text-sm", isLight ? "text-[#293178]" : "text-blue-100/90")}>{example.explanation}</p>

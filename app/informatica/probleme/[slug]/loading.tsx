@@ -6,13 +6,11 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { PlanckCodeSettingsProvider } from "@/components/planckcode-settings-provider"
 import { PlanckCodeSidebar } from "@/components/planckcode-sidebar"
 
 export default function Loading() {
   return (
-    <PlanckCodeSettingsProvider>
-      <div className="h-screen bg-[#070707] text-white overflow-hidden flex flex-col">
+    <div className="h-screen-mobile bg-black text-white overflow-hidden flex flex-col">
         <Navigation />
         <PlanckCodeSidebar />
         
@@ -124,7 +122,6 @@ export default function Loading() {
           </ResizablePanelGroup>
         </main>
       </div>
-    </PlanckCodeSettingsProvider>
   )
 }
 

@@ -14,8 +14,9 @@ import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimu
 import { OnboardingPostAuthSplash } from "@/components/onboarding/OnboardingPostAuthSplash"
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
 import {
-  getCinematicaFirstLearningPathItemHref,
+  getPostOnboardingLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
+import { getPostOnboardingLearningPathCtaLabel } from "@/lib/practice-subject"
 import {
   canAccessStudentOnboarding,
   consumePostOnboardingRedirect,
@@ -397,7 +398,7 @@ function RegisterPageContent() {
     let cancelled = false
     void (async () => {
       try {
-        const href = await getCinematicaFirstLearningPathItemHref()
+        const href = await getPostOnboardingLearningPathItemHref(onboardingState.subject)
         if (!cancelled) setGuestFirstItemHref(href)
       } catch {
         if (!cancelled) setGuestFirstItemHref(null)
@@ -406,7 +407,7 @@ function RegisterPageContent() {
     return () => {
       cancelled = true
     }
-  }, [hydrated, onboardingState.step])
+  }, [hydrated, onboardingState.step, onboardingState.subject])
 
   const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= 6
   const showBackButton =
@@ -529,7 +530,9 @@ function RegisterPageContent() {
 
   const handleTryWithoutAccount = async () => {
     try {
-      const target = guestFirstItemHref ?? (await getCinematicaFirstLearningPathItemHref())
+      const target =
+        guestFirstItemHref ??
+        (await getPostOnboardingLearningPathItemHref(onboardingState.subject))
       if (target) {
         router.push(target)
         return
@@ -676,8 +679,10 @@ function RegisterPageContent() {
 
     await refreshProfile()
     const postOnboardingRedirect = consumePostOnboardingRedirect()
-    const cinematicaHref = await getCinematicaFirstLearningPathItemHref()
-    router.push(postOnboardingRedirect ?? cinematicaHref ?? "/dashboard")
+    const defaultLearningPathHref = await getPostOnboardingLearningPathItemHref(
+      onboardingState.subject,
+    )
+    router.push(postOnboardingRedirect ?? defaultLearningPathHref ?? "/dashboard")
   }
 
   const renderStepContent = () => {
@@ -916,7 +921,7 @@ function RegisterPageContent() {
                     Salvăm...
                   </span>
                 ) : (
-                  "Începe Cinematică"
+                  getPostOnboardingLearningPathCtaLabel(onboardingState.subject)
                 )}
               </button>
             </form>

@@ -5,18 +5,19 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Code, FileText, FolderOpen, Settings } from 'lucide-react'
 import { usePlanckCodeSettings } from './planckcode-settings-provider'
+import { isInformaticaProblemeRoute, isPlanckCodeShellRoute } from '@/lib/planckcode-shell-routes'
 
 export function PlanckCodeSidebar() {
   const { openModal } = usePlanckCodeSettings()
   const pathname = usePathname()
-  const isPlanckCode = pathname?.startsWith('/planckcode') ?? false
-  const topOffset = isPlanckCode ? 'top-16' : 'top-[100px]'
-  const heightCalc = isPlanckCode ? 'h-[calc(100vh-64px)]' : 'h-[calc(100vh-100px)]'
+  const isShellRoute = isPlanckCodeShellRoute(pathname)
+  const topOffset = isShellRoute ? 'top-16' : 'top-[100px]'
+  const heightCalc = isShellRoute ? 'h-[calc(100vh-64px)]' : 'h-[calc(100vh-100px)]'
 
   const menuItems = [
     { label: 'IDE', icon: Code, href: '/planckcode/ide' },
     { label: 'Proiecte', icon: FolderOpen, href: '/planckcode/projects' },
-    { label: 'Probleme', icon: FileText, href: '/informatica/probleme', disabled: true },
+    { label: 'Probleme', icon: FileText, href: '/informatica/probleme' },
   ]
 
   const baseButtonClassName = 'w-full flex items-center justify-center py-3 text-white hover:bg-[#262626] transition-colors duration-200 relative font-vt323 text-lg'
@@ -47,10 +48,12 @@ export function PlanckCodeSidebar() {
           <ul className="space-y-2">
             {menuItems.map((item) => {
               const Icon = item.icon
-              const isLink = item.href !== '#' && !item.disabled
-              const isDisabled = item.disabled
-              const isActive = pathname === item.href
-              const className = `${baseButtonClassName} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${isActive ? 'bg-[#262626] border-l-2 border-white' : ''}`
+              const isLink = item.href !== '#'
+              const isActive =
+                item.label === 'Probleme'
+                  ? isInformaticaProblemeRoute(pathname)
+                  : pathname === item.href
+              const className = `${baseButtonClassName} ${isActive ? 'bg-[#262626] border-l-2 border-white' : ''}`
 
               return (
                 <li key={item.label}>
@@ -61,7 +64,7 @@ export function PlanckCodeSidebar() {
                       </div>
                     </Link>
                   ) : (
-                    <button className={className} disabled={isDisabled} title={item.label}>
+                    <button className={className} title={item.label}>
                       <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-5 h-5 text-white" />
                       </div>

@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Chrome, Github, Loader2, Send, X, Copy, Check, Sparkles, ChevronDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { Input } from "@/components/ui/input"
 import Image from "next/image"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { AnonLimitLockedContent } from "@/components/anon-limit-locked-content"
@@ -69,10 +68,30 @@ interface InsightIdeChatProps {
 
 const INSIGHT_SESSION_TITLE = "PlanckCode IDE"
 const MODEL_OPTIONS = [
-  { id: "gpt-4o-mini", label: "Raptor1 fast", selectable: true },
-  { id: "gpt-4o", label: "Raptor1", selectable: true },
-  { id: "deep-thinking", label: "Raptor1 heavy", selectable: true },
+  { id: "gpt-4o-mini", label: "Planck rapid", selectable: true },
+  { id: "gpt-4o", label: "Planck Agent", selectable: true },
+  { id: "deep-thinking", label: "Planck gânditor", selectable: true },
 ]
+
+function sanitizeMessageForApi(content: string): string {
+  return content.replace(/:::status:[^:]+:::/g, "").trim()
+}
+
+function buildConversationHistory(
+  priorMessages: ChatMessage[],
+  currentUserContent: string,
+): Array<{ role: "user" | "assistant"; content: string }> {
+  const history = priorMessages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter((m) => m.content.trim().length > 0 && !m.anonLimitLocked)
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: sanitizeMessageForApi(m.content),
+    }))
+    .filter((m) => m.content.length > 0)
+
+  return [...history, { role: "user", content: currentUserContent }]
+}
 
 function findJsonCandidate(text: string): string | null {
   const trimmed = text.trim()
@@ -420,7 +439,7 @@ export function InsightIdeChat({
     {
       role: "system",
       content:
-        "Ești Insight, un asistent inteligent pentru PlanckCode IDE. Ajută utilizatorii cu sfaturi C++, generare de cod și depanare. Respectă politicile și limitează-te la subiecte de programare.",
+        "Ești Planck Agent, profesorul de informatică din PlanckCode IDE. Ajuți elevii de liceu cu C++ și Python.",
     },
   ])
   const [input, setInput] = useState("")
@@ -433,7 +452,7 @@ export function InsightIdeChat({
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
-  const [shouldSendContext, setShouldSendContext] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const [mode, setMode] = useState<"agent" | "ask">("agent")
   const [selectedModel, setSelectedModel] = useState("gpt-4o")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -450,6 +469,17 @@ export function InsightIdeChat({
     setHasPendingCodeChange(false)
     onRejectCodeChanges?.()
   }, [onRejectCodeChanges])
+
+  const adjustInputHeight = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [])
+
+  useEffect(() => {
+    adjustInputHeight()
+  }, [input, adjustInputHeight])
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => message.role !== "system"),
@@ -519,14 +549,6 @@ export function InsightIdeChat({
   useEffect(() => {
     scrollToBottom()
   }, [visibleMessages.length, isStreaming, busy, scrollToBottom])
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldSendContext(true)
-    } else {
-      setShouldSendContext(false)
-    }
-  }, [isOpen, activeFileContent, activeFileName, activeFileLanguage])
 
   useEffect(() => {
     if (didApplyFreeDefaultModelRef.current) return
@@ -608,7 +630,7 @@ export function InsightIdeChat({
         })
 
         if (!createRes.ok) {
-          throw new Error("Nu am putut crea sesiunea Insight.")
+          throw new Error("Nu am putut crea sesiunea Planck Agent.")
         }
 
         const createData = await createRes.json()
@@ -616,29 +638,31 @@ export function InsightIdeChat({
         setSessionId(currentSessionId)
       }
 
-      const activeModelId = mode === "ask" ? "gpt-4o" : selectedModel
+      const activeModelId = selectedModel
       setMessages((prev) => [...prev, { role: "assistant", content: "", model: activeModelId }])
 
-      const contextMessages =
-        shouldSendContext && activeFileContent
-          ? [
+      const conversationHistory = buildConversationHistory(messages, newUserMessage.content)
+
+      const contextMessages = activeFileContent
+        ? [
             {
               role: "user",
               content: [
                 "Context: codul curent din fișierul activ din IDE.",
                 activeFileName ? `Fișier: ${activeFileName}` : null,
+                activeFileLanguage ? `Limbaj: ${activeFileLanguage}` : null,
                 "",
                 "```" +
-                (activeFileLanguage || "plaintext") +
-                "\n" +
-                activeFileContent +
-                "\n```",
+                  (activeFileLanguage || "plaintext") +
+                  "\n" +
+                  activeFileContent +
+                  "\n```",
               ]
                 .filter(Boolean)
                 .join("\n"),
             } as ChatMessage,
           ]
-          : undefined
+        : undefined
 
       const fetchHeaders: Record<string, string> = {
         "Content-Type": "application/json",
@@ -654,9 +678,10 @@ export function InsightIdeChat({
         body: JSON.stringify({
           ...(isGuest ? {} : { sessionId: currentSessionId }),
           input: newUserMessage.content,
+          messages: conversationHistory,
           persona: "ide",
           mode,
-          model: mode === "ask" ? "gpt-4o" : selectedModel,
+          model: selectedModel,
           contextMessages,
         }),
         signal: controller.signal,
@@ -664,7 +689,7 @@ export function InsightIdeChat({
 
       if (response.status === 429) {
         const data = await response.json()
-        const limitMessage = data.error || "Limită zilnică atinsă pentru Insight."
+        const limitMessage = data.error || "Limită zilnică atinsă pentru Planck Agent."
         const isDailyLimit = Boolean(data.resetTime) || /zilnic/i.test(limitMessage)
 
         if (isDailyLimit) {
@@ -694,13 +719,12 @@ export function InsightIdeChat({
         abortControllerRef.current = null
         setBusy(false)
         setIsStreaming(false)
-        setShouldSendContext(false)
         return
       }
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || "Eroare la Insight.")
+        throw new Error(data.error || "Eroare la Planck Agent.")
       }
 
       const contentType = response.headers.get("content-type")
@@ -723,7 +747,7 @@ export function InsightIdeChat({
 
       const reader = response.body?.getReader()
       if (!reader) {
-        throw new Error("Nu s-a putut citi răspunsul Insight.")
+        throw new Error("Nu s-a putut citi răspunsul Planck Agent.")
       }
 
       const decoder = new TextDecoder()
@@ -828,7 +852,7 @@ export function InsightIdeChat({
             } else if (data.type === "session" && data.sessionId) {
               setSessionId(data.sessionId)
             } else if (data.type === "error") {
-              throw new Error(data.error || "Eroare la Insight.")
+              throw new Error(data.error || "Eroare la Planck Agent.")
             }
           } catch (error) {
             console.error("Failed to parse Insight stream chunk:", error)
@@ -1046,7 +1070,7 @@ export function InsightIdeChat({
       console.error("Insight IDE chat error:", err)
       setIsGenerating(false)
       const message =
-        err instanceof Error ? err.message : "Eroare la comunicarea cu Insight."
+        err instanceof Error ? err.message : "Eroare la comunicarea cu Planck Agent."
       setError(message)
       toast({
         title: "Eroare",
@@ -1058,15 +1082,14 @@ export function InsightIdeChat({
       setBusy(false)
       setIsStreaming(false)
       setIsGenerating(false)
-      setShouldSendContext(false)
     }
   }, [
     user,
     input,
     busy,
     sessionId,
+    messages,
     toast,
-    shouldSendContext,
     activeFileContent,
     activeFileLanguage,
     activeFileName,
@@ -1251,15 +1274,15 @@ export function InsightIdeChat({
         <div className="flex items-center gap-3">
           <Image
             src="/insight-logo.png"
-            alt="Insight Logo"
+            alt="Planck Agent"
             width={32}
             height={32}
             className="rounded-full"
           />
           <div>
-            <h2 className="text-white font-semibold text-base">Insight</h2>
+            <h2 className="text-white font-semibold text-base">Planck Agent</h2>
             <p className="text-xs text-gray-400">
-              Generează cod, debugging și explicații contextualizate.
+              Profesorul tău de C++ și Python — generează cod, explică și depanează.
             </p>
           </div>
         </div>
@@ -1281,8 +1304,8 @@ export function InsightIdeChat({
           <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
             {visibleMessages.length === 0 ? (
               <div className="mt-20 text-center text-gray-400 text-sm space-y-2">
-                <p className="text-lg text-white">Salut, sunt Insight!</p>
-                <p>Pune o întrebare despre cod, algoritmi sau lasă-mă să scriu cod pentru tine.</p>
+                <p className="text-lg text-white">Salut, sunt Planck Agent!</p>
+                <p>Pune o întrebare despre C++ sau Python, sau lasă-mă să scriu și să corectez codul pentru tine.</p>
               </div>
             ) : (
               visibleMessages.map((message, index) => {
@@ -1296,7 +1319,7 @@ export function InsightIdeChat({
                     {isAssistant ? (
                       <div className="w-full lg:max-w-none space-y-3">
                         <div className="text-xs uppercase tracking-wide text-gray-500">
-                          {MODEL_OPTIONS.find((m) => m.id === message.model)?.label || "Insight"}
+                          {MODEL_OPTIONS.find((m) => m.id === message.model)?.label || "Planck Agent"}
                         </div>
                         {renderAssistantMessage(message.content, index, isLastMessage, message.anonLimitLocked)}
                       </div>
@@ -1318,7 +1341,7 @@ export function InsightIdeChat({
             {busy && !isGenerating && (
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Insight scrie...
+                Planck Agent scrie...
               </div>
             )}
 
@@ -1332,17 +1355,22 @@ export function InsightIdeChat({
 
           <div className="p-4 space-y-3">
             <div className="rounded-2xl border border-[#3b3b3b] bg-[#242424] px-3 py-1.5 space-y-1">
-              <Input
+              <textarea
+                ref={inputRef}
                 value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder="How can I help you?"
+                onChange={(event) => {
+                  setInput(event.target.value)
+                  adjustInputHeight()
+                }}
+                placeholder="Cu ce te pot ajuta?"
+                rows={1}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault()
                     sendMessage()
                   }
                 }}
-                className="h-8 bg-transparent border-0 text-[13px] text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 rounded-xl"
+                className="w-full min-h-8 max-h-[120px] resize-none overflow-y-auto bg-transparent border-0 text-[13px] leading-relaxed text-gray-100 placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-0 px-0 rounded-xl whitespace-pre-wrap break-words"
                 disabled={busy}
               />
               <div className="flex items-center justify-between gap-2 pt-0.5">

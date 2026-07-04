@@ -1,33 +1,54 @@
 "use client"
 
+import type { ReactNode } from "react"
+import { cn } from "@/lib/utils"
+
 export function AnimatedWords({
   text,
   className,
   startDelay = 0,
   as: Tag = "p",
+  suffix,
+  suffixAfterWord,
+  highlightWords,
 }: {
   text: string
   className?: string
   startDelay?: number
-  as?: "p" | "h1" | "h2"
+  as?: "p" | "h1" | "h2" | "span"
+  suffix?: ReactNode
+  suffixAfterWord?: { match: string; node: ReactNode }
+  /** Optional class applied when a word matches exactly (e.g. subject labels). */
+  highlightWords?: Record<string, string>
 }) {
   const words = text.split(" ")
 
   return (
     <Tag className={className}>
-      {words.map((word, index) => (
+      {words.map((word, index) => {
+        const wordKey = word.replace(/[.,!?;:]+$/, "")
+
+        return (
         <span
           key={`${word}-${index}`}
-          className="inline-block opacity-0"
+          className={cn(
+            "inline-block opacity-0",
+            highlightWords?.[word] ?? highlightWords?.[wordKey],
+          )}
           style={{
             animation: "registerWordFade 420ms ease-out forwards",
             animationDelay: `${startDelay + index * 80}ms`,
           }}
         >
           {word}
+          {suffixAfterWord?.match === word || suffixAfterWord?.match === wordKey
+            ? suffixAfterWord.node
+            : null}
+          {index === words.length - 1 && suffix ? suffix : null}
           {index === words.length - 1 ? "" : "\u00A0"}
         </span>
-      ))}
+        )
+      })}
     </Tag>
   )
 }

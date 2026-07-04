@@ -59,6 +59,18 @@ export function isGrileRoute(pathname: string | null | undefined): boolean {
   return pathname === "/grile" || pathname.startsWith("/grile/")
 }
 
+export function isMatematicaProblemsCatalogRoute(pathname: string | null | undefined): boolean {
+  return pathname === "/matematica/probleme"
+}
+
+export function isInformaticaProblemsCatalogRoute(pathname: string | null | undefined): boolean {
+  return pathname === "/informatica/probleme"
+}
+
+export function isSubjectPracticeCatalogRoute(pathname: string | null | undefined): boolean {
+  return isMatematicaProblemsCatalogRoute(pathname) || isInformaticaProblemsCatalogRoute(pathname)
+}
+
 export function isProfesorTemeRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return pathname === "/profesor/teme" || pathname.startsWith("/profesor/teme/")
@@ -117,6 +129,7 @@ export function isMobileAppShellRoute(
     pathname === "/exerseaza" ||
     pathname.startsWith("/exerseaza/") ||
     pathname.startsWith("/probleme") ||
+    isSubjectPracticeCatalogRoute(pathname) ||
     pathname.startsWith("/abonament") ||
     pathname.startsWith("/profil") ||
     isClassroomsRoute(pathname) ||
@@ -179,7 +192,7 @@ export function getMobileTopBarContent(
     return { primary: "Exerseaza" }
   }
 
-  if (pathname?.startsWith("/probleme")) {
+  if (pathname?.startsWith("/probleme") || isSubjectPracticeCatalogRoute(pathname)) {
     return { primary: "Exerseaza" }
   }
 

@@ -66,6 +66,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from 'next/navigation'
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
+import { usePlanckIdeFloatingSync } from "@/hooks/use-planck-ide-floating-sync"
 import { PlusPromoCard } from "@/components/plus-promo-card"
 
 const FREE_PLAN_PROJECT_LIMIT = 3
@@ -732,6 +733,17 @@ function IDEPageContent() {
   const streamingActiveRef = useRef<Set<string>>(new Set())
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0]
+  const defaultLanguage = activeFile?.type === "python" ? "python" : "cpp"
+
+  usePlanckIdeFloatingSync({
+    returnPath: "/planckcode/ide",
+    source: "standalone",
+    defaultLanguage,
+    files,
+    activeFileId,
+    enabled: isHydrated,
+  })
+
   const stdinSidebarVisible = activeFile?.type !== 'python' || waitingForInput
   const {
     registerFailure: registerIdeFailure,
@@ -1798,26 +1810,6 @@ function IDEPageContent() {
 
       <div className="md:ml-16 mt-16 h-screen-minus-64 flex overflow-hidden">
         <div className={`relative flex-1 flex flex-col overflow-hidden transition-[margin,width] duration-300 ${isInsightOpen ? 'lg:mr-[420px]' : ''}`}>
-          {pendingInsightEdit && (
-            <div className="absolute right-6 top-3 z-30 flex items-center gap-2 rounded-md bg-[#181818] px-2.5 py-1.5 shadow-lg border border-white/10">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-3 border border-green-500 text-gray-400 hover:bg-green-500/10"
-                onClick={handleConfirmInsightEdit}
-              >
-                Confirm
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-3 border-white/10 text-gray-400 hover:bg-white/10"
-                onClick={handleUndoInsightEdit}
-              >
-                Undo
-              </Button>
-            </div>
-          )}
           {/* File Tabs */}
           <div className="flex items-center justify-between gap-1 px-4 py-2 bg-[#1e1e1e] border-b border-[#3b3b3b] overflow-x-auto">
             <div className="flex items-center gap-1 flex-1 min-w-0">

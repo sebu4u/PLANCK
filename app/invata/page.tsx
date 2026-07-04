@@ -23,7 +23,7 @@ import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-person
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import {
   isFreePreviewLearningPathChapterSlug,
-  splitLearningPathChaptersForFreePlanHub,
+  resolveLearningPathHubChapterSplit,
 } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 
@@ -62,9 +62,11 @@ export default async function InvataPage() {
         .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
         .map((chapter) => chapter.id)
 
-  const { visibleChapters, archivedChapters } = hasFullAccess
-    ? { visibleChapters: allChapters, archivedChapters: [] as LearningPathHubChapter[] }
-    : splitLearningPathChaptersForFreePlanHub(allChapters)
+  const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(allChapters, {
+    isAdmin: access.isAdmin,
+    isDev: access.isDev,
+    hasFullAccess,
+  })
 
   const visiblePublicLessonIds = visibleChapters
     .filter((chapter) => chapter.is_personalized !== true)

@@ -7,15 +7,14 @@ import { ArrowRight, Clock } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
+import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import {
   EXERSEAZA_CARDS,
   formatExerseazaCount,
   type ExerseazaCardConfig,
-  type ExerseazaSubjectId,
 } from "@/lib/exerseaza-config"
 import type { ExerseazaCounts } from "@/lib/exerseaza-counts"
 import { fetchFlashcardDeck } from "@/lib/learning-path-flashcard-client"
-import { ExerseazaSubjectSelector } from "@/components/exerseaza/exerseaza-subject-selector"
 
 interface ExerseazaHubProps {
   counts: ExerseazaCounts
@@ -219,7 +218,6 @@ function SidebarNav({
 
 export function ExerseazaHub({ counts }: ExerseazaHubProps) {
   const { user, loading: authLoading } = useAuth()
-  const [selectedSubjectId, setSelectedSubjectId] = useState<ExerseazaSubjectId>("fizica")
   const [flashcardCount, setFlashcardCount] = useState<number | null>(null)
 
   useEffect(() => {
@@ -294,10 +292,7 @@ export function ExerseazaHub({ counts }: ExerseazaHubProps) {
                 </p>
               </header>
 
-              <ExerseazaSubjectSelector
-                selectedId={selectedSubjectId}
-                onSelect={setSelectedSubjectId}
-              />
+              <PracticeSubjectSwitcher currentSubject="fizica" />
 
               {/* Mobile: vertical cards */}
               <div className="flex flex-col gap-4 lg:hidden">

@@ -46,6 +46,11 @@ import {
   isParentTemeRoute,
   shouldShowMobileBottomNav,
 } from "@/lib/mobile-app-nav"
+import { isInformaticaProblemDetailRoute, isPlanckCodeShellRoute } from "@/lib/planckcode-shell-routes"
+import { getPlanckCodeNavHref } from "@/lib/planckcode-floating-session"
+import { usePlanckIdeFloatingOptional } from "@/components/planckcode-floating-provider"
+import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
+import { isStudentDashboardRoute, normalizePracticeSubject } from "@/lib/practice-subject"
 
 function isInsideMonacoEditor(element: EventTarget | null): boolean {
   if (!(element instanceof HTMLElement)) return false
@@ -67,12 +72,14 @@ export function Navigation() {
   const lastScrollY = useRef(0)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
-  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo, isTeacher, isParent } = useAuth()
+  const { user, logout, loading, profile, loginWithGitHub, subscriptionPlan, userElo, isTeacher, isParent, isStudent } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
+  const floatingIde = usePlanckIdeFloatingOptional()
+  const codeNavHref = getPlanckCodeNavHref(floatingIde?.session, floatingIde?.isVisible ?? false)
 
-  // Dashboard, /invata, /grile, /probleme catalog, /matematica/probleme, /classrooms, and /profil share the same white navbar theme.
+  // Dashboard, /invata, /grile, /probleme catalog, /matematica|informatica/probleme, /classrooms, and /profil share the same white navbar theme.
   const isDashboard =
     pathname === "/dashboard" ||
     pathname?.startsWith("/dashboard/") === true ||
@@ -82,6 +89,7 @@ export function Navigation() {
   const isDashboardPage = pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
   const isMatematicaProblemsCatalog = pathname === "/matematica/probleme"
   const isMatematicaProblemDetail = Boolean(pathname?.match(/^\/matematica\/probleme\/[^/]+$/))
+  const isInformaticaProblemsCatalog = pathname === "/informatica/probleme"
   // Desktop search state
   const [query, setQuery] = useState("")
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false)
@@ -432,11 +440,11 @@ export function Navigation() {
   const isSketchRoute = pathname?.startsWith('/sketch') ?? false
   const isRegisterRoute = pathname === '/register'
   const isTransparentRoute = isHomepage || isRegisterRoute
-  const isPlanckCodeRoute = pathname?.startsWith('/planckcode') ?? false
+  const isPlanckCodeRoute = isPlanckCodeShellRoute(pathname)
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
   const isInvataFizicaHub = pathname === "/invata/fizica"
-  const isExerseazaActive = isExerseazaRoute(pathname)
+  const isExerseazaActive = isExerseazaRoute(pathname) && !isInformaticaProblemDetailRoute(pathname)
   const isProblemPage = Boolean(pathname?.match(/^\/probleme\/[^/]+$/)) || isProblemsCatalog
   const isProfesorTemeActive = isProfesorTemeRoute(pathname)
   const isProfesorResurseActive = isProfesorResurseRoute(pathname)
@@ -452,6 +460,7 @@ export function Navigation() {
     isProblemPage ||
     isMatematicaProblemsCatalog ||
     isMatematicaProblemDetail ||
+    isInformaticaProblemsCatalog ||
     isClassroomsRoute(pathname) ||
     isProfesorTemeRoute(pathname) ||
     isProfesorResurseRoute(pathname) ||
@@ -463,6 +472,7 @@ export function Navigation() {
     !user &&
     ((pathname?.startsWith("/probleme") ?? false) ||
       (pathname?.startsWith("/matematica/probleme") ?? false) ||
+      (pathname?.startsWith("/informatica/probleme") ?? false) ||
       isExerseazaHub ||
       (pathname?.startsWith("/cursuri") ?? false))
   const isBacSimulationsPage = pathname?.startsWith('/simulari-bac') ?? false
@@ -541,7 +551,11 @@ export function Navigation() {
   const showMobileGrileShell = Boolean(user && isMobile && matchGrileRoute(pathname))
   const showMobileFocusedShell = showMobileLessonShell || showMobileGrileShell
   const isExerseazaHubPage = pathname === "/exerseaza"
-  const isCatalogHubPage = isExerseazaHubPage || isInvataFizicaHub
+  const isCatalogHubPage =
+    isExerseazaHubPage ||
+    isInvataFizicaHub ||
+    isMatematicaProblemsCatalog ||
+    isInformaticaProblemsCatalog
   const navbarElevationClass =
     isProblemDetailPage
       ? "shadow-none"
@@ -554,6 +568,9 @@ export function Navigation() {
   const showMobileBottomNav = shouldShowMobileBottomNav(pathname, Boolean(user))
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
+  const showStudentDashboardSubjectSwitcher =
+    Boolean(user && isStudent && isStudentDashboardRoute(pathname))
+  const studentDashboardSubject = normalizePracticeSubject(profile?.preferred_materie)
   const invataHubChapters = useInvataHubChapters()
   const showInvataHubMobileNav =
     isMobile && isInvataHubRoute(pathname) && Boolean(invataHubChapters?.length)
@@ -689,12 +706,22 @@ export function Navigation() {
                 ) : showMobileAppShell ? (
                   <>
                     <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
-                      <p className="truncate text-sm font-bold text-gray-900">
-                        {mobileTopBarContent.primary}
-                      </p>
-                      {mobileTopBarContent.secondary ? (
-                        <p className="truncate text-xs text-gray-500">{mobileTopBarContent.secondary}</p>
-                      ) : null}
+                      {showStudentDashboardSubjectSwitcher ? (
+                        <PracticeSubjectSwitcher
+                          currentSubject={studentDashboardSubject}
+                          size="navbar"
+                          navigateOnChange={false}
+                        />
+                      ) : (
+                        <>
+                          <p className="truncate text-sm font-bold text-gray-900">
+                            {mobileTopBarContent.primary}
+                          </p>
+                          {mobileTopBarContent.secondary ? (
+                            <p className="truncate text-xs text-gray-500">{mobileTopBarContent.secondary}</p>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <NavbarEloDisplay userElo={userElo} useLightNav />
@@ -921,7 +948,7 @@ export function Navigation() {
                     </Link>
 
                     <Link
-                      href="/planckcode/ide"
+                      href={codeNavHref}
                       className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPlanckCodeRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
                       <Code size={16} />

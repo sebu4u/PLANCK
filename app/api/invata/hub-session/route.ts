@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger"
 import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 import {
   isFreePreviewLearningPathChapterSlug,
-  splitLearningPathChaptersForFreePlanHub,
+  resolveLearningPathHubChapterSplit,
 } from "@/lib/learning-path-free-plan"
 import {
   getLearningPathHubLessonsByChapterIds,
@@ -71,9 +71,11 @@ export async function GET(_req: NextRequest) {
           .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
           .map((chapter) => chapter.id)
 
-    const { visibleChapters, archivedChapters } = hasFullAccess
-      ? { visibleChapters: chapters, archivedChapters: [] as LearningPathHubChapter[] }
-      : splitLearningPathChaptersForFreePlanHub(chapters)
+    const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(chapters, {
+      isAdmin: access.isAdmin,
+      isDev: access.isDev,
+      hasFullAccess,
+    })
 
     const visiblePublicLessonIds = visibleChapters
       .filter((chapter) => publicChapterIdSet.has(chapter.id))

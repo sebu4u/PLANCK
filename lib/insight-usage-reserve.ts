@@ -28,6 +28,11 @@ export async function reserveAuthenticatedInsightUsage(
     return { ok: true };
   }
 
+  // PlanckCode IDE agent: unlimited for Plus and Premium
+  if (useRaptorFreeTierLimits && plan === 'plus') {
+    return { ok: true };
+  }
+
   if (plan === 'plus') {
     const { data: incrementAllowed, error: rpcErr } = await supabase.rpc(
       'ai_check_and_increment_monthly',
@@ -72,7 +77,7 @@ export async function reserveAuthenticatedInsightUsage(
       return {
         ok: false,
         status: 500,
-        body: { error: 'Nu am putut verifica utilizarea lunară pentru Raptor1.' },
+        body: { error: 'Nu am putut verifica utilizarea lunară pentru Planck Agent.' },
       };
     }
 
@@ -82,7 +87,7 @@ export async function reserveAuthenticatedInsightUsage(
         status: 429,
         body: {
           error:
-            'Ai atins limita lunară pentru Raptor1 (10 solicitări/lună) pe planul Free. Treci la Raptor1 fast sau fă upgrade.',
+            'Ai atins limita lunară pentru Planck Agent (10 solicitări/lună) pe planul Free. Treci la Planck rapid sau fă upgrade.',
         },
       };
     }
@@ -108,7 +113,7 @@ export async function reserveAuthenticatedInsightUsage(
 
   if (!incrementAllowed) {
     const errorMessage = useRaptorFreeTierLimits
-      ? 'Ai atins limita zilnică pentru Raptor1 fast (3 solicitări/zi).'
+      ? 'Ai atins limita zilnică pentru Planck rapid (3 solicitări/zi).'
       : 'Ai atins limita zilnică pentru Insight (3 solicitări/zi) pe planul Free. Încearcă mâine sau fă upgrade.';
 
     return {
@@ -148,7 +153,7 @@ export async function reserveAnonymousInsightUsage(
       return {
         ok: false,
         status: 500,
-        body: { error: 'Nu am putut verifica utilizarea lunară pentru Raptor1.' },
+        body: { error: 'Nu am putut verifica utilizarea lunară pentru Planck Agent.' },
       };
     }
 

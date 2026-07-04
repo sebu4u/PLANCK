@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
 import { ArrowLeft, Loader2, Lock } from "lucide-react"
 import { Navigation } from "@/components/navigation"
@@ -14,8 +15,9 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { PlanckCodeSettingsProvider } from "@/components/planckcode-settings-provider"
 import { PlanckCodeSidebar } from "@/components/planckcode-sidebar"
+import { usePlanckIdeFloatingOptional } from "@/components/planckcode-floating-provider"
+import type { FileItem } from "@/lib/types"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { useCatalogTheme } from "@/components/catalog-theme-provider"
 import { supabase } from "@/lib/supabaseClient"
@@ -98,6 +100,9 @@ type DetailState =
   | { status: "locked" }
 
 export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientProps) {
+  const pathname = usePathname()
+  const floatingIde = usePlanckIdeFloatingOptional()
+  const registerLiveSession = floatingIde?.registerLiveSession
   const [state, setState] = useState<DetailState>({ status: "idle" })
 
   const loadDetails = useCallback(async () => {
@@ -220,11 +225,28 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   }
 
   const isReady = state.status === "loaded" && loadedProblem
+  const floatingSession = floatingIde?.session
+  const restoreFloatingWorkspace =
+    Boolean(floatingSession && floatingSession.returnPath === pathname && floatingSession.files.length > 0)
+
+  const handleFloatingWorkspaceChange = useCallback(
+    (files: FileItem[], activeFileId: string) => {
+      if (!registerLiveSession || !pathname) return
+      registerLiveSession({
+        returnPath: pathname,
+        source: "problem",
+        problemSlug: slug,
+        defaultLanguage: loadedProblem?.language === "python" ? "python" : "cpp",
+        files,
+        activeFileId,
+      })
+    },
+    [registerLiveSession, pathname, slug, loadedProblem?.language],
+  )
 
   return (
-    <PlanckCodeSettingsProvider>
-      <CatalogThemeProvider catalogType="info" pageType="detail">
-        <div className="h-screen-mobile bg-[#070707] text-white overflow-hidden flex flex-col">
+    <CatalogThemeProvider catalogType="info" pageType="detail">
+        <div className="h-screen-mobile bg-black text-white overflow-hidden flex flex-col">
           <Navigation />
           <PlanckCodeSidebar />
           
@@ -240,33 +262,33 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                             asChild
                             variant="outline"
                             size="sm"
-                            className="font-vt323 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+                            className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
                           >
                             <Link
                               href="/informatica/probleme"
-                              className="inline-flex items-center gap-2 px-2"
+                              className="inline-flex items-center gap-2 px-2 text-sm font-medium"
                             >
                               <ArrowLeft className="h-4 w-4" />
-                              <span className="relative top-[1px]">Înapoi la catalog</span>
+                              Înapoi la catalog
                             </Link>
                           </Button>
                           {metaText && (
-                            <span className="font-vt323 text-sm uppercase tracking-[0.18em] text-white/50">
+                            <span className="text-sm font-medium text-white/50">
                               {metaText}
                             </span>
                           )}
                           {loadedProblem?.language === "python" && (
-                            <span className="font-vt323 rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-amber-100">
+                            <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
                               Python
                             </span>
                           )}
                           {loadedProblem?.language !== "python" && (
-                            <span className="font-vt323 rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-sky-100/90">
+                            <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-100/90">
                               C++
                             </span>
                           )}
                           {loadedProblem?.isFreeMonthly && (
-                            <span className="font-vt323 text-xs uppercase tracking-[0.3em] text-emerald-300">
+                            <span className="text-xs font-medium text-emerald-300">
                               Free luna aceasta
                             </span>
                           )}
@@ -283,12 +305,19 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                   <div className="h-full overflow-hidden bg-black">
                     <EmbeddedIDE
                       defaultLanguage={loadedProblem.language === "python" ? "python" : "cpp"}
+                      initialFiles={restoreFloatingWorkspace ? floatingSession!.files : undefined}
+                      initialActiveFileId={
+                        restoreFloatingWorkspace ? floatingSession!.activeFileId : undefined
+                      }
                       initialCode={
-                        loadedProblem.language === "python"
-                          ? loadedProblem.boilerplate_python ?? undefined
-                          : loadedProblem.boilerplate_cpp ?? undefined
+                        restoreFloatingWorkspace
+                          ? undefined
+                          : loadedProblem.language === "python"
+                            ? loadedProblem.boilerplate_python ?? undefined
+                            : loadedProblem.boilerplate_cpp ?? undefined
                       }
                       problemSlug={loadedProblem.language === "python" ? slug : undefined}
+                      onWorkspaceChange={handleFloatingWorkspaceChange}
                     />
                   </div>
                 </ResizablePanel>
@@ -301,7 +330,6 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
           </main>
         </div>
       </CatalogThemeProvider>
-    </PlanckCodeSettingsProvider>
   )
 }
 

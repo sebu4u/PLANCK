@@ -30,6 +30,7 @@ import {
   MatematicaCatalogCard,
   MatematicaCatalogCardSkeleton,
 } from "@/components/math-problems/matematica-catalog-card"
+import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 
 const STORAGE_PREFIX = "matematicaCatalog"
 
@@ -276,6 +277,7 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
       sidebarScrolling={sidebarScrolling}
       onSidebarScroll={handleSidebarScroll}
       onProblemsScroll={() => {}}
+      headerPrefix={<PracticeSubjectSwitcher currentSubject="matematica" />}
     >
       <div className="relative pt-2">
         <div
@@ -291,7 +293,7 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
 
         <div className="relative z-10">
           {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 8 }).map((_, index) => (
                 <MatematicaCatalogCardSkeleton key={index} />
               ))}
