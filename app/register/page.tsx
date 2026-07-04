@@ -17,7 +17,10 @@ import {
   getCinematicaFirstLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
 import {
+  canAccessStudentOnboarding,
   consumePostOnboardingRedirect,
+  getDashboardPathForUserType,
+  getOnboardingBlockedToast,
   isOnboardingSubjectId,
   OAUTH_ONBOARDING_PARAM,
   ONBOARDING_SUBJECT_OPTIONS,
@@ -231,7 +234,7 @@ function RegisterPageContent() {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, profile, loginWithGoogle, loginWithGitHub, needsOnboarding, refreshProfile } = useAuth()
+  const { user, profile, profileSyncedUserId, userType, loginWithGoogle, loginWithGitHub, needsOnboarding, refreshProfile } = useAuth()
 
   const shouldForcePostAuthStep = searchParams.get("onboarding") === "1"
   const shouldForceOAuthOnboarding = searchParams.get("onboarding") === OAUTH_ONBOARDING_PARAM
@@ -328,7 +331,23 @@ function RegisterPageContent() {
   }
 
   useEffect(() => {
-    if (!hydrated || !user || !needsOnboarding) return
+    if (!hydrated || !user || profileSyncedUserId !== user.id) return
+
+    if (!needsOnboarding) {
+      router.replace(getDashboardPathForUserType(userType))
+      return
+    }
+
+    if (!canAccessStudentOnboarding(profile)) {
+      const blockedToast = getOnboardingBlockedToast(userType, "student")
+      toast({
+        title: blockedToast.title,
+        description: blockedToast.description,
+        variant: "destructive",
+      })
+      router.replace(getDashboardPathForUserType(userType))
+      return
+    }
 
     const oauthFromRegister =
       onboardingState.awaitingPostAuth ||
@@ -358,20 +377,19 @@ function RegisterPageContent() {
 
     if (needsOnboarding && !isOnboardingFinalFlow && !isAuthenticatedOnboardingStep) {
       setOnboardingState((prev) => ({ ...prev, step: 2 }))
-      return
-    }
-
-    if (!needsOnboarding && !isOnboardingFinalFlow) {
-      router.replace("/dashboard")
     }
   }, [
     hydrated,
     needsOnboarding,
     onboardingState.awaitingPostAuth,
     onboardingState.step,
+    profile,
+    profileSyncedUserId,
     router,
     shouldForcePostAuthStep,
+    toast,
     user,
+    userType,
   ])
 
   useEffect(() => {
@@ -598,6 +616,17 @@ function RegisterPageContent() {
         variant: "destructive",
       })
       setStep(6)
+      return
+    }
+
+    if (!canAccessStudentOnboarding(profile)) {
+      const blockedToast = getOnboardingBlockedToast(userType, "student")
+      toast({
+        title: blockedToast.title,
+        description: blockedToast.description,
+        variant: "destructive",
+      })
+      router.replace(getDashboardPathForUserType(userType))
       return
     }
 

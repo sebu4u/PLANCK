@@ -6,7 +6,7 @@ export const GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY = "planck_guardian_onboarding_a
 
 export type GuardianRole = Extract<UserType, "parinte" | "profesor">
 export type GuardianTeachingMaterie = "matematica" | "fizica" | "informatica" | "biologie"
-export type GuardianStep = 1 | 2 | 3 | 4 | 5 | 6 | "name"
+export type GuardianStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | "name"
 export type GuardianDailyTimeOption = "15" | "30" | "60"
 
 export type GuardianOnboardingState = {
@@ -31,7 +31,7 @@ export const defaultGuardianOnboardingState: GuardianOnboardingState = {
   awaitingPostAuth: false,
 }
 
-const isNumericGuardianStep = (step: GuardianStep): step is 1 | 2 | 3 | 4 | 5 | 6 =>
+const isNumericGuardianStep = (step: GuardianStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 =>
   typeof step === "number"
 
 export function isGuardianOnboardingRoute(pathname: string | null | undefined): boolean {
@@ -44,7 +44,7 @@ export function isGuardianRole(value: unknown): value is GuardianRole {
 
 const sanitizeStep = (value: unknown): GuardianStep => {
   if (value === "name") return "name"
-  if (typeof value === "number" && value >= 1 && value <= 6) return value as GuardianStep
+  if (typeof value === "number" && value >= 1 && value <= 7) return value as GuardianStep
   return 1
 }
 
@@ -100,6 +100,10 @@ export function hasGuardianOAuthReturnPending(): boolean {
 }
 
 export function getGuardianOAuthStep(role: GuardianRole | null): GuardianStep {
+  return role === "profesor" ? 7 : 6
+}
+
+export function getGuardianTestimonialsStep(role: GuardianRole | null): GuardianStep {
   return role === "profesor" ? 6 : 5
 }
 
@@ -110,7 +114,7 @@ export function getGuardianProgressPercent(
   if (step === "name") return 100
   if (!isNumericGuardianStep(step)) return 0
 
-  const totalSteps = role === "profesor" ? 6 : 5
+  const totalSteps = role === "profesor" ? 7 : 6
   return (step / totalSteps) * 100
 }
 

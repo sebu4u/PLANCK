@@ -14,10 +14,13 @@ import {
 } from "@/components/onboarding/animated-words"
 import { GuardianAiIntroStep } from "@/components/onboarding/guardian-ai-intro-step"
 import { GuardianRoleCard } from "@/components/onboarding/guardian-role-card"
+import { GuardianTestimonialsStep } from "@/components/onboarding/guardian-testimonials-step"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
-import { supabase } from "@/lib/supabaseClient"
 import {
+  canAccessGuardianOnboarding,
   consumePostOnboardingRedirect,
+  getDashboardPathForUserType,
+  getOnboardingBlockedToast,
   OAUTH_ONBOARDING_PARAM,
   ONBOARDING_SUBJECT_OPTIONS,
   type OnboardingSubjectId,
@@ -27,6 +30,8 @@ import {
   getGuardianDashboardPath,
   getGuardianOAuthStep,
   getGuardianProgressPercent,
+  getGuardianTestimonialsStep,
+  GUARDIAN_CHILD_AGE_DEFAULT,
   GUARDIAN_CHILD_AGE_MAX,
   GUARDIAN_CHILD_AGE_MIN,
   GUARDIAN_DAILY_TIME_OPTIONS,
@@ -46,7 +51,7 @@ const mainCtaClassName =
 const choiceButtonClassName =
   "w-full rounded-full border px-5 py-3 text-left text-sm font-semibold transition-colors"
 
-const isNumericStep = (step: GuardianStep): step is 1 | 2 | 3 | 4 | 5 | 6 => typeof step === "number"
+const isNumericStep = (step: GuardianStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 => typeof step === "number"
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -87,8 +92,17 @@ function GuardianRegisterPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const { user, loading, needsOnboarding, refreshProfile, profile, loginWithGoogle, loginWithGitHub } =
-    useAuth()
+  const {
+    user,
+    loading,
+    needsOnboarding,
+    refreshProfile,
+    profile,
+    profileSyncedUserId,
+    userType,
+    loginWithGoogle,
+    loginWithGitHub,
+  } = useAuth()
 
   const [onboardingState, setOnboardingState] = useState<GuardianOnboardingState>(
     defaultGuardianOnboardingState,
@@ -196,6 +210,38 @@ function GuardianRegisterPageContent() {
   }, [onboardingState.step])
 
   const oauthResumeHandledRef = useRef(false)
+  const blockedRedirectHandledRef = useRef(false)
+
+  const clearGuardianOnboardingStorage = useCallback(() => {
+    localStorage.removeItem(GUARDIAN_ONBOARDING_STORAGE_KEY)
+    localStorage.removeItem(GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated || loading || !user || profileSyncedUserId !== user.id) return
+    if (canAccessGuardianOnboarding(profile)) return
+    if (blockedRedirectHandledRef.current) return
+
+    blockedRedirectHandledRef.current = true
+    const blockedToast = getOnboardingBlockedToast(userType, "guardian")
+    toast({
+      title: blockedToast.title,
+      description: blockedToast.description,
+      variant: "destructive",
+    })
+    clearGuardianOnboardingStorage()
+    router.replace(getDashboardPathForUserType(userType))
+  }, [
+    clearGuardianOnboardingStorage,
+    hydrated,
+    loading,
+    profile,
+    profileSyncedUserId,
+    router,
+    toast,
+    user,
+    userType,
+  ])
 
   useEffect(() => {
     if (!hydrated || !userId || !needsOnboarding) return
@@ -253,8 +299,18 @@ function GuardianRegisterPageContent() {
       return
     }
 
+    if (onboardingState.step === 6 && onboardingState.role === "parinte") {
+      setStep(5)
+      return
+    }
+
     if (onboardingState.step === 6 && onboardingState.role === "profesor") {
       setStep(5)
+      return
+    }
+
+    if (onboardingState.step === 7 && onboardingState.role === "profesor") {
+      setStep(6)
       return
     }
 
@@ -296,10 +352,6 @@ function GuardianRegisterPageContent() {
             })
             return
           }
-          if (user && needsOnboarding) {
-            setStep("name")
-            break
-          }
           setStep(5)
           break
         }
@@ -315,12 +367,23 @@ function GuardianRegisterPageContent() {
         setStep(5)
         break
       case 5:
-        if (onboardingState.role === "profesor") {
+        if (onboardingState.role === "parinte") {
           if (user && needsOnboarding) {
             setStep("name")
             break
           }
           setStep(6)
+        } else {
+          setStep(6)
+        }
+        break
+      case 6:
+        if (onboardingState.role === "profesor") {
+          if (user && needsOnboarding) {
+            setStep("name")
+            break
+          }
+          setStep(7)
         }
         break
       default:
@@ -444,6 +507,18 @@ function GuardianRegisterPageContent() {
       return
     }
 
+    if (!canAccessGuardianOnboarding(profile)) {
+      const blockedToast = getOnboardingBlockedToast(userType, "guardian")
+      toast({
+        title: blockedToast.title,
+        description: blockedToast.description,
+        variant: "destructive",
+      })
+      clearGuardianOnboardingStorage()
+      router.replace(getDashboardPathForUserType(userType))
+      return
+    }
+
     const cleanName = displayName.trim()
     if (cleanName.length < 2) {
       toast({
@@ -454,34 +529,75 @@ function GuardianRegisterPageContent() {
       return
     }
 
+    if (onboardingState.role === "profesor" && !onboardingState.teachingMaterie) {
+      toast({
+        title: "Onboarding incomplet",
+        description: "Reia pașii de la început.",
+        variant: "destructive",
+      })
+      setStep(4)
+      return
+    }
+
+    if (onboardingState.role === "parinte" && !onboardingState.dailyTime) {
+      toast({
+        title: "Onboarding incomplet",
+        description: "Reia pașii de la început.",
+        variant: "destructive",
+      })
+      setStep(4)
+      return
+    }
+
     setNameSaving(true)
 
-    const payload: {
-      name: string
-      user_type: GuardianRole
-      teaching_materie?: OnboardingSubjectId | null
-      onboarding_child_age?: number | null
-      onboarding_daily_minutes?: GuardianDailyTimeOption | null
-      onboarding_completed_at: string
-    } = {
-      name: cleanName,
-      user_type: onboardingState.role,
-      onboarding_completed_at: new Date().toISOString(),
+    const requestBody =
+      onboardingState.role === "profesor"
+        ? {
+            name: cleanName,
+            role: "profesor" as const,
+            teachingMaterie: onboardingState.teachingMaterie,
+          }
+        : {
+            name: cleanName,
+            role: "parinte" as const,
+            childAge: onboardingState.childAge ?? GUARDIAN_CHILD_AGE_DEFAULT,
+            dailyTime: onboardingState.dailyTime,
+          }
+
+    let response: Response
+    try {
+      response = await fetch("/api/register/guardian/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      })
+    } catch {
+      toast({
+        title: "Nu am putut salva profilul",
+        description: "Mai încearcă o dată, te rog.",
+        variant: "destructive",
+      })
+      setNameSaving(false)
+      return
     }
 
-    if (onboardingState.role === "profesor") {
-      payload.teaching_materie = onboardingState.teachingMaterie
-      payload.onboarding_child_age = null
-      payload.onboarding_daily_minutes = null
-    } else {
-      payload.teaching_materie = null
-      payload.onboarding_child_age = onboardingState.childAge
-      payload.onboarding_daily_minutes = onboardingState.dailyTime
-    }
+    if (!response.ok) {
+      if (response.status === 409) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        toast({
+          title: "Cont activ",
+          description:
+            body?.error ??
+            "Contul tău existent nu poate fi folosit pentru acest tip de înregistrare.",
+          variant: "destructive",
+        })
+        clearGuardianOnboardingStorage()
+        router.replace(getDashboardPathForUserType(userType))
+        setNameSaving(false)
+        return
+      }
 
-    const { error } = await supabase.from("profiles").update(payload).eq("user_id", user.id)
-
-    if (error) {
       toast({
         title: "Nu am putut salva profilul",
         description: "Mai încearcă o dată, te rog.",
@@ -684,7 +800,9 @@ function GuardianRegisterPageContent() {
 
       case 5:
         if (onboardingState.role === "parinte") {
-          return renderOAuthStep()
+          return onboardingState.role ? (
+            <GuardianTestimonialsStep role={onboardingState.role} />
+          ) : null
         }
 
         return (
@@ -697,6 +815,15 @@ function GuardianRegisterPageContent() {
         )
 
       case 6:
+        if (onboardingState.role === "parinte") {
+          return renderOAuthStep()
+        }
+
+        return onboardingState.role ? (
+          <GuardianTestimonialsStep role={onboardingState.role} />
+        ) : null
+
+      case 7:
         return renderOAuthStep()
 
       case "name":
@@ -735,7 +862,7 @@ function GuardianRegisterPageContent() {
     }
   }
 
-  const maxProgressStep = onboardingState.role === "profesor" ? 6 : 5
+  const maxProgressStep = onboardingState.role === "profesor" ? 7 : 6
   const progressPercent = getGuardianProgressPercent(onboardingState.step, onboardingState.role)
   const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= maxProgressStep
   const showBackButton =
@@ -744,12 +871,12 @@ function GuardianRegisterPageContent() {
     onboardingState.step <= maxProgressStep &&
     !isOAuthStep
   const showBottomCta =
-    (onboardingState.step === 1 ||
-      onboardingState.step === 2 ||
-      onboardingState.step === 3 ||
-      onboardingState.step === 4 ||
-      (onboardingState.step === 5 && onboardingState.role === "profesor")) &&
+    isNumericStep(onboardingState.step) &&
+    onboardingState.step <= maxProgressStep &&
     !isOAuthStep
+  const isTestimonialsStep =
+    onboardingState.role !== null &&
+    onboardingState.step === getGuardianTestimonialsStep(onboardingState.role)
 
   const isContinueDisabled =
     (onboardingState.step === 2 && !onboardingState.role) ||
@@ -810,11 +937,23 @@ function GuardianRegisterPageContent() {
         )}
 
         <main
-          className={`flex flex-1 justify-center overflow-hidden px-4 sm:items-center sm:px-6 ${
-            showBottomCta ? "items-center pb-28 pt-3 sm:items-center sm:pb-28 sm:pt-8" : "items-center py-4 sm:py-8"
+          className={`flex min-h-0 flex-1 justify-center px-4 sm:px-6 ${
+            isTestimonialsStep
+              ? "items-center overflow-hidden pb-28 pt-0 sm:items-center sm:overflow-visible sm:py-8"
+              : showBottomCta
+                ? "items-center overflow-hidden pb-28 pt-3 sm:items-center sm:overflow-visible sm:pb-28 sm:pt-8"
+                : "items-center overflow-hidden py-4 sm:overflow-visible sm:py-8"
           }`}
         >
-          {renderStepContent()}
+          <div
+            className={
+              isTestimonialsStep
+                ? "flex w-full flex-1 flex-col justify-center lg:min-h-0 lg:justify-start"
+                : "contents"
+            }
+          >
+            {renderStepContent()}
+          </div>
         </main>
 
         {showBottomCta && (

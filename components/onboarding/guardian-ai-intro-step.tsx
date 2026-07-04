@@ -32,9 +32,9 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
   const [phase, setPhase] = useState<AiIntroPhase>("pop")
   const [iconAtLeft, setIconAtLeft] = useState(false)
   const [iconReturning, setIconReturning] = useState(false)
+  const [iconRaised, setIconRaised] = useState(false)
   const [showStage1, setShowStage1] = useState(false)
   const [showStage2, setShowStage2] = useState(false)
-  const [textHidden, setTextHidden] = useState(false)
 
   const stage1Duration = useMemo(() => getWordRevealDuration(TEXT_STAGE_1), [])
   const stage2Duration = useMemo(() => getWordRevealDuration(TEXT_STAGE_2), [])
@@ -44,9 +44,9 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
     setPhase("pop")
     setIconAtLeft(false)
     setIconReturning(false)
+    setIconRaised(false)
     setShowStage1(false)
     setShowStage2(false)
-    setTextHidden(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on mount
   }, [])
 
@@ -80,7 +80,8 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
 
     if (phase === "stream2") {
       const timer = window.setTimeout(() => {
-        setTextHidden(true)
+        setShowStage1(false)
+        setShowStage2(false)
         setIconReturning(true)
         setIconAtLeft(false)
         setPhase("outro")
@@ -90,11 +91,12 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
 
     if (phase === "outro") {
       const timer = window.setTimeout(() => {
-        setShowStage1(false)
-        setShowStage2(false)
         setIconReturning(false)
         setPhase("ready")
         onReadyChange?.(true)
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => setIconRaised(true))
+        })
       }, SLIDE_DURATION_MS)
       return () => window.clearTimeout(timer)
     }
@@ -105,11 +107,16 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
   const showTextPanel = showStage1 || showStage2
   const showOutroText = phase === "ready"
 
-  const iconTransition = iconReturning
-    ? `left ${SLIDE_DURATION_MS}ms ${POPPY_EASING}, transform ${SLIDE_DURATION_MS}ms ${POPPY_EASING}`
-    : iconAtLeft
+  const iconTransition =
+    iconReturning || iconAtLeft || iconRaised || phase === "ready"
       ? `left ${SLIDE_DURATION_MS}ms ${POPPY_EASING}, transform ${SLIDE_DURATION_MS}ms ${POPPY_EASING}`
       : undefined
+
+  const iconTransform = iconAtLeft
+    ? "translateY(-50%)"
+    : iconRaised
+      ? "translate(-50%, calc(-50% - 1.25rem))"
+      : "translate(-50%, -50%)"
 
   return (
     <div className="mx-auto flex min-h-[360px] w-full max-w-[760px] flex-col items-center justify-center px-2 sm:min-h-[400px]">
@@ -118,7 +125,7 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
           className="absolute top-1/2 z-10 will-change-[left,transform]"
           style={{
             left: iconAtLeft ? 0 : "50%",
-            transform: iconAtLeft ? "translateY(-50%)" : "translate(-50%, -50%)",
+            transform: iconTransform,
             transition: iconTransition,
           }}
         >
@@ -147,9 +154,9 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
         </div>
 
         <div
-          className={`ml-0 flex min-h-[120px] flex-1 flex-col justify-center gap-3 pl-[104px] transition-opacity duration-700 sm:pl-[136px] ${
+          className={`ml-0 flex min-h-[120px] flex-1 flex-col justify-center gap-3 pl-[104px] transition-opacity duration-300 sm:pl-[136px] ${
             showTextPanel ? "opacity-100" : "pointer-events-none opacity-0"
-          } ${textHidden ? "opacity-0" : ""}`}
+          }`}
         >
           {showStage1 ? (
             <AnimatedWords
@@ -167,15 +174,22 @@ export function GuardianAiIntroStep({ onReadyChange }: GuardianAiIntroStepProps)
         </div>
       </div>
 
-      {showOutroText ? (
-        <div className="mt-6 text-center sm:mt-8">
+      <div
+        className={`w-full text-center transition-[opacity,margin] duration-500 ${
+          showOutroText
+            ? "-mt-10 opacity-100 sm:-mt-12"
+            : "pointer-events-none mt-0 opacity-0"
+        }`}
+        aria-hidden={!showOutroText}
+      >
+        {showOutroText ? (
           <AnimatedWords
             as="h2"
             text="Haide să începem"
             className="text-[1.75rem] font-bold text-[#111111] sm:text-4xl"
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import {
   hasGuardianOAuthReturnPending,
   hasGuardianOnboardingInProgress,
 } from "@/lib/guardian-onboarding"
+import { normalizeUserType, USER_TYPE_LABELS, type UserType } from "@/lib/user-types"
 
 export const OAUTH_ONBOARDING_PARAM = "oauth"
 export const REGISTER_ONBOARDING_PATH = `/register?onboarding=${OAUTH_ONBOARDING_PARAM}`
@@ -45,10 +46,59 @@ export function isOnboardingSubjectId(value: unknown): value is OnboardingSubjec
 export type OnboardingProfile = {
   onboarding_completed_at?: string | null
   preferred_materie?: OnboardingSubjectId | null
+  user_type?: string | null
 } | null
+
+export type OnboardingFlow = "student" | "guardian"
 
 export function needsOnboarding(profile: OnboardingProfile): boolean {
   return !profile?.onboarding_completed_at
+}
+
+export function getDashboardPathForUserType(userType: UserType): string {
+  if (userType === "parinte") return "/dashboard/parent"
+  if (userType === "profesor") return "/dashboard/teacher"
+  return "/dashboard"
+}
+
+function isIncompleteElevProfile(profile: OnboardingProfile): boolean {
+  if (!profile || profile.onboarding_completed_at) return false
+  return normalizeUserType(profile.user_type) === "elev"
+}
+
+export function canAccessStudentOnboarding(profile: OnboardingProfile): boolean {
+  return isIncompleteElevProfile(profile)
+}
+
+export function canAccessGuardianOnboarding(profile: OnboardingProfile): boolean {
+  return isIncompleteElevProfile(profile)
+}
+
+export function getOnboardingBlockedToast(
+  userType: UserType,
+  flow: OnboardingFlow,
+): { title: string; description: string } {
+  const roleLabel = USER_TYPE_LABELS[userType]
+
+  if (flow === "guardian" && userType === "elev") {
+    return {
+      title: "Cont de elev existent",
+      description:
+        "Contul tău de elev nu poate fi folosit pentru înregistrarea de profesor/părinte.",
+    }
+  }
+
+  if (flow === "student" && userType !== "elev") {
+    return {
+      title: "Cont activ",
+      description: `Contul tău de ${roleLabel.toLowerCase()} nu poate fi folosit pentru înregistrarea de elev.`,
+    }
+  }
+
+  return {
+    title: "Cont activ",
+    description: `Ai deja un cont activ ca ${roleLabel.toLowerCase()}.`,
+  }
 }
 
 export function isOnboardingRoute(pathname: string | null | undefined): boolean {

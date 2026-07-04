@@ -52,8 +52,12 @@ export const HOME_TITLE =
 
 export const HOME_HERO_HEADLINE = "Obține nota pe care o vrei"
 
+export const HOME_HERO_HEADLINE_GRADIENT = "explicată simplu."
+
 export const HOME_HERO_SUBTITLE =
-  "Trasee de învățare pentru clasele 9–12, peste 10.000 de grile, peste 800 de soluții video și AI care te ajută exact când te blochezi."
+  "Învață cu un tutor AI care se adaptează ritmului tău."
+
+export const HOME_HERO_SUBTITLE_MOBILE = "Învață cu un tutor AI personal."
 
 export const PLANCKCODE_TITLE = "PlanckCode – IDE Online C++ & Python în Browser"
 

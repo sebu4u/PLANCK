@@ -5,7 +5,6 @@ import { Footer } from "@/components/footer"
 import { ProgressNotification } from "@/components/progress-notification"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
-import { HomepagePricingPlansSection } from "@/components/homepage-pricing-plans-section"
 import FinalCTASection from "@/components/final-cta-section"
 import { Suspense, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
@@ -41,7 +40,6 @@ const HOME_SECTION_IDS = [
   "home-mai-eficient",
   "home-courses",
   "home-reviews",
-  "home-pricing",
   "home-faq",
 ]
 
@@ -190,8 +188,6 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
       <section id="home-reviews">
         <ReviewsSection />
       </section>
-
-      <HomepagePricingPlansSection />
 
       {/* FAQ Section */}
       <section id="home-faq">

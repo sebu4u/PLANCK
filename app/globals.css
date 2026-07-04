@@ -1223,6 +1223,16 @@
   transform: translateY(0);
 }
 
+/* Hero phone — entry animation desktop only */
+@media (max-width: 1023px) {
+  .hero-phone-enter.scroll-animate-slide-up,
+  .hero-phone-enter.scroll-animate-slide-up.animate {
+    opacity: 1;
+    transform: translateY(0);
+    transition: none;
+  }
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .title-font {
