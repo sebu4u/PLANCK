@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { notFound, redirect } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learning-path-lesson-progress"
@@ -7,6 +8,7 @@ import { LearningPathLessonLockedPreview } from "@/components/invata/learning-pa
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabaseAdmin"
 import {
   getCompletedLearningPathItemIdsForUser,
   getLearningPathChapterById,
@@ -31,6 +33,48 @@ import {
 } from "@/lib/guest-learning-path-cookie"
 
 export const dynamic = "force-dynamic"
+
+async function resolveOwnedPersonalizedLessonContext(
+  chapterSlug: string,
+  lessonSlug: string,
+  userId: string,
+): Promise<{
+  chapter: Awaited<ReturnType<typeof getLearningPathChapterBySlug>>
+  lesson: Awaited<ReturnType<typeof getLearningPathLessonBySlug>>
+  client: SupabaseClient | null
+}> {
+  const admin = createAdminClient()
+  const chapterQuery = admin
+    .from("learning_path_chapters")
+    .select("*")
+    .eq("generated_by_user_id", userId)
+    .eq("is_personalized", true)
+    .eq("is_active", true)
+
+  const { data: chapter, error: chapterError } = isUuid(chapterSlug)
+    ? await chapterQuery.eq("id", chapterSlug.trim()).maybeSingle()
+    : await chapterQuery.eq("slug", chapterSlug.trim()).maybeSingle()
+
+  if (chapterError || !chapter) {
+    return { chapter: null, lesson: null, client: null }
+  }
+
+  const lessonQuery = admin
+    .from("learning_path_lessons")
+    .select("*")
+    .eq("chapter_id", chapter.id)
+    .eq("is_active", true)
+
+  const { data: lesson, error: lessonError } = isUuid(lessonSlug)
+    ? await lessonQuery.eq("id", lessonSlug.trim()).maybeSingle()
+    : await lessonQuery.eq("slug", lessonSlug.trim()).maybeSingle()
+
+  if (lessonError || !lesson) {
+    return { chapter: null, lesson: null, client: null }
+  }
+
+  return { chapter, lesson, client: admin }
+}
 
 export async function generateMetadata({
   params,
@@ -81,38 +125,51 @@ export default async function InvataLessonDetailPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const chapter = isUuid(chapterSlug)
+  let contentClient: SupabaseClient = supabase
+  let chapter = isUuid(chapterSlug)
     ? await getLearningPathChapterById(chapterSlug, supabase)
     : await getLearningPathChapterBySlug(chapterSlug, supabase)
 
-  if (!chapter) {
+  let lesson = null
+  if (chapter) {
+    lesson = isUuid(lessonSlug)
+      ? await getLearningPathLessonById(lessonSlug, supabase)
+      : await getLearningPathLessonBySlug(chapterSlug, lessonSlug, supabase)
+  }
+
+  if ((!chapter || !lesson || lesson.chapter_id !== chapter.id) && user) {
+    const ownedPersonalized = await resolveOwnedPersonalizedLessonContext(
+      chapterSlug,
+      lessonSlug,
+      user.id,
+    )
+    if (ownedPersonalized.chapter && ownedPersonalized.lesson && ownedPersonalized.client) {
+      chapter = ownedPersonalized.chapter
+      lesson = ownedPersonalized.lesson
+      contentClient = ownedPersonalized.client
+    }
+  }
+
+  if (!chapter || !lesson || lesson.chapter_id !== chapter.id) {
     notFound()
   }
 
   const access = await getLearningPathAccess(chapter)
   const showRealContent = access.mode === "full" || access.mode === "free-preview"
 
-  const lesson = isUuid(lessonSlug)
-    ? await getLearningPathLessonById(lessonSlug, supabase)
-    : await getLearningPathLessonBySlug(chapterSlug, lessonSlug, supabase)
-
-  if (!lesson || lesson.chapter_id !== chapter.id) {
-    notFound()
-  }
-
   const canonicalRedirect = learningPathUrlNeedsCanonicalRedirect(chapterSlug, lessonSlug, chapter, lesson)
   if (canonicalRedirect) {
     redirect(canonicalRedirect)
   }
 
-  const chapterLessons = showRealContent ? await getLearningPathLessonsByChapterId(chapter.id, supabase) : []
+  const chapterLessons = showRealContent ? await getLearningPathLessonsByChapterId(chapter.id, contentClient) : []
   const currentLessonIndex = chapterLessons.findIndex((chapterLesson) => chapterLesson.id === lesson.id)
   const nextLesson =
     currentLessonIndex >= 0 && currentLessonIndex < chapterLessons.length - 1
       ? chapterLessons[currentLessonIndex + 1]
       : null
 
-  const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id, supabase) : []
+  const rawItems = showRealContent ? await getLearningPathLessonItems(lesson.id, contentClient) : []
   const items = rawItems.map((item) => ({
     ...item,
     content_json: sanitizeTestContentJson(item.item_type, item.content_json ?? null),

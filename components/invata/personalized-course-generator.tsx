@@ -16,14 +16,15 @@ import type { PlanckResourceReference } from "@/lib/insight/agent/types"
 import type { InvataAskMessage, InvataAskStreamEvent } from "@/lib/invata/ask-types"
 import { InvataAskConversation } from "@/components/invata/invata-ask-conversation"
 import { usePersonalizedCourseGeneration } from "@/components/invata/personalized-course-generation-context"
-import { INVATA_ASK_CARD_Z } from "@/components/invata/invata-hub-top-glow"
+import { INVATA_ASK_CARD_Z } from "@/components/invata/invata-hub-layout-constants"
 
-interface PersonalizedCourseGeneratorProps {
+export interface PersonalizedCourseGeneratorProps {
   isAuthenticated: boolean
   canGeneratePersonalizedPath?: boolean
   personalizedPathBlockedReason?: string | null
   loginHref?: string
   className?: string
+  initialOpen?: boolean
 }
 
 type CardPhase = "open" | "thinking" | "streaming" | "conversation" | "generating"
@@ -109,6 +110,7 @@ export function PersonalizedCourseGenerator({
   personalizedPathBlockedReason = null,
   loginHref = "/login?next=/invata",
   className,
+  initialOpen = false,
 }: PersonalizedCourseGeneratorProps) {
   const router = useRouter()
   const { startActiveGeneration } = usePersonalizedCourseGeneration()
@@ -120,7 +122,7 @@ export function PersonalizedCourseGenerator({
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(() => initialOpen)
   const [phase, setPhase] = useState<CardPhase>("open")
   const [recentPrompts, setRecentPrompts] = useState<string[]>([])
   const [messages, setMessages] = useState<InvataAskMessage[]>([])
@@ -179,6 +181,14 @@ export function PersonalizedCourseGenerator({
       inputRef.current?.focus()
     })
   }, [messages.length])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return

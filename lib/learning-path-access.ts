@@ -1,4 +1,5 @@
-import { isAdminFromDB } from "@/lib/admin-check"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
+import { isAdmin } from "@/lib/admin-check"
 import {
   FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
   isFreePreviewLearningPathChapterSlug,
@@ -21,6 +22,8 @@ export interface LearningPathAccess {
 
 interface ChapterLike {
   slug: string | null
+  generated_by_user_id?: string | null
+  is_personalized?: boolean | null
 }
 
 /**
@@ -34,14 +37,18 @@ interface ChapterLike {
 export async function getLearningPathAccess(chapter?: ChapterLike | null): Promise<LearningPathAccess> {
   const supabase = await createClient()
 
-  if (await isAdminFromDB(supabase)) {
-    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: null }
-  }
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
+  return getLearningPathAccessForUser(supabase, user, chapter)
+}
+
+export async function getLearningPathAccessForUser(
+  supabase: SupabaseClient,
+  user: User | null,
+  chapter?: ChapterLike | null,
+): Promise<LearningPathAccess> {
   if (!user) {
     if (isFreePreviewLearningPathChapterSlug(chapter?.slug ?? null)) {
       return {
@@ -56,9 +63,17 @@ export async function getLearningPathAccess(chapter?: ChapterLike | null): Promi
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan, plus_months_remaining")
+    .select("is_admin, plan, plus_months_remaining")
     .eq("user_id", user.id)
     .maybeSingle()
+
+  if (profile?.is_admin === true || isAdmin(user)) {
+    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: null }
+  }
+
+  if (chapter?.is_personalized === true && chapter.generated_by_user_id === user.id) {
+    return { mode: "full", itemsSolved: 0, itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT, userId: user.id }
+  }
 
   const appMetadata = (user.app_metadata as Record<string, unknown>) ?? {}
   const candidates: unknown[] = [profile?.plan]

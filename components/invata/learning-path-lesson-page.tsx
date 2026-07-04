@@ -7,6 +7,8 @@ import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loa
 import {
   getLearningPathLessonHref,
   getLearningPathRouteSegments,
+} from "@/lib/learning-path-routes"
+import {
   type LearningPathChapter,
   type LearningPathLesson,
   type LearningPathLessonItem,

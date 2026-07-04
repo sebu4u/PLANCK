@@ -1,36 +1,14 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { createPortal } from "react-dom"
-
-/** Height of the mobile /invata hub path nav row (must match navigation.tsx). */
-export const INVATA_HUB_MOBILE_NAV_HEIGHT = "5.875rem"
-
-/** Below fixed nav/bottom bar (300), above lesson cards (290). Applied on the in-tree search anchor when open on mobile — not portaled to body. */
-export const INVATA_ASK_CARD_Z = 295
+import {
+  INVATA_HUB_MOBILE_NAV_HEIGHT,
+  INVATA_HUB_TOP_GLOW_Z,
+} from "@/components/invata/invata-hub-layout-constants"
 
 /**
- * Stacking on mobile /invata hub (navbar wrapper stays z-[300]):
- * chapter image (2) < glow (280) < lesson cards / titles (290) < ask advisor dropdown anchor (295) < top & bottom bar (300)
- */
-export const INVATA_HUB_TOP_GLOW_Z = 280
-export const INVATA_HUB_CHAPTER_IMAGE_Z = 2
-export const INVATA_HUB_LESSON_CARDS_Z = 290
-
-/**
- * Fixed blue glow under the hub top bar on mobile. Portaled to document.body so it
- * reliably paints above chapter icons; lesson cards use a higher z-index.
+ * Fixed blue glow under the hub top bar on mobile. Lesson cards use a higher
+ * z-index while the navbar remains above both.
  */
 export function InvataHubTopGlow() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return null
-
-  return createPortal(
+  return (
     <div
       aria-hidden="true"
       className="pointer-events-none fixed inset-x-0 hidden max-sm:block"
@@ -49,7 +27,6 @@ export function InvataHubTopGlow() {
           ].join(", "),
         }}
       />
-    </div>,
-    document.body
+    </div>
   )
 }

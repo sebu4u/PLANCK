@@ -8,7 +8,7 @@ import {
   clearLearningPathItemCache,
   fetchLearningPathItemPayload,
   getCachedLearningPathItemPayload,
-  prefetchAllLearningPathItems,
+  prefetchNearbyLearningPathItems,
   setCachedLearningPathItemPayload,
   type LearningPathItemFetchResult,
 } from "@/lib/learning-path-item-client-cache"
@@ -93,7 +93,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         syncUrl(next, options?.urlMode ?? "replace")
       }
       if (!options?.skipPrefetch) {
-        prefetchAllLearningPathItems(next)
+        prefetchNearbyLearningPathItems(next)
       }
     },
     [syncUrl],
@@ -252,7 +252,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
 
   useEffect(() => {
     setCachedLearningPathItemPayload(initialPayload)
-    prefetchAllLearningPathItems(initialPayload)
+    prefetchNearbyLearningPathItems(initialPayload)
   }, [initialPayload])
 
   useEffect(() => {

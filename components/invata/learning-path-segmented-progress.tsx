@@ -1,7 +1,7 @@
-import type { LearningPathLesson } from "@/lib/supabase-learning-paths"
+import type { LearningPathHubLesson } from "@/lib/supabase-learning-paths"
 
 interface LearningPathSegmentedProgressProps {
-  lessons: LearningPathLesson[]
+  lessons: LearningPathHubLesson[]
   completedLessonIds: string[]
 }
 

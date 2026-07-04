@@ -2,6 +2,8 @@ import type { Problem } from "@/data/problems"
 import type { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import type { Lesson as PhysicsLesson } from "@/lib/supabase-physics"
 import type { QuizQuestion } from "@/lib/types/quiz-questions"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { unstable_cache } from "next/cache"
 import { supabase } from "@/lib/supabaseClient"
 import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
 import { getLearningPathAccess, type LearningPathAccess } from "@/lib/learning-path-access"
@@ -74,6 +76,19 @@ export type LearningPathItemLoadResult =
   | { status: "locked"; chapter: LearningPathChapter; lesson: LearningPathLesson }
   | { status: "blocked"; lessonBaseHref: string }
   | { status: "ok"; payload: LearningPathItemPayload }
+
+type StaticLearningPathItemPayload = Omit<
+  LearningPathItemPayload,
+  "initialCurrentItemCompleted" | "completedItemIdsForLesson" | "completedItemIdsForFizicaAssignment"
+>
+
+type StaticLearningPathItemLoadResult =
+  | { status: "not_found" }
+  | { status: "invalid_index" }
+  | { status: "personalized" }
+  | { status: "ok"; payload: StaticLearningPathItemPayload }
+
+const LEARNING_PATH_ITEM_STATIC_CACHE_SECONDS = 60 * 60
 
 export async function resolveLessonContext(chapterSlug: string, lessonSlug: string, client = supabase) {
   const chapter = isUuid(chapterSlug)
@@ -262,28 +277,34 @@ function isBlockedByFreePlan(
   return blockedBySkip || blockedByLimit
 }
 
-export async function loadLearningPathItemPayload(
+function isPersonalizedLearningPathChapter(chapter: LearningPathChapter): boolean {
+  return chapter.is_personalized === true || Boolean(chapter.generated_by_user_id)
+}
+
+async function loadStaticLearningPathItemPayloadWithClient(
+  client: SupabaseClient,
   chapterSlug: string,
   lessonSlug: string,
   itemIndex: number,
-  options?: { fizicaMapContext?: FizicaMapItemContext | null },
-): Promise<LearningPathItemLoadResult> {
+  fizicaRouteSlug: string,
+  fizicaChapterSlug: string,
+  fizicaLessonId: string,
+  options?: { allowPersonalized?: boolean },
+): Promise<StaticLearningPathItemLoadResult> {
   if (!Number.isFinite(itemIndex) || itemIndex < 1) {
     return { status: "invalid_index" }
   }
 
-  const requestClient = await createClient()
-  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug, requestClient)
+  const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug, client)
   if (!chapter || !lesson) {
     return { status: "not_found" }
   }
 
-  const access = await getLearningPathAccess(chapter)
-  if (access.mode === "locked") {
-    return { status: "locked", chapter, lesson }
+  if (!options?.allowPersonalized && isPersonalizedLearningPathChapter(chapter)) {
+    return { status: "personalized" }
   }
 
-  const items = await getLearningPathLessonItems(lesson.id, requestClient)
+  const items = await getLearningPathLessonItems(lesson.id, client)
   const item = items[itemIndex - 1]
   if (!item) {
     return { status: "not_found" }
@@ -291,26 +312,6 @@ export async function loadLearningPathItemPayload(
 
   const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
   const { chapterSegment, lessonSegment } = getLearningPathRouteSegments(chapter, lesson)
-  const {
-    completedItemIdsForLesson,
-    initialCurrentItemCompleted,
-    itemsRemainingForFreePreview,
-    progressUser,
-    guestProgressMap,
-  } = await getProgressState(access, lesson.id, items, item.id)
-
-  if (
-    isBlockedByFreePlan(
-      access,
-      items,
-      item,
-      completedItemIdsForLesson,
-      initialCurrentItemCompleted,
-      itemsRemainingForFreePreview
-    )
-  ) {
-    return { status: "blocked", lessonBaseHref }
-  }
 
   const { sourceLesson, sourceProblem, sourceCodingProblem, sourceCodingExamples, sourceQuizQuestion } =
     await loadItemContent(item)
@@ -320,10 +321,16 @@ export async function loadLearningPathItemPayload(
     itemIndex < items.length ? `${lessonBaseHref}/${itemIndex + 1}` : lessonBaseHref
   let prevItemHref: string | null = itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null
   let isLastItem = itemIndex >= items.length
-  const fizicaMapContext = options?.fizicaMapContext ?? null
+  const fizicaMapContext =
+    fizicaRouteSlug && fizicaChapterSlug && fizicaLessonId
+      ? {
+          routeSlug: fizicaRouteSlug,
+          chapterSlug: fizicaChapterSlug,
+          fizicaLessonId,
+        }
+      : null
   let fizicaAssignmentItems: FizicaMapAssignmentItemRoute[] | undefined
   let fizicaAssignmentItemIds: string[] | undefined
-  let completedItemIdsForFizicaAssignment: string[] | undefined
   let fizicaLessonTotalElo: number | undefined
 
   if (fizicaMapContext) {
@@ -335,29 +342,6 @@ export async function loadLearningPathItemPayload(
       fizicaAssignmentItems = fizicaNavigation.assignmentItems
       fizicaAssignmentItemIds = fizicaNavigation.assignmentItemIds
       fizicaLessonTotalElo = fizicaNavigation.fizicaLessonTotalElo
-
-      if (fizicaAssignmentItemIds.length > 0) {
-        if (progressUser) {
-          const supabaseForProgress = await createClient()
-          completedItemIdsForFizicaAssignment = await getCompletedLearningPathItemIdsForUser(
-            supabaseForProgress,
-            progressUser.id,
-            fizicaAssignmentItemIds,
-          )
-        } else if (access.mode === "free-preview") {
-          const scopedIds = new Set(fizicaAssignmentItemIds)
-          const completed = new Set<string>()
-          for (const ids of Object.values(guestProgressMap)) {
-            if (!Array.isArray(ids)) continue
-            for (const id of ids) {
-              if (typeof id === "string" && scopedIds.has(id)) completed.add(id)
-            }
-          }
-          completedItemIdsForFizicaAssignment = Array.from(completed)
-        } else {
-          completedItemIdsForFizicaAssignment = []
-        }
-      }
     }
   }
 
@@ -378,10 +362,7 @@ export async function loadLearningPathItemPayload(
       fizicaMapContext,
       fizicaAssignmentItems,
       fizicaAssignmentItemIds,
-      completedItemIdsForFizicaAssignment,
       fizicaLessonTotalElo,
-      initialCurrentItemCompleted,
-      completedItemIdsForLesson,
       sourceLesson,
       sourceProblem,
       sourceCodingProblem,
@@ -389,6 +370,145 @@ export async function loadLearningPathItemPayload(
       sourceQuizQuestion,
       isLastItem,
       ...uiFlags,
+    },
+  }
+}
+
+async function loadCacheableStaticLearningPathItemPayload(
+  chapterSlug: string,
+  lessonSlug: string,
+  itemIndex: number,
+  fizicaRouteSlug: string,
+  fizicaChapterSlug: string,
+  fizicaLessonId: string,
+): Promise<StaticLearningPathItemLoadResult> {
+  return loadStaticLearningPathItemPayloadWithClient(
+    supabase,
+    chapterSlug,
+    lessonSlug,
+    itemIndex,
+    fizicaRouteSlug,
+    fizicaChapterSlug,
+    fizicaLessonId,
+  )
+}
+
+const loadCachedStaticLearningPathItemPayload = unstable_cache(
+  loadCacheableStaticLearningPathItemPayload,
+  ["learning-path-item-static-payload-v2"],
+  { revalidate: LEARNING_PATH_ITEM_STATIC_CACHE_SECONDS },
+)
+
+export async function loadLearningPathItemPayload(
+  chapterSlug: string,
+  lessonSlug: string,
+  itemIndex: number,
+  options?: { fizicaMapContext?: FizicaMapItemContext | null },
+): Promise<LearningPathItemLoadResult> {
+  if (!Number.isFinite(itemIndex) || itemIndex < 1) {
+    return { status: "invalid_index" }
+  }
+
+  const fizicaMapContext = options?.fizicaMapContext ?? null
+  const cachedStaticResult = await loadCachedStaticLearningPathItemPayload(
+    chapterSlug,
+    lessonSlug,
+    itemIndex,
+    fizicaMapContext?.routeSlug ?? "",
+    fizicaMapContext?.chapterSlug ?? "",
+    fizicaMapContext?.fizicaLessonId ?? "",
+  )
+
+  const staticResult =
+    cachedStaticResult.status === "personalized" || cachedStaticResult.status === "not_found"
+      ? await loadStaticLearningPathItemPayloadWithClient(
+          await createClient(),
+          chapterSlug,
+          lessonSlug,
+          itemIndex,
+          fizicaMapContext?.routeSlug ?? "",
+          fizicaMapContext?.chapterSlug ?? "",
+          fizicaMapContext?.fizicaLessonId ?? "",
+          { allowPersonalized: true },
+        )
+      : cachedStaticResult
+
+  if (staticResult.status === "personalized") {
+    return { status: "not_found" }
+  }
+
+  if (staticResult.status !== "ok") {
+    return staticResult
+  }
+
+  const staticPayload = staticResult.payload
+  const access = await getLearningPathAccess(staticPayload.chapter)
+  if (access.mode === "locked") {
+    return {
+      status: "locked",
+      chapter: staticPayload.chapter,
+      lesson: staticPayload.lesson,
+    }
+  }
+
+  const {
+    completedItemIdsForLesson,
+    initialCurrentItemCompleted,
+    itemsRemainingForFreePreview,
+    progressUser,
+    guestProgressMap,
+  } = await getProgressState(
+    access,
+    staticPayload.lesson.id,
+    staticPayload.items,
+    staticPayload.item.id,
+  )
+
+  if (
+    isBlockedByFreePlan(
+      access,
+      staticPayload.items,
+      staticPayload.item,
+      completedItemIdsForLesson,
+      initialCurrentItemCompleted,
+      itemsRemainingForFreePreview,
+    )
+  ) {
+    return { status: "blocked", lessonBaseHref: staticPayload.lessonBaseHref }
+  }
+
+  let completedItemIdsForFizicaAssignment: string[] | undefined
+  const fizicaAssignmentItemIds = staticPayload.fizicaAssignmentItemIds
+  if (fizicaAssignmentItemIds?.length) {
+    if (progressUser) {
+      const supabaseForProgress = await createClient()
+      completedItemIdsForFizicaAssignment = await getCompletedLearningPathItemIdsForUser(
+        supabaseForProgress,
+        progressUser.id,
+        fizicaAssignmentItemIds,
+      )
+    } else if (access.mode === "free-preview") {
+      const scopedIds = new Set(fizicaAssignmentItemIds)
+      const completed = new Set<string>()
+      for (const ids of Object.values(guestProgressMap)) {
+        if (!Array.isArray(ids)) continue
+        for (const id of ids) {
+          if (typeof id === "string" && scopedIds.has(id)) completed.add(id)
+        }
+      }
+      completedItemIdsForFizicaAssignment = Array.from(completed)
+    } else {
+      completedItemIdsForFizicaAssignment = []
+    }
+  }
+
+  return {
+    status: "ok",
+    payload: {
+      ...staticPayload,
+      initialCurrentItemCompleted,
+      completedItemIdsForLesson,
+      completedItemIdsForFizicaAssignment,
     },
   }
 }
