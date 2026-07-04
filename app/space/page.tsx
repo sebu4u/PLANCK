@@ -3,11 +3,11 @@ import { Navigation } from "@/components/navigation"
 import { SpacePageContent } from "@/components/space/space-page-content"
 
 export const metadata: Metadata = {
-    title: "Space - Memorator Fizică | Planck",
+    title: { absolute: "Memorator de Fizică | Planck" },
     description: "Explorează conceptele și formulele de fizică într-un graf interactiv. Vizualizează conexiunile dintre concepte pentru o învățare mai eficientă.",
     keywords: ["fizică", "memorator", "formule", "concepte", "graf", "învățare", "liceu", "bac"],
     openGraph: {
-        title: "Space - Memorator Fizică | Planck",
+        title: "Memorator de Fizică | Planck",
         description: "Explorează conceptele și formulele de fizică într-un graf interactiv.",
         type: "website",
     },

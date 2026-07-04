@@ -9,7 +9,6 @@ import {
   LEARNING_PATHS_TITLE,
   INSIGHT_DESCRIPTION,
   PLANCKCODE_DESCRIPTION,
-  PLANCKCODE_TITLE,
   QUIZ_COUNT,
   VIDEO_SOLUTIONS_COUNT,
   TEACHER_VERIFICATION,
@@ -236,29 +235,29 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   about: {
-    title: "Despre PLANCK – Trasee, Grile, Video și Echipa Noastră",
+    title: { absolute: "Despre Planck — Echipa și Misiunea Noastră" },
     description: `Planck Academy te ajută să obții nota dorită la clasă, BAC sau admitere. Trasee de învățare 9–12, ${QUIZ_COUNT} grile, ${VIDEO_SOLUTIONS_COUNT} soluții video, ${TESTIMONIALS_LABEL}. ${TEACHER_VERIFICATION}.`,
     keywords: "despre planck, echipa planck, trasee invatare, grile liceu, Insight AI, PlanckCode, Planck Sketch, Raptor1, platformă educațională, IDE C++ Python online",
     alternates: {
       canonical: '/despre',
     },
     openGraph: {
-      title: "Despre PLANCK – Trasee, Grile, Video și Echipa Noastră",
+      title: "Despre Planck — Echipa și Misiunea Noastră",
       description: `Platformă pentru nota dorită la clasă, BAC și admitere. Trasee complete, ${QUIZ_COUNT} grile, Insight AI, PlanckCode și Planck Sketch.`,
       url: `${PLATFORM_SITE_URL}/despre`,
     },
     twitter: {
-      title: "Despre PLANCK – Trasee, Grile, Video și Echipa Noastră",
+      title: "Despre Planck — Echipa și Misiunea Noastră",
       description: `Planck Academy – trasee de învățare, ${QUIZ_COUNT} grile, ${VIDEO_SOLUTIONS_COUNT} soluții video, ${TEACHER_VERIFICATION}.`,
     },
   },
 
   contact: {
-    title: "Contact - PLANCK",
+    title: { absolute: "Contact | Planck" },
     description: "Contactează echipa PLANCK pentru întrebări, suport tehnic sau colaborări. Suntem aici să te ajutăm!",
     keywords: "contact planck, suport planck, întrebări planck, ajutor liceu",
     openGraph: {
-      title: "Contact - PLANCK",
+      title: "Contact | Planck",
       description: "Contactează echipa PLANCK pentru suport și întrebări.",
     },
   },
@@ -294,11 +293,11 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   help: {
-    title: "Ajutor - PLANCK",
+    title: { absolute: "Ajutor | Planck" },
     description: "Ghid complet pentru utilizarea platformei PLANCK. Află cum să navighezi prin trasee, grile și probleme video.",
     keywords: "ajutor planck, ghid planck, tutorial planck, suport utilizatori, trasee invatare",
     openGraph: {
-      title: "Ajutor - PLANCK",
+      title: "Ajutor | Planck",
       description: "Ghid complet pentru utilizarea platformei PLANCK.",
     },
   },
@@ -420,14 +419,14 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   planckcode: {
-    title: PLANCKCODE_TITLE,
+    title: { absolute: "PlanckCode: IDE Online C++ & Python | Planck" },
     description: PLANCKCODE_DESCRIPTION,
     keywords: "C++, Python, C++ compiler online, Python IDE online, compilator C++ online, IDE C++ online, online judge, competitive programming, informatica liceu, bac informatica",
     alternates: {
       canonical: '/planckcode',
     },
     openGraph: {
-      title: PLANCKCODE_TITLE,
+      title: "PlanckCode: IDE Online C++ & Python | Planck",
       description: PLANCKCODE_DESCRIPTION,
       url: `${PLATFORM_SITE_URL}/planckcode`,
       type: 'website',
@@ -441,7 +440,7 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: PLANCKCODE_TITLE,
+      title: "PlanckCode: IDE Online C++ & Python | Planck",
       description: PLANCKCODE_DESCRIPTION,
       images: [OG_IMAGE],
       card: 'summary_large_image',

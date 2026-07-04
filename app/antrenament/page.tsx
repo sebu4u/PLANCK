@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 
 export const metadata: Metadata = {
-    title: "Antrenament | PLANCK",
+    title: { absolute: "Antrenament | Planck" },
     description: "Teste de antrenament pentru concursul de fizică PLANCK.",
 }
 
