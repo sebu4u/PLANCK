@@ -12,6 +12,7 @@ import {
   SidebarClassProgress,
   type CatalogSidebarConfig,
 } from "@/components/problems/problems-catalog-sidebar"
+import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/catalog-desktop-sidebar-discount-offer-card"
 
 export interface SubjectCatalogLayoutProps {
   catalogReady: boolean
@@ -122,9 +123,9 @@ export function SubjectCatalogLayout({
 
       <div className="flex h-full min-h-0 flex-row">
         {catalogReady && (
-          <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] bg-white lg:block">
+          <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] flex-col bg-white lg:flex">
             <div
-              className={cn("catalog-sidebar-scroll h-full overflow-y-auto px-5 py-5", sidebarScrolling && "is-scrolling")}
+              className={cn("catalog-sidebar-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5", sidebarScrolling && "is-scrolling")}
               onScroll={onSidebarScroll}
             >
               <ProblemsCatalogSidebar
@@ -137,6 +138,7 @@ export function SubjectCatalogLayout({
                 config={sidebarConfig}
               />
             </div>
+            <CatalogDesktopSidebarDiscountOfferCard />
           </aside>
         )}
 

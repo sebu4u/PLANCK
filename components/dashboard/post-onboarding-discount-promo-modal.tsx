@@ -27,7 +27,7 @@ export function PostOnboardingDiscountPromoModal({
           <Link
             href={ctaHref}
             onClick={onClose}
-            className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-2.5 text-sm font-bold text-[#101117] shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#9a5aa8] active:translate-y-1 active:shadow-[0_1px_0_#9a5aa8] sm:mt-6 sm:py-3"
+            className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#9a5aa8] active:translate-y-1 active:shadow-[0_1px_0_#9a5aa8] sm:mt-6 sm:py-3"
             style={{ "--start-glow-tint": "rgba(248, 220, 228, 0.88)" } as CSSProperties}
           >
             <span className="relative z-[1]">Vreau oferta unică</span>

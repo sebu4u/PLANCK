@@ -721,7 +721,7 @@ export function Navigation() {
                       {showMobilePracticeSubjectSwitcher ? (
                         <PracticeSubjectSwitcher
                           currentSubject={mobilePracticeSubject}
-                          size="navbar"
+                          size={isStudentDashboardRoute(pathname) ? "navbar-lg" : "navbar"}
                           navigateOnChange={
                             isMatematicaProblemsCatalog || isInformaticaProblemsCatalog
                           }

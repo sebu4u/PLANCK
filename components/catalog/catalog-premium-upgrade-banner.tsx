@@ -1,6 +1,9 @@
 "use client"
 
-import { PremiumUpgradeBanner } from "@/components/premium-upgrade-banner"
+import {
+  PremiumBannerGradientLink,
+  PremiumUpgradeBanner,
+} from "@/components/premium-upgrade-banner"
 
 export function CatalogPremiumUpgradeBanner() {
   return (
@@ -8,7 +11,7 @@ export function CatalogPremiumUpgradeBanner() {
       defaultMessage={
         <>
           Treci la Premium și accesează Insight fără limite.{" "}
-          <span className="underline-offset-2 group-hover:underline">Go Premium →</span>
+          <PremiumBannerGradientLink>Go Premium</PremiumBannerGradientLink>
         </>
       }
     />

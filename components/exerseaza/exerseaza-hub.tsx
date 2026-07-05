@@ -15,6 +15,7 @@ import {
 } from "@/lib/exerseaza-config"
 import type { ExerseazaCounts } from "@/lib/exerseaza-counts"
 import { fetchFlashcardDeck } from "@/lib/learning-path-flashcard-client"
+import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/catalog-desktop-sidebar-discount-offer-card"
 
 interface ExerseazaHubProps {
   counts: ExerseazaCounts
@@ -248,8 +249,8 @@ export function ExerseazaHub({ counts }: ExerseazaHubProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-row">
-      <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] bg-white lg:block">
-        <div className="catalog-sidebar-scroll h-full overflow-y-auto px-5 py-5">
+      <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-[300px] flex-col bg-white lg:flex">
+        <div className="catalog-sidebar-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <SidebarNav counts={counts} flashcardCount={flashcardCount} />
           <div className="mt-8 rounded-xl border border-[#0b0c0f]/8 bg-[#faf9f7] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c2f33]/55">
@@ -273,6 +274,7 @@ export function ExerseazaHub({ counts }: ExerseazaHubProps) {
             </ul>
           </div>
         </div>
+        <CatalogDesktopSidebarDiscountOfferCard />
       </aside>
 
       <div className="relative min-w-0 flex-1 lg:ml-[300px] h-full">

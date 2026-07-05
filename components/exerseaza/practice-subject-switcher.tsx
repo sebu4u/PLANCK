@@ -9,7 +9,7 @@ interface PracticeSubjectSwitcherProps {
   currentSubject: PracticeSubjectId
   className?: string
   compact?: boolean
-  size?: "default" | "navbar"
+  size?: "default" | "navbar" | "navbar-lg"
   /** When false, only persists preferred_materie — no route change. */
   navigateOnChange?: boolean
 }

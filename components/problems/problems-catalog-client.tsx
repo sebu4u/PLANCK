@@ -30,6 +30,7 @@ import {
   ProblemsCatalogSidebar,
   SidebarClassProgress,
 } from "@/components/problems/problems-catalog-sidebar"
+import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/catalog-desktop-sidebar-discount-offer-card"
 
 const ProblemCard = lazy(() => import("@/components/problem-card").then((module) => ({ default: module.ProblemCard })))
 
@@ -897,12 +898,12 @@ export default function ProblemsCatalogClient({
         {catalogReady && (
           <aside
             className={cn(
-              "hidden bg-white lg:block",
+              "hidden flex-col bg-white lg:flex",
               isEmbedded ? "w-[300px] shrink-0 rounded-2xl border border-[#e8eaed]" : "fixed bottom-0 left-0 top-16 z-30 w-[300px]",
             )}
           >
             <div
-              className={cn("catalog-sidebar-scroll h-full overflow-y-auto px-5 py-5", sidebarScrolling && "is-scrolling")}
+              className={cn("catalog-sidebar-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5", sidebarScrolling && "is-scrolling")}
               onScroll={handleSidebarScroll}
             >
               <ProblemsCatalogSidebar
@@ -914,6 +915,7 @@ export default function ProblemsCatalogClient({
                 lockedClass={effectiveUserClass}
               />
             </div>
+            <CatalogDesktopSidebarDiscountOfferCard />
           </aside>
         )}
 

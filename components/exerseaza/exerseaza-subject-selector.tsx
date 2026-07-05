@@ -14,7 +14,7 @@ interface ExerseazaSubjectSelectorProps {
   onSelect: (id: ExerseazaSubjectId) => void
   /** Hides the trailing “Schimbă materia” hint — for compact mobile nav. */
   compact?: boolean
-  size?: "default" | "navbar"
+  size?: "default" | "navbar" | "navbar-lg"
 }
 
 export function ExerseazaSubjectSelector({
@@ -23,7 +23,9 @@ export function ExerseazaSubjectSelector({
   compact = false,
   size = "default",
 }: ExerseazaSubjectSelectorProps) {
+  const isNavbarLg = size === "navbar-lg"
   const isNavbar = size === "navbar" || compact
+  const isCompactNav = isNavbar || isNavbarLg
   const [open, setOpen] = useState(false)
   const selected =
     EXERSEAZA_SUBJECTS.find((subject) => subject.id === selectedId) ?? EXERSEAZA_SUBJECTS[0]
@@ -34,7 +36,7 @@ export function ExerseazaSubjectSelector({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={cn("inline-flex items-center text-left", isNavbar ? "gap-0" : "gap-3")}
+          className={cn("inline-flex items-center text-left", isCompactNav ? "gap-0" : "gap-3")}
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-label={`Materia selectată: ${selected.label}. Schimbă materia.`}
@@ -42,30 +44,42 @@ export function ExerseazaSubjectSelector({
           <span
             className={cn(
               "inline-flex items-center rounded-xl border border-[#0b0c0f]/10 bg-white shadow-[0_4px_16px_-10px_rgba(11,12,15,0.2)] transition-colors hover:border-[#0b0c0f]/16 active:scale-[0.99]",
-              isNavbar ? "gap-1.5 rounded-lg px-2 py-1" : "gap-2 px-2.5 py-2",
+              isNavbarLg
+                ? "gap-2 rounded-lg px-2.5 py-1.5"
+                : isNavbar
+                  ? "gap-1.5 rounded-lg px-2 py-1"
+                  : "gap-2 px-2.5 py-2",
             )}
           >
             <span
               className={cn(
                 "inline-flex shrink-0 items-center justify-center rounded-lg bg-[#f5f4f2] text-[#2c2f33]",
-                isNavbar ? "h-6 w-6" : "h-8 w-8",
+                isNavbarLg ? "h-7 w-7" : isNavbar ? "h-6 w-6" : "h-8 w-8",
               )}
             >
-              <SelectedIcon className={cn(isNavbar ? "h-3 w-3" : "h-4 w-4")} aria-hidden />
+              <SelectedIcon
+                className={cn(isNavbarLg ? "h-3.5 w-3.5" : isNavbar ? "h-3 w-3" : "h-4 w-4")}
+                aria-hidden
+              />
             </span>
-            <span className={cn("font-bold text-[#0b0c0f]", isNavbar ? "text-xs" : "text-sm")}>
+            <span
+              className={cn(
+                "font-bold text-[#0b0c0f]",
+                isNavbarLg ? "text-sm" : isNavbar ? "text-xs" : "text-sm",
+              )}
+            >
               {selected.label}
             </span>
             <ChevronDown
               className={cn(
                 "shrink-0 text-[#2c2f33]/45 transition-transform duration-200",
-                isNavbar ? "h-3 w-3" : "h-4 w-4",
+                isNavbarLg ? "h-3.5 w-3.5" : isNavbar ? "h-3 w-3" : "h-4 w-4",
                 open && "rotate-180",
               )}
               aria-hidden
             />
           </span>
-          {!isNavbar ? (
+          {!isCompactNav ? (
             <span className="text-sm font-medium text-[#2c2f33]/55">Schimbă materia</span>
           ) : null}
         </button>

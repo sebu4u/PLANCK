@@ -1,6 +1,6 @@
 "use client"
 
-import { type CSSProperties, useCallback, useEffect, useRef, useState, useMemo } from "react"
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
@@ -40,7 +40,9 @@ import {
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
+import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
 import { PostOnboardingDiscountPromoModal } from "@/components/dashboard/post-onboarding-discount-promo-modal"
+import { PremiumUpgradeBanner } from "@/components/premium-upgrade-banner"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
@@ -461,13 +463,13 @@ export function DashboardAuth() {
   useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || isPaid) return
     if (showWelcomeBack) return
-    if (!postOnboardingDiscount.active) return
     if (mobileDiscountPromoCheckedRef.current) return
     mobileDiscountPromoCheckedRef.current = true
 
     try {
       const dismissed = sessionStorage.getItem(getPostOnboardingDiscountMobilePromoSessionKey(user.id))
       if (!dismissed) {
+        postOnboardingDiscount.ensureWindow()
         setShowMobileDiscountPromo(true)
       }
     } catch {
@@ -480,7 +482,7 @@ export function DashboardAuth() {
     user?.id,
     isPaid,
     showWelcomeBack,
-    postOnboardingDiscount.active,
+    postOnboardingDiscount.ensureWindow,
   ])
 
   const dismissMobileDiscountPromo = () => {
@@ -580,55 +582,8 @@ export function DashboardAuth() {
             {/* Scrollable Content Area — locked on mobile, scrollable from md up */}
             <div className="flex-1 min-h-0 overflow-hidden overscroll-none md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#ffffff]">
               {!isPaid ? (
-                <div className="hidden md:block bg-[#ffffff]">
-                  {postOnboardingDiscount.active ? (
-                    <button
-                      type="button"
-                      onClick={() => setPremiumUpgradeOpen(true)}
-                      className="group flex w-full items-center justify-center gap-2 border-y border-[#e8e8e8] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-3 py-[8.5px] text-center sm:px-4"
-                    >
-                      <span className="relative hidden h-9 w-9 flex-shrink-0 items-center justify-center lg:inline-flex">
-                        <Image
-                          src="/streak-icon.png"
-                          alt=""
-                          width={36}
-                          height={36}
-                          className="h-9 w-9 object-contain"
-                        />
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col items-center gap-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-3 sm:gap-y-0">
-                        <span className="text-center text-[11px] font-extrabold leading-snug text-[#1a1520] sm:text-xs">
-                          Dispare curând: jumătate din preț la orice plan.
-                        </span>
-                        <span className="inline-flex items-center gap-2 font-mono text-sm font-black tabular-nums tracking-tight text-[#b91c1c]">
-                          {postOnboardingDiscount.remainingLabel}
-                          <span className="font-sans text-xs font-bold text-[#2f2a3c] underline-offset-2 group-hover:underline">
-                            →
-                          </span>
-                        </span>
-                      </span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setPremiumUpgradeOpen(true)}
-                      className="group flex w-full items-center justify-center gap-2 border-y border-[#e8e8e8] bg-gradient-to-r from-[#efe0f5] via-[#f8dce4] to-[#fce8d4] px-4 py-[8.5px] text-center"
-                    >
-                      <span className="relative hidden h-9 w-9 flex-shrink-0 items-center justify-center lg:inline-flex">
-                        <Image
-                          src="/streak-icon.png"
-                          alt=""
-                          width={36}
-                          height={36}
-                          className="h-9 w-9 object-contain"
-                        />
-                      </span>
-                      <span className="text-xs font-semibold text-[#2f2a3c] sm:text-sm">
-                        Treci la Premium și accesează Insight fără limite.{" "}
-                        <span className="underline-offset-2 group-hover:underline">Go Premium →</span>
-                      </span>
-                    </button>
-                  )}
+                <div className="hidden md:block">
+                  <PremiumUpgradeBanner className="burger:flex" />
                 </div>
               ) : null}
               <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:block md:h-auto md:overflow-visible md:p-8 lg:p-10 animate-fade-in-up">
@@ -652,71 +607,7 @@ export function DashboardAuth() {
                       />
 
                       {!isPaid ? (
-                        postOnboardingDiscount.active ? (
-                          <button
-                            type="button"
-                            onClick={() => setPremiumUpgradeOpen(true)}
-                            className="group mt-4 hidden w-full text-left lg:block rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[transform,box-shadow] hover:shadow-[0_8px_24px_rgba(185,28,28,0.12)]"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="relative h-11 w-11 flex-shrink-0">
-                                <Image
-                                  src="/streak-icon.png"
-                                  alt=""
-                                  fill
-                                  className="object-contain"
-                                  sizes="44px"
-                                />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[15px] leading-snug font-extrabold tracking-tight text-[#0f0f10]">
-                                  Dispare curând: jumătate din preț la orice plan.
-                                </p>
-                                <p className="mt-3 font-mono text-[22px] font-black tabular-nums leading-none tracking-tight text-[#b91c1c]">
-                                  {postOnboardingDiscount.remainingLabel}
-                                </p>
-                              </div>
-                            </div>
-
-                            <span
-                              className="dashboard-start-glow mt-4 inline-flex w-full cursor-pointer items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-3 text-base font-bold text-[#101117] shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] group-hover:translate-y-1 group-hover:shadow-[0_1px_0_#9a5aa8] group-active:translate-y-1 group-active:shadow-[0_1px_0_#9a5aa8]"
-                              style={{ "--start-glow-tint": "rgba(248, 220, 228, 0.88)" } as CSSProperties}
-                            >
-                              Revendică −50% acum
-                            </span>
-                          </button>
-                        ) : (
-                          <div className="mt-4 hidden lg:block rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-                            <div className="flex items-center gap-3">
-                              <div className="relative h-11 w-11 flex-shrink-0">
-                                <Image
-                                  src="/streak-icon.png"
-                                  alt="Premium"
-                                  fill
-                                  className="object-contain"
-                                  sizes="44px"
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[15px] leading-tight font-extrabold tracking-tight text-[#0f0f10]">
-                                  Deblochează învățarea cu Premium
-                                </p>
-                                <p className="mt-1 text-[15px] leading-tight text-[#111215]">
-                                  ca să înveți mai rapid, mai bine
-                                </p>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setPremiumUpgradeOpen(true)}
-                              className="dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-3 text-base font-bold text-[#101117] shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#9a5aa8] active:translate-y-1 active:shadow-[0_1px_0_#9a5aa8]"
-                              style={{ "--start-glow-tint": "rgba(248, 220, 228, 0.88)" } as CSSProperties}
-                            >
-                              Explorează Premium
-                            </button>
-                          </div>
-                        )
+                        <DashboardPremiumUpgradeCard onExploreClick={() => setPremiumUpgradeOpen(true)} />
                       ) : null}
                     </div>
 
@@ -749,7 +640,7 @@ export function DashboardAuth() {
         <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
       ) : null}
 
-      {showMobileDiscountPromo && postOnboardingDiscount.active ? (
+      {showMobileDiscountPromo ? (
         <div
           className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300 md:hidden"
           role="presentation"

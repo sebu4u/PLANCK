@@ -1,6 +1,6 @@
 "use client"
 
-import { useLayoutEffect, useMemo, useState } from "react"
+import { useCallback, useLayoutEffect, useMemo, useState } from "react"
 
 export const POST_ONBOARDING_DISCOUNT_WINDOW_MS = 60 * 60 * 1000
 
@@ -29,6 +29,27 @@ function formatCountdown(remainingMs: number): string {
 
 export function usePostOnboardingDiscountWindow(userId: string | undefined) {
   const [now, setNow] = useState(0)
+  const [windowNonce, setWindowNonce] = useState(0)
+
+  const ensureWindow = useCallback(() => {
+    if (!userId) return
+
+    try {
+      const key = getPostOnboardingDiscountStorageKey(userId)
+      const startRaw = localStorage.getItem(key)
+      const start = Number(startRaw)
+      const expired =
+        !startRaw || !Number.isFinite(start) || start + WINDOW_MS <= Date.now()
+
+      if (expired) {
+        localStorage.setItem(key, String(Date.now()))
+      }
+
+      setWindowNonce((value) => value + 1)
+    } catch {
+      // ignore
+    }
+  }, [userId])
 
   useLayoutEffect(() => {
     setNow(Date.now())
@@ -39,7 +60,7 @@ export function usePostOnboardingDiscountWindow(userId: string | undefined) {
     return () => window.clearInterval(id)
   }, [userId])
 
-  return useMemo(() => {
+  const discount = useMemo(() => {
     if (now === 0 || !userId) {
       return { active: false as const, remainingLabel: "00:00" }
     }
@@ -73,5 +94,7 @@ export function usePostOnboardingDiscountWindow(userId: string | undefined) {
     }
 
     return { active: true as const, remainingLabel: formatCountdown(remainingMs) }
-  }, [now, userId])
+  }, [now, userId, windowNonce])
+
+  return { ...discount, ensureWindow }
 }
