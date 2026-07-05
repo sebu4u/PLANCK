@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { flushSync } from "react-dom"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
@@ -67,6 +67,11 @@ import { supabase } from "@/lib/supabaseClient"
 import type { CodingSubmitResponse } from "./types"
 import { CodingSubmitResultOverlay } from "./coding-submit-result-overlay"
 import { cn } from "@/lib/utils"
+import {
+  type EmbeddedIdeAgentBridge,
+  type EmbeddedIdeCodeEditResponse,
+  normalizeIdeNewlines,
+} from "@/lib/planckcode/embedded-ide-agent-bridge"
 
 const defaultCppCode = `#include <iostream>
 using namespace std;
@@ -238,6 +243,8 @@ export interface EmbeddedIDEProps {
   presentation?: "default" | "learning-path" | "floating"
   /** Ascunde Run Code / Trimite (ex. card floating mini). */
   hideRunActions?: boolean
+  /** Expune starea editorului și handler-ele Planck Agent către panoul de chat. */
+  onAgentBridgeChange?: (bridge: EmbeddedIdeAgentBridge | null) => void
 }
 
 export default function EmbeddedIDE({
@@ -251,6 +258,7 @@ export default function EmbeddedIDE({
   onWorkspaceChange,
   presentation = "default",
   hideRunActions = false,
+  onAgentBridgeChange,
 }: EmbeddedIDEProps) {
   const { settings } = usePlanckCodeSettings()
   const editorFontFamily = getFontStack(settings.font)
@@ -288,6 +296,10 @@ export default function EmbeddedIDE({
 
   const editorRef = useRef<import("monaco-editor").editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
+  const [pendingAgentEdit, setPendingAgentEdit] = useState<{
+    fileId: string
+    previousContent: string
+  } | null>(null)
 
   const activeFile = files.find((f) => f.id === activeFileId) || files[0]
   const stdinSidebarVisible = activeFile?.type !== "python"
@@ -367,6 +379,99 @@ export default function EmbeddedIDE({
     lastWorkspaceNotifyRef.current = snapshot
     onWorkspaceChangeRef.current?.(files, activeFileId)
   }, [files, activeFileId])
+
+  const updateFileContent = useCallback((fileId: string, content: string) => {
+    setFiles((prevFiles) =>
+      prevFiles.map((file) => (file.id === fileId ? { ...file, content } : file)),
+    )
+  }, [])
+
+  const handleAgentInsertCode = useCallback(
+    (code: string) => {
+      if (!activeFileId) return
+      const active = files.find((file) => file.id === activeFileId)
+      if (!active) return
+      setPendingAgentEdit({ fileId: activeFileId, previousContent: active.content })
+      updateFileContent(activeFileId, normalizeIdeNewlines(code))
+    },
+    [activeFileId, files, updateFileContent],
+  )
+
+  const handleAgentApplyCodeEdit = useCallback(
+    (edit: EmbeddedIdeCodeEditResponse): boolean => {
+      if (!edit?.full_content?.trim() && (!edit.changes || edit.changes.length === 0)) {
+        return false
+      }
+
+      const targetName = edit.target?.file_name
+      const targetFile = targetName
+        ? files.find((file) => file.name === targetName)
+        : files.find((file) => file.id === activeFileId)
+
+      if (!targetFile) return false
+
+      const nextContent = edit.full_content
+        ? normalizeIdeNewlines(edit.full_content)
+        : targetFile.content
+
+      if (nextContent === targetFile.content) return false
+
+      setPendingAgentEdit({
+        fileId: targetFile.id,
+        previousContent: targetFile.content,
+      })
+      updateFileContent(targetFile.id, nextContent)
+      return true
+    },
+    [activeFileId, files, updateFileContent],
+  )
+
+  const handleAgentAcceptCodeChanges = useCallback(() => {
+    setPendingAgentEdit(null)
+  }, [])
+
+  const handleAgentRejectCodeChanges = useCallback(() => {
+    setPendingAgentEdit((current) => {
+      if (!current) return null
+      updateFileContent(current.fileId, current.previousContent)
+      return null
+    })
+  }, [updateFileContent])
+
+  const onAgentBridgeChangeRef = useRef(onAgentBridgeChange)
+  onAgentBridgeChangeRef.current = onAgentBridgeChange
+
+  useEffect(() => {
+    const bridge: EmbeddedIdeAgentBridge = {
+      activeFileName: activeFile?.name ?? "",
+      activeFileContent: activeFile?.content ?? "",
+      activeFileLanguage:
+        activeFile?.type === "cpp"
+          ? "cpp"
+          : activeFile?.type === "python"
+            ? "python"
+            : "plaintext",
+      insertCode: handleAgentInsertCode,
+      applyCodeEdit: handleAgentApplyCodeEdit,
+      acceptCodeChanges: handleAgentAcceptCodeChanges,
+      rejectCodeChanges: handleAgentRejectCodeChanges,
+    }
+    onAgentBridgeChangeRef.current?.(bridge)
+  }, [
+    activeFile?.name,
+    activeFile?.content,
+    activeFile?.type,
+    handleAgentInsertCode,
+    handleAgentApplyCodeEdit,
+    handleAgentAcceptCodeChanges,
+    handleAgentRejectCodeChanges,
+  ])
+
+  useEffect(() => {
+    return () => {
+      onAgentBridgeChangeRef.current?.(null)
+    }
+  }, [])
 
   const handleEditorChange = (value: string | undefined) => {
     if (!activeFile) return

@@ -224,6 +224,50 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  invataMate: {
+    title: "Învață Matematică – Harta Lecțiilor | PLANCK",
+    description:
+      "Parcurge lecțiile de matematică pas cu pas pe harta interactivă. Traseu structurat pentru liceu, de la algebră la analiză.",
+    keywords:
+      "invata matematica, lectii matematica liceu, harta lectii mate, traseu invatare matematica, planck academy",
+    alternates: {
+      canonical: "/invata/mate",
+    },
+    openGraph: {
+      title: "Învață Matematică – Harta Lecțiilor",
+      description:
+        "Harta lecțiilor de matematică pe Planck Academy: parcurge capitolele în ordine, lecție cu lecție.",
+      url: `${PLATFORM_SITE_URL}/invata/mate`,
+    },
+    twitter: {
+      title: "Învață Matematică – Harta Lecțiilor",
+      description:
+        "Parcurge lecțiile de matematică pe harta interactivă Planck Academy.",
+    },
+  },
+
+  invataInfo: {
+    title: "Învață Informatică – Harta Lecțiilor | PLANCK",
+    description:
+      "Parcurge lecțiile de informatică pas cu pas pe harta interactivă. Traseu structurat pentru liceu, de la algoritmi la programare.",
+    keywords:
+      "invata informatica, lectii informatica liceu, harta lectii info, traseu invatare informatica, planck academy",
+    alternates: {
+      canonical: "/invata/info",
+    },
+    openGraph: {
+      title: "Învață Informatică – Harta Lecțiilor",
+      description:
+        "Harta lecțiilor de informatică pe Planck Academy: parcurge capitolele în ordine, lecție cu lecție.",
+      url: `${PLATFORM_SITE_URL}/invata/info`,
+    },
+    twitter: {
+      title: "Învață Informatică – Harta Lecțiilor",
+      description:
+        "Parcurge lecțiile de informatică pe harta interactivă Planck Academy.",
+    },
+  },
+
   problems: {
     title: "Probleme Rezolvate Video & Catalog – BAC, Admitere, Clasă | PLANCK",
     description: `Peste ${VIDEO_SOLUTIONS_COUNT} probleme cu soluții video explicate și catalog complet pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. ${TEACHER_VERIFICATION}.`,

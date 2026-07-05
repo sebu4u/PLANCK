@@ -184,6 +184,14 @@ export function getMobileTopBarContent(
     return { primary: "Fizica" }
   }
 
+  if (pathname === "/invata/mate") {
+    return { primary: "Matematica" }
+  }
+
+  if (pathname === "/invata/info") {
+    return { primary: "Informatica" }
+  }
+
   if (pathname?.startsWith("/invata")) {
     return { primary: "Invata" }
   }

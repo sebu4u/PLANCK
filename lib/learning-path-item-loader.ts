@@ -38,6 +38,10 @@ import {
   resolveFizicaMapItemNavigation,
   type FizicaMapAssignmentItemRoute,
 } from "@/lib/supabase-fizica-learning-map"
+import type { SubjectMapItemContext } from "@/lib/subject-map/navigation"
+import { resolveSubjectMapItemNavigation } from "@/lib/subject-map/supabase-learning-map"
+import type { SubjectMapAssignmentItemRoute } from "@/lib/subject-map/types"
+import { getSubjectMapConfig } from "@/lib/subject-map/config"
 
 export interface LearningPathItemPayload {
   chapterSlug: string
@@ -68,6 +72,11 @@ export interface LearningPathItemPayload {
   fizicaAssignmentItemIds?: string[]
   completedItemIdsForFizicaAssignment?: string[]
   fizicaLessonTotalElo?: number
+  subjectMapContext?: SubjectMapItemContext | null
+  subjectMapAssignmentItems?: SubjectMapAssignmentItemRoute[]
+  subjectMapAssignmentItemIds?: string[]
+  completedItemIdsForSubjectMapAssignment?: string[]
+  subjectMapLessonTotalElo?: number
 }
 
 export type LearningPathItemLoadResult =
@@ -79,7 +88,10 @@ export type LearningPathItemLoadResult =
 
 type StaticLearningPathItemPayload = Omit<
   LearningPathItemPayload,
-  "initialCurrentItemCompleted" | "completedItemIdsForLesson" | "completedItemIdsForFizicaAssignment"
+  | "initialCurrentItemCompleted"
+  | "completedItemIdsForLesson"
+  | "completedItemIdsForFizicaAssignment"
+  | "completedItemIdsForSubjectMapAssignment"
 >
 
 type StaticLearningPathItemLoadResult =
@@ -289,6 +301,7 @@ async function loadStaticLearningPathItemPayloadWithClient(
   fizicaRouteSlug: string,
   fizicaChapterSlug: string,
   fizicaLessonId: string,
+  subjectMapContext: SubjectMapItemContext | null,
   options?: { allowPersonalized?: boolean },
 ): Promise<StaticLearningPathItemLoadResult> {
   if (!Number.isFinite(itemIndex) || itemIndex < 1) {
@@ -329,6 +342,7 @@ async function loadStaticLearningPathItemPayloadWithClient(
           fizicaLessonId,
         }
       : null
+
   let fizicaAssignmentItems: FizicaMapAssignmentItemRoute[] | undefined
   let fizicaAssignmentItemIds: string[] | undefined
   let fizicaLessonTotalElo: number | undefined
@@ -342,6 +356,26 @@ async function loadStaticLearningPathItemPayloadWithClient(
       fizicaAssignmentItems = fizicaNavigation.assignmentItems
       fizicaAssignmentItemIds = fizicaNavigation.assignmentItemIds
       fizicaLessonTotalElo = fizicaNavigation.fizicaLessonTotalElo
+    }
+  }
+
+  let subjectMapAssignmentItems: SubjectMapAssignmentItemRoute[] | undefined
+  let subjectMapAssignmentItemIds: string[] | undefined
+  let subjectMapLessonTotalElo: number | undefined
+
+  if (subjectMapContext) {
+    const subjectNavigation = await resolveSubjectMapItemNavigation(
+      getSubjectMapConfig(subjectMapContext.subject),
+      item.id,
+      subjectMapContext,
+    )
+    if (subjectNavigation) {
+      nextItemHref = subjectNavigation.nextItemHref
+      prevItemHref = subjectNavigation.prevItemHref
+      isLastItem = subjectNavigation.isLastItemInAssignment
+      subjectMapAssignmentItems = subjectNavigation.assignmentItems
+      subjectMapAssignmentItemIds = subjectNavigation.assignmentItemIds
+      subjectMapLessonTotalElo = subjectNavigation.mapLessonTotalElo
     }
   }
 
@@ -363,6 +397,10 @@ async function loadStaticLearningPathItemPayloadWithClient(
       fizicaAssignmentItems,
       fizicaAssignmentItemIds,
       fizicaLessonTotalElo,
+      subjectMapContext,
+      subjectMapAssignmentItems,
+      subjectMapAssignmentItemIds,
+      subjectMapLessonTotalElo,
       sourceLesson,
       sourceProblem,
       sourceCodingProblem,
@@ -381,7 +419,9 @@ async function loadCacheableStaticLearningPathItemPayload(
   fizicaRouteSlug: string,
   fizicaChapterSlug: string,
   fizicaLessonId: string,
+  subjectMapCacheKey: string,
 ): Promise<StaticLearningPathItemLoadResult> {
+  const subjectMapContext = parseSubjectMapCacheKey(subjectMapCacheKey)
   return loadStaticLearningPathItemPayloadWithClient(
     supabase,
     chapterSlug,
@@ -390,12 +430,32 @@ async function loadCacheableStaticLearningPathItemPayload(
     fizicaRouteSlug,
     fizicaChapterSlug,
     fizicaLessonId,
+    subjectMapContext,
   )
+}
+
+function serializeSubjectMapCacheKey(context: SubjectMapItemContext | null | undefined): string {
+  if (!context) return ""
+  return `${context.subject}:${context.routeSlug}:${context.chapterSlug}:${context.mapLessonId}`
+}
+
+function parseSubjectMapCacheKey(value: string): SubjectMapItemContext | null {
+  if (!value) return null
+  const [subject, routeSlug, chapterSlug, mapLessonId] = value.split(":")
+  if (
+    (subject !== "mate" && subject !== "info") ||
+    !routeSlug ||
+    !chapterSlug ||
+    !mapLessonId
+  ) {
+    return null
+  }
+  return { subject, routeSlug, chapterSlug, mapLessonId }
 }
 
 const loadCachedStaticLearningPathItemPayload = unstable_cache(
   loadCacheableStaticLearningPathItemPayload,
-  ["learning-path-item-static-payload-v2"],
+  ["learning-path-item-static-payload-v3"],
   { revalidate: LEARNING_PATH_ITEM_STATIC_CACHE_SECONDS },
 )
 
@@ -403,13 +463,17 @@ export async function loadLearningPathItemPayload(
   chapterSlug: string,
   lessonSlug: string,
   itemIndex: number,
-  options?: { fizicaMapContext?: FizicaMapItemContext | null },
+  options?: {
+    fizicaMapContext?: FizicaMapItemContext | null
+    subjectMapContext?: SubjectMapItemContext | null
+  },
 ): Promise<LearningPathItemLoadResult> {
   if (!Number.isFinite(itemIndex) || itemIndex < 1) {
     return { status: "invalid_index" }
   }
 
   const fizicaMapContext = options?.fizicaMapContext ?? null
+  const subjectMapContext = options?.subjectMapContext ?? null
   const cachedStaticResult = await loadCachedStaticLearningPathItemPayload(
     chapterSlug,
     lessonSlug,
@@ -417,6 +481,7 @@ export async function loadLearningPathItemPayload(
     fizicaMapContext?.routeSlug ?? "",
     fizicaMapContext?.chapterSlug ?? "",
     fizicaMapContext?.fizicaLessonId ?? "",
+    serializeSubjectMapCacheKey(subjectMapContext),
   )
 
   const staticResult =
@@ -429,6 +494,7 @@ export async function loadLearningPathItemPayload(
           fizicaMapContext?.routeSlug ?? "",
           fizicaMapContext?.chapterSlug ?? "",
           fizicaMapContext?.fizicaLessonId ?? "",
+          subjectMapContext,
           { allowPersonalized: true },
         )
       : cachedStaticResult
@@ -478,17 +544,18 @@ export async function loadLearningPathItemPayload(
   }
 
   let completedItemIdsForFizicaAssignment: string[] | undefined
-  const fizicaAssignmentItemIds = staticPayload.fizicaAssignmentItemIds
-  if (fizicaAssignmentItemIds?.length) {
+  const mapAssignmentItemIds =
+    staticPayload.fizicaAssignmentItemIds ?? staticPayload.subjectMapAssignmentItemIds
+  if (mapAssignmentItemIds?.length) {
     if (progressUser) {
       const supabaseForProgress = await createClient()
       completedItemIdsForFizicaAssignment = await getCompletedLearningPathItemIdsForUser(
         supabaseForProgress,
         progressUser.id,
-        fizicaAssignmentItemIds,
+        mapAssignmentItemIds,
       )
     } else if (access.mode === "free-preview") {
-      const scopedIds = new Set(fizicaAssignmentItemIds)
+      const scopedIds = new Set(mapAssignmentItemIds)
       const completed = new Set<string>()
       for (const ids of Object.values(guestProgressMap)) {
         if (!Array.isArray(ids)) continue
@@ -509,6 +576,7 @@ export async function loadLearningPathItemPayload(
       initialCurrentItemCompleted,
       completedItemIdsForLesson,
       completedItemIdsForFizicaAssignment,
+      completedItemIdsForSubjectMapAssignment: completedItemIdsForFizicaAssignment,
     },
   }
 }

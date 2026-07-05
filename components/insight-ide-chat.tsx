@@ -64,6 +64,12 @@ interface InsightIdeChatProps {
   activeFileName?: string
   activeFileContent?: string
   activeFileLanguage?: string
+  /** Extra context (e.g. full problem statement) sent with each request. */
+  additionalContextMessages?: ChatMessage[]
+  layout?: "sidebar" | "embedded-panel"
+  sessionTitle?: string
+  emptyStateTitle?: string
+  emptyStateDescription?: string
 }
 
 const INSIGHT_SESSION_TITLE = "PlanckCode IDE"
@@ -432,7 +438,13 @@ export function InsightIdeChat({
   activeFileName,
   activeFileContent,
   activeFileLanguage,
+  additionalContextMessages,
+  layout = "sidebar",
+  sessionTitle = INSIGHT_SESSION_TITLE,
+  emptyStateTitle = "Salut, sunt Planck Agent!",
+  emptyStateDescription = "Pune o întrebare despre C++ sau Python, sau lasă-mă să scriu și să corectez codul pentru tine.",
 }: InsightIdeChatProps) {
+  const isEmbeddedPanel = layout === "embedded-panel"
   const { user, loginWithGoogle, loginWithGitHub, subscriptionPlan } = useAuth()
   const { toast } = useToast()
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -626,7 +638,7 @@ export function InsightIdeChat({
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ title: INSIGHT_SESSION_TITLE }),
+          body: JSON.stringify({ title: sessionTitle }),
         })
 
         if (!createRes.ok) {
@@ -643,7 +655,7 @@ export function InsightIdeChat({
 
       const conversationHistory = buildConversationHistory(messages, newUserMessage.content)
 
-      const contextMessages = activeFileContent
+      const fileContextMessages = activeFileContent
         ? [
             {
               role: "user",
@@ -662,7 +674,12 @@ export function InsightIdeChat({
                 .join("\n"),
             } as ChatMessage,
           ]
-        : undefined
+        : []
+
+      const contextMessages =
+        fileContextMessages.length > 0 || (additionalContextMessages?.length ?? 0) > 0
+          ? [...(additionalContextMessages ?? []), ...fileContextMessages]
+          : undefined
 
       const fetchHeaders: Record<string, string> = {
         "Content-Type": "application/json",
@@ -1100,6 +1117,8 @@ export function InsightIdeChat({
     isGenerating,
     supabase,
     onMessageSent,
+    additionalContextMessages,
+    sessionTitle,
   ])
 
   const handleGoogleLogin = useCallback(async () => {
@@ -1267,23 +1286,29 @@ export function InsightIdeChat({
 
   return (
     <div
-      className={`h-full flex flex-col bg-[#181818] transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      className={`h-full flex flex-col bg-[#181818] transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"} ${isEmbeddedPanel ? "rounded-none" : ""}`}
       aria-hidden={!isOpen}
     >
-      <header className="flex items-center justify-between px-4 py-3 border-b border-[#3b3b3b]">
-        <div className="flex items-center gap-3">
+      <header
+        className={`flex items-center justify-between border-b border-[#3b3b3b] ${isEmbeddedPanel ? "px-3 py-2" : "px-4 py-3"}`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
           <Image
             src="/insight-logo.png"
             alt="Planck Agent"
-            width={32}
-            height={32}
-            className="rounded-full"
+            width={isEmbeddedPanel ? 28 : 32}
+            height={isEmbeddedPanel ? 28 : 32}
+            className="rounded-full shrink-0"
           />
-          <div>
-            <h2 className="text-white font-semibold text-base">Planck Agent</h2>
-            <p className="text-xs text-gray-400">
-              Profesorul tău de C++ și Python — generează cod, explică și depanează.
-            </p>
+          <div className="min-w-0">
+            <h2 className={`text-white font-semibold ${isEmbeddedPanel ? "text-sm truncate" : "text-base"}`}>
+              Planck Agent
+            </h2>
+            {!isEmbeddedPanel ? (
+              <p className="text-xs text-gray-400">
+                Profesorul tău de C++ și Python — generează cod, explică și depanează.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -1294,18 +1319,18 @@ export function InsightIdeChat({
             stopStreaming()
             onClose()
           }}
-          className="text-gray-400 hover:text-white hover:bg-white/10"
+          className="text-gray-400 hover:text-white hover:bg-white/10 shrink-0"
         >
           <X className="w-4 h-4" />
         </Button>
       </header>
 
         <>
-          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
+          <div className={`flex-1 overflow-y-auto space-y-5 ${isEmbeddedPanel ? "px-3 py-3" : "px-4 py-5"}`}>
             {visibleMessages.length === 0 ? (
-              <div className="mt-20 text-center text-gray-400 text-sm space-y-2">
-                <p className="text-lg text-white">Salut, sunt Planck Agent!</p>
-                <p>Pune o întrebare despre C++ sau Python, sau lasă-mă să scriu și să corectez codul pentru tine.</p>
+              <div className={`text-center text-gray-400 text-sm space-y-2 ${isEmbeddedPanel ? "mt-8" : "mt-20"}`}>
+                <p className={`text-white ${isEmbeddedPanel ? "text-base" : "text-lg"}`}>{emptyStateTitle}</p>
+                <p className={isEmbeddedPanel ? "text-xs leading-relaxed px-2" : ""}>{emptyStateDescription}</p>
               </div>
             ) : (
               visibleMessages.map((message, index) => {
@@ -1353,7 +1378,7 @@ export function InsightIdeChat({
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 space-y-3">
+          <div className={`space-y-3 ${isEmbeddedPanel ? "p-3" : "p-4"}`}>
             <div className="rounded-2xl border border-[#3b3b3b] bg-[#242424] px-3 py-1.5 space-y-1">
               <textarea
                 ref={inputRef}

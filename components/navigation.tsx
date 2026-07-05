@@ -443,7 +443,10 @@ export function Navigation() {
   const isPlanckCodeRoute = isPlanckCodeShellRoute(pathname)
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
-  const isInvataFizicaHub = pathname === "/invata/fizica"
+  const isInvataSubjectHub =
+    pathname === "/invata/fizica" ||
+    pathname === "/invata/mate" ||
+    pathname === "/invata/info"
   const isExerseazaActive = isExerseazaRoute(pathname) && !isInformaticaProblemDetailRoute(pathname)
   const isProblemPage = Boolean(pathname?.match(/^\/probleme\/[^/]+$/)) || isProblemsCatalog
   const isProfesorTemeActive = isProfesorTemeRoute(pathname)
@@ -455,7 +458,7 @@ export function Navigation() {
   const useLightNav =
     isDashboard ||
     isExerseazaHub ||
-    isInvataFizicaHub ||
+    isInvataSubjectHub ||
     isProblemsCatalog ||
     isProblemPage ||
     isMatematicaProblemsCatalog ||
@@ -553,7 +556,7 @@ export function Navigation() {
   const isExerseazaHubPage = pathname === "/exerseaza"
   const isCatalogHubPage =
     isExerseazaHubPage ||
-    isInvataFizicaHub ||
+    isInvataSubjectHub ||
     isMatematicaProblemsCatalog ||
     isInformaticaProblemsCatalog
   const navbarElevationClass =

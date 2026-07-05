@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
-import { ArrowLeft, Loader2, Lock } from "lucide-react"
+import { ArrowLeft, Loader2, Lock, Sparkles } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { ProblemStatementSection } from "./problem-statement-section"
 import { CodingProblem, CodingProblemExample } from "./types"
@@ -21,6 +21,8 @@ import type { FileItem } from "@/lib/types"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { useCatalogTheme } from "@/components/catalog-theme-provider"
 import { supabase } from "@/lib/supabaseClient"
+import { ProblemAgentChatPanel } from "./problem-agent-chat-panel"
+import type { EmbeddedIdeAgentBridge } from "@/lib/planckcode/embedded-ide-agent-bridge"
 
 const EmbeddedIDE = dynamic(() => import("./embedded-ide"), {
   ssr: false,
@@ -104,6 +106,18 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   const floatingIde = usePlanckIdeFloatingOptional()
   const registerLiveSession = floatingIde?.registerLiveSession
   const [state, setState] = useState<DetailState>({ status: "idle" })
+  const [isAgentOpen, setIsAgentOpen] = useState(false)
+  const [agentBridge, setAgentBridge] = useState<EmbeddedIdeAgentBridge | null>(null)
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false)
+
+  useEffect(() => {
+    const syncViewport = () => {
+      setIsDesktopViewport(typeof window !== "undefined" && window.innerWidth >= 1024)
+    }
+    syncViewport()
+    window.addEventListener("resize", syncViewport)
+    return () => window.removeEventListener("resize", syncViewport)
+  }, [])
 
   const loadDetails = useCallback(async () => {
     setState({ status: "loading" })
@@ -255,47 +269,79 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
               <ResizablePanelGroup direction="horizontal" className="flex-1 max-md:flex-col">
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-auto max-md:!min-h-[50vh]">
                   <StatementPanelBackground defaultBackgroundClass="bg-[#121212]">
-                    <ScrollArea className="h-full">
-                      <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 lg:px-12">
-                        <div className="mb-8 flex flex-wrap items-center gap-3">
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
-                          >
-                            <Link
-                              href="/informatica/probleme"
-                              className="inline-flex items-center gap-2 px-2 text-sm font-medium"
-                            >
-                              <ArrowLeft className="h-4 w-4" />
-                              Înapoi la catalog
-                            </Link>
-                          </Button>
-                          {metaText && (
-                            <span className="text-sm font-medium text-white/50">
-                              {metaText}
-                            </span>
-                          )}
-                          {loadedProblem?.language === "python" && (
-                            <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
-                              Python
-                            </span>
-                          )}
-                          {loadedProblem?.language !== "python" && (
-                            <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-100/90">
-                              C++
-                            </span>
-                          )}
-                          {loadedProblem?.isFreeMonthly && (
-                            <span className="text-xs font-medium text-emerald-300">
-                              Free luna aceasta
-                            </span>
-                          )}
-                        </div>
-                        <ProblemStatementSection problem={loadedProblem} examples={loadedExamples} />
-                      </div>
-                    </ScrollArea>
+                    <ResizablePanelGroup direction="vertical" className="h-full">
+                      <ResizablePanel defaultSize={isAgentOpen ? 58 : 100} minSize={30}>
+                        <ScrollArea className="h-full">
+                          <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 lg:px-12">
+                            <div className="mb-8 flex flex-wrap items-center gap-3">
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+                              >
+                                <Link
+                                  href="/informatica/probleme"
+                                  className="inline-flex items-center gap-2 px-2 text-sm font-medium"
+                                >
+                                  <ArrowLeft className="h-4 w-4" />
+                                  Înapoi la catalog
+                                </Link>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsAgentOpen((open) => !open)}
+                                aria-pressed={isAgentOpen}
+                                className={`rounded-full border-white/20 text-white hover:bg-white/20 ${
+                                  isAgentOpen ? "bg-white/15" : "bg-white/10"
+                                }`}
+                              >
+                                <Sparkles className="h-4 w-4" />
+                                {isAgentOpen ? "Închide Agent" : "Planck Agent"}
+                              </Button>
+                              {metaText && (
+                                <span className="text-sm font-medium text-white/50">
+                                  {metaText}
+                                </span>
+                              )}
+                              {loadedProblem?.language === "python" && (
+                                <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
+                                  Python
+                                </span>
+                              )}
+                              {loadedProblem?.language !== "python" && (
+                                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-100/90">
+                                  C++
+                                </span>
+                              )}
+                              {loadedProblem?.isFreeMonthly && (
+                                <span className="text-xs font-medium text-emerald-300">
+                                  Free luna aceasta
+                                </span>
+                              )}
+                            </div>
+                            <ProblemStatementSection problem={loadedProblem} examples={loadedExamples} />
+                          </div>
+                        </ScrollArea>
+                      </ResizablePanel>
+
+                      {isAgentOpen && isDesktopViewport ? (
+                        <>
+                          <ResizableHandle withHandle className="bg-white/10 hover:bg-white/20 transition-colors" />
+                          <ResizablePanel defaultSize={42} minSize={24} maxSize={60}>
+                            <ProblemAgentChatPanel
+                              isOpen={isAgentOpen}
+                              onClose={() => setIsAgentOpen(false)}
+                              problem={loadedProblem}
+                              examples={loadedExamples}
+                              agentBridge={agentBridge}
+                            />
+                          </ResizablePanel>
+                        </>
+                      ) : null}
+                    </ResizablePanelGroup>
                   </StatementPanelBackground>
                 </ResizablePanel>
 
@@ -318,6 +364,7 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                       }
                       problemSlug={loadedProblem.language === "python" ? slug : undefined}
                       onWorkspaceChange={handleFloatingWorkspaceChange}
+                      onAgentBridgeChange={setAgentBridge}
                     />
                   </div>
                 </ResizablePanel>
@@ -328,6 +375,25 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
               </div>
             )}
           </main>
+
+          {isReady && isAgentOpen && !isDesktopViewport ? (
+            <>
+              <div
+                className="fixed inset-0 top-16 z-40 bg-black/70 backdrop-blur-sm lg:hidden"
+                onClick={() => setIsAgentOpen(false)}
+                aria-hidden="true"
+              />
+              <aside className="fixed inset-x-0 bottom-0 top-[42%] z-50 flex flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-[#141414] shadow-2xl lg:hidden">
+                <ProblemAgentChatPanel
+                  isOpen={isAgentOpen}
+                  onClose={() => setIsAgentOpen(false)}
+                  problem={loadedProblem}
+                  examples={loadedExamples}
+                  agentBridge={agentBridge}
+                />
+              </aside>
+            </>
+          ) : null}
         </div>
       </CatalogThemeProvider>
   )

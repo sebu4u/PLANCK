@@ -14,32 +14,29 @@ import { BookOpen, Check, ChevronDown, Clock, Dumbbell, List, Loader2, Map, PenL
 import { MapLessonItemsSidebar } from "@/components/invata/map-lesson-items-sidebar"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS, MOBILE_BOTTOM_NAV_OFFSET_CLASS, MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
-import { FIZICA_MAP_COMPLETED_LESSON_PARAM } from "@/lib/fizica-map-item-navigation"
+import { MATE_MAP_COMPLETED_LESSON_PARAM } from "@/lib/mate-map-item-navigation"
 import {
-  FIZICA_CALENDAR_ENABLED,
-  FIZICA_HUB_CARDS_ENABLED,
-  FIZICA_INSIGHT_STARTER_CHIPS,
-  FIZICA_LESSON_TYPE_LABEL,
-  type FizicaLessonType,
-} from "@/lib/invata-fizica-config"
+  MATE_CALENDAR_ENABLED,
+  MATE_HUB_CARDS_ENABLED,
+  MATE_INSIGHT_STARTER_CHIPS,
+  MATE_LESSON_TYPE_LABEL,
+  type MateLessonType,
+} from "@/lib/invata-mate-config"
 import { computeFizicaMapMinHeight } from "@/lib/fizica-map-layout"
 import { FizicaLessonIrisTransition } from "@/components/invata/fizica-lesson-iris-transition"
 import { LearningPathItemAiChatFab } from "@/components/invata/learning-path-item-ai-chat-fab"
-import { FizicaBacCountdown } from "@/components/invata/fizica-bac-countdown"
-import { FizicaCalendarCard } from "@/components/invata/fizica-calendar-card"
-import { FizicaSimulationCards } from "@/components/invata/fizica-simulation-cards"
 import { InvataSubjectSelector } from "@/components/invata/invata-subject-selector"
 import { LearningPathUpNextSection } from "@/components/invata/learning-path-up-next-section"
 import { INVATA_SUBJECTS, type InvataSubjectId } from "@/lib/invata-config"
-import type { FizicaHubCardsData } from "@/lib/supabase-fizica-simulations"
-import type { FizicaCalendarEvent } from "@/lib/supabase-fizica-calendar"
 import {
-  getFizicaMapHref,
-  type FizicaMapLesson,
-  type FizicaMapPageData,
-} from "@/lib/supabase-fizica-learning-map"
+  getMateMapHref,
+  type MateMapPageData,
+} from "@/lib/supabase-mate-learning-map"
+import type { SubjectMapLessonLayout } from "@/lib/subject-map/types"
 
-type MapLesson = FizicaMapLesson
+type MapLesson = SubjectMapLessonLayout
+
+
 
 const FIZICA_MAP_POP_STAGGER_MS = 90
 const FIZICA_MAP_POP_DURATION_MS = 450
@@ -114,11 +111,11 @@ function useMapPathLayout(
   }, [containerRef, lessonCount, revealKey, updatePaths])
 }
 
-function buildFizicaMapInsightContext(mapData: FizicaMapPageData): string {
+function buildMateMapInsightContext(mapData: MateMapPageData): string {
   const { selectedRoute, selectedChapter, lessons } = mapData
   const parts = [
-    "Context: utilizatorul este pe harta lecțiilor de fizică (Planck Academy — /invata/fizica).",
-    "Rolul tău: tutor de fizică pentru liceu; răspunde clar, pas cu pas, în română.",
+    "Context: utilizatorul este pe harta lecțiilor de fizică (Planck Academy — /invata/mate).",
+    "Rolul tău: tutor de matematică pentru liceu; răspunde clar, pas cu pas, în română.",
   ]
 
   if (selectedRoute) {
@@ -133,7 +130,7 @@ function buildFizicaMapInsightContext(mapData: FizicaMapPageData): string {
     parts.push("", "Lecții în capitolul curent:")
     for (const lesson of lessons) {
       parts.push(
-        `- ${lesson.title} (${FIZICA_LESSON_TYPE_LABEL[lesson.type]}, ${lesson.durationMinutes} min, status: ${lesson.status})`,
+        `- ${lesson.title} (${MATE_LESSON_TYPE_LABEL[lesson.type]}, ${lesson.durationMinutes} min, status: ${lesson.status})`,
       )
     }
   }
@@ -141,7 +138,7 @@ function buildFizicaMapInsightContext(mapData: FizicaMapPageData): string {
   return parts.join("\n")
 }
 
-function LessonTypeIcon({ type, className }: { type: FizicaLessonType; className?: string }) {
+function LessonTypeIcon({ type, className }: { type: MateLessonType; className?: string }) {
   if (type === "exerseaza") {
     return <Dumbbell className={className} aria-hidden />
   }
@@ -155,15 +152,15 @@ function SidebarNav({
   mapData,
   onNavigate,
 }: {
-  mapData: FizicaMapPageData
+  mapData: MateMapPageData
   onNavigate: (href: string) => void
 }) {
   const { routes, chapters, selectedRoute, selectedChapter } = mapData
 
   return (
-    <nav className="space-y-4" aria-label="Navigare fizică">
+    <nav className="space-y-4" aria-label="Navigare matematică">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2c2f33]/55">
-        Fizică
+        Matematică
       </p>
 
       <div>
@@ -173,7 +170,7 @@ function SidebarNav({
         <div className="space-y-1">
           {routes.map((route) => {
             const isActive = selectedRoute?.id === route.id
-            const href = `/invata/fizica?traseu=${encodeURIComponent(route.slug)}`
+            const href = `/invata/mate?traseu=${encodeURIComponent(route.slug)}`
 
             return (
               <Link
@@ -223,10 +220,10 @@ function SidebarNav({
                 return (
                   <Link
                     key={chapter.id}
-                    href={getFizicaMapHref(selectedRoute.slug, chapter.slug)}
+                    href={getMateMapHref(selectedRoute.slug, chapter.slug)}
                     onClick={(event) => {
                       event.preventDefault()
-                      onNavigate(getFizicaMapHref(selectedRoute.slug, chapter.slug))
+                      onNavigate(getMateMapHref(selectedRoute.slug, chapter.slug))
                     }}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[#2c2f33]/80 transition-colors hover:bg-[#faf9f7] hover:text-[#0b0c0f]",
@@ -252,7 +249,7 @@ function MobileRouteChapterPicker({
   mapData,
   onNavigate,
 }: {
-  mapData: FizicaMapPageData
+  mapData: MateMapPageData
   onNavigate: (href: string) => void
 }) {
   const { routes, chapters, selectedRoute, selectedChapter } = mapData
@@ -272,7 +269,7 @@ function MobileRouteChapterPicker({
             onChange={(event) => {
               const nextRoute = routes.find((route) => route.slug === event.target.value)
               if (!nextRoute) return
-              onNavigate(`/invata/fizica?traseu=${encodeURIComponent(nextRoute.slug)}`)
+              onNavigate(`/invata/mate?traseu=${encodeURIComponent(nextRoute.slug)}`)
             }}
           >
             {routes.map((route) => (
@@ -295,7 +292,7 @@ function MobileRouteChapterPicker({
               className="w-full appearance-none rounded-xl border border-[#0b0c0f]/10 bg-white px-3 py-2.5 pr-10 text-sm font-medium text-[#0b0c0f]"
               value={selectedChapter?.slug ?? ""}
               onChange={(event) => {
-                onNavigate(getFizicaMapHref(selectedRoute.slug, event.target.value))
+                onNavigate(getMateMapHref(selectedRoute.slug, event.target.value))
               }}
             >
               {chapters.map((chapter) => (
@@ -412,7 +409,7 @@ function scrollMapToTop() {
 
 const FIZICA_MAP_DESCEND_DELAY_MAX_MS = 1200
 
-function reconcileFizicaMapLessonStatuses(
+function reconcileMateMapLessonStatuses(
   lessons: MapLesson[],
   extraCompletedIds: Set<string> = new Set(),
 ): MapLesson[] {
@@ -455,7 +452,7 @@ function getLessonIdAfterCompletion(lessons: MapLesson[], completedLessonId: str
   return nextLesson?.id ?? getDefaultSelectedLessonId(lessons)
 }
 
-function isFizicaLessonSelectable(lesson: MapLesson): boolean {
+function isMateLessonSelectable(lesson: MapLesson): boolean {
   return lesson.status === "active" || lesson.status === "completed"
 }
 
@@ -558,7 +555,7 @@ function LessonCard({
               isCurrent ? "bg-[#c68a00] text-white" : "bg-[#1a3d6b] text-[#b8d4f5]",
             )}
           >
-            {FIZICA_LESSON_TYPE_LABEL[lesson.type]}
+            {MATE_LESSON_TYPE_LABEL[lesson.type]}
           </span>
         )}
         <span
@@ -694,7 +691,7 @@ function buildMobileZigzagPath(
   fromCard: DOMRect | null,
   toCard: DOMRect | null,
   containerRect: DOMRect,
-): OrthogonalPath {
+): { d: string } {
   const ax = fromNode.left + fromNode.width / 2 - containerRect.left
   const ay = fromNode.top + fromNode.height / 2 - containerRect.top
   const bx = toNode.left + toNode.width / 2 - containerRect.left
@@ -1079,7 +1076,7 @@ function DesktopLessonMarker({
   isEnteringLesson: boolean
 }) {
   const isCurrent = lesson.status === "active"
-  const isSelectable = isFizicaLessonSelectable(lesson)
+  const isSelectable = isMateLessonSelectable(lesson)
   const cardAbove = lesson.cardPosition === "above"
   const node = (
     <button
@@ -1172,7 +1169,7 @@ function MobileLessonMarker({
   const isLeft = isMobileLeftSide(index)
   const isCurrent = lesson.status === "active"
   const isCompleted = lesson.status === "completed"
-  const isSelectable = isFizicaLessonSelectable(lesson)
+  const isSelectable = isMateLessonSelectable(lesson)
   const showCard = isCurrent || (isCompleted && isFocused)
 
   return (
@@ -1291,18 +1288,14 @@ function MobileMap({
   )
 }
 
-export function FizicaLearningMap({
-  hubCards,
+export function MateLearningMap({
   mapData,
-  calendarEvents = [],
 }: {
-  hubCards: FizicaHubCardsData
-  mapData: FizicaMapPageData
-  calendarEvents?: FizicaCalendarEvent[]
+  mapData: MateMapPageData
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const completedLessonFromUrl = searchParams.get(FIZICA_MAP_COMPLETED_LESSON_PARAM)
+  const completedLessonFromUrl = searchParams.get(MATE_MAP_COMPLETED_LESSON_PARAM)
   const [isMapNavigating, startMapTransition] = useTransition()
   const [mapRevealKey, setMapRevealKey] = useState(0)
   const [isOpeningNextChapter, setIsOpeningNextChapter] = useState(false)
@@ -1321,13 +1314,11 @@ export function FizicaLearningMap({
     nextChapter,
     isCurrentChapterComplete,
   } = mapData
-  const showHubCards =
-    FIZICA_HUB_CARDS_ENABLED &&
-    (hubCards.preparations.length > 0 || hubCards.nextSimulation !== null)
-  const showCalendar = FIZICA_CALENDAR_ENABLED
+  const showHubCards = false
+  const showCalendar = MATE_CALENDAR_ENABLED
 
   const displayLessons = useMemo(
-    () => reconcileFizicaMapLessonStatuses(lessons, optimisticCompletedIds),
+    () => reconcileMateMapLessonStatuses(lessons, optimisticCompletedIds),
     [lessons, optimisticCompletedIds],
   )
 
@@ -1429,7 +1420,7 @@ export function FizicaLearningMap({
       return next
     })
 
-    const reconciledLessons = reconcileFizicaMapLessonStatuses(
+    const reconciledLessons = reconcileMateMapLessonStatuses(
       lessons,
       new Set([completedLessonFromUrl]),
     )
@@ -1443,9 +1434,9 @@ export function FizicaLearningMap({
     }
 
     const params = new URLSearchParams(searchParams.toString())
-    params.delete(FIZICA_MAP_COMPLETED_LESSON_PARAM)
+    params.delete(MATE_MAP_COMPLETED_LESSON_PARAM)
     const query = params.toString()
-    router.replace(query ? `/invata/fizica?${query}` : "/invata/fizica", { scroll: false })
+    router.replace(query ? `/invata/mate?${query}` : "/invata/mate", { scroll: false })
     router.refresh()
   }, [chapterKey, completedLessonFromUrl, isMapNavigating, lessons, router, searchParams])
 
@@ -1481,7 +1472,7 @@ export function FizicaLearningMap({
   const handleSelectLesson = useCallback(
     (lessonId: string) => {
       const lesson = displayLessons.find((entry) => entry.id === lessonId)
-      if (!lesson || !isFizicaLessonSelectable(lesson)) return
+      if (!lesson || !isMateLessonSelectable(lesson)) return
 
       if (lesson.status === "active") {
         scrollLessonMarkerIntoView(lessonId)
@@ -1502,11 +1493,11 @@ export function FizicaLearningMap({
     return () => window.removeEventListener("resize", sync)
   }, [])
 
-  const chatContext = useMemo(() => buildFizicaMapInsightContext(mapData), [mapData])
+  const chatContext = useMemo(() => buildMateMapInsightContext(mapData), [mapData])
   const chatProblemId = useMemo(() => {
     const routeSlug = selectedRoute?.slug ?? "default"
     const chapterSlug = selectedChapter?.slug ?? "default"
-    return `invata-fizica-map:${routeSlug}:${chapterSlug}`
+    return `invata-mate-map:${routeSlug}:${chapterSlug}`
   }, [selectedChapter?.slug, selectedRoute?.slug])
 
   const embedChatOnDesktop = chatPanelMounted && isDesktopViewport
@@ -1541,7 +1532,7 @@ export function FizicaLearningMap({
     if (!nextChapter || !selectedRoute || isOpeningNextChapter || !isCurrentChapterComplete) return
     setIsOpeningNextChapter(true)
     startMapTransition(() => {
-      router.push(getFizicaMapHref(selectedRoute.slug, nextChapter.slug))
+      router.push(getMateMapHref(selectedRoute.slug, nextChapter.slug))
     })
   }, [
     isCurrentChapterComplete,
@@ -1568,9 +1559,8 @@ export function FizicaLearningMap({
         <div className="catalog-sidebar-scroll flex h-full flex-col overflow-y-auto px-5 py-5">
           <SidebarNav mapData={mapData} onNavigate={handleMapNavigate} />
           <div className="mt-auto pt-8">
-            <FizicaBacCountdown />
             <InvataSubjectSelector
-              selectedId="fizica"
+              selectedId="mate"
               onSelect={handleSubjectSelect}
               variant="sidebar"
             />
@@ -1585,13 +1575,6 @@ export function FizicaLearningMap({
         )}
       >
         <div className="absolute inset-0 top-0 overflow-hidden bg-white lg:inset-[3px] lg:rounded-xl lg:bg-[#f5f4f2]">
-          {showCalendar && !isMapNavigating ? (
-            <FizicaCalendarCard
-              initialEvents={calendarEvents}
-              variant="desktop"
-              className="fizica-ai-fab-enter"
-            />
-          ) : null}
           <div
             className={cn(
               "catalog-problems-scroll h-full overflow-y-auto",
@@ -1602,15 +1585,6 @@ export function FizicaLearningMap({
           >
             <div className="px-5 pb-12 pt-5 sm:px-8 lg:px-10 lg:pt-8 xl:px-12">
               <MobileRouteChapterPicker mapData={mapData} onNavigate={handleMapNavigate} />
-              {showCalendar && !isMapNavigating ? (
-                <div className="mb-5 lg:hidden">
-                  <FizicaCalendarCard
-                    initialEvents={calendarEvents}
-                    variant="mobile"
-                    className="fizica-ai-fab-enter"
-                  />
-                </div>
-              ) : null}
               {!isMapNavigating && selectedChapter ? (
                 <h2 className="mb-5 text-center text-lg font-bold leading-tight text-[#0b0c0f] sm:mb-6 lg:mb-8 lg:text-3xl xl:text-4xl">
                   {selectedChapter.title}
@@ -1655,23 +1629,6 @@ export function FizicaLearningMap({
               ) : null}
             </div>
           </div>
-
-          {showHubCards ? (
-            <div
-              className={cn(
-                "pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-3 pt-6 sm:px-6 lg:px-8",
-                MOBILE_BOTTOM_NAV_OFFSET_CLASS,
-              )}
-            >
-              <div className="pointer-events-auto w-full max-w-3xl">
-                <FizicaSimulationCards
-                  preparations={hubCards.preparations}
-                  nextSimulation={hubCards.nextSimulation}
-                  overlay
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -1708,7 +1665,7 @@ export function FizicaLearningMap({
           embedDesktopTopClass="top-16"
           embedDesktopHeightClass="h-[calc(100dvh-4rem)]"
           onExitAnimationComplete={finalizeChatClose}
-          starterQuestionChips={FIZICA_INSIGHT_STARTER_CHIPS}
+          starterQuestionChips={MATE_INSIGHT_STARTER_CHIPS}
           disableEntranceAnimations
           panelSlideTransitionClass="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
         />
@@ -1721,8 +1678,8 @@ export function FizicaLearningMap({
           onExitAnimationComplete={finalizeItemsSidebarClose}
           embedOnDesktop={embedItemsSidebarOnDesktop}
           panelSlideTransitionClass="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
-          subject="fizica"
-          mapLessonId={itemsSidebarLesson?.fizicaLessonId ?? null}
+          subject="mate"
+          mapLessonId={itemsSidebarLesson?.mapLessonId ?? null}
           lessonTitle={itemsSidebarLesson?.title ?? ""}
           routeSlug={selectedRoute?.slug ?? null}
           chapterSlug={selectedChapter?.slug ?? null}

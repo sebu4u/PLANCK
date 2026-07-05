@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { loadLearningPathItemPayload } from "@/lib/learning-path-item-loader"
 import { parseFizicaMapItemContext } from "@/lib/fizica-map-item-navigation"
+import { parseAnySubjectMapItemContext } from "@/lib/subject-map/navigation"
 
 export async function GET(
   request: Request,
@@ -10,9 +11,11 @@ export async function GET(
     const { chapterSlug, lessonSlug, itemIndex } = await params
     const parsedIndex = Number.parseInt(itemIndex, 10)
     const fizicaMapContext = parseFizicaMapItemContext(new URL(request.url).searchParams)
+    const subjectMapContext = parseAnySubjectMapItemContext(new URL(request.url).searchParams)
 
     const result = await loadLearningPathItemPayload(chapterSlug, lessonSlug, parsedIndex, {
       fizicaMapContext,
+      subjectMapContext,
     })
 
     switch (result.status) {

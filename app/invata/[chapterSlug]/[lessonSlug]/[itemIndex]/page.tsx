@@ -16,6 +16,7 @@ import {
   resolveLessonContext,
 } from "@/lib/learning-path-item-loader"
 import { parseFizicaMapItemContext, appendFizicaMapItemQuery } from "@/lib/fizica-map-item-navigation"
+import { parseAnySubjectMapItemContext, appendSubjectMapItemQuery } from "@/lib/subject-map/navigation"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 
 export const dynamic = "force-dynamic"
@@ -67,6 +68,7 @@ export default async function InvataLessonItemPage({
   const parsedIndex = Number.parseInt(itemIndex, 10)
   const resolvedSearchParams = await searchParams
   const fizicaMapContext = parseFizicaMapItemContext(resolvedSearchParams)
+  const subjectMapContext = parseAnySubjectMapItemContext(resolvedSearchParams)
 
   const { chapter, lesson } = await resolveLessonContext(chapterSlug, lessonSlug)
   if (chapter && lesson) {
@@ -81,13 +83,16 @@ export default async function InvataLessonItemPage({
       redirect(
         fizicaMapContext
           ? appendFizicaMapItemQuery(canonicalRedirect, fizicaMapContext)
-          : canonicalRedirect,
+          : subjectMapContext
+            ? appendSubjectMapItemQuery(canonicalRedirect, subjectMapContext)
+            : canonicalRedirect,
       )
     }
   }
 
   const result = await loadLearningPathItemPayload(chapterSlug, lessonSlug, parsedIndex, {
     fizicaMapContext,
+    subjectMapContext,
   })
 
   if (result.status === "not_found" || result.status === "invalid_index") {

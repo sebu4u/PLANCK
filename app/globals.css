@@ -2297,6 +2297,59 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
   animation: fizica-ai-fab-slide-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+@keyframes ai-chat-fab-nudge-in {
+  from {
+    opacity: 0;
+    transform: translate(14px, 10px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes ai-chat-fab-nudge-out {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(10px, 8px) scale(0.9);
+  }
+}
+
+.ai-chat-fab-nudge-enter {
+  animation: ai-chat-fab-nudge-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.ai-chat-fab-nudge-visible {
+  opacity: 1;
+  transform: translate(0, 0) scale(1);
+}
+
+.ai-chat-fab-nudge-exit {
+  animation: ai-chat-fab-nudge-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-chat-fab-nudge-enter,
+  .ai-chat-fab-nudge-exit {
+    animation: none;
+  }
+
+  .ai-chat-fab-nudge-enter,
+  .ai-chat-fab-nudge-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  .ai-chat-fab-nudge-exit {
+    opacity: 0;
+    transform: none;
+  }
+}
+
 @keyframes loading-video-pop-in {
   0% {
     opacity: 0;

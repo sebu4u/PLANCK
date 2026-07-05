@@ -13,7 +13,8 @@ import {
   type LearningPathItemFetchResult,
 } from "@/lib/learning-path-item-client-cache"
 import { appendFizicaMapItemQuery } from "@/lib/fizica-map-item-navigation"
-import type { FizicaMapAssignmentItemRoute } from "@/lib/supabase-fizica-learning-map"
+import { appendSubjectMapItemQuery } from "@/lib/subject-map/navigation"
+import type { SubjectMapAssignmentItemRoute } from "@/lib/subject-map/types"
 import { LearningPathItemView } from "@/components/invata/learning-path-item-view"
 import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
 import { FizicaLessonCompletionScreen } from "@/components/invata/fizica-lesson-completion-screen"
@@ -23,23 +24,32 @@ interface LearningPathItemExperienceProps {
   initialPayload: LearningPathItemPayload
 }
 
+type MapAssignmentItemRoute = SubjectMapAssignmentItemRoute
+
 function buildItemUrl(payload: LearningPathItemPayload): string {
   const base = `${payload.lessonBaseHref}/${payload.itemIndex}`
   if (payload.fizicaMapContext) {
     return appendFizicaMapItemQuery(base, payload.fizicaMapContext)
   }
+  if (payload.subjectMapContext) {
+    return appendSubjectMapItemQuery(base, payload.subjectMapContext)
+  }
   return base
 }
 
+function getMapAssignmentItems(payload: LearningPathItemPayload): MapAssignmentItemRoute[] | undefined {
+  return payload.fizicaAssignmentItems ?? payload.subjectMapAssignmentItems
+}
+
 function isSameItemRoute(
-  a: FizicaMapAssignmentItemRoute,
-  b: FizicaMapAssignmentItemRoute,
+  a: MapAssignmentItemRoute,
+  b: MapAssignmentItemRoute,
 ): boolean {
   return a.chapterSlug === b.chapterSlug && a.lessonSlug === b.lessonSlug && a.itemIndex === b.itemIndex
 }
 
-function findFizicaAssignmentIndex(
-  items: FizicaMapAssignmentItemRoute[],
+function findMapAssignmentIndex(
+  items: MapAssignmentItemRoute[],
   payload: LearningPathItemPayload,
 ): number {
   return items.findIndex((item) =>
@@ -63,7 +73,9 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const isPopstateRef = useRef(false)
   const eligibleForFirstItemEntryRef = useRef(initialPayload.itemIndex === 1)
   const [firstItemEntryConsumed, setFirstItemEntryConsumed] = useState(false)
-  const usesFizicaLessonCompletionScreen = Boolean(payload.fizicaMapContext)
+  const usesFizicaLessonCompletionScreen = Boolean(
+    payload.fizicaMapContext || payload.subjectMapContext,
+  )
 
   const animateFirstItemEntry =
     eligibleForFirstItemEntryRef.current &&
@@ -105,15 +117,19 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       lessonSlug: string,
       itemIndex: number,
       fizicaMapContext: LearningPathItemPayload["fizicaMapContext"],
+      subjectMapContext: LearningPathItemPayload["subjectMapContext"],
     ): Promise<LearningPathItemFetchResult> => {
-      return fetchLearningPathItemPayload(chapterSlug, lessonSlug, itemIndex, { fizicaMapContext })
+      return fetchLearningPathItemPayload(chapterSlug, lessonSlug, itemIndex, {
+        fizicaMapContext,
+        subjectMapContext,
+      })
     },
     [],
   )
 
   const goToItem = useCallback(
     async (
-      target: FizicaMapAssignmentItemRoute,
+      target: MapAssignmentItemRoute,
       options?: { urlMode?: "replace" | "push"; direction?: LearningPathSlideDirection },
     ) => {
       if (
@@ -127,9 +143,10 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       setSlideDirection(
         options?.direction ??
           (() => {
-            if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
-              const fromIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
-              const toIndex = payload.fizicaAssignmentItems.findIndex((item) =>
+            const assignmentItems = getMapAssignmentItems(payload)
+            if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
+              const fromIndex = findMapAssignmentIndex(assignmentItems, payload)
+              const toIndex = assignmentItems.findIndex((item) =>
                 isSameItemRoute(item, target),
               )
               return toIndex > fromIndex ? "forward" : "backward"
@@ -143,6 +160,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         target.lessonSlug,
         target.itemIndex,
         payload.fizicaMapContext,
+        payload.subjectMapContext,
       )
       if (cached) {
         setFreePlanPaywall(null)
@@ -158,6 +176,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
           target.lessonSlug,
           target.itemIndex,
           payload.fizicaMapContext,
+          payload.subjectMapContext,
         )
         if (result.status === "ok") {
           setFreePlanPaywall(null)
@@ -211,13 +230,14 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   )
 
   const goToNextItem = useCallback(async () => {
-    if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
+    const assignmentItems = getMapAssignmentItems(payload)
+    if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
       if (payload.isLastItem) {
         setShowLessonCompletion(true)
         return
       }
-      const currentIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
-      const nextItem = payload.fizicaAssignmentItems[currentIndex + 1]
+      const currentIndex = findMapAssignmentIndex(assignmentItems, payload)
+      const nextItem = assignmentItems[currentIndex + 1]
       if (nextItem) {
         await goToItem(nextItem, { urlMode: "push", direction: "forward" })
       }
@@ -237,9 +257,10 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   }, [payload.nextItemHref, router])
 
   const goToPrevItem = useCallback(async () => {
-    if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
-      const currentIndex = findFizicaAssignmentIndex(payload.fizicaAssignmentItems, payload)
-      const prevItem = currentIndex > 0 ? payload.fizicaAssignmentItems[currentIndex - 1] : null
+    const assignmentItems = getMapAssignmentItems(payload)
+    if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
+      const currentIndex = findMapAssignmentIndex(assignmentItems, payload)
+      const prevItem = currentIndex > 0 ? assignmentItems[currentIndex - 1] : null
       if (prevItem) {
         await goToItem(prevItem, { urlMode: "push", direction: "backward" })
       }
@@ -275,18 +296,20 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         payload.lessonSlug,
         payload.itemIndex,
         payload.fizicaMapContext,
+        payload.subjectMapContext,
       )
       if (refreshed.status === "ok") {
         applyPayload(refreshed.payload, { skipPrefetch: false })
       }
     })()
-  }, [applyPayload, loadItem, payload.chapterSlug, payload.fizicaMapContext, payload.itemIndex, payload.lessonSlug, user?.id])
+  }, [applyPayload, loadItem, payload.chapterSlug, payload.fizicaMapContext, payload.subjectMapContext, payload.itemIndex, payload.lessonSlug, user?.id])
 
   useEffect(() => {
     const handlePopState = () => {
-      if (payload.fizicaMapContext && payload.fizicaAssignmentItems?.length) {
+      const assignmentItems = getMapAssignmentItems(payload)
+      if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
         const targetPath = window.location.pathname
-        const targetItem = payload.fizicaAssignmentItems.find((item) => {
+        const targetItem = assignmentItems.find((item) => {
           const itemPath = `/invata/${item.chapterSlug}/${item.lessonSlug}/${item.itemIndex}`
           return targetPath === itemPath
         })
@@ -313,7 +336,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
 
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
-  }, [goToItem, goToItemIndex, payload.fizicaAssignmentItems, payload.fizicaMapContext, payload.itemIndex])
+  }, [goToItem, goToItemIndex, payload, payload.itemIndex])
 
   if (freePlanPaywall) {
     return (
@@ -336,7 +359,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       />
       {showLessonCompletion ? (
         <FizicaLessonCompletionScreen
-          totalElo={payload.fizicaLessonTotalElo ?? 0}
+          totalElo={payload.fizicaLessonTotalElo ?? payload.subjectMapLessonTotalElo ?? 0}
           onContinue={dismissLessonCompletion}
         />
       ) : null}

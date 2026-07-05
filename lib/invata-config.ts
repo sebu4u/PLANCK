@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react"
-import { Atom } from "lucide-react"
+import { Atom, Calculator, Code2 } from "lucide-react"
 
-export type InvataSubjectId = "fizica"
+export type InvataSubjectId = "fizica" | "mate" | "info"
 
 export interface InvataSubjectConfig {
   id: InvataSubjectId
@@ -17,5 +17,17 @@ export const INVATA_SUBJECTS: InvataSubjectConfig[] = [
     label: "Fizică",
     icon: Atom,
     href: "/invata/fizica",
+  },
+  {
+    id: "mate",
+    label: "Matematică",
+    icon: Calculator,
+    href: "/invata/mate",
+  },
+  {
+    id: "info",
+    label: "Informatică",
+    icon: Code2,
+    href: "/invata/info",
   },
 ]
