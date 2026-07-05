@@ -50,7 +50,7 @@ import { isInformaticaProblemDetailRoute, isPlanckCodeShellRoute } from "@/lib/p
 import { getPlanckCodeNavHref } from "@/lib/planckcode-floating-session"
 import { usePlanckIdeFloatingOptional } from "@/components/planckcode-floating-provider"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
-import { isStudentDashboardRoute, normalizePracticeSubject } from "@/lib/practice-subject"
+import { isStudentDashboardRoute, normalizePracticeSubject, type PracticeSubjectId } from "@/lib/practice-subject"
 
 function isInsideMonacoEditor(element: EventTarget | null): boolean {
   if (!(element instanceof HTMLElement)) return false
@@ -571,9 +571,18 @@ export function Navigation() {
   const showMobileBottomNav = shouldShowMobileBottomNav(pathname, Boolean(user))
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
-  const showStudentDashboardSubjectSwitcher =
-    Boolean(user && isStudent && isStudentDashboardRoute(pathname))
-  const studentDashboardSubject = normalizePracticeSubject(profile?.preferred_materie)
+  const showMobilePracticeSubjectSwitcher = Boolean(
+    user &&
+      isStudent &&
+      (isStudentDashboardRoute(pathname) ||
+        isMatematicaProblemsCatalog ||
+        isInformaticaProblemsCatalog),
+  )
+  const mobilePracticeSubject: PracticeSubjectId = isMatematicaProblemsCatalog
+    ? "matematica"
+    : isInformaticaProblemsCatalog
+      ? "informatica"
+      : normalizePracticeSubject(profile?.preferred_materie)
   const invataHubChapters = useInvataHubChapters()
   const showInvataHubMobileNav =
     isMobile && isInvataHubRoute(pathname) && Boolean(invataHubChapters?.length)
@@ -709,11 +718,13 @@ export function Navigation() {
                 ) : showMobileAppShell ? (
                   <>
                     <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
-                      {showStudentDashboardSubjectSwitcher ? (
+                      {showMobilePracticeSubjectSwitcher ? (
                         <PracticeSubjectSwitcher
-                          currentSubject={studentDashboardSubject}
+                          currentSubject={mobilePracticeSubject}
                           size="navbar"
-                          navigateOnChange={false}
+                          navigateOnChange={
+                            isMatematicaProblemsCatalog || isInformaticaProblemsCatalog
+                          }
                         />
                       ) : (
                         <>

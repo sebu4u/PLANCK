@@ -38,6 +38,7 @@ import {
   InformaticaCatalogCardSkeleton,
 } from "@/components/coding-problems/informatica-catalog-card"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
+import { CatalogMobileTopBanner } from "@/components/catalog/catalog-mobile-top-banner"
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 const STORAGE_PREFIX = "informaticaCatalog"
@@ -338,7 +339,12 @@ export function InformaticaCatalogClient({
       sidebarScrolling={sidebarScrolling}
       onSidebarScroll={handleSidebarScroll}
       onProblemsScroll={() => {}}
-      headerPrefix={<PracticeSubjectSwitcher currentSubject="informatica" />}
+      topSlot={<CatalogMobileTopBanner />}
+      headerPrefix={
+        <div className="hidden burger:block">
+          <PracticeSubjectSwitcher currentSubject="informatica" />
+        </div>
+      }
     >
       <div className="relative pt-2">
         <div

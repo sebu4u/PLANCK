@@ -485,7 +485,14 @@ export function ProblemSection({
                   </span>
                 )}
               </div>
-              <div className="mt-4 whitespace-pre-wrap text-lg font-semibold leading-relaxed text-[#2C2F33] sm:text-xl lg:text-lg">
+              <div
+                className={cn(
+                  "mt-4 whitespace-pre-wrap font-semibold leading-relaxed text-[#2C2F33]",
+                  itemType === "math_problem"
+                    ? "text-sm sm:text-base lg:text-lg"
+                    : "text-lg sm:text-xl lg:text-lg",
+                )}
+              >
                 {renderInlineMath(problem.statement)}
               </div>
               {problem.image_url && (

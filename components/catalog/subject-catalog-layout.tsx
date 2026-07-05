@@ -146,7 +146,8 @@ export function SubjectCatalogLayout({
               {topSlot}
               <div
                 className={cn(
-                  "space-y-6 pb-12 pl-6 pr-[19px] pt-6 sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px]",
+                  "space-y-6 pb-12 pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px]",
+                  topSlot ? "pt-2 burger:pt-6" : "pt-6",
                   MOBILE_BOTTOM_NAV_PADDING_CLASS,
                   "burger:pb-12",
                 )}

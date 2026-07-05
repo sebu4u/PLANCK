@@ -5,6 +5,7 @@ export const MOBILE_BOTTOM_NAV_HEIGHT = "4.5rem"
 
 /** Scoped to body.mobile-app-shell below 948px — safe on desktop and non-shell routes */
 export const MOBILE_BOTTOM_NAV_PADDING_CLASS = "mobile-bottom-nav-pad"
+export const MOBILE_BOTTOM_NAV_UPGRADE_BANNER_PADDING_CLASS = "mobile-bottom-nav-upgrade-banner-pad"
 export const MOBILE_BOTTOM_NAV_OFFSET_CLASS = "mobile-bottom-nav-offset"
 export const MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS = "mobile-bottom-nav-fab-offset"
 export const MOBILE_BOTTOM_NAV_QUIZ_PADDING_CLASS = "mobile-bottom-nav-quiz-pad"

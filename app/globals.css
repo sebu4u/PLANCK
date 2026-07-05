@@ -78,6 +78,10 @@
       padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
     }
 
+    body.mobile-app-shell .mobile-bottom-nav-upgrade-banner-pad {
+      padding-bottom: calc(4.5rem + 2.25rem + env(safe-area-inset-bottom, 0px));
+    }
+
     body.mobile-app-shell .mobile-bottom-nav-offset {
       bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
     }

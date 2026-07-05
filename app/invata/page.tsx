@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
-import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
@@ -20,6 +19,8 @@ import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
 import { LearningPathsList } from "@/components/invata/learning-paths-list"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
 import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
+import { InvataPremiumUpgradeBanner } from "@/components/invata/invata-premium-upgrade-banner"
+import { InvataHubMain } from "@/components/invata/invata-hub-main"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import {
   isFreePreviewLearningPathChapterSlug,
@@ -98,9 +99,7 @@ export default async function InvataPage() {
         <Navigation />
         {visibleChapters.length > 0 ? <InvataHubTopGlow /> : null}
 
-        <main
-          className={`relative min-h-screen max-sm:bg-transparent bg-[#ffffff] max-sm:pt-[calc(5.875rem+3rem)] pt-16 burger:pt-28 burger:pb-10 sm:pt-16 ${MOBILE_BOTTOM_NAV_PADDING_CLASS}`}
-        >
+        <InvataHubMain>
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
             <header className="mb-8 hidden flex-col gap-4 sm:flex sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -130,7 +129,8 @@ export default async function InvataPage() {
 
             <InvataSeoIntro />
           </div>
-        </main>
+        </InvataHubMain>
+        <InvataPremiumUpgradeBanner />
       </InvataChapterImageLoadProvider>
     </InvataHubNavProvider>
   )

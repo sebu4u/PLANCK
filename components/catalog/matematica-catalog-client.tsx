@@ -31,6 +31,7 @@ import {
   MatematicaCatalogCardSkeleton,
 } from "@/components/math-problems/matematica-catalog-card"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
+import { CatalogMobileTopBanner } from "@/components/catalog/catalog-mobile-top-banner"
 
 const STORAGE_PREFIX = "matematicaCatalog"
 
@@ -277,7 +278,12 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
       sidebarScrolling={sidebarScrolling}
       onSidebarScroll={handleSidebarScroll}
       onProblemsScroll={() => {}}
-      headerPrefix={<PracticeSubjectSwitcher currentSubject="matematica" />}
+      topSlot={<CatalogMobileTopBanner />}
+      headerPrefix={
+        <div className="hidden burger:block">
+          <PracticeSubjectSwitcher currentSubject="matematica" />
+        </div>
+      }
     >
       <div className="relative pt-2">
         <div

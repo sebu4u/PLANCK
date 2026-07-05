@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -9,6 +10,7 @@ type BeforeInstallPromptEvent = Event & {
 }
 
 export function ProblemsPwaInstallBanner() {
+  const { isPaid } = useSubscriptionPlan()
   const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const [shouldShow, setShouldShow] = useState(false)
   const router = useRouter()
@@ -68,7 +70,7 @@ export function ProblemsPwaInstallBanner() {
     }
   }
 
-  if (!shouldShow) return null
+  if (!isPaid || !shouldShow) return null
 
   return (
     <button
