@@ -45,7 +45,7 @@ import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-compari
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import {
-  getPostOnboardingDiscountMobilePromoDismissedKey,
+  getPostOnboardingDiscountMobilePromoSessionKey,
   usePostOnboardingDiscountWindow,
 } from "@/hooks/use-post-onboarding-discount-window"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
@@ -466,7 +466,7 @@ export function DashboardAuth() {
     mobileDiscountPromoCheckedRef.current = true
 
     try {
-      const dismissed = localStorage.getItem(getPostOnboardingDiscountMobilePromoDismissedKey(user.id))
+      const dismissed = sessionStorage.getItem(getPostOnboardingDiscountMobilePromoSessionKey(user.id))
       if (!dismissed) {
         setShowMobileDiscountPromo(true)
       }
@@ -486,7 +486,7 @@ export function DashboardAuth() {
   const dismissMobileDiscountPromo = () => {
     if (user) {
       try {
-        localStorage.setItem(getPostOnboardingDiscountMobilePromoDismissedKey(user.id), "1")
+        sessionStorage.setItem(getPostOnboardingDiscountMobilePromoSessionKey(user.id), "1")
       } catch {
         // Ignore storage errors silently
       }
@@ -633,17 +633,17 @@ export function DashboardAuth() {
               ) : null}
               <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:block md:h-auto md:overflow-visible md:p-8 lg:p-10 animate-fade-in-up">
                 <div className="mx-auto flex h-full min-h-0 w-full max-w-[1000px] flex-col md:h-auto md:min-h-0">
-                  {isStudent ? (
-                    <div className="mb-6 hidden md:block">
-                      <PracticeSubjectSwitcher
-                        currentSubject={normalizePracticeSubject(profile?.preferred_materie)}
-                        className="flex justify-start"
-                        navigateOnChange={false}
-                      />
-                    </div>
-                  ) : null}
                   <div className={`grid min-h-0 flex-1 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[340px_minmax(0,1fr)] md:flex-none ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
                     <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
+                      {isStudent ? (
+                        <div className="mb-4">
+                          <PracticeSubjectSwitcher
+                            currentSubject={normalizePracticeSubject(profile?.preferred_materie)}
+                            className="flex justify-start"
+                            navigateOnChange={false}
+                          />
+                        </div>
+                      ) : null}
                       <DashboardStreakCard
                         currentStreak={dashboardData.stats.current_streak}
                         problemsToday={dashboardData.stats.problems_solved_today}

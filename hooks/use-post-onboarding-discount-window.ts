@@ -2,14 +2,16 @@
 
 import { useLayoutEffect, useMemo, useState } from "react"
 
-const WINDOW_MS = 24 * 60 * 60 * 1000
+export const POST_ONBOARDING_DISCOUNT_WINDOW_MS = 60 * 60 * 1000
+
+const WINDOW_MS = POST_ONBOARDING_DISCOUNT_WINDOW_MS
 
 export function getPostOnboardingDiscountStorageKey(userId: string) {
   return `planck_new_user_discount_start_${userId}`
 }
 
-export function getPostOnboardingDiscountMobilePromoDismissedKey(userId: string) {
-  return `planck_new_user_discount_mobile_promo_dismissed_${userId}`
+export function getPostOnboardingDiscountMobilePromoSessionKey(userId: string) {
+  return `planck_new_user_discount_mobile_promo_session_${userId}`
 }
 
 function formatCountdown(remainingMs: number): string {
@@ -17,7 +19,12 @@ function formatCountdown(remainingMs: number): string {
   const h = Math.floor(totalSec / 3600)
   const m = Math.floor((totalSec % 3600) / 60)
   const s = totalSec % 60
-  return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":")
+
+  if (h > 0) {
+    return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":")
+  }
+
+  return [m, s].map((n) => String(n).padStart(2, "0")).join(":")
 }
 
 export function usePostOnboardingDiscountWindow(userId: string | undefined) {
@@ -34,23 +41,23 @@ export function usePostOnboardingDiscountWindow(userId: string | undefined) {
 
   return useMemo(() => {
     if (now === 0 || !userId) {
-      return { active: false as const, remainingLabel: "00:00:00" }
+      return { active: false as const, remainingLabel: "00:00" }
     }
 
     let startRaw: string | null = null
     try {
       startRaw = localStorage.getItem(getPostOnboardingDiscountStorageKey(userId))
     } catch {
-      return { active: false as const, remainingLabel: "00:00:00" }
+      return { active: false as const, remainingLabel: "00:00" }
     }
 
     if (!startRaw) {
-      return { active: false as const, remainingLabel: "00:00:00" }
+      return { active: false as const, remainingLabel: "00:00" }
     }
 
     const start = Number(startRaw)
     if (!Number.isFinite(start)) {
-      return { active: false as const, remainingLabel: "00:00:00" }
+      return { active: false as const, remainingLabel: "00:00" }
     }
 
     const end = start + WINDOW_MS
@@ -62,7 +69,7 @@ export function usePostOnboardingDiscountWindow(userId: string | undefined) {
       } catch {
         // ignore
       }
-      return { active: false as const, remainingLabel: "00:00:00" }
+      return { active: false as const, remainingLabel: "00:00" }
     }
 
     return { active: true as const, remainingLabel: formatCountdown(remainingMs) }
