@@ -100,6 +100,10 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
   const setCookieHeader = isNewAnonymousId ? buildAnonymousInsightCookieHeader(anonymousId) : null;
 
   const { sessionId: _sid, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
+  const requestSource =
+    typeof (body as Record<string, unknown>)?.source === 'string'
+      ? String((body as Record<string, unknown>).source).trim()
+      : '';
 
   const anonAttachmentPaths = Array.isArray((body as Record<string, unknown>)?.attachmentPaths)
     ? ((body as Record<string, unknown>).attachmentPaths as unknown[]).filter(
@@ -117,6 +121,7 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
   }
 
   const isIdeRequest = persona === 'ide';
+  const isMainChatDeepSeek = requestSource === 'main_chat' && !isIdeRequest;
   const useRaptorFreeTierLimits = shouldUseRaptorFreeTierLimits(persona);
 
   let userInput: string;
@@ -300,7 +305,9 @@ Asigură-te că JSON-ul este valid.`;
 
   const activeModel = isIdeRequest
     ? resolveIdeAgentModel(modelToUseParam)
-    : (modelToUseParam as 'gpt-4o' | 'gpt-4o-mini');
+    : isMainChatDeepSeek
+      ? resolveIdeAgentModel(modelToUseParam)
+      : (modelToUseParam as 'gpt-4o' | 'gpt-4o-mini');
 
   const maxTokensParam = {
     max_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 3000,
@@ -333,7 +340,7 @@ Asigură-te că JSON-ul este valid.`;
   const t0 = Date.now();
   let stream: AsyncIterable<any>;
   try {
-    const openai = isIdeRequest ? getIdeAgentClient() : getOpenAIClient();
+    const openai = isIdeRequest || isMainChatDeepSeek ? getIdeAgentClient() : getOpenAIClient();
     stream = await openai.chat.completions.create({
       model: activeModel,
       messages: chatMessages,
@@ -411,7 +418,9 @@ Asigură-te că JSON-ul este valid.`;
         const totalTokens = usage?.total_tokens ?? 0;
         const latencyMs = Date.now() - t0;
 
-        const costUSD = estimateCostUSD(inputTokens, outputTokens, { ideAgent: isIdeRequest });
+        const costUSD = estimateCostUSD(inputTokens, outputTokens, {
+          ideAgent: isIdeRequest || isMainChatDeepSeek,
+        });
 
         await admin.from('insight_logs').insert({
           user_id: null,

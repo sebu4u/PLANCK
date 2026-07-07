@@ -534,6 +534,11 @@ function CountdownUnit({ value, label }: { value: number; label: string }) {
 function PricingSection() {
   const { days, hours, minutes, seconds } = useCountdown()
 
+  const freeFeatures = [
+    "10 lecții gratuite din cursurile platformei",
+    "Catalog de probleme — fără rezolvări video",
+    "Câteva întrebări pe zi pentru Insight",
+  ]
   const plusFeatures = [
     "Acces complet la toate materiile de pe platformă",
     "Toate traseele de învățare — peste 5000+ ore de conținut",
@@ -550,7 +555,7 @@ function PricingSection() {
 
   return (
     <section id="pricing" className="bg-[#F8F7FF] py-20 sm:py-28">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <FadeInUp className="mb-4 text-center">
           <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
             Alege planul tău —{" "}
@@ -582,7 +587,42 @@ function PricingSection() {
           </div>
         </FadeInUp>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-3">
+          {/* Free card */}
+          <FadeInUp delay={0.12}>
+            <div className="relative h-full rounded-[25px] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/5 sm:p-8">
+              <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600">
+                Începe fără card
+              </div>
+              <h3 className="mt-3 text-2xl font-black tracking-tight text-gray-900">Free</h3>
+              <p className="text-sm text-gray-400">Testează platforma înainte să faci upgrade</p>
+              <div className="mt-5">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-4xl font-black tracking-tight text-gray-900">Gratuit</span>
+                </div>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  Fără card. Poți face upgrade oricând.
+                </p>
+              </div>
+              <ul className="mt-7 space-y-3">
+                {freeFeatures.map(f => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
+                      <Check className="h-3 w-3 text-gray-500" />
+                    </div>
+                    <span className="text-sm leading-snug text-gray-600">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/register"
+                className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-gray-300 border-b-[3px] border-b-[#b8bcc4] bg-white text-sm font-bold text-gray-900 transition-[background-color,border-color] hover:border-gray-400 hover:bg-gray-50"
+              >
+                Creează cont gratuit
+              </Link>
+            </div>
+          </FadeInUp>
+
           {/* Plus card */}
           <FadeInUp delay={0.15}>
             <div className="relative h-full rounded-[25px] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.10)] ring-1 ring-black/5 sm:p-8">

@@ -20,7 +20,40 @@ export type InsightMessageAttachment = {
   path: string;
   mime: string;
   kind?: InsightAttachmentKind;
+  /** Text extracted via OpenAI vision OCR (main chat DeepSeek pipeline). */
+  ocrText?: string;
 };
+
+/** Builds model-facing user text from visible content + stored OCR excerpts. */
+export function buildInsightUserTextContent(
+  content: string,
+  attachments: InsightMessageAttachment[] | null | undefined
+): string {
+  const parts: string[] = [];
+  const visible = content.trim();
+  if (visible) parts.push(visible);
+
+  const ocrBlocks = (attachments ?? [])
+    .map((a) => a.ocrText?.trim())
+    .filter((t): t is string => Boolean(t));
+
+  if (ocrBlocks.length > 0) {
+    parts.push('--- CONȚINUT EXTRAS DIN IMAGINE ---');
+    ocrBlocks.forEach((block, i) => {
+      if (ocrBlocks.length > 1) {
+        parts.push(`[Imagine ${i + 1}]\n${block}`);
+      } else {
+        parts.push(block);
+      }
+    });
+  } else if ((attachments?.length ?? 0) > 0 && !visible) {
+    parts.push(
+      '(Utilizatorul a trimis imagini cu o problemă — rezolvă pe baza conținutului extras din imagini.)'
+    );
+  }
+
+  return parts.join('\n\n') || '(Mesaj gol)';
+}
 
 const IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
 

@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } fr
 import { useAuth } from '@/components/auth-provider';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -35,17 +34,22 @@ import {
   Pencil,
   Pin,
   Trash2,
-  Paperclip,
-  Send,
   Plus,
   Home,
   PanelRightOpen,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  MAX_INSIGHT_ATTACHMENT_BYTES,
+  MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE,
+  prepareInsightImageForUpload,
+} from '@/lib/insight-client-image';
 import InsightActionButtons from '@/components/insight-action-buttons';
 import InsightProblemsDialog from '@/components/insight-problems-dialog';
 import InsightAgentPanel, { type InsightAgentPanelData } from '@/components/insight-agent-panel';
 import InsightMessageArtifacts from '@/components/insight-message-artifacts';
+import { InsightChatComposer } from '@/components/insight/insight-chat-composer';
+import { InsightChatThinking } from '@/components/insight/insight-chat-thinking';
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay';
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content';
 import { BlockMath, InlineMath } from 'react-katex';
@@ -72,6 +76,13 @@ type Session = {
   created_at: string;
   updated_at: string;
   last_message_at: string | null;
+};
+
+type PendingInsightImage = {
+  id: string;
+  file: File;
+  compressedFile?: File;
+  preview: string;
 };
 
 // Parse inline Markdown (bold, italic) - without affecting LaTeX
@@ -363,11 +374,15 @@ function InsightChatPageContent() {
   const renameInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendRef = useRef<((messageOverride?: string) => Promise<void>) | null>(null);
-  const [textareaHeight, setTextareaHeight] = useState(24); // Initial height in pixels
+  const [textareaHeight, setTextareaHeight] = useState(44);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [pendingPrefill, setPendingPrefill] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingInsightImage[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const cameraAttachmentInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const prefillParam = searchParams.get('prefill');
     const prefillTokenParam = searchParams.get('prefillToken');
@@ -735,74 +750,25 @@ function InsightChatPageContent() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy]);
 
-  // Function to adjust textarea height
+  const COMPOSER_MIN_HEIGHT = 44;
+  const COMPOSER_MAX_HEIGHT = 200;
+
   const adjustTextareaHeight = useCallback(() => {
     if (!textareaRef.current) return;
 
     const textarea = textareaRef.current;
-    const baseLineHeight = 20; // Base line height in pixels (matching style)
-    const paddingVertical = 16; // Top + bottom padding when there's content (8px * 2)
-    const lineHeightWithPadding = baseLineHeight + paddingVertical; // Total height per line
-    const maxHeight = (baseLineHeight * 10) + paddingVertical; // 10 rows maximum (UPDATED)
-    const minHeight = 28; // Fixed minimum height for one line (when empty: 20px line-height + 8px padding)
-    
-    // If textarea is empty, set fixed height and return early
-    if (!textarea.value.trim()) {
-      setTextareaHeight(minHeight);
-      textarea.style.height = `${minHeight}px`;
-      textarea.style.minHeight = `${minHeight}px`;
-      textarea.style.maxHeight = `${minHeight}px`;
-      textarea.style.overflowY = 'hidden';
-      textarea.style.overflowX = 'hidden';
-      textarea.style.paddingTop = '4px';
-      textarea.style.paddingBottom = '4px';
-      return;
-    }
-    
-    // Save current styles
-    const originalMinHeight = textarea.style.minHeight;
-    const originalHeight = textarea.style.height;
-    const originalMaxHeight = textarea.style.maxHeight;
-    
-    // Force recalculation by temporarily resetting height constraints
-    textarea.style.minHeight = '0';
-    textarea.style.maxHeight = 'none';
     textarea.style.height = 'auto';
-    
-    // Get scroll height
-    const scrollHeight = textarea.scrollHeight;
-    
-    // Restore original constraints temporarily
-    textarea.style.minHeight = originalMinHeight;
-    textarea.style.maxHeight = originalMaxHeight;
-    textarea.style.height = originalHeight;
-    
-    // If content fits within 10 rows, grow textarea
-    if (scrollHeight <= maxHeight) {
-      const newHeight = Math.max(minHeight, scrollHeight);
-      setTextareaHeight(newHeight);
-      textarea.style.height = `${newHeight}px`;
-      textarea.style.maxHeight = `${maxHeight}px`;
-      textarea.style.overflowY = 'hidden';
-      textarea.style.overflowX = 'hidden';
-      textarea.style.paddingTop = '8px';
-      textarea.style.paddingBottom = '8px';
-    } else {
-      // Show scrollbar after 10 rows
-      setTextareaHeight(maxHeight);
-      textarea.style.height = `${maxHeight}px`;
-      textarea.style.maxHeight = `${maxHeight}px`;
-      textarea.style.overflowY = 'auto';
-      textarea.style.overflowX = 'hidden';
-      textarea.style.paddingTop = '8px';
-      textarea.style.paddingBottom = '8px';
-    }
+    const nextHeight = Math.min(
+      COMPOSER_MAX_HEIGHT,
+      Math.max(COMPOSER_MIN_HEIGHT, textarea.scrollHeight)
+    );
+    setTextareaHeight(nextHeight);
   }, []);
 
   // Adjust textarea height based on content
   useEffect(() => {
     adjustTextareaHeight();
-  }, [input, adjustTextareaHeight]);
+  }, [input, pendingAttachments.length, adjustTextareaHeight]);
 
   // Initialize textarea height on mount and when chat state changes
   useEffect(() => {
@@ -1010,6 +976,14 @@ function InsightChatPageContent() {
     return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
   };
 
+  useEffect(() => {
+    if (!loadingMessage) return;
+    const timer = window.setInterval(() => {
+      setLoadingMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
+    }, 3500);
+    return () => window.clearInterval(timer);
+  }, [Boolean(loadingMessage)]);
+
   const stopGeneration = useCallback(() => {
     if (!isStreaming) return;
 
@@ -1027,10 +1001,135 @@ function InsightChatPageContent() {
     setLoadingMessage(null);
   }, [isStreaming]);
 
+  const revokePendingPreview = useCallback((preview: string) => {
+    if (preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+  }, []);
+
+  const removePendingAttachment = useCallback(
+    (id: string) => {
+      setPendingAttachments((prev) => {
+        const found = prev.find((p) => p.id === id);
+        if (found) revokePendingPreview(found.preview);
+        return prev.filter((p) => p.id !== id);
+      });
+    },
+    [revokePendingPreview]
+  );
+
+  const handleInsightAttachmentInput = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files?.length || !user) {
+        if (!user) {
+          toast({
+            title: 'Cont necesar',
+            description: 'Atașarea imaginilor în Insight este disponibilă doar după autentificare.',
+            variant: 'destructive',
+          });
+        }
+        e.target.value = '';
+        return;
+      }
+      const additions: PendingInsightImage[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (!f || !f.type.startsWith('image/')) continue;
+        let prepared: File;
+        try {
+          prepared = await prepareInsightImageForUpload(f);
+        } catch (err) {
+          const code = err instanceof Error ? err.message : '';
+          if (code === 'FILE_TOO_LARGE') {
+            toast({
+              title: 'Fișier prea mare',
+              description: `Maxim ${Math.round(MAX_INSIGHT_ATTACHMENT_BYTES / (1024 * 1024))} MB per imagine.`,
+              variant: 'destructive',
+            });
+          } else if (code === 'INVALID_TYPE') {
+            toast({
+              title: 'Fișier invalid',
+              description: 'Selectează doar imagini.',
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Eroare la procesarea imaginii',
+              description: 'Încearcă alt format sau o imagine mai mică.',
+              variant: 'destructive',
+            });
+          }
+          continue;
+        }
+        const preview = URL.createObjectURL(prepared);
+        additions.push({
+          id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+          file: f,
+          compressedFile: prepared,
+          preview,
+        });
+      }
+      if (additions.length === 0) {
+        e.target.value = '';
+        return;
+      }
+      setPendingAttachments((prev) => {
+        const room = MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE - prev.length;
+        if (room <= 0) {
+          additions.forEach((a) => revokePendingPreview(a.preview));
+          toast({
+            title: 'Prea multe imagini',
+            description: `Maxim ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE} imagini per mesaj.`,
+            variant: 'destructive',
+          });
+          return prev;
+        }
+        const take = additions.slice(0, room);
+        if (additions.length > room) {
+          additions.slice(room).forEach((a) => revokePendingPreview(a.preview));
+          toast({
+            title: 'Prea multe imagini',
+            description: `Maxim ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE} imagini per mesaj.`,
+            variant: 'destructive',
+          });
+        }
+        return [...prev, ...take];
+      });
+      e.target.value = '';
+    },
+    [user, toast, revokePendingPreview]
+  );
+
+  const openAttachmentPicker = useCallback(() => {
+    if (!user) {
+      toast({
+        title: 'Cont necesar',
+        description: 'Atașarea imaginilor în Insight este disponibilă doar după autentificare.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!busy && !uploadingAttachments) {
+      attachmentInputRef.current?.click();
+    }
+  }, [user, busy, uploadingAttachments, toast]);
+
+  const canSendMessage =
+    Boolean(input.trim()) || pendingAttachments.length > 0;
+
   const send = async (overrideMessage?: string) => {
     const messageSource = typeof overrideMessage === 'string' ? overrideMessage : input;
     const trimmedMessage = messageSource.trim();
-    if (!trimmedMessage || busy) return;
+    const attachmentsSnapshot = [...pendingAttachments];
+    if ((!trimmedMessage && attachmentsSnapshot.length === 0) || busy) return;
+
+    if (!user && attachmentsSnapshot.length > 0) {
+      toast({
+        title: 'Cont necesar',
+        description: 'Atașarea imaginilor necesită autentificare.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -1058,32 +1157,18 @@ function InsightChatPageContent() {
         }
       }
 
-      const newUserMsg: ChatMessage = {
-        role: 'user',
-        content: trimmedMessage,
-      };
-
-      setMessages((prev) => [...prev, newUserMsg]);
-      setInput('');
-
-      // Add empty assistant message that will be updated incrementally
-      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
-      
-      // Set random loading message
-      setLoadingMessage(getRandomLoadingMessage());
-
       if (!isGuest && accessToken) {
         if (!currentSessionId) {
-          const autoTitle = newUserMsg.content.slice(0, 60) || 'New Chat';
+          const autoTitle =
+            trimmedMessage.slice(0, 60) ||
+            (attachmentsSnapshot.length > 0 ? 'Insight — imagini' : 'New Chat');
           const createRes = await fetch('/api/insight/sessions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({
-              title: autoTitle,
-            }),
+            body: JSON.stringify({ title: autoTitle }),
           });
 
           if (!createRes.ok) {
@@ -1103,6 +1188,58 @@ function InsightChatPageContent() {
         }
       }
 
+      let uploadedPaths: string[] = [];
+      if (!isGuest && attachmentsSnapshot.length > 0) {
+        if (!currentSessionId) {
+          throw new Error('Sesiunea lipsește pentru încărcarea imaginilor.');
+        }
+        setUploadingAttachments(true);
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          const uid = userData.user?.id;
+          if (!uid) {
+            throw new Error('Utilizator necunoscut.');
+          }
+          for (const item of attachmentsSnapshot) {
+            const file = item.compressedFile ?? item.file;
+            const ext =
+              file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+            const path = `${uid}/${currentSessionId}/${crypto.randomUUID()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from(INSIGHT_ATTACHMENTS_BUCKET)
+              .upload(path, file, {
+                contentType: file.type || 'image/jpeg',
+                upsert: false,
+              });
+            if (upErr) {
+              throw new Error(upErr.message || 'Eroare la încărcarea imaginii.');
+            }
+            uploadedPaths.push(path);
+          }
+        } finally {
+          setUploadingAttachments(false);
+        }
+      }
+
+      const attachmentRefs: InsightChatImageRef[] =
+        uploadedPaths.length > 0
+          ? uploadedPaths.map((path, idx) => ({
+              storagePath: path,
+              previewUrl: attachmentsSnapshot[idx]!.preview,
+            }))
+          : [];
+
+      const newUserMsg: ChatMessage = {
+        role: 'user',
+        content: trimmedMessage,
+        ...(attachmentRefs.length ? { attachments: attachmentRefs } : {}),
+      };
+
+      setMessages((prev) => [...prev, newUserMsg]);
+      if (!overrideMessage) setInput('');
+      setPendingAttachments([]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+      setLoadingMessage(getRandomLoadingMessage());
       setIsStreaming(true);
 
       const fetchHeaders: Record<string, string> = {
@@ -1122,10 +1259,13 @@ function InsightChatPageContent() {
         headers: fetchHeaders,
         body: JSON.stringify(
           isGuest
-            ? { messages: [...guestPrior, newUserMsg] }
+            ? { messages: [...guestPrior, newUserMsg], source: 'main_chat' }
             : {
                 sessionId: currentSessionId,
-                input: newUserMsg.content,
+                input: trimmedMessage,
+                visibleInput: trimmedMessage,
+                source: 'main_chat',
+                ...(uploadedPaths.length ? { attachmentPaths: uploadedPaths } : {}),
               }
         ),
         signal: controller.signal,
@@ -1138,7 +1278,14 @@ function InsightChatPageContent() {
         if (data.resetTime) {
           setPremiumUpgradeOpen(true);
           setError(null);
-          setMessages((prev) => prev.slice(0, -1));
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            const secondLast = prev[prev.length - 2];
+            if (last?.role === 'assistant' && secondLast?.role === 'user') {
+              return prev.slice(0, -2);
+            }
+            return prev.slice(0, -1);
+          });
         } else {
           setError(data.error || 'Limită zilnică atinsă.');
           setMessages((prev) => {
@@ -1160,6 +1307,14 @@ function InsightChatPageContent() {
 
       if (!res.ok) {
         const data = await res.json();
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          const secondLast = prev[prev.length - 2];
+          if (last?.role === 'assistant' && secondLast?.role === 'user') {
+            return prev.slice(0, -2);
+          }
+          return prev;
+        });
         throw new Error(data.error || 'Eroare la Insight.');
       }
 
@@ -1331,12 +1486,43 @@ function InsightChatPageContent() {
     void sendRef.current?.(message);
   }, [pendingPrefill, loadingSession, busy, authLoading]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleComposerKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
     }
   };
+
+  const openCameraPicker = useCallback(() => {
+    if (user && !busy && !uploadingAttachments) {
+      cameraAttachmentInputRef.current?.click();
+    }
+  }, [user, busy, uploadingAttachments]);
+
+  const composerPlaceholder = isMobile ? 'Ask Insight' : 'What do you want to know?';
+
+  const renderChatComposer = () => (
+    <InsightChatComposer
+      input={input}
+      onInputChange={setInput}
+      onKeyDown={handleComposerKeyDown}
+      textareaRef={textareaRef}
+      textareaHeight={textareaHeight}
+      pendingAttachments={pendingAttachments}
+      onRemoveAttachment={removePendingAttachment}
+      onOpenAttachmentPicker={openAttachmentPicker}
+      onOpenCamera={openCameraPicker}
+      onSend={() => send()}
+      onStop={stopGeneration}
+      busy={busy}
+      isStreaming={isStreaming}
+      uploadingAttachments={uploadingAttachments}
+      canSend={canSendMessage}
+      user={user}
+      isMobile={isMobile}
+      placeholder={composerPlaceholder}
+    />
+  );
 
   const filteredSessions = sessions.filter((s) =>
     s.title?.toLowerCase().includes(searchQuery.toLowerCase()) || !searchQuery
@@ -1360,6 +1546,22 @@ function InsightChatPageContent() {
 
   return (
     <div className="h-screen-mobile bg-[#141414] text-white flex overflow-hidden">
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        onChange={handleInsightAttachmentInput}
+      />
+      <input
+        ref={cameraAttachmentInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="environment"
+        className="hidden"
+        onChange={handleInsightAttachmentInput}
+      />
       <style dangerouslySetInnerHTML={{__html: `
         .sidebar-scrollable::-webkit-scrollbar {
           width: 3px;
@@ -1765,36 +1967,31 @@ function InsightChatPageContent() {
                       key={i}
                       className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
                       style={{
-                        ...(isLastAssistantMessage ? { paddingBottom: '70px' } : {}),
-                        ...(isFirstMessage ? { paddingTop: '64px' } : {})
+                        ...(isLastAssistantMessage ? { paddingBottom: '140px' } : {}),
+                        ...(isFirstMessage ? { paddingTop: '64px' } : {}),
                       }}
                     >
                       {isAssistant ? (
                         <div className="w-full py-2">
-                          <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">
-                            {m.content === '' && loadingMessage ? (
-                              <span className="flex items-center gap-2">
-                                <span className="shimmer-text">{loadingMessage}</span>
-                                <span className="flex gap-1">
-                                  <span className="animate-pulse">●</span>
-                                  <span className="animate-pulse delay-75">●</span>
-                                  <span className="animate-pulse delay-150">●</span>
-                                </span>
-                              </span>
-                            ) : (
-                              'Insight'
-                            )}
-                          </div>
-                          {m.content && (
-                            <AnonLimitLockedContent active={Boolean(m.anonLimitLocked)}>
-                              <MessageContent content={m.content} />
-                            </AnonLimitLockedContent>
+                          {m.content === '' && loadingMessage ? (
+                            <InsightChatThinking message={loadingMessage} />
+                          ) : (
+                            <>
+                              <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">
+                                Insight
+                              </div>
+                              {m.content && (
+                                <AnonLimitLockedContent active={Boolean(m.anonLimitLocked)}>
+                                  <MessageContent content={m.content} />
+                                </AnonLimitLockedContent>
+                              )}
+                            </>
                           )}
                           <InsightMessageArtifacts artifacts={m.agentArtifacts} />
                         </div>
                       ) : (
-                        <div className="max-w-[70%] rounded-3xl bg-[#212121] text-white px-4 py-3 shadow-sm">
-                          <div className="text-xs uppercase tracking-wide text-gray-400 mb-2 opacity-70">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md border border-white/[0.06] bg-[#1c1c1c] px-4 py-3 text-white shadow-sm">
+                          <div className="mb-2 text-xs uppercase tracking-wide text-gray-500 opacity-80">
                             Tu
                           </div>
                           {m.attachments && m.attachments.length > 0 && (
@@ -1851,66 +2048,16 @@ function InsightChatPageContent() {
 
         {/* Chatbar */}
         {hasMessages ? (
-          // Floating chatbar when messages exist
-          <div className="absolute bottom-0 left-0 right-0 px-8 py-4 pointer-events-none">
-            <div className="max-w-3xl mx-auto">
-              <div className={`relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 drop-shadow-lg max-[600px]:mt-4 ${input.trim() && textareaHeight > 40 ? 'rounded-2xl' : 'rounded-full'}`}>
-                <button
-                  className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
-                  disabled
-                  title="Atașează fișier (în curând)"
-                >
-                  <Paperclip className="w-4 h-4 text-white" />
-                </button>
-                <Textarea
-                  ref={textareaRef}
-                  placeholder={isMobile ? "Ask Insight" : "What do you want to know?"}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  rows={1}
-                  className="flex-1 bg-transparent border-0 text-white placeholder:text-[#8e8e8e] resize-none focus-visible:ring-0 focus-visible:ring-offset-0 self-center mb-0.5"
-                  disabled={busy}
-                  style={{ 
-                    minHeight: '24px', 
-                    height: input.trim() ? `${textareaHeight}px` : '24px',
-                    maxHeight: input.trim() ? '216px' : '24px',
-                    overflowY: input.trim() && textareaHeight > 20 * 10 ? 'auto' : 'hidden',
-                    overflowX: 'hidden',
-                    fontSize: '14px',
-                    lineHeight: '24px',
-                    paddingTop: input.trim() ? '8px' : '0px',
-                    paddingBottom: input.trim() ? '8px' : '0px',
-                    paddingLeft: '0.75rem',
-                    paddingRight: '0.75rem',
-                    display: 'block'
-                  }}
-                />
-                {busy && isStreaming ? (
-                  <button
-                    onClick={stopGeneration}
-                    className="p-2 rounded transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
-                    title="Oprește răspunsul"
-                  >
-                    <span className="flex items-center justify-center w-5 h-5">
-                      <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
-                        <span className="w-2 h-2 bg-black" />
-                      </span>
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => send()}
-                    disabled={busy || !input.trim()}
-                    className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
-                  >
-                    <Send className="w-4 h-4 text-white" />
-                  </button>
-                )}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 px-4 pb-4 pt-10 sm:px-8 sm:pb-5">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#141414] via-[#141414]/90 to-transparent" />
+            <div className="relative mx-auto max-w-3xl pointer-events-auto">
+              {renderChatComposer()}
+              <div className="pointer-events-auto mt-2 hidden text-center text-xs text-[#6b6b6b] max-[600px]:block">
+                Enter pentru trimitere · Shift+Enter linie nouă
               </div>
-              <div className="text-xs text-[#7e7e7e] mt-2 text-center pointer-events-auto max-[600px]:hidden">
-                Plan Free: limită 3 mesaje/zi. Apasă Enter pentru a trimite, Shift+Enter pentru
-                linie nouă.
+              <div className="pointer-events-auto mt-2 hidden text-center text-xs text-[#6b6b6b] max-[600px]:hidden">
+                Plan Free: limită 3 mesaje/zi. Apasă Enter pentru a trimite, Shift+Enter pentru linie
+                nouă.
               </div>
             </div>
           </div>
@@ -1923,60 +2070,7 @@ function InsightChatPageContent() {
                 {formatWelcomeText(welcomeText)}
               </div>
               <div className="w-full">
-                <div className={`relative flex items-end gap-2 bg-[#212121] border border-[#2f2f2f] p-3 shadow-lg backdrop-blur-sm pointer-events-auto hover:shadow-xl hover:border-[#2f2f2f] transition-all duration-200 ${input.trim() && textareaHeight > 40 ? 'rounded-2xl' : 'rounded-full'}`}>
-                  <button
-                    className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
-                    disabled
-                    title="Atașează fișier (în curând)"
-                  >
-                    <Paperclip className="w-4 h-4 text-white" />
-                  </button>
-                  <Textarea
-                    ref={textareaRef}
-                    placeholder={isMobile ? "Ask Insight" : "What do you want to know?"}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    rows={1}
-                    className="flex-1 bg-transparent border-0 text-white placeholder:text-[#8e8e8e] resize-none focus-visible:ring-0 focus-visible:ring-offset-0 self-center mb-0.5"
-                    disabled={busy}
-                    style={{ 
-                      minHeight: '24px', 
-                      height: input.trim() ? `${textareaHeight}px` : '24px',
-                      maxHeight: input.trim() ? '216px' : '24px',
-                      overflowY: input.trim() && textareaHeight > 20 * 10 ? 'auto' : 'hidden',
-                      overflowX: 'hidden',
-                      fontSize: '14px',
-                      lineHeight: '24px',
-                      paddingTop: input.trim() ? '8px' : '0px',
-                      paddingBottom: input.trim() ? '8px' : '0px',
-                      paddingLeft: '0.75rem',
-                      paddingRight: '0.75rem',
-                      display: 'block'
-                    }}
-                  />
-                  {busy && isStreaming ? (
-                    <button
-                      onClick={stopGeneration}
-                      className="p-2 rounded transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
-                      title="Oprește răspunsul"
-                    >
-                      <span className="flex items-center justify-center w-5 h-5">
-                        <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
-                          <span className="w-2 h-2 bg-black" />
-                        </span>
-                      </span>
-                    </button>
-                  ) : (
-                  <button
-                    onClick={() => send()}
-                      disabled={busy || !input.trim()}
-                      className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
-                    >
-                      <Send className="w-4 h-4 text-white" />
-                    </button>
-                  )}
-                </div>
+                {renderChatComposer()}
                 {/* Action Buttons */}
                 <InsightActionButtons
                   onThinkDeeper={handleThinkDeeper}

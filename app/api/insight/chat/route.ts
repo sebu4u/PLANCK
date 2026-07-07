@@ -36,10 +36,16 @@ import {
 import { ensureInsightAgentProfile, loadInsightAgentProfile } from '@/lib/insight/agent/profile';
 import {
   buildInsightAttachmentRecords,
+  buildInsightUserTextContent,
   createSignedUrlsForInsightPaths,
   validateInsightAttachmentPathsForSession,
   type InsightMessageAttachment,
 } from '@/lib/insight-attachments';
+import {
+  enrichInsightAttachmentsWithOcr,
+  enrichInsightAttachmentsWithOcrAndUsage,
+  type OcrUsageMetrics,
+} from '@/lib/insight-image-ocr';
 import {
   buildIdeAgentSystemPrompt,
   getIdeAgentClient,
@@ -69,6 +75,15 @@ function toChatCompletionsMessages(
     content: m.content,
   }));
 }
+
+const MAIN_CHAT_VISION_APPENDIX = `
+
+IMAGINI / PROBLEME DIN FOTOGRAFII:
+Utilizatorul poate trimite fotografii cu enunțuri de probleme sau rezolvări scrise de mână. Conținutul imaginilor îți este furnizat ca text transcris (OCR) în mesaj.
+1) Rezolvă problema pas cu pas sau verifică rezolvarea, după intenția utilizatorului.
+2) Folosește LaTeX în $...$ / $$...$$ pentru formule.
+3) Dacă OCR-ul marchează zone ilizibile, menționează ce informații lipsesc.
+4) Răspunde util și complet; adaptează stilul (ghidare vs. soluție directă) la cererea utilizatorului.`;
 
 const PROBLEM_TUTOR_VISION_APPENDIX = `
 
@@ -125,6 +140,28 @@ async function insightHistoryToOpenAIMessages(
 
 function threadHasVisionAttachments(rows: InsightHistoryRow[]): boolean {
   return rows.some((r) => r.role === 'user' && Array.isArray(r.attachments) && r.attachments.length > 0);
+}
+
+async function insightHistoryToTextMessages(
+  supabase: SupabaseClient,
+  rows: InsightHistoryRow[]
+): Promise<ChatCompletionMessageParam[]> {
+  const out: ChatCompletionMessageParam[] = [];
+  for (const m of rows) {
+    if (m.role === 'user') {
+      let attachments = m.attachments;
+      if (attachments?.length && attachments.some((a) => !a.ocrText?.trim())) {
+        attachments = await enrichInsightAttachmentsWithOcr(supabase, attachments);
+      }
+      out.push({
+        role: 'user',
+        content: buildInsightUserTextContent(m.content, attachments),
+      });
+    } else {
+      out.push({ role: m.role as 'assistant' | 'system', content: m.content });
+    }
+  }
+  return out;
 }
 
 /**
@@ -201,6 +238,10 @@ export async function POST(req: NextRequest) {
     const userPlan = await resolvePlanForRequest(supabase, accessToken);
 
     const { sessionId, input, messages, maxOutputTokens, persona, contextMessages, mode } = body || {};
+    const requestSource =
+      typeof (body as Record<string, unknown>).source === 'string'
+        ? String((body as Record<string, unknown>).source).trim()
+        : '';
     const rawVisibleInput =
       typeof (body as Record<string, unknown>).visibleInput === 'string'
         ? String((body as Record<string, unknown>).visibleInput).trim()
@@ -215,6 +256,7 @@ export async function POST(req: NextRequest) {
 
     // Check if this is from IDE - IDE messages should not be saved to chat history
     const isIdeRequest = persona === 'ide';
+    const isMainChatDeepSeek = requestSource === 'main_chat' && !isIdeRequest;
     const personaKey = typeof persona === 'string' ? persona : null;
     const isFocusedTutorPersona = personaKey === 'problem_tutor' || personaKey === 'lesson_tutor';
 
@@ -268,6 +310,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let ocrUsage: OcrUsageMetrics | null = null;
+
     // Handle session: create if needed, validate ownership if exists
     // Skip session handling for IDE requests as they don't need persistent history
     if (!isIdeRequest) {
@@ -319,6 +363,28 @@ export async function POST(req: NextRequest) {
         if (attachmentsPayload.length !== rawAttachmentPaths.length) {
           return NextResponse.json({ error: 'Atașamentele nu au putut fi validate.' }, { status: 400 });
         }
+
+        if (isMainChatDeepSeek) {
+          try {
+            const ocrResult = await enrichInsightAttachmentsWithOcrAndUsage(
+              supabase,
+              attachmentsPayload
+            );
+            attachmentsPayload = ocrResult.attachments;
+            ocrUsage = ocrResult.ocrUsage;
+            userInput = buildInsightUserTextContent(visibleUserInput, attachmentsPayload);
+          } catch (ocrErr: unknown) {
+            logger.error('Insight main chat OCR error:', ocrErr);
+            return NextResponse.json(
+              {
+                error:
+                  'Nu am putut citi conținutul imaginilor. Încearcă o poză mai clară sau adaugă text.',
+              },
+              { status: 502 }
+            );
+          }
+        }
+
         logger.info('Insight chat: user message with image attachments', {
           count: rawAttachmentPaths.length,
           sessionId: resolvedSessionId,
@@ -603,6 +669,13 @@ Asigură-te că JSON-ul este valid.`;
       );
     }
 
+    const hasAnyImagesInContext =
+      threadHasVisionAttachments(history) || rawAttachmentPaths.length > 0;
+
+    if (isMainChatDeepSeek && hasAnyImagesInContext) {
+      systemMessage.content += MAIN_CHAT_VISION_APPENDIX;
+    }
+
     const sanitizedContextMessages = Array.isArray(contextMessages)
       ? contextMessages
         .filter(
@@ -622,42 +695,85 @@ Asigură-te că JSON-ul este valid.`;
     const lastHistoryMessage = history.length > 0 ? history[history.length - 1] : null;
     const isLastMessageCurrentUser =
       lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === visibleUserInput;
-    const historyForOpenAI = isLastMessageCurrentUser
-      ? history.map((row, index) =>
-          index === history.length - 1
-            ? {
-                ...row,
-                content: userInput,
-              }
-            : row
-        )
-      : history;
 
-    let historyOpenAI: ChatCompletionMessageParam[] = [];
-    let trailingUser: ChatCompletionMessageParam[] = [];
-    try {
-      historyOpenAI = await insightHistoryToOpenAIMessages(supabase, historyForOpenAI);
-      if (!isLastMessageCurrentUser) {
-        const trailingAttachments =
-          rawAttachmentPaths.length > 0 ? buildInsightAttachmentRecords(rawAttachmentPaths) : null;
-        trailingUser = [
-          await openAIUserMessageFromRow(supabase, userInput, trailingAttachments),
-        ];
+    let finalMessages: ChatCompletionMessageParam[] = [];
+
+    if (isMainChatDeepSeek) {
+      const historyForText = isLastMessageCurrentUser
+        ? history.map((row, index) =>
+            index === history.length - 1
+              ? {
+                  ...row,
+                  content: visibleUserInput,
+                }
+              : row
+          )
+        : history;
+
+      let historyText: ChatCompletionMessageParam[] = [];
+      let trailingUserText: ChatCompletionMessageParam[] = [];
+      try {
+        historyText = await insightHistoryToTextMessages(supabase, historyForText);
+        if (!isLastMessageCurrentUser) {
+          trailingUserText = [
+            {
+              role: 'user' as const,
+              content: userInput,
+            },
+          ];
+        }
+      } catch (textErr: unknown) {
+        logger.error('Insight main chat text/OCR history error:', textErr);
+        return NextResponse.json(
+          { error: 'Nu am putut pregăti mesajele pentru chat. Încearcă din nou.' },
+          { status: 502 }
+        );
       }
-    } catch (visionErr: unknown) {
-      logger.error('Insight vision / signed URL error:', visionErr);
-      return NextResponse.json(
-        { error: 'Nu am putut pregăti imaginile pentru analiză. Încearcă din nou.' },
-        { status: 502 }
-      );
-    }
 
-    const finalMessages: ChatCompletionMessageParam[] = [
-      systemMessage,
-      ...toChatCompletionsMessages(sanitizedContextMessages),
-      ...historyOpenAI,
-      ...trailingUser,
-    ];
+      finalMessages = [
+        systemMessage,
+        ...toChatCompletionsMessages(sanitizedContextMessages),
+        ...historyText,
+        ...trailingUserText,
+      ];
+    } else {
+      const historyForOpenAI = isLastMessageCurrentUser
+        ? history.map((row, index) =>
+            index === history.length - 1
+              ? {
+                  ...row,
+                  content: userInput,
+                }
+              : row
+          )
+        : history;
+
+      let historyOpenAI: ChatCompletionMessageParam[] = [];
+      let trailingUser: ChatCompletionMessageParam[] = [];
+      try {
+        historyOpenAI = await insightHistoryToOpenAIMessages(supabase, historyForOpenAI);
+        if (!isLastMessageCurrentUser) {
+          const trailingAttachments =
+            rawAttachmentPaths.length > 0 ? buildInsightAttachmentRecords(rawAttachmentPaths) : null;
+          trailingUser = [
+            await openAIUserMessageFromRow(supabase, userInput, trailingAttachments),
+          ];
+        }
+      } catch (visionErr: unknown) {
+        logger.error('Insight vision / signed URL error:', visionErr);
+        return NextResponse.json(
+          { error: 'Nu am putut pregăti imaginile pentru analiză. Încearcă din nou.' },
+          { status: 502 }
+        );
+      }
+
+      finalMessages = [
+        systemMessage,
+        ...toChatCompletionsMessages(sanitizedContextMessages),
+        ...historyOpenAI,
+        ...trailingUser,
+      ];
+    }
 
     // Validate that messages array is not empty and has at least one user message
     if (!finalMessages || finalMessages.length === 0) {
@@ -677,20 +793,19 @@ Asigură-te că JSON-ul este valid.`;
       );
     }
 
-    const hasAnyImagesInContext =
-      threadHasVisionAttachments(history) || rawAttachmentPaths.length > 0;
-
     let activeModel = isIdeRequest
       ? resolveIdeAgentModel(modelToUseParam)
-      : modelToUseParam === 'deep-thinking'
-        ? 'gpt-4o'
-        : modelToUseParam;
-    if (hasAnyImagesInContext && !isIdeRequest) {
+      : isMainChatDeepSeek
+        ? resolveIdeAgentModel(modelToUseParam)
+        : modelToUseParam === 'deep-thinking'
+          ? 'gpt-4o'
+          : modelToUseParam;
+    if (hasAnyImagesInContext && !isIdeRequest && !isMainChatDeepSeek) {
       activeModel = 'gpt-4o';
     }
 
-    // For "deep-thinking" mode on non-IDE personas, inject Chain of Thought instructions
-    if (!isIdeRequest && modelToUseParam === 'deep-thinking') {
+    // For "deep-thinking" mode on non-IDE, non-main-chat personas, inject Chain of Thought instructions
+    if (!isIdeRequest && !isMainChatDeepSeek && modelToUseParam === 'deep-thinking') {
       const deepBlock =
         '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
       systemMessage.content += deepBlock;
@@ -716,7 +831,8 @@ Asigură-te că JSON-ul este valid.`;
     const t0 = Date.now();
     let stream: any;
     try {
-      const openai = isIdeRequest ? getIdeAgentClient() : getOpenAIClient();
+      const openai =
+        isIdeRequest || isMainChatDeepSeek ? getIdeAgentClient() : getOpenAIClient();
 
       const completionParams: any = {
         model: activeModel,
@@ -895,10 +1011,16 @@ Asigură-te că JSON-ul este valid.`;
               outputTokens,
             });
           }
-          const costUSD = estimateCostUSD(inputTokens, outputTokens, {
-            insightVisionImagesApprox: imagesInThread,
-            ideAgent: isIdeRequest,
-          });
+          const costUSD =
+            estimateCostUSD(inputTokens, outputTokens, {
+              insightVisionImagesApprox: isMainChatDeepSeek ? 0 : imagesInThread,
+              ideAgent: isIdeRequest || isMainChatDeepSeek,
+            }) +
+            (ocrUsage
+              ? estimateCostUSD(ocrUsage.inputTokens, ocrUsage.outputTokens, {
+                  insightVisionImagesApprox: rawAttachmentPaths.length,
+                })
+              : 0);
 
           // Log individual request
           await supabase.from('insight_logs').insert({
