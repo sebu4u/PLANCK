@@ -99,3 +99,23 @@ export function buildGradeProjection(
 export function formatGrade(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
+
+/** Inverse of estimateGradeFromElo — binary search with 0.05 tolerance. */
+export function eloFromGrade(targetGrade: number): number {
+  const goal = clampGrade(targetGrade)
+  let low = 0
+  let high = 25_000
+
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2)
+    if (estimateGradeFromElo(mid) < goal) {
+      low = mid
+    } else {
+      high = mid
+    }
+  }
+
+  const lowDiff = Math.abs(estimateGradeFromElo(low) - goal)
+  const highDiff = Math.abs(estimateGradeFromElo(high) - goal)
+  return lowDiff <= highDiff ? low : high
+}

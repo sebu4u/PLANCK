@@ -691,7 +691,7 @@ export async function acceptParentInvite(params: {
 
   const { data: childProfile } = await admin
     .from("profiles")
-    .select("user_type")
+    .select("user_type, onboarding_target_grade")
     .eq("user_id", params.childUserId)
     .maybeSingle()
 
@@ -714,11 +714,17 @@ export async function acceptParentInvite(params: {
     }
   }
 
+  const childTargetGrade =
+    typeof childProfile?.onboarding_target_grade === "number" &&
+    Number.isFinite(childProfile.onboarding_target_grade)
+      ? Math.round(childProfile.onboarding_target_grade * 10) / 10
+      : 9
+
   const now = new Date().toISOString()
   if (existing?.id) {
     await admin
       .from("parent_child_relationships")
-      .update({ status: "active", accepted_at: now })
+      .update({ status: "active", accepted_at: now, target_grade: childTargetGrade })
       .eq("id", existing.id)
   } else {
     const { error } = await admin.from("parent_child_relationships").insert({
@@ -726,6 +732,7 @@ export async function acceptParentInvite(params: {
       child_id: params.childUserId,
       status: "active",
       accepted_at: now,
+      target_grade: childTargetGrade,
     })
     if (error) {
       throw new Error("RELATIONSHIP_CREATE_FAILED")

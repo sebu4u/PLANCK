@@ -12,13 +12,15 @@ import {
 type LiveStatsProps = {
   variant?: "dark" | "light"
   centerOnMobile?: boolean
+  /** Skip scroll-triggered fade; show immediately (e.g. onboarding). */
+  instant?: boolean
 }
 
 function formatCount(value: number) {
   return value.toLocaleString("ro-RO")
 }
 
-export function LiveStats({ variant = "dark", centerOnMobile = false }: LiveStatsProps) {
+export function LiveStats({ variant = "dark", centerOnMobile = false, instant = false }: LiveStatsProps) {
   const isLight = variant === "light"
   const labelClassName = isLight ? "text-gray-600" : "text-gray-300"
   const valueClassName = isLight ? "text-gray-900" : "text-white"
@@ -45,9 +47,9 @@ export function LiveStats({ variant = "dark", centerOnMobile = false }: LiveStat
 
   return (
     <div
-      className={`scroll-animate-fade-up mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 ${
-        centerOnMobile ? "justify-center lg:justify-start" : "justify-start"
-      }`}
+      className={`flex flex-wrap items-center gap-x-6 gap-y-2 ${
+        instant ? "mb-0" : "scroll-animate-fade-up mb-6"
+      } ${centerOnMobile ? "justify-center lg:justify-start" : "justify-start"}`}
     >
       <div className="flex items-center gap-2">
         <span className="relative flex h-2 w-2 shrink-0" aria-hidden>

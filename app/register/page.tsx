@@ -7,11 +7,20 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
-import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
-import { supabase } from "@/lib/supabaseClient"
+import { OnboardingAccountStep } from "@/components/onboarding/onboarding-account-step"
+import { OnboardingGradeSliderStep } from "@/components/onboarding/onboarding-grade-slider-step"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
 import { OnboardingPostAuthSplash } from "@/components/onboarding/OnboardingPostAuthSplash"
+import { StudentTestimonialsStep } from "@/components/onboarding/student-testimonials-step"
+import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
+import { supabase } from "@/lib/supabaseClient"
+import {
+  clampSelfGrade,
+  clampTargetGrade,
+  defaultTargetGrade,
+} from "@/lib/student-onboarding-plan"
+import { formatGrade } from "@/lib/parent/grade-estimate"
 import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding-discount-window"
 import {
   getPostOnboardingLearningPathItemHref,
@@ -31,15 +40,22 @@ import {
 type SubjectOption = OnboardingSubjectId
 type GradeOption = "9" | "10" | "11" | "12"
 type DailyTimeOption = "15" | "30" | "60"
-type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | "name"
+type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | "name"
 
 type OnboardingState = {
   step: RegisterStep
   subject: SubjectOption | null
   grade: GradeOption | null
+  selfGrade: number | null
+  targetGrade: number | null
   dailyTime: DailyTimeOption | null
   awaitingPostAuth: boolean
 }
+
+const PROGRESS_STEPS = 8
+const ACCOUNT_STEP = 9
+const SPLASH_STEP = 10
+const DEFAULT_SELF_GRADE = 7
 
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
 const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
@@ -48,6 +64,8 @@ const defaultOnboardingState: OnboardingState = {
   step: 1,
   subject: null,
   grade: null,
+  selfGrade: null,
+  targetGrade: null,
   dailyTime: null,
   awaitingPostAuth: false,
 }
@@ -78,14 +96,27 @@ const mainCtaClassName =
 const choiceButtonClassName =
   "w-full rounded-full border px-5 py-3 text-left text-sm font-semibold transition-colors"
 
-const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 =>
+const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 =>
   typeof step === "number"
+
+const LEGACY_STEP_MAP: Record<number, RegisterStep> = {
+  6: ACCOUNT_STEP,
+  7: SPLASH_STEP,
+}
 
 const sanitizeStep = (value: unknown): RegisterStep => {
   if (value === "name") return "name"
   if (value === 0 || value === "coming_soon") return 1
-  if (typeof value === "number" && value >= 1 && value <= 7) return value as RegisterStep
+  if (typeof value === "number") {
+    if (value >= 1 && value <= 10) return value as RegisterStep
+    if (LEGACY_STEP_MAP[value]) return LEGACY_STEP_MAP[value]
+  }
   return 1
+}
+
+const sanitizeGradeValue = (value: unknown): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null
+  return clampSelfGrade(value)
 }
 
 const sanitizeSubject = (value: unknown): SubjectOption | null =>
@@ -256,6 +287,8 @@ function RegisterPageContent() {
           step: sanitizeStep(decoded.step),
           subject: sanitizeSubject(decoded.subject),
           grade: sanitizeGrade(decoded.grade),
+          selfGrade: sanitizeGradeValue(decoded.selfGrade),
+          targetGrade: sanitizeGradeValue(decoded.targetGrade),
           dailyTime: sanitizeDailyTime(decoded.dailyTime),
           awaitingPostAuth: Boolean(decoded.awaitingPostAuth),
         }
@@ -268,29 +301,29 @@ function RegisterPageContent() {
       const oauthFromRegister =
         localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1" ||
         parsedState.awaitingPostAuth ||
-        parsedState.step === 7
+        parsedState.step === SPLASH_STEP
       if (oauthFromRegister) {
-        parsedState.step = 7
+        parsedState.step = SPLASH_STEP
         parsedState.awaitingPostAuth = false
       } else {
         parsedState.step = 2
         parsedState.awaitingPostAuth = false
       }
     } else if (shouldForcePostAuthStep) {
-      parsedState.step = 7
+      parsedState.step = SPLASH_STEP
       parsedState.awaitingPostAuth = true
     } else if (
       user &&
       (parsedState.awaitingPostAuth || localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1") &&
       parsedState.step !== "name"
     ) {
-      parsedState.step = 7
+      parsedState.step = SPLASH_STEP
       parsedState.awaitingPostAuth = false
     }
 
     const wasInAccountCreationFlow =
-      parsedState.step === 6 ||
-      parsedState.step === 7 ||
+      parsedState.step === ACCOUNT_STEP ||
+      parsedState.step === SPLASH_STEP ||
       parsedState.step === "name" ||
       parsedState.awaitingPostAuth
     if (!user && wasInAccountCreationFlow && !parsedState.awaitingPostAuth) {
@@ -358,19 +391,21 @@ function RegisterPageContent() {
       shouldForcePostAuthStep ||
       onboardingState.awaitingPostAuth ||
       oauthFromRegister ||
-      onboardingState.step === 7 ||
+      onboardingState.step === SPLASH_STEP ||
       onboardingState.step === "name"
     const isAuthenticatedOnboardingStep =
       onboardingState.step === 2 ||
       onboardingState.step === 3 ||
       onboardingState.step === 4 ||
+      onboardingState.step === 5 ||
+      onboardingState.step === 6 ||
       onboardingState.step === "name"
 
-    if (oauthFromRegister && onboardingState.step !== 7 && onboardingState.step !== "name") {
+    if (oauthFromRegister && onboardingState.step !== SPLASH_STEP && onboardingState.step !== "name") {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
-        step: 7,
+        step: SPLASH_STEP,
         awaitingPostAuth: false,
       }))
       return
@@ -394,7 +429,7 @@ function RegisterPageContent() {
   ])
 
   useEffect(() => {
-    if (!hydrated || onboardingState.step !== 6) return
+    if (!hydrated || onboardingState.step !== ACCOUNT_STEP) return
     let cancelled = false
     void (async () => {
       try {
@@ -409,29 +444,35 @@ function RegisterPageContent() {
     }
   }, [hydrated, onboardingState.step, onboardingState.subject])
 
-  const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= 6
+  const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
   const showBackButton =
-    isNumericStep(onboardingState.step) && onboardingState.step >= 2 && onboardingState.step <= 5
+    isNumericStep(onboardingState.step) &&
+    onboardingState.step >= 2 &&
+    onboardingState.step <= 8
   const showBottomCta =
-    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 5
+    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 8
+  const isTestimonialsStep = onboardingState.step === 7
   const isOAuthOnboardingFlow =
     Boolean(user && needsOnboarding) &&
     !onboardingState.awaitingPostAuth &&
-    onboardingState.step !== 5 &&
-    onboardingState.step !== 6 &&
-    onboardingState.step !== 7
+    onboardingState.step !== 7 &&
+    onboardingState.step !== 8 &&
+    onboardingState.step !== ACCOUNT_STEP &&
+    onboardingState.step !== SPLASH_STEP
 
   const progressPercent =
-    isNumericStep(onboardingState.step) && onboardingState.step <= 6
-      ? (onboardingState.step / 6) * 100
+    isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
+      ? ((onboardingState.step - 1) / PROGRESS_STEPS) * 100
       : 0
 
-  const continueLabel = onboardingState.step === 5 ? "Salveaza-ti progresul" : "Continua"
+  const continueLabel = onboardingState.step === 8 ? "Salveaza-ti progresul" : "Continua"
 
   const isContinueDisabled =
     (onboardingState.step === 2 && !onboardingState.subject) ||
     (onboardingState.step === 3 && !onboardingState.grade) ||
-    (onboardingState.step === 4 && !onboardingState.dailyTime)
+    (onboardingState.step === 4 && onboardingState.selfGrade == null) ||
+    (onboardingState.step === 5 && onboardingState.targetGrade == null) ||
+    (onboardingState.step === 6 && !onboardingState.dailyTime)
 
   const setStep = (step: RegisterStep) =>
     setOnboardingState((prev) => ({
@@ -473,6 +514,35 @@ function RegisterPageContent() {
         setStep(4)
         break
       case 4:
+        if (onboardingState.selfGrade == null) {
+          toast({
+            title: "Alege nota",
+            description: "Spune-ne ce notă crezi că iei acum.",
+            variant: "destructive",
+          })
+          return
+        }
+        setOnboardingState((prev) => ({
+          ...prev,
+          step: 5,
+          targetGrade:
+            prev.targetGrade != null
+              ? clampTargetGrade(prev.selfGrade ?? DEFAULT_SELF_GRADE, prev.targetGrade)
+              : defaultTargetGrade(prev.selfGrade ?? DEFAULT_SELF_GRADE),
+        }))
+        break
+      case 5:
+        if (onboardingState.targetGrade == null || onboardingState.selfGrade == null) {
+          toast({
+            title: "Alege nota țintă",
+            description: "Setează nota la care vrei să ajungi.",
+            variant: "destructive",
+          })
+          return
+        }
+        setStep(6)
+        break
+      case 6:
         if (!onboardingState.dailyTime) {
           toast({
             title: "Alege timpul zilnic",
@@ -485,10 +555,13 @@ function RegisterPageContent() {
           setStep("name")
           break
         }
-        setStep(5)
+        setStep(7)
         break
-      case 5:
-        setStep(6)
+      case 7:
+        setStep(8)
+        break
+      case 8:
+        setStep(ACCOUNT_STEP)
         break
       default:
         break
@@ -506,6 +579,27 @@ function RegisterPageContent() {
     setOnboardingState((prev) => ({
       ...prev,
       grade,
+    }))
+  }
+
+  const handleSelfGradeChange = (selfGrade: number) => {
+    setOnboardingState((prev) => ({
+      ...prev,
+      selfGrade,
+      targetGrade:
+        prev.targetGrade != null
+          ? clampTargetGrade(selfGrade, prev.targetGrade)
+          : defaultTargetGrade(selfGrade),
+    }))
+  }
+
+  const handleTargetGradeChange = (targetGrade: number) => {
+    setOnboardingState((prev) => ({
+      ...prev,
+      targetGrade:
+        prev.selfGrade != null
+          ? clampTargetGrade(prev.selfGrade, targetGrade)
+          : clampTargetGrade(DEFAULT_SELF_GRADE, targetGrade),
     }))
   }
 
@@ -558,7 +652,7 @@ function RegisterPageContent() {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
-        step: 6,
+        step: ACCOUNT_STEP,
         awaitingPostAuth: false,
       }))
       toast({
@@ -595,7 +689,7 @@ function RegisterPageContent() {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
-        step: 6,
+        step: ACCOUNT_STEP,
         awaitingPostAuth: false,
       }))
       toast({
@@ -618,7 +712,7 @@ function RegisterPageContent() {
         description: "Pentru a salva numele, trebuie să fii autentificat.",
         variant: "destructive",
       })
-      setStep(6)
+      setStep(ACCOUNT_STEP)
       return
     }
 
@@ -645,19 +739,15 @@ function RegisterPageContent() {
 
     setNameSaving(true)
 
-    const payload: {
-      name: string
-      grade?: string
-      preferred_materie?: SubjectOption
-      onboarding_completed_at: string
-    } = {
+    const { error } = await finalizeStudentOnboarding(supabase, {
+      userId: user.id,
       name: cleanName,
-      onboarding_completed_at: new Date().toISOString(),
-    }
-    if (onboardingState.grade) payload.grade = onboardingState.grade
-    if (onboardingState.subject) payload.preferred_materie = onboardingState.subject
-
-    const { error } = await supabase.from("profiles").update(payload).eq("user_id", user.id)
+      subject: onboardingState.subject,
+      schoolGrade: onboardingState.grade,
+      selfGrade: onboardingState.selfGrade,
+      targetGrade: onboardingState.targetGrade,
+      dailyTime: onboardingState.dailyTime,
+    })
 
     if (error) {
       toast({
@@ -774,7 +864,45 @@ function RegisterPageContent() {
           </div>
         )
 
-      case 4:
+      case 4: {
+        const selfGrade = onboardingState.selfGrade ?? DEFAULT_SELF_GRADE
+        return (
+          <OnboardingGradeSliderStep
+            mode="self"
+            value={selfGrade}
+            onChange={handleSelfGradeChange}
+            headline={
+              onboardingState.selfGrade != null
+                ? `Acum ești pe la ${formatGrade(selfGrade)}.`
+                : "Unde te situezi acum?"
+            }
+            subtitle="Fii sincer — de aici construim planul tău."
+            popFromLeft={onboardingState.selfGrade != null}
+          />
+        )
+      }
+
+      case 5: {
+        const selfGrade = onboardingState.selfGrade ?? DEFAULT_SELF_GRADE
+        const targetGrade = onboardingState.targetGrade ?? defaultTargetGrade(selfGrade)
+        return (
+          <OnboardingGradeSliderStep
+            mode="target"
+            value={targetGrade}
+            selfGrade={selfGrade}
+            onChange={handleTargetGradeChange}
+            headline={
+              onboardingState.targetGrade != null
+                ? `Ținta ta: ${formatGrade(targetGrade)}.`
+                : "La ce notă vrei să ajungi?"
+            }
+            subtitle="Minimum cu 2 puncte peste nota ta actuală."
+            popFromLeft={onboardingState.targetGrade != null}
+          />
+        )
+      }
+
+      case 6:
         return (
           <div className="mx-auto w-full max-w-[520px]">
             <StepHeadingWithIcon
@@ -824,7 +952,10 @@ function RegisterPageContent() {
           </div>
         )
 
-      case 5: {
+      case 7:
+        return <StudentTestimonialsStep />
+
+      case 8: {
         const selectedGrade = onboardingState.grade ?? "9"
         const simulationSubject = onboardingState.subject ?? "fizica"
 
@@ -847,48 +978,28 @@ function RegisterPageContent() {
         )
       }
 
-      case 6:
+      case 9: {
+        const selfGrade = onboardingState.selfGrade ?? DEFAULT_SELF_GRADE
+        const targetGrade = onboardingState.targetGrade ?? defaultTargetGrade(selfGrade)
+        const dailyTime = onboardingState.dailyTime ?? "30"
+
         return (
-          <div className="mx-auto w-full max-w-[420px]">
-            <div className="rounded-3xl border border-[#ececf1] bg-white px-6 py-8 shadow-[0_30px_70px_-40px_rgba(18,20,28,0.5)]">
-              <h1 className="text-center text-[30px] font-semibold leading-tight text-[#0f1115]">
-                Creează un cont gratuit
-              </h1>
-              <p className="mb-6 mt-2 text-center text-sm text-[#666a73]">ca să salvăm parcursul tău de învățare.</p>
-
-              <div className="space-y-3">
-                <GoogleSignInButton
-                  disabled={oauthLoading !== null}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-                  onStart={handleGoogleOAuthStart}
-                  onResult={handleGoogleOAuthResult}
-                >
-                  {oauthLoading === "google" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
-                  Continuă cu Google
-                </GoogleSignInButton>
-
-                <button
-                  type="button"
-                  onClick={() => handleOAuthLogin("github")}
-                  disabled={oauthLoading !== null}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-                >
-                  {oauthLoading === "github" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GitHubIcon />}
-                  Continuă cu GitHub
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleTryWithoutAccount}
-              className="mt-6 w-full bg-transparent py-2 text-center text-sm font-medium text-[#5c5f68] underline-offset-4 transition-colors hover:text-[#1a1c21] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8043f0] focus-visible:ring-offset-2"
-            >
-              Sau încearcă fără cont
-            </button>
-          </div>
+          <OnboardingAccountStep
+            selfGrade={selfGrade}
+            targetGrade={targetGrade}
+            dailyTime={dailyTime}
+            oauthLoading={oauthLoading}
+            onGoogleStart={handleGoogleOAuthStart}
+            onGoogleResult={handleGoogleOAuthResult}
+            onGitHubLogin={() => handleOAuthLogin("github")}
+            onTryWithoutAccount={handleTryWithoutAccount}
+            googleIcon={<GoogleIcon />}
+            githubIcon={<GitHubIcon />}
+          />
         )
+      }
 
-      case 7:
+      case 10:
         return (
           <OnboardingPostAuthSplash
             subject={onboardingState.subject}
@@ -1037,11 +1148,23 @@ function RegisterPageContent() {
         )}
 
         <main
-          className={`flex flex-1 justify-center overflow-hidden px-4 sm:items-center sm:px-6 ${
-            showBottomCta ? "items-center pb-28 pt-3 sm:items-center sm:pb-28 sm:pt-8" : "items-center py-4 sm:py-8"
+          className={`flex min-h-0 flex-1 justify-center px-4 sm:px-6 ${
+            isTestimonialsStep
+              ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-0 sm:items-center sm:overflow-visible sm:py-8"
+              : showBottomCta
+                ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-3 sm:items-center sm:overflow-visible sm:pb-28 sm:pt-8"
+                : "items-center overflow-y-auto overflow-x-hidden py-4 sm:overflow-visible sm:py-8"
           }`}
         >
-          {renderStepContent()}
+          <div
+            className={
+              isTestimonialsStep
+                ? "flex w-full flex-1 flex-col justify-center lg:min-h-0 lg:flex-none lg:justify-start"
+                : "flex w-full flex-col justify-center sm:block"
+            }
+          >
+            {renderStepContent()}
+          </div>
         </main>
 
         {showBottomCta && (
