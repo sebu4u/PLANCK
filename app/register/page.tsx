@@ -13,6 +13,7 @@ import { OnboardingGradeSliderStep } from "@/components/onboarding/onboarding-gr
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
 import { OnboardingPostAuthSplash } from "@/components/onboarding/OnboardingPostAuthSplash"
 import { StudentTestimonialsStep } from "@/components/onboarding/student-testimonials-step"
+import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
 import { supabase } from "@/lib/supabaseClient"
 import {
@@ -26,6 +27,7 @@ import {
   getPostOnboardingLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
 import { getPostOnboardingLearningPathCtaLabel } from "@/lib/practice-subject"
+import { playOnboardingSelectSound } from "@/lib/onboarding-sounds"
 import {
   canAccessStudentOnboarding,
   consumePostOnboardingRedirect,
@@ -262,6 +264,10 @@ function RegisterPageContent() {
   const [displayName, setDisplayName] = useState("")
   const [nameSaving, setNameSaving] = useState(false)
   const [guestFirstItemHref, setGuestFirstItemHref] = useState<string | null>(null)
+  // Set right after the name is saved successfully, while we resolve the redirect target and
+  // navigate away: masks the brief "onboarding restarts" flash caused by the hydration effect
+  // re-running (it clears onboardingState back to step 1) once `profile` refreshes with the new name.
+  const [isFinalizing, setIsFinalizing] = useState(false)
 
   const { toast } = useToast()
   const router = useRouter()
@@ -433,7 +439,10 @@ function RegisterPageContent() {
     let cancelled = false
     void (async () => {
       try {
-        const href = await getPostOnboardingLearningPathItemHref(onboardingState.subject)
+        const href = await getPostOnboardingLearningPathItemHref(
+          onboardingState.subject,
+          onboardingState.grade,
+        )
         if (!cancelled) setGuestFirstItemHref(href)
       } catch {
         if (!cancelled) setGuestFirstItemHref(null)
@@ -569,6 +578,7 @@ function RegisterPageContent() {
   }
 
   const handleSubjectSelect = (subject: SubjectOption) => {
+    playOnboardingSelectSound()
     setOnboardingState((prev) => ({
       ...prev,
       subject,
@@ -576,6 +586,7 @@ function RegisterPageContent() {
   }
 
   const handleGradeSelect = (grade: GradeOption) => {
+    playOnboardingSelectSound()
     setOnboardingState((prev) => ({
       ...prev,
       grade,
@@ -604,6 +615,7 @@ function RegisterPageContent() {
   }
 
   const handleDailyTimeSelect = (dailyTime: DailyTimeOption) => {
+    playOnboardingSelectSound()
     setOnboardingState((prev) => ({
       ...prev,
       dailyTime,
@@ -626,7 +638,10 @@ function RegisterPageContent() {
     try {
       const target =
         guestFirstItemHref ??
-        (await getPostOnboardingLearningPathItemHref(onboardingState.subject))
+        (await getPostOnboardingLearningPathItemHref(
+          onboardingState.subject,
+          onboardingState.grade,
+        ))
       if (target) {
         router.push(target)
         return
@@ -759,6 +774,12 @@ function RegisterPageContent() {
       return
     }
 
+    // From here on we're committed to leaving this page: show the same loading screen as the
+    // dashboard instead of the onboarding wizard while we refresh the profile and resolve the
+    // redirect target (refreshProfile() below re-triggers the localStorage-hydration effect,
+    // which would otherwise briefly reset onboardingState back to step 1).
+    setIsFinalizing(true)
+
     localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
     localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
     try {
@@ -771,6 +792,7 @@ function RegisterPageContent() {
     const postOnboardingRedirect = consumePostOnboardingRedirect()
     const defaultLearningPathHref = await getPostOnboardingLearningPathItemHref(
       onboardingState.subject,
+      onboardingState.grade,
     )
     router.push(postOnboardingRedirect ?? defaultLearningPathHref ?? "/dashboard")
   }
@@ -1042,6 +1064,10 @@ function RegisterPageContent() {
       default:
         return null
     }
+  }
+
+  if (isFinalizing) {
+    return <LoadingVideoOverlay zIndex={500} />
   }
 
   return (

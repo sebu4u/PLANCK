@@ -10,6 +10,7 @@ import {
   type LearningPathHubLesson,
   type LearningPathLessonItemAggregates,
 } from "@/lib/supabase-learning-paths"
+import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
 
 const LEARNING_PATH_HUB_CACHE_SECONDS = 5 * 60
 const LEARNING_PATH_HUB_CHAPTER_COLUMNS =
@@ -40,6 +41,7 @@ async function loadPublicLearningPathHubCatalog(): Promise<PublicLearningPathHub
     .select(LEARNING_PATH_HUB_CHAPTER_COLUMNS)
     .eq("is_active", true)
     .or("is_personalized.is.null,is_personalized.eq.false")
+    .or("is_hidden.is.null,is_hidden.eq.false")
     .order("order_index")
 
   if (error) {
@@ -85,5 +87,39 @@ async function loadPublicLearningPathLessonItemAggregates(
 export const getCachedPublicLearningPathLessonItemAggregates = unstable_cache(
   loadPublicLearningPathLessonItemAggregates,
   ["learning-path-hub-public-item-aggregates-v1"],
+  { revalidate: LEARNING_PATH_HUB_CACHE_SECONDS }
+)
+
+/**
+ * Lesson ids under the hidden onboarding chapter (see `ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG`).
+ * Used to exclude onboarding-lesson item completions from the free-plan 10-item quota, since
+ * that chapter has its own always-unlocked access mode (see `lib/learning-path-access.ts`).
+ */
+async function loadOnboardingCustomLessonIds(): Promise<string[]> {
+  const supabase = createAnonSupabaseClient()
+  const { data: chapter } = await supabase
+    .from("learning_path_chapters")
+    .select("id")
+    .eq("slug", ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG)
+    .maybeSingle()
+
+  if (!chapter) return []
+
+  const { data: lessons, error } = await supabase
+    .from("learning_path_lessons")
+    .select("id")
+    .eq("chapter_id", chapter.id)
+
+  if (error) {
+    console.error("Error fetching onboarding custom lesson ids:", error)
+    return []
+  }
+
+  return (lessons || []).map((lesson) => lesson.id)
+}
+
+export const getCachedOnboardingCustomLessonIds = unstable_cache(
+  loadOnboardingCustomLessonIds,
+  ["onboarding-custom-lesson-ids-v1"],
   { revalidate: LEARNING_PATH_HUB_CACHE_SECONDS }
 )

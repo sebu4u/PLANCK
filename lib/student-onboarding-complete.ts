@@ -36,6 +36,7 @@ export async function finalizeStudentOnboarding(
     .eq("user_id", params.userId)
 
   if (profileError) {
+    console.error("[finalizeStudentOnboarding] profiles update failed:", profileError)
     return { error: profileError }
   }
 
@@ -62,6 +63,7 @@ export async function finalizeStudentOnboarding(
       )
 
       if (statsError) {
+        console.error("[finalizeStudentOnboarding] user_stats upsert failed:", statsError)
         return { error: statsError }
       }
     }
@@ -75,6 +77,7 @@ export async function finalizeStudentOnboarding(
       .eq("status", "active")
 
     if (targetError) {
+      console.error("[finalizeStudentOnboarding] parent_child_relationships update failed:", targetError)
       return { error: targetError }
     }
   }

@@ -27,6 +27,7 @@ import { mathProblemRowToProblem } from "@/lib/math-problem-to-learning-path-pro
 import { getLessonBySlug } from "@/lib/supabase-physics"
 import { cookies } from "next/headers"
 import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
+import { getCachedOnboardingCustomLessonIds } from "@/lib/learning-path-hub-cache"
 import {
   GUEST_LEARNING_PATH_PROGRESS_COOKIE,
   countGuestCompletedLearningPathItems,
@@ -42,6 +43,7 @@ import type { SubjectMapItemContext } from "@/lib/subject-map/navigation"
 import { resolveSubjectMapItemNavigation } from "@/lib/subject-map/supabase-learning-map"
 import type { SubjectMapAssignmentItemRoute } from "@/lib/subject-map/types"
 import { getSubjectMapConfig } from "@/lib/subject-map/config"
+import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
 
 export interface LearningPathItemPayload {
   chapterSlug: string
@@ -77,6 +79,8 @@ export interface LearningPathItemPayload {
   subjectMapAssignmentItemIds?: string[]
   completedItemIdsForSubjectMapAssignment?: string[]
   subjectMapLessonTotalElo?: number
+  /** Hidden onboarding chapter (see `ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG`): plain single lesson, own completion+offer flow. */
+  isOnboardingLesson?: boolean
 }
 
 export type LearningPathItemLoadResult =
@@ -232,9 +236,11 @@ async function getProgressState(
       cookieStore.get(GUEST_LEARNING_PATH_PROGRESS_COOKIE)?.value
     )
   }
+  const onboardingLessonIdsForGuestQuota =
+    access.mode === "free-preview" && !progressUser ? await getCachedOnboardingCustomLessonIds() : []
   const guestGlobalSolved =
     access.mode === "free-preview" && !progressUser
-      ? countGuestCompletedLearningPathItems(guestProgressMap)
+      ? countGuestCompletedLearningPathItems(guestProgressMap, onboardingLessonIdsForGuestQuota)
       : 0
 
   let completedItemIdsForLesson: string[] = []
@@ -401,6 +407,7 @@ async function loadStaticLearningPathItemPayloadWithClient(
       subjectMapAssignmentItems,
       subjectMapAssignmentItemIds,
       subjectMapLessonTotalElo,
+      isOnboardingLesson: chapter.slug === ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG,
       sourceLesson,
       sourceProblem,
       sourceCodingProblem,

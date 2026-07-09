@@ -16,6 +16,7 @@ import { GuardianAiIntroStep } from "@/components/onboarding/guardian-ai-intro-s
 import { GuardianRoleCard } from "@/components/onboarding/guardian-role-card"
 import { GuardianTestimonialsStep } from "@/components/onboarding/guardian-testimonials-step"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
+import { playOnboardingSelectSound } from "@/lib/onboarding-sounds"
 import {
   canAccessGuardianOnboarding,
   consumePostOnboardingRedirect,
@@ -392,14 +393,17 @@ function GuardianRegisterPageContent() {
   }
 
   const handleRoleSelect = (role: GuardianRole) => {
+    playOnboardingSelectSound()
     setOnboardingState((prev) => ({ ...prev, role }))
   }
 
   const handleDailyTimeSelect = (dailyTime: GuardianDailyTimeOption) => {
+    playOnboardingSelectSound()
     setOnboardingState((prev) => ({ ...prev, dailyTime }))
   }
 
   const handleSubjectSelect = (subject: OnboardingSubjectId) => {
+    playOnboardingSelectSound()
     setOnboardingState((prev) => ({ ...prev, teachingMaterie: subject }))
   }
 

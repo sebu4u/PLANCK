@@ -2,8 +2,10 @@ import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { isAdmin } from "@/lib/admin-check"
 import {
   FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
-  isFreePreviewLearningPathChapterSlug,
+  FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT,
 } from "@/lib/learning-path-free-plan"
+import { getCachedOnboardingCustomLessonIds } from "@/lib/learning-path-hub-cache"
+import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
 import { createClient } from "@/lib/supabase/server"
 import {
   PLAN_PROPERTY_PRIORITY,
@@ -26,14 +28,40 @@ interface ChapterLike {
   slug: string | null
   generated_by_user_id?: string | null
   is_personalized?: boolean | null
+  order_index?: number | null
+}
+
+/**
+ * Un traseu oficial (nu personalizat) e considerat "free preview" doar dacă se
+ * numără printre primele `FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT` trasee după
+ * order_index — aceleași trasee care apar deblocate (nu grayed out) pe /invata.
+ */
+async function isFreePlanUnlockedChapter(
+  supabase: SupabaseClient,
+  chapter: ChapterLike | null | undefined,
+): Promise<boolean> {
+  if (!chapter || chapter.is_personalized === true) return false
+  if (chapter.order_index === null || chapter.order_index === undefined) return false
+
+  const { count, error } = await supabase
+    .from("learning_path_chapters")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true)
+    .not("is_personalized", "is", true)
+    .lt("order_index", chapter.order_index)
+
+  if (error) return false
+
+  return (count ?? 0) < FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT
 }
 
 /**
  * Determina nivelul de acces al userului curent pentru un capitol learning-path.
  *
  * - `full`: admini, dev (`profiles.is_dev`), planuri platite (plus/premium), useri cu `plus_months_remaining > 0`.
- * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru capitolele din
- *   `FREE_PREVIEW_LEARNING_PATH_CHAPTER_SLUGS`; pot parcurge secvențial până la limita globală de itemi.
+ * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru primele
+ *   `FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT` trasee oficiale (după order_index); pot
+ *   parcurge secvențial până la limita globală de itemi.
  * - `locked`: orice alt scenariu (afiseaza preview-ul placeholder).
  */
 export async function getLearningPathAccess(chapter?: ChapterLike | null): Promise<LearningPathAccess> {
@@ -51,8 +79,22 @@ export async function getLearningPathAccessForUser(
   user: User | null,
   chapter?: ChapterLike | null,
 ): Promise<LearningPathAccess> {
+  // Hidden onboarding chapter (see `ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG`): always fully
+  // unlocked, for guests and account holders alike, and never subject to the free-plan
+  // 10-item quota — it must never show the free-plan paywall mid-lesson.
+  if (chapter?.slug === ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG) {
+    return {
+      mode: "full",
+      itemsSolved: 0,
+      itemsRemaining: FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
+      userId: user?.id ?? null,
+      isAdmin: false,
+      isDev: false,
+    }
+  }
+
   if (!user) {
-    if (isFreePreviewLearningPathChapterSlug(chapter?.slug ?? null)) {
+    if (await isFreePlanUnlockedChapter(supabase, chapter)) {
       return {
         mode: "free-preview",
         itemsSolved: 0,
@@ -135,7 +177,7 @@ export async function getLearningPathAccessForUser(
     }
   }
 
-  const isFreeChapter = isFreePreviewLearningPathChapterSlug(chapter?.slug ?? null)
+  const isFreeChapter = await isFreePlanUnlockedChapter(supabase, chapter)
   if (!isFreeChapter) {
     return {
       mode: "locked",
@@ -147,10 +189,23 @@ export async function getLearningPathAccessForUser(
     }
   }
 
-  const { count } = await supabase
+  // Onboarding-lesson item completions must never eat into the free-plan quota available
+  // for the rest of the catalog (that chapter is always "full" access, see above).
+  const onboardingLessonIds = await getCachedOnboardingCustomLessonIds()
+  let progressCountQuery = supabase
     .from("user_learning_path_item_progress")
-    .select("item_id", { count: "exact", head: true })
+    .select("item_id, learning_path_lesson_items!inner(lesson_id)", { count: "exact", head: true })
     .eq("user_id", user.id)
+
+  if (onboardingLessonIds.length > 0) {
+    progressCountQuery = progressCountQuery.not(
+      "learning_path_lesson_items.lesson_id",
+      "in",
+      `(${onboardingLessonIds.join(",")})`
+    )
+  }
+
+  const { count } = await progressCountQuery
 
   const itemsSolved = Number(count ?? 0)
   const itemsRemaining = Math.max(0, FREE_PLAN_LEARNING_PATH_ITEM_LIMIT - itemsSolved)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { logger } from "@/lib/logger"
 import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 import {
-  isFreePreviewLearningPathChapterSlug,
+  getFreePlanLockedChapterIds,
   resolveLearningPathHubChapterSplit,
 } from "@/lib/learning-path-free-plan"
 import {
@@ -65,11 +65,7 @@ export async function GET(_req: NextRequest) {
     }
 
     const hasFullAccess = access.mode === "full"
-    const lockedChapterIds = hasFullAccess
-      ? []
-      : chapters
-          .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
-          .map((chapter) => chapter.id)
+    const lockedChapterIds = hasFullAccess ? [] : getFreePlanLockedChapterIds(chapters)
 
     const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(chapters, {
       isAdmin: access.isAdmin,

@@ -420,6 +420,75 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ quizQuestions: quizQuestions || [] })
     }
 
+    if (action === "lesson-items-search") {
+      const search = (searchParams.get("search") || "").trim()
+      const itemTypeParam = (searchParams.get("item_type") || "").trim()
+      const chapterIdParam = (searchParams.get("chapter_id") || "").trim()
+      const excludeLessonId = (searchParams.get("exclude_lesson_id") || "").trim()
+
+      const { data: chaptersForSearch, error: chaptersSearchErr } = await fetchAllTableRows(async (range) =>
+        supabase
+          .from("learning_path_chapters")
+          .select("id, problem_category, allowed_dev_user_ids")
+          .range(range.from, range.to)
+      )
+      if (chaptersSearchErr) {
+        logger.error("[dev/learning-paths] lesson-items-search chapters:", chaptersSearchErr)
+        return NextResponse.json({ error: "Nu am putut căuta itemii existenți." }, { status: 500 })
+      }
+
+      const visibleChapterIds = new Set(
+        (chaptersForSearch || [])
+          .filter((c) => chapterVisibleForDevUser(c, accessSubject, auth.permissions, auth.userId))
+          .filter((c) => !chapterIdParam || c.id === chapterIdParam)
+          .map((c) => c.id)
+      )
+      if (visibleChapterIds.size === 0) {
+        return NextResponse.json({ items: [] })
+      }
+
+      const { data: lessonsForSearch, error: lessonsSearchErr } = await fetchAllTableRows(async (range) =>
+        supabase.from("learning_path_lessons").select("id, chapter_id").range(range.from, range.to)
+      )
+      if (lessonsSearchErr) {
+        logger.error("[dev/learning-paths] lesson-items-search lessons:", lessonsSearchErr)
+        return NextResponse.json({ error: "Nu am putut căuta itemii existenți." }, { status: 500 })
+      }
+
+      const lessonIds = (lessonsForSearch || [])
+        .filter((l) => visibleChapterIds.has(l.chapter_id) && (!excludeLessonId || l.id !== excludeLessonId))
+        .map((l) => l.id)
+      if (lessonIds.length === 0) {
+        return NextResponse.json({ items: [] })
+      }
+
+      let itemsQuery = supabase
+        .from("learning_path_lesson_items")
+        .select(
+          "id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json, order_index, is_active, created_at, learning_path_lessons(title, slug, chapter_id, learning_path_chapters(title, slug))"
+        )
+        .eq("is_active", true)
+        .in("lesson_id", lessonIds)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (itemTypeParam && ITEM_TYPES.includes(itemTypeParam as (typeof ITEM_TYPES)[number])) {
+        itemsQuery = itemsQuery.eq("item_type", itemTypeParam)
+      }
+      if (search) {
+        const escaped = search.replace(/[%_]/g, "")
+        itemsQuery = itemsQuery.or(`title.ilike.%${escaped}%,cursuri_lesson_slug.ilike.%${escaped}%`)
+      }
+
+      const { data: lessonItems, error: lessonItemsErr } = await itemsQuery
+      if (lessonItemsErr) {
+        logger.error("[dev/learning-paths] lesson-items-search:", lessonItemsErr)
+        return NextResponse.json({ error: "Nu am putut căuta itemii existenți." }, { status: 500 })
+      }
+
+      return NextResponse.json({ items: lessonItems || [] })
+    }
+
     const { data: allChapters, error: chaptersErr } = await fetchAllTableRows(async (range) =>
       supabase
         .from("learning_path_chapters")

@@ -9,9 +9,10 @@ import {
   type ComponentType,
 } from "react"
 import Link from "next/link"
-import { BookOpen, ChevronDown, Loader2, Trash2 } from "lucide-react"
+import { BookOpen, ChevronDown, Loader2, Lock, Trash2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { getLearningPathLessonHref } from "@/lib/learning-path-routes"
+import { cn } from "@/lib/utils"
 import type {
   LearningPathHubChapter,
   LearningPathHubLesson,
@@ -237,8 +238,9 @@ function InvataChapterSection({
               <p className="mt-1 text-sm text-[#707070]">{chapter.description}</p>
             ) : null}
             {isLocked ? (
-              <span className="mt-3 inline-flex rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
-                În curând..
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
+                <Lock className="h-3 w-3" aria-hidden="true" />
+                Disponibil cu Plus+
               </span>
             ) : null}
             {canDeletePersonalizedChapter ? (
@@ -266,12 +268,15 @@ function InvataChapterSection({
                 src={chapter.icon_url}
                 enabled={imagesEnabled}
                 alt=""
-                className="h-20 w-20 object-contain"
+                className={cn("h-20 w-20 object-contain", isLocked && "opacity-60 grayscale")}
               />
             </div>
           ) : (
             <div
-              className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]"
+              className={cn(
+                "relative flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f]",
+                isLocked && "opacity-60 grayscale"
+              )}
               style={{ zIndex: INVATA_HUB_CHAPTER_IMAGE_Z }}
             >
               <BookOpen className="h-10 w-10" aria-hidden="true" />
@@ -287,10 +292,18 @@ function InvataChapterSection({
               src={chapter.icon_url}
               enabled={imagesEnabled}
               alt={chapter.title}
-              className="h-24 w-24 shrink-0 rounded-xl object-contain sm:h-28 sm:w-28"
+              className={cn(
+                "h-24 w-24 shrink-0 rounded-xl object-contain sm:h-28 sm:w-28",
+                isLocked && "opacity-60 grayscale"
+              )}
             />
           ) : (
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28">
+            <div
+              className={cn(
+                "flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#f1f1f1] text-[#5f5f5f] sm:h-28 sm:w-28",
+                isLocked && "opacity-60 grayscale"
+              )}
+            >
               <BookOpen className="h-12 w-12 sm:h-14 sm:w-14" />
             </div>
           )}
@@ -332,8 +345,9 @@ function InvataChapterSection({
             </button>
           ) : null}
           {isLocked ? (
-            <span className="rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
-              In curand..
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
+              <Lock className="h-3 w-3" aria-hidden="true" />
+              Disponibil cu Plus+
             </span>
           ) : null}
         </div>
@@ -345,6 +359,7 @@ function InvataChapterSection({
           lessons={chapterLessons}
           lessonProgressByLessonId={lessonProgressByLessonId}
           loadImages={imagesEnabled}
+          isLocked={isLocked}
         />
       </div>
 
@@ -355,8 +370,25 @@ function InvataChapterSection({
               {chapterLessons.map((lesson, lessonIndex) => {
                 const lessonHref = getLearningPathLessonHref(chapter, lesson)
                 const cardContent = (
-                  <div className="relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]">
-                    <div className="flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]">
+                  <div
+                    className={
+                      isLocked
+                        ? "relative flex w-[168px] shrink-0 cursor-not-allowed flex-col items-center opacity-60 grayscale sm:w-[190px]"
+                        : "relative flex w-[168px] shrink-0 cursor-pointer flex-col items-center sm:w-[190px]"
+                    }
+                  >
+                    <div
+                      className={
+                        isLocked
+                          ? "relative flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 sm:h-[162px] sm:w-[162px]"
+                          : "flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]"
+                      }
+                    >
+                      {isLocked ? (
+                        <div className="absolute inset-0 z-[1] flex items-center justify-center rounded-2xl bg-white/60">
+                          <Lock className="h-6 w-6 text-[#8a8a8a]" aria-hidden="true" />
+                        </div>
+                      ) : null}
                       {lesson.image_url ? (
                         <InvataDeferredImage
                           src={lesson.image_url}
@@ -380,6 +412,14 @@ function InvataChapterSection({
                     </p>
                   </div>
                 )
+
+                if (isLocked) {
+                  return (
+                    <div key={lesson.id} aria-disabled="true" className="block shrink-0">
+                      {cardContent}
+                    </div>
+                  )
+                }
 
                 return (
                   <Link key={lesson.id} href={lessonHref} className="block shrink-0">

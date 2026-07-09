@@ -18,6 +18,8 @@ import type { SubjectMapAssignmentItemRoute } from "@/lib/subject-map/types"
 import { LearningPathItemView } from "@/components/invata/learning-path-item-view"
 import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
 import { FizicaLessonCompletionScreen } from "@/components/invata/fizica-lesson-completion-screen"
+import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
+import { computeLearningPathLessonEloTotal } from "@/lib/learning-path-elo"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
 
 interface LearningPathItemExperienceProps {
@@ -69,12 +71,15 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const [freePlanPaywall, setFreePlanPaywall] = useState<{ lessonBaseHref: string } | null>(null)
   const [slideDirection, setSlideDirection] = useState<LearningPathSlideDirection>("forward")
   const [showLessonCompletion, setShowLessonCompletion] = useState(false)
+  // Masks the brief flash while navigating away from the onboarding lesson's offer step to
+  // /dashboard, with the same loading screen used elsewhere (dashboard load, name-save redirect).
+  const [isLeavingToDashboard, setIsLeavingToDashboard] = useState(false)
   const lastUserIdRef = useRef<string | null | undefined>(undefined)
   const isPopstateRef = useRef(false)
   const eligibleForFirstItemEntryRef = useRef(initialPayload.itemIndex === 1)
   const [firstItemEntryConsumed, setFirstItemEntryConsumed] = useState(false)
   const usesFizicaLessonCompletionScreen = Boolean(
-    payload.fizicaMapContext || payload.subjectMapContext,
+    payload.fizicaMapContext || payload.subjectMapContext || payload.isOnboardingLesson,
   )
 
   const animateFirstItemEntry =
@@ -230,6 +235,11 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   )
 
   const goToNextItem = useCallback(async () => {
+    if (payload.isOnboardingLesson && payload.isLastItem) {
+      setShowLessonCompletion(true)
+      return
+    }
+
     const assignmentItems = getMapAssignmentItems(payload)
     if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
       if (payload.isLastItem) {
@@ -253,8 +263,11 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
 
   const dismissLessonCompletion = useCallback(() => {
     setShowLessonCompletion(false)
-    router.push(payload.nextItemHref)
-  }, [payload.nextItemHref, router])
+    if (payload.isOnboardingLesson) {
+      setIsLeavingToDashboard(true)
+    }
+    router.push(payload.isOnboardingLesson ? "/dashboard" : payload.nextItemHref)
+  }, [payload.isOnboardingLesson, payload.nextItemHref, router])
 
   const goToPrevItem = useCallback(async () => {
     const assignmentItems = getMapAssignmentItems(payload)
@@ -338,6 +351,10 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     return () => window.removeEventListener("popstate", handlePopState)
   }, [goToItem, goToItemIndex, payload, payload.itemIndex])
 
+  if (isLeavingToDashboard) {
+    return <LoadingVideoOverlay zIndex={500} />
+  }
+
   if (freePlanPaywall) {
     return (
       <main className="min-h-screen bg-[#ffffff]">
@@ -359,7 +376,12 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       />
       {showLessonCompletion ? (
         <FizicaLessonCompletionScreen
-          totalElo={payload.fizicaLessonTotalElo ?? payload.subjectMapLessonTotalElo ?? 0}
+          totalElo={
+            payload.fizicaLessonTotalElo ??
+            payload.subjectMapLessonTotalElo ??
+            (payload.isOnboardingLesson ? computeLearningPathLessonEloTotal(payload.items) : 0)
+          }
+          showOfferPhase={payload.isOnboardingLesson}
           onContinue={dismissLessonCompletion}
         />
       ) : null}

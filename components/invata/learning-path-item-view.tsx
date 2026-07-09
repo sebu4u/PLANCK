@@ -71,9 +71,11 @@ export function LearningPathItemView({
   const prevItemHref =
     payload.prevItemHref ?? (itemIndex > 1 ? `${lessonBaseHref}/${itemIndex - 1}` : null)
 
-  const exitHref = payload.fizicaMapContext
-    ? getFizicaMapHref(payload.fizicaMapContext.routeSlug, payload.fizicaMapContext.chapterSlug)
-    : lessonBaseHref
+  const exitHref = payload.isOnboardingLesson
+    ? "/dashboard"
+    : payload.fizicaMapContext
+      ? getFizicaMapHref(payload.fizicaMapContext.routeSlug, payload.fizicaMapContext.chapterSlug)
+      : lessonBaseHref
 
   const isPoll = item.item_type === "poll"
   const isProblem =
@@ -131,6 +133,7 @@ export function LearningPathItemView({
         fizicaAssignmentItemIds={fizicaAssignmentItemIds}
         lessonBaseHref={lessonBaseHref}
         exitHref={exitHref}
+        isOnboardingLesson={payload.isOnboardingLesson}
         isTextLesson={isTextLesson}
         hideBottomCta={hideBottomCta}
         overflowHidden={overflowHidden}

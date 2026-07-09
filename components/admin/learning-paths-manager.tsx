@@ -89,6 +89,15 @@ interface QuizQuestionResult {
   correct_answer: string
 }
 
+interface ExistingLessonItemResult extends LearningPathLessonItem {
+  learning_path_lessons?: {
+    title: string
+    slug: string | null
+    chapter_id: string
+    learning_path_chapters?: { title: string; slug: string | null } | null
+  } | null
+}
+
 interface BiologyGrilaDraft {
   question_id: string
   title: string
@@ -593,6 +602,13 @@ export function LearningPathsManager({
   const [form, setForm] = useState<ItemFormState | null>(null)
   const [interactiveEditorNonce, setInteractiveEditorNonce] = useState(0)
 
+  const [itemSourceMode, setItemSourceMode] = useState<"scratch" | "existing">("scratch")
+  const [existingItemSearch, setExistingItemSearch] = useState("")
+  const [existingItemTypeFilter, setExistingItemTypeFilter] = useState("")
+  const [existingItemChapterFilter, setExistingItemChapterFilter] = useState("")
+  const [existingItemResults, setExistingItemResults] = useState<ExistingLessonItemResult[]>([])
+  const [existingItemLoading, setExistingItemLoading] = useState(false)
+
   const [problemSearch, setProblemSearch] = useState("")
   const [problemResults, setProblemResults] = useState<ProblemResult[]>([])
   const [problemLoading, setProblemLoading] = useState(false)
@@ -860,12 +876,21 @@ export function LearningPathsManager({
     })
   }
 
+  const resetExistingItemPicker = () => {
+    setItemSourceMode("scratch")
+    setExistingItemSearch("")
+    setExistingItemTypeFilter("")
+    setExistingItemChapterFilter("")
+    setExistingItemResults([])
+  }
+
   const openCreateItem = (lessonId: string) => {
     const lessonItems = getItemsForLesson(lessonId)
     const nextOrderIndex = lessonItems.length ? Math.max(...lessonItems.map((item) => item.order_index)) + 1 : 0
     setSelectedLessonId(lessonId)
     setForm(createEmptyForm(lessonId, nextOrderIndex))
     setFormMode("create-item")
+    resetExistingItemPicker()
     setError(null)
   }
 
@@ -874,6 +899,7 @@ export function LearningPathsManager({
     setSelectedLessonId(lessonId)
     setForm(createEmptyForm(lessonId, targetOrderIndex))
     setFormMode("create-item")
+    resetExistingItemPicker()
     setError(null)
   }
 
@@ -881,7 +907,26 @@ export function LearningPathsManager({
     setSelectedLessonId(item.lesson_id)
     setForm(createFormFromItem(item))
     setFormMode("edit-item")
+    resetExistingItemPicker()
     setError(null)
+  }
+
+  /** Copiază un item deja existent din platformă (orice traseu/lecție) în lecția curentă, ca punct de plecare editabil. */
+  const handleUseExistingItem = (item: ExistingLessonItemResult) => {
+    setForm((prev) => {
+      if (!prev) return prev
+      const filled = createFormFromItem(item)
+      return {
+        ...filled,
+        id: undefined,
+        lesson_id: prev.lesson_id,
+        order_index: prev.order_index,
+        is_active: true,
+      }
+    })
+    setItemSourceMode("scratch")
+    setExistingItemSearch("")
+    setExistingItemResults([])
   }
 
   const resetForm = () => {
@@ -896,6 +941,7 @@ export function LearningPathsManager({
     setBiologyGrilaDraft(createDefaultBiologyGrilaDraft())
     setPreviewCustomText(false)
     setPreviewSimulationIntro(false)
+    resetExistingItemPicker()
   }
 
   const updateForm = <K extends keyof ItemFormState>(key: K, value: ItemFormState[K]) => {
@@ -1987,6 +2033,77 @@ export function LearningPathsManager({
     return () => clearTimeout(timer)
   }, [fetchQuizQuestions, form, quizClass, quizSearch])
 
+  const fetchExistingLessonItems = useCallback(async () => {
+    if (!form || itemSourceMode !== "existing") return
+
+    try {
+      setExistingItemLoading(true)
+      const accessToken = await getAccessToken()
+      if (!accessToken) return
+
+      const params = new URLSearchParams()
+      params.set("action", "lesson-items-search")
+      if (isDev && devSubject) {
+        params.set("subject", devSubject)
+      }
+      if (existingItemSearch.trim()) {
+        params.set("search", existingItemSearch.trim())
+      }
+      if (existingItemTypeFilter) {
+        params.set("item_type", existingItemTypeFilter)
+      }
+      if (existingItemChapterFilter) {
+        params.set("chapter_id", existingItemChapterFilter)
+      }
+      if (form.lesson_id) {
+        params.set("exclude_lesson_id", form.lesson_id)
+      }
+
+      const response = await fetch(`${apiBase}?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut căuta itemii existenți.")
+      }
+
+      const data = await response.json()
+      setExistingItemResults(data.items || [])
+    } catch (err: any) {
+      setError(err.message || "Eroare la căutarea itemilor existenți.")
+    } finally {
+      setExistingItemLoading(false)
+    }
+  }, [
+    form,
+    itemSourceMode,
+    getAccessToken,
+    isDev,
+    devSubject,
+    existingItemSearch,
+    existingItemTypeFilter,
+    existingItemChapterFilter,
+    apiBase,
+  ])
+
+  useEffect(() => {
+    if (!form || itemSourceMode !== "existing") return
+    const timer = setTimeout(() => {
+      fetchExistingLessonItems()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [
+    fetchExistingLessonItems,
+    form,
+    itemSourceMode,
+    existingItemSearch,
+    existingItemTypeFilter,
+    existingItemChapterFilter,
+  ])
+
   const renderMarkerToolbar = (field: "custom_text_body" | "simulation_intro_markdown") => (
     <div className="flex flex-wrap items-center gap-2">
       {MARKERS.map((marker) => (
@@ -3062,6 +3179,14 @@ export function LearningPathsManager({
                         {chapter.title}
                       </span>
                       {!chapter.is_active ? <EyeOff className="w-3.5 h-3.5 text-gray-500" /> : <Eye className="w-3.5 h-3.5 text-gray-500" />}
+                      {chapter.is_hidden ? (
+                        <span
+                          className="text-[10px] font-semibold uppercase tracking-wide text-amber-400/90"
+                          title="Ascuns din /invata, dashboard și hărțile de materie — accesibil doar direct prin URL."
+                        >
+                          ascuns
+                        </span>
+                      ) : null}
                       {!isDev && (chapter.allowed_dev_user_ids?.length ?? 0) > 0 ? (
                         <span className="text-[10px] text-amber-400/90">{chapter.allowed_dev_user_ids!.length} dev</span>
                       ) : null}
@@ -3601,6 +3726,116 @@ export function LearningPathsManager({
                     </Button>
                   </div>
 
+                  {formMode === "create-item" && !form.id ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant={itemSourceMode === "scratch" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setItemSourceMode("scratch")}
+                        className={
+                          itemSourceMode === "scratch"
+                            ? "bg-violet-600 hover:bg-violet-500 text-white"
+                            : "border-white/20 bg-white/5 text-gray-200 hover:bg-white/10 hover:text-white"
+                        }
+                      >
+                        Creează de la zero
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={itemSourceMode === "existing" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setItemSourceMode("existing")}
+                        className={
+                          itemSourceMode === "existing"
+                            ? "bg-violet-600 hover:bg-violet-500 text-white"
+                            : "border-white/20 bg-white/5 text-gray-200 hover:bg-white/10 hover:text-white"
+                        }
+                      >
+                        <Search className="w-3.5 h-3.5 mr-1.5" />
+                        Alege item existent
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {itemSourceMode === "existing" && formMode === "create-item" && !form.id ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-gray-400 leading-snug">
+                        Caută un item deja creat pe platformă (din orice traseu/lecție) și copiază-l în această
+                        lecție. Poți edita conținutul copiei înainte de a-l salva.
+                      </p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <Input
+                          value={existingItemSearch}
+                          onChange={(e) => setExistingItemSearch(e.target.value)}
+                          placeholder="Caută după titlu"
+                          className="bg-black/40 border-white/20 text-gray-100"
+                        />
+                        <select
+                          value={existingItemTypeFilter}
+                          onChange={(e) => setExistingItemTypeFilter(e.target.value)}
+                          className="rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"
+                        >
+                          <option value="">Toate tipurile</option>
+                          {itemTypesForForm.map((type) => (
+                            <option key={type} value={type}>
+                              {ITEM_TYPE_LABEL[type]}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={existingItemChapterFilter}
+                          onChange={(e) => setExistingItemChapterFilter(e.target.value)}
+                          className="rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100"
+                        >
+                          <option value="">Toate traseele</option>
+                          {sortedChapters.map((chapter) => (
+                            <option key={chapter.id} value={chapter.id}>
+                              {chapter.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg border border-white/10 p-2">
+                        {existingItemLoading ? (
+                          <div className="py-8 text-center text-gray-400 text-sm">
+                            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+                            Se caută itemi...
+                          </div>
+                        ) : existingItemResults.length === 0 ? (
+                          <div className="py-8 text-center text-gray-500 text-sm">Nu există rezultate.</div>
+                        ) : (
+                          existingItemResults.map((existingItem) => {
+                            const ExistingItemIcon = getItemIcon(existingItem.item_type)
+                            const lessonInfo = existingItem.learning_path_lessons
+                            const chapterInfo = lessonInfo?.learning_path_chapters
+                            return (
+                              <button
+                                key={existingItem.id}
+                                type="button"
+                                onClick={() => handleUseExistingItem(existingItem)}
+                                className="w-full rounded-md border border-white/10 bg-white/5 p-3 text-left transition-colors hover:bg-white/10"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <ExistingItemIcon className="w-3.5 h-3.5 text-violet-300 shrink-0" />
+                                  <p className="text-sm font-semibold text-white truncate">
+                                    {existingItem.title?.trim() || ITEM_TYPE_LABEL[existingItem.item_type]}
+                                  </p>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {ITEM_TYPE_LABEL[existingItem.item_type]}
+                                  {chapterInfo?.title ? ` · ${chapterInfo.title}` : ""}
+                                  {lessonInfo?.title ? ` › ${lessonInfo.title}` : ""}
+                                </p>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-xs text-gray-300">Tip item</p>
@@ -3705,6 +3940,8 @@ export function LearningPathsManager({
                       Anulează
                     </Button>
                   </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

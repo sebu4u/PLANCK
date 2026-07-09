@@ -23,7 +23,7 @@ import { InvataPremiumUpgradeBanner } from "@/components/invata/invata-premium-u
 import { InvataHubMain } from "@/components/invata/invata-hub-main"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import {
-  isFreePreviewLearningPathChapterSlug,
+  getFreePlanLockedChapterIds,
   resolveLearningPathHubChapterSplit,
 } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
@@ -57,11 +57,7 @@ export default async function InvataPage() {
   const access = await getLearningPathAccessForUser(supabase, user, null)
   const hasFullAccess = access.mode === "full"
 
-  const lockedChapterIds = hasFullAccess
-    ? []
-    : allChapters
-        .filter((chapter) => !isFreePreviewLearningPathChapterSlug(chapter.slug))
-        .map((chapter) => chapter.id)
+  const lockedChapterIds = hasFullAccess ? [] : getFreePlanLockedChapterIds(allChapters)
 
   const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(allChapters, {
     isAdmin: access.isAdmin,

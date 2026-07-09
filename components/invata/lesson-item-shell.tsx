@@ -53,6 +53,7 @@ import {
   LearningPathFlashcardSessionScreen,
 } from "@/components/invata/learning-path-flashcard-item-screens"
 import { lpAiChatDesktopMargin, lpAiChatDesktopRightInset } from "@/lib/learning-path-ai-chat-layout"
+import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 
 const CTA_GLOW_TINT = "rgba(221, 211, 255, 0.84)"
 
@@ -78,6 +79,8 @@ interface LessonItemShellProps {
   lessonBaseHref: string
   /** Destinația la ieșirea din lecție. Implicit `lessonBaseHref`; pentru Fizică, harta `/invata/fizica`. */
   exitHref?: string
+  /** Lecția ascunsă de onboarding: ieșirea afișează loading-ul standard (ca pe dashboard) în loc de un flash. */
+  isOnboardingLesson?: boolean
   isTextLesson: boolean
   hideBottomCta?: boolean
   overflowHidden?: boolean
@@ -103,6 +106,7 @@ function LessonItemShellInner({
   fizicaAssignmentItemIds,
   lessonBaseHref,
   exitHref,
+  isOnboardingLesson = false,
   isTextLesson,
   hideBottomCta = false,
   overflowHidden = false,
@@ -120,6 +124,7 @@ function LessonItemShellInner({
   const router = useRouter()
   const [streak, setStreak] = useState<number | null>(null)
   const [showQuitDialog, setShowQuitDialog] = useState(false)
+  const [isExitingLesson, setIsExitingLesson] = useState(false)
   const [showPrevItemCue, setShowPrevItemCue] = useState(false)
   const [showNextItemCue, setShowNextItemCue] = useState(false)
   const [currentItemCompleted, setCurrentItemCompleted] = useState(initialCurrentItemCompleted)
@@ -567,7 +572,6 @@ function LessonItemShellInner({
               href={nextItemHref}
               onClick={(event) => {
                 event.preventDefault()
-                playClickSound()
                 void continueToNextItem()
               }}
               className="dashboard-start-glow inline-flex w-full max-w-sm items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-4 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6]"
@@ -610,7 +614,10 @@ function LessonItemShellInner({
             </button>
             <button
               type="button"
-              onClick={() => router.push(exitTargetHref)}
+              onClick={() => {
+                if (isOnboardingLesson) setIsExitingLesson(true)
+                router.push(exitTargetHref)
+              }}
               className="text-sm font-medium text-red-500 transition-colors hover:text-red-600"
             >
               Ieși din lecție
@@ -619,6 +626,8 @@ function LessonItemShellInner({
           </div>
         </DialogContent>
       </Dialog>
+
+      {isExitingLesson ? <LoadingVideoOverlay zIndex={500} /> : null}
     </>
   )
 

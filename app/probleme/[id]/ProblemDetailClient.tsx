@@ -566,8 +566,8 @@ export default function ProblemDetailClient({
                         {renderInlineMath(problem.statement)}
                       </div>
                     </div>
-                    <div className="lg:hidden">
-                      {hasAnswerCard ? (
+                    {hasAnswerCard && (
+                      <div className="lg:hidden">
                         <ProblemAnswerCard
                           problem={problem}
                           onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
@@ -586,10 +586,8 @@ export default function ProblemDetailClient({
                               : undefined
                           }
                         />
-                      ) : (
-                        <NoAnswerCard />
-                      )}
-                    </div>
+                      </div>
+                    )}
                     {hasProblemImage && (
                       <div className="flex justify-center lg:hidden">
                         {!imageLoaded && <ImageSkeleton />}

@@ -339,6 +339,60 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ quizQuestions: quizQuestions || [] })
     }
 
+    if (action === "lesson-items-search") {
+      const search = (searchParams.get("search") || "").trim()
+      const itemTypeParam = (searchParams.get("item_type") || "").trim()
+      const chapterId = (searchParams.get("chapter_id") || "").trim()
+      const excludeLessonId = (searchParams.get("exclude_lesson_id") || "").trim()
+
+      let lessonIdsFilter: string[] | null = null
+      if (chapterId) {
+        const { data: chapterLessons, error: chapterLessonsErr } = await supabase
+          .from("learning_path_lessons")
+          .select("id")
+          .eq("chapter_id", chapterId)
+        if (chapterLessonsErr) {
+          logger.error("[admin/learning-paths] Failed to resolve chapter lessons:", chapterLessonsErr)
+          return NextResponse.json({ error: "Nu am putut filtra după traseu." }, { status: 500 })
+        }
+        lessonIdsFilter = (chapterLessons || []).map((row) => row.id)
+        if (lessonIdsFilter.length === 0) {
+          return NextResponse.json({ items: [] })
+        }
+      }
+
+      let query = supabase
+        .from("learning_path_lesson_items")
+        .select(
+          "id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json, order_index, is_active, created_at, learning_path_lessons(title, slug, chapter_id, learning_path_chapters(title, slug))"
+        )
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (itemTypeParam && ITEM_TYPES.includes(itemTypeParam as (typeof ITEM_TYPES)[number])) {
+        query = query.eq("item_type", itemTypeParam)
+      }
+      if (lessonIdsFilter) {
+        query = query.in("lesson_id", lessonIdsFilter)
+      }
+      if (excludeLessonId) {
+        query = query.neq("lesson_id", excludeLessonId)
+      }
+      if (search) {
+        const escaped = search.replace(/[%_]/g, "")
+        query = query.or(`title.ilike.%${escaped}%,cursuri_lesson_slug.ilike.%${escaped}%`)
+      }
+
+      const { data: lessonItems, error: lessonItemsErr } = await query
+      if (lessonItemsErr) {
+        logger.error("[admin/learning-paths] Failed to search lesson items:", lessonItemsErr)
+        return NextResponse.json({ error: "Nu am putut căuta itemii existenți." }, { status: 500 })
+      }
+
+      return NextResponse.json({ items: lessonItems || [] })
+    }
+
     const { data: chapters, error: chaptersErr } = await fetchAllTableRows(async (range) =>
       supabase
         .from("learning_path_chapters")
@@ -611,6 +665,7 @@ export async function PUT(req: NextRequest) {
       }
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
+      if (body.is_hidden !== undefined) updateData.is_hidden = toBoolean(body.is_hidden, false)
       updateData.updated_at = new Date().toISOString()
 
       const { data, error } = await supabase

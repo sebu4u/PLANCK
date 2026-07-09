@@ -9,6 +9,7 @@ import {
   ONBOARDING_STEP_POP_FROM_LEFT_ANIM,
 } from "@/components/onboarding/animated-words"
 import { Slider } from "@/components/ui/slider"
+import { playOnboardingSliderTickSound } from "@/lib/onboarding-sounds"
 import { formatGrade } from "@/lib/parent/grade-estimate"
 import {
   clampSelfGrade,
@@ -98,6 +99,7 @@ export function OnboardingGradeSliderStep({
   const handleSliderChange = (values: number[]) => {
     const raw = values[0] ?? sliderMin
     const grade = raw / 10
+    if (raw !== sliderValue) playOnboardingSliderTickSound()
     onChange(isSelf ? clampSelfGrade(grade) : clampTargetGrade(selfGrade, grade))
   }
 

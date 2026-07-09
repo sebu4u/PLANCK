@@ -5,19 +5,23 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { FizicaLessonLeaderboardPhase } from "@/components/invata/fizica-lesson-leaderboard-phase"
 import { FizicaLessonBatteryPhase } from "@/components/invata/fizica-lesson-battery-phase"
+import { OnboardingLessonOfferPhase } from "@/components/invata/onboarding-lesson-offer-phase"
 import { fireFizicaLessonCompletionConfetti } from "@/lib/learning-path-confetti"
 import { playButtonClickSound } from "@/lib/platform-sounds"
 
 interface FizicaLessonCompletionScreenProps {
   totalElo: number
   onContinue: () => void
+  /** Adds a 4th "ofertă unică" phase after the battery screen (onboarding custom lessons only). */
+  showOfferPhase?: boolean
 }
 
-type CompletionScreen = "celebration" | "leaderboard" | "battery"
+type CompletionScreen = "celebration" | "leaderboard" | "battery" | "offer"
 
 export function FizicaLessonCompletionScreen({
   totalElo,
   onContinue,
+  showOfferPhase = false,
 }: FizicaLessonCompletionScreenProps) {
   const [screen, setScreen] = useState<CompletionScreen>("celebration")
   const [phase, setPhase] = useState<"title" | "elo">("title")
@@ -62,8 +66,16 @@ export function FizicaLessonCompletionScreen({
     setScreen("leaderboard")
   }
 
+  if (screen === "offer") {
+    return <OnboardingLessonOfferPhase onDecline={onContinue} />
+  }
+
   if (screen === "battery") {
-    return <FizicaLessonBatteryPhase onClose={onContinue} />
+    return (
+      <FizicaLessonBatteryPhase
+        onClose={showOfferPhase ? () => setScreen("offer") : onContinue}
+      />
+    )
   }
 
   if (screen === "leaderboard") {

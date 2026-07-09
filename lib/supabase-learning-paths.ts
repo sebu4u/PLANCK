@@ -5,6 +5,10 @@ import {
 } from "@/lib/learning-path-free-plan"
 import { getDashboardPrimaryLearningPathSlug } from "@/lib/practice-subject"
 import {
+  ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG,
+  getOnboardingCustomLessonSlug,
+} from "@/lib/onboarding-custom-lesson"
+import {
   getLearningPathItemHref,
   getLearningPathLessonHref,
 } from "@/lib/learning-path-routes"
@@ -51,6 +55,8 @@ export interface LearningPathChapter {
   allowed_dev_user_ids: string[] | null
   order_index: number
   is_active: boolean
+  /** True for chapters kept out of /invata, the dashboard, and subject maps (e.g. onboarding custom lessons). */
+  is_hidden?: boolean
   generated_by_user_id?: string | null
   is_personalized?: boolean
   original_prompt?: string | null
@@ -138,6 +144,10 @@ export interface LearningPathChapterDashboardSnapshot {
   previewLessons: LearningPathLesson[]
   hasStarted: boolean
   resumeHref: string
+  /** Current/next lesson item progress (completed items / total items), for progress bars. */
+  currentLessonProgress: { completed: number; total: number }
+  currentLessonId: string | null
+  currentLessonTitle: string | null
 }
 
 export async function getLearningPathChapterDashboardSnapshot(
@@ -153,6 +163,9 @@ export async function getLearningPathChapterDashboardSnapshot(
       previewLessons: [],
       hasStarted: false,
       resumeHref: "/invata",
+      currentLessonProgress: { completed: 0, total: 0 },
+      currentLessonId: null,
+      currentLessonTitle: null,
     }
   }
 
@@ -166,6 +179,9 @@ export async function getLearningPathChapterDashboardSnapshot(
   let currentLessonIndex = 0
   let resumeHref = getLearningPathLessonHref(chapter, firstLesson)
   let foundIncomplete = false
+  let currentLessonProgress = { completed: 0, total: 0 }
+  let currentLessonId: string | null = firstLesson.id
+  let currentLessonTitle: string | null = firstLesson.title
 
   for (let lessonIndex = 0; lessonIndex < lessons.length; lessonIndex++) {
     const lesson = lessons[lessonIndex]
@@ -177,6 +193,9 @@ export async function getLearningPathChapterDashboardSnapshot(
         foundIncomplete = true
         currentLessonIndex = lessonIndex
         resumeHref = lessonHref
+        currentLessonId = lesson.id
+        currentLessonTitle = lesson.title
+        currentLessonProgress = { completed: 0, total: 0 }
         break
       }
       continue
@@ -200,6 +219,9 @@ export async function getLearningPathChapterDashboardSnapshot(
       currentLevel =
         Math.floor(Math.max(nextItemIndex, 0) / LEARNING_PATH_ITEMS_PER_LEVEL) + 1
       resumeHref = getLearningPathItemHref(chapter, lesson, Math.max(nextItemIndex, 0))
+      currentLessonId = lesson.id
+      currentLessonTitle = lesson.title
+      currentLessonProgress = { completed: completedItemIds.length, total: items.length }
       break
     }
   }
@@ -213,6 +235,9 @@ export async function getLearningPathChapterDashboardSnapshot(
         ? Math.ceil(lastItems.length / LEARNING_PATH_ITEMS_PER_LEVEL)
         : 1
     resumeHref = getLearningPathLessonHref(chapter, lastLesson)
+    currentLessonId = lastLesson.id
+    currentLessonTitle = lastLesson.title
+    currentLessonProgress = { completed: lastItems.length, total: lastItems.length }
   }
 
   const previewLessons = lessons.slice(currentLessonIndex, currentLessonIndex + 2)
@@ -220,6 +245,9 @@ export async function getLearningPathChapterDashboardSnapshot(
   return {
     currentLevel,
     previewLessons,
+    currentLessonProgress,
+    currentLessonId,
+    currentLessonTitle,
     hasStarted,
     resumeHref,
   }
@@ -230,6 +258,7 @@ export async function getLearningPathChapters(client: SupabaseClient = supabase)
     .from("learning_path_chapters")
     .select("*")
     .eq("is_active", true)
+    .or("is_hidden.is.null,is_hidden.eq.false")
     .order("order_index")
 
   if (error) {
@@ -921,10 +950,39 @@ export async function getCinematicaFirstLearningPathItemHref(): Promise<string |
   return null
 }
 
-/** După onboarding elev: traseul intro pentru matematică/informatică, altfel Cinematică. */
+/** Primul item dintr-o lecție anume (identificată prin slug), în capitolul dat (identificat prin slug). */
+export async function getFirstLearningPathItemHrefForChapterAndLessonSlug(
+  chapterSlug: string,
+  lessonSlug: string
+): Promise<string | null> {
+  const chapter = await getLearningPathChapterBySlug(chapterSlug.trim())
+  if (!chapter) return null
+
+  const lesson = await getLearningPathLessonBySlug(chapter.id, lessonSlug.trim())
+  if (!lesson) return null
+
+  const items = await getLearningPathLessonItems(lesson.id)
+  if (!items.length) return null
+
+  return getLearningPathItemHref(chapter, lesson, 0)
+}
+
+/**
+ * După onboarding elev: lecția custom din capitolul ascuns de onboarding, aleasă în funcție de
+ * materie (și, pentru fizică, clasă). Cade pe traseul intro pentru matematică/informatică sau pe
+ * Cinematică dacă lecția custom încă nu are itemi (nepublicată) sau nu poate fi rezolvată.
+ */
 export async function getPostOnboardingLearningPathItemHref(
   preferredMaterie: unknown,
+  grade?: unknown,
 ): Promise<string | null> {
+  const onboardingLessonSlug = getOnboardingCustomLessonSlug(preferredMaterie, grade)
+  const onboardingHref = await getFirstLearningPathItemHrefForChapterAndLessonSlug(
+    ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG,
+    onboardingLessonSlug,
+  )
+  if (onboardingHref) return onboardingHref
+
   const slug = getDashboardPrimaryLearningPathSlug(preferredMaterie)
   if (slug) {
     const href = await getFirstLearningPathItemHrefForChapterSlug(slug)

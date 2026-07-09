@@ -13,10 +13,19 @@ export function parseGuestLearningPathProgress(raw: string | undefined): GuestLe
   }
 }
 
-/** Număr unic de itemi marcați ca finalizați (în orice lecție), pentru limita planului free. */
-export function countGuestCompletedLearningPathItems(map: GuestLearningPathProgressMap): number {
+/**
+ * Număr unic de itemi marcați ca finalizați (în orice lecție), pentru limita planului free.
+ * `excludeLessonIds` permite excluderea unor lecții (ex: capitolul ascuns de onboarding, care
+ * are acces "full" și nu trebuie să consume din cota de 10 itemi gratuiți).
+ */
+export function countGuestCompletedLearningPathItems(
+  map: GuestLearningPathProgressMap,
+  excludeLessonIds?: Iterable<string>
+): number {
+  const excluded = excludeLessonIds ? new Set(excludeLessonIds) : null
   const set = new Set<string>()
-  for (const ids of Object.values(map)) {
+  for (const [lessonId, ids] of Object.entries(map)) {
+    if (excluded?.has(lessonId)) continue
     if (!Array.isArray(ids)) continue
     for (const id of ids) {
       if (typeof id === "string" && id.trim()) set.add(id)

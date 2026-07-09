@@ -38,6 +38,7 @@ import {
   type DashboardStreakDay,
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
+import { FreeMobileDashboard } from "@/components/dashboard/free-mobile/free-mobile-dashboard"
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
@@ -93,6 +94,8 @@ export function DashboardAuth() {
     dashboardStartHrefByChapter: Record<string, string>
     dashboardLevelByChapter: Record<string, number>
     dashboardHasStartedByChapter: Record<string, boolean>
+    dashboardLessonProgressByChapter: Record<string, { completed: number; total: number }>
+    dashboardCurrentLessonTitleByChapter: Record<string, string | null>
   } | null>(null)
 
   useStreakTrigger({
@@ -123,6 +126,8 @@ export function DashboardAuth() {
             dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
             dashboardLevelByChapter: learningPathsData.levelByChapterId,
             dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
+            dashboardLessonProgressByChapter: learningPathsData.lessonProgressByChapterId,
+            dashboardCurrentLessonTitleByChapter: learningPathsData.currentLessonTitleByChapterId,
           }
         })
       } catch (error) {
@@ -245,6 +250,8 @@ export function DashboardAuth() {
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
           dashboardLevelByChapter: learningPathsData.levelByChapterId,
           dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
+          dashboardLessonProgressByChapter: learningPathsData.lessonProgressByChapterId,
+          dashboardCurrentLessonTitleByChapter: learningPathsData.currentLessonTitleByChapterId,
         }
 
         setDashboardData(completeData)
@@ -332,6 +339,8 @@ export function DashboardAuth() {
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
           dashboardLevelByChapter: learningPathsData.levelByChapterId,
           dashboardHasStartedByChapter: learningPathsData.hasStartedByChapterId,
+          dashboardLessonProgressByChapter: learningPathsData.lessonProgressByChapterId,
+          dashboardCurrentLessonTitleByChapter: learningPathsData.currentLessonTitleByChapterId,
         }
 
         // Only update cache, don't update UI if silent mode
@@ -612,14 +621,59 @@ export function DashboardAuth() {
                     </div>
 
                     <div className="order-2 flex min-h-0 flex-col overflow-hidden md:order-3 md:overflow-visible xl:order-none xl:col-start-2 xl:row-span-2 md:min-h-0">
-                      <DashboardLearningPathsCarousel
-                        key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
-                        chapters={dashboardData.dashboardLearningPaths}
-                        lessonsByChapter={dashboardData.dashboardLessonsByChapter}
-                        startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
-                        levelByChapter={dashboardData.dashboardLevelByChapter}
-                        hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
-                      />
+                      {isFree ? (
+                        <div className="h-full min-h-0 overflow-y-auto md:hidden">
+                          <FreeMobileDashboard
+                            primaryChapter={dashboardData.dashboardLearningPaths[0] ?? null}
+                            level={
+                              dashboardData.dashboardLearningPaths[0]
+                                ? dashboardData.dashboardLevelByChapter[dashboardData.dashboardLearningPaths[0].id]
+                                : 1
+                            }
+                            hasStarted={
+                              dashboardData.dashboardLearningPaths[0]
+                                ? Boolean(
+                                    dashboardData.dashboardHasStartedByChapter[
+                                      dashboardData.dashboardLearningPaths[0].id
+                                    ],
+                                  )
+                                : false
+                            }
+                            resumeHref={
+                              dashboardData.dashboardLearningPaths[0]
+                                ? dashboardData.dashboardStartHrefByChapter[
+                                    dashboardData.dashboardLearningPaths[0].id
+                                  ]
+                                : "/invata"
+                            }
+                            lessonProgress={
+                              dashboardData.dashboardLearningPaths[0]
+                                ? dashboardData.dashboardLessonProgressByChapter[
+                                    dashboardData.dashboardLearningPaths[0].id
+                                  ]
+                                : undefined
+                            }
+                            currentLessonTitle={
+                              dashboardData.dashboardLearningPaths[0]
+                                ? dashboardData.dashboardCurrentLessonTitleByChapter[
+                                    dashboardData.dashboardLearningPaths[0].id
+                                  ]
+                                : null
+                            }
+                            rank={dashboardData.stats.rank}
+                          />
+                        </div>
+                      ) : null}
+                      <div className={isFree ? "hidden h-full min-h-0 flex-col overflow-hidden md:flex md:overflow-visible" : "flex h-full min-h-0 flex-col overflow-hidden md:overflow-visible"}>
+                        <DashboardLearningPathsCarousel
+                          key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
+                          chapters={dashboardData.dashboardLearningPaths}
+                          lessonsByChapter={dashboardData.dashboardLessonsByChapter}
+                          startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
+                          levelByChapter={dashboardData.dashboardLevelByChapter}
+                          hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
+                        />
+                      </div>
                     </div>
 
                     <div className="order-3 hidden md:block md:order-2 xl:order-none xl:col-start-1 xl:row-start-2">
@@ -1277,6 +1331,8 @@ interface DashboardLearningPathsData {
   startHrefByChapterId: Record<string, string>
   levelByChapterId: Record<string, number>
   hasStartedByChapterId: Record<string, boolean>
+  lessonProgressByChapterId: Record<string, { completed: number; total: number }>
+  currentLessonTitleByChapterId: Record<string, string | null>
 }
 
 function findDashboardChapterBySlug(
@@ -1391,6 +1447,8 @@ async function fetchDashboardLearningPaths(
   const startHrefByChapterId: Record<string, string> = {}
   const levelByChapterId: Record<string, number> = {}
   const hasStartedByChapterId: Record<string, boolean> = {}
+  const lessonProgressByChapterId: Record<string, { completed: number; total: number }> = {}
+  const currentLessonTitleByChapterId: Record<string, string | null> = {}
 
   await Promise.all(
     selectedChapters.map(async (chapter) => {
@@ -1405,6 +1463,8 @@ async function fetchDashboardLearningPaths(
       startHrefByChapterId[chapter.id] = snapshot.resumeHref
       levelByChapterId[chapter.id] = snapshot.currentLevel
       hasStartedByChapterId[chapter.id] = snapshot.hasStarted
+      lessonProgressByChapterId[chapter.id] = snapshot.currentLessonProgress
+      currentLessonTitleByChapterId[chapter.id] = snapshot.currentLessonTitle
     })
   )
 
@@ -1414,6 +1474,8 @@ async function fetchDashboardLearningPaths(
     startHrefByChapterId,
     levelByChapterId,
     hasStartedByChapterId,
+    lessonProgressByChapterId,
+    currentLessonTitleByChapterId,
   }
 }
 

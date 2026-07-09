@@ -40,7 +40,6 @@ import {
   LEARNING_PATH_FILL_SLOT_EXPLAIN_INITIAL_PROMPT,
   LEARNING_PATH_REVEAL_STEPS_QUIZ_EXPLAIN_INITIAL_PROMPT,
 } from "@/lib/learning-path-insight-context"
-import { playDashboardStartButtonClickSound } from "@/lib/ui-click-sound"
 import { playErrorSound, playSuccessSound } from "@/lib/platform-sounds"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
 import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
@@ -206,7 +205,6 @@ function CardSortView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!canContinue) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -786,7 +784,6 @@ function MatchView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!allMatchCorrect) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -1069,7 +1066,6 @@ function GraphBuildView({
 
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -1353,7 +1349,6 @@ function CodeTraceView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!done) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -1555,7 +1550,6 @@ function SwipeClassifyView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!passed) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -1814,7 +1808,6 @@ function SliderExploreView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!hit) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -2011,7 +2004,6 @@ function MemoryFlipView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!done) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
@@ -2195,7 +2187,6 @@ function RevealStepsView({
     if (atEnd || !block) return
 
     if (block.kind === "markdown") {
-      playDashboardStartButtonClickSound()
       setVisible((v) => v + 1)
       return
     }
@@ -2223,7 +2214,6 @@ function RevealStepsView({
   const handleContinue = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!atEnd) return
-    playDashboardStartButtonClickSound()
     await markComplete()
     await navigateToNextItem()
   }
