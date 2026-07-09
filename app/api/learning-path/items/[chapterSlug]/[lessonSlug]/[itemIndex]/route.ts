@@ -23,11 +23,6 @@ export async function GET(
         return NextResponse.json(result.payload, {
           headers: { "Cache-Control": "private, no-store" },
         })
-      case "blocked":
-        return NextResponse.json(
-          { error: "blocked", lessonBaseHref: result.lessonBaseHref },
-          { status: 403 }
-        )
       case "locked":
         return NextResponse.json({ error: "locked" }, { status: 403 })
       case "invalid_index":

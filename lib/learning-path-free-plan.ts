@@ -27,7 +27,7 @@ export const PAID_PLAN_VISIBLE_LEARNING_PATH_COUNT = 12
  * deblocate pentru planul free; restul sunt vizibile pe /invata (grayed out,
  * pot fi răsfoite) dar nu pot fi începute.
  */
-export const FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT = 3
+export const FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT = 6
 
 /** Aliasuri pentru slug-ul principal de cinematică (redirect / onboarding). */
 export const FREE_PREVIEW_CHAPTER_SLUG_ALIASES = ["cinematica-punctului-material"] as const

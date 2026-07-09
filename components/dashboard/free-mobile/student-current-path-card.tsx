@@ -13,6 +13,7 @@ import {
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
+import { withDashboardItemReturn } from "@/lib/learning-path-item-return"
 import { LessonItemProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { DashboardDetailOverlay } from "@/components/dashboard/free-mobile/dashboard-detail-overlay"
 
@@ -99,7 +100,7 @@ export function StudentCurrentPathCard({
     event.stopPropagation()
     if (isNavigating) return
     setIsNavigating(true)
-    router.push(resumeHref)
+    router.push(withDashboardItemReturn(resumeHref))
   }
 
   return (
@@ -114,7 +115,7 @@ export function StudentCurrentPathCard({
             handleCardClick()
           }
         }}
-        className="w-full cursor-pointer rounded-3xl border border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-transform active:scale-[0.99]"
+        className="w-full cursor-pointer rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-transform active:scale-[0.99]"
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">

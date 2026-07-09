@@ -81,13 +81,14 @@ export interface LearningPathItemPayload {
   subjectMapLessonTotalElo?: number
   /** Hidden onboarding chapter (see `ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG`): plain single lesson, own completion+offer flow. */
   isOnboardingLesson?: boolean
+  /** Free-plan quota exhausted or skip-ahead: item loads, paywall overlays content. */
+  showFreePlanPaywall?: boolean
 }
 
 export type LearningPathItemLoadResult =
   | { status: "not_found" }
   | { status: "invalid_index" }
   | { status: "locked"; chapter: LearningPathChapter; lesson: LearningPathLesson }
-  | { status: "blocked"; lessonBaseHref: string }
   | { status: "ok"; payload: LearningPathItemPayload }
 
 type StaticLearningPathItemPayload = Omit<
@@ -537,18 +538,14 @@ export async function loadLearningPathItemPayload(
     staticPayload.item.id,
   )
 
-  if (
-    isBlockedByFreePlan(
-      access,
-      staticPayload.items,
-      staticPayload.item,
-      completedItemIdsForLesson,
-      initialCurrentItemCompleted,
-      itemsRemainingForFreePreview,
-    )
-  ) {
-    return { status: "blocked", lessonBaseHref: staticPayload.lessonBaseHref }
-  }
+  const blockedByFreePlan = isBlockedByFreePlan(
+    access,
+    staticPayload.items,
+    staticPayload.item,
+    completedItemIdsForLesson,
+    initialCurrentItemCompleted,
+    itemsRemainingForFreePreview,
+  )
 
   let completedItemIdsForFizicaAssignment: string[] | undefined
   const mapAssignmentItemIds =
@@ -584,6 +581,7 @@ export async function loadLearningPathItemPayload(
       completedItemIdsForLesson,
       completedItemIdsForFizicaAssignment,
       completedItemIdsForSubjectMapAssignment: completedItemIdsForFizicaAssignment,
+      showFreePlanPaywall: blockedByFreePlan,
     },
   }
 }

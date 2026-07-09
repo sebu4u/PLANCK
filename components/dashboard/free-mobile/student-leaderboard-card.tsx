@@ -71,7 +71,7 @@ export function StudentLeaderboardCard({ studentName, elo, rank }: StudentLeader
       <button
         type="button"
         onClick={() => setDetailOpen(true)}
-        className="flex w-full flex-col rounded-3xl border border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-transform active:scale-[0.99]"
+        className="flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-transform active:scale-[0.99]"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>

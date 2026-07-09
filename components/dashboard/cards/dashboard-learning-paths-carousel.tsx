@@ -13,6 +13,7 @@ import {
   getLearningPathChapterNavTitle,
   getLearningPathLessonHref,
 } from "@/lib/learning-path-routes"
+import { withDashboardItemReturn } from "@/lib/learning-path-item-return"
 import {
   type LearningPathChapter,
   type LearningPathLesson,
@@ -39,7 +40,7 @@ function getChapterHref(
   const fallbackChapterHref = firstLesson
     ? getLearningPathLessonHref(chapter, firstLesson)
     : "/invata"
-  return startHrefByChapter[chapter.id] ?? fallbackChapterHref
+  return withDashboardItemReturn(startHrefByChapter[chapter.id] ?? fallbackChapterHref)
 }
 
 function LessonPreviewRows({

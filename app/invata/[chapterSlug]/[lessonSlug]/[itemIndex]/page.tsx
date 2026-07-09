@@ -2,7 +2,6 @@ import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
-import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
 import { LearningPathItemExperience } from "@/components/invata/learning-path-item-experience"
 import { ITEM_TYPE_LABEL } from "@/components/invata/learning-path-item-body"
 import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
@@ -105,17 +104,6 @@ export default async function InvataLessonItemPage({
         <Navigation />
         <main className="min-h-screen bg-[#ffffff]">
           <LearningPathLessonLockedPreview chapter={result.chapter} lesson={result.lesson} />
-        </main>
-      </>
-    )
-  }
-
-  if (result.status === "blocked") {
-    return (
-      <>
-        <Navigation />
-        <main className="min-h-screen bg-[#ffffff]">
-          <FreePlanComparisonScreen backHref={result.lessonBaseHref} />
         </main>
       </>
     )

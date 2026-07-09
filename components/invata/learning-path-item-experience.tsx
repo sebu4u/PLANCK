@@ -12,11 +12,16 @@ import {
   setCachedLearningPathItemPayload,
   type LearningPathItemFetchResult,
 } from "@/lib/learning-path-item-client-cache"
+import {
+  appendLearningPathItemReturnFromLocation,
+  getLearningPathItemReturnSourceFromLocation,
+  getLearningPathPaywallDismissHref,
+} from "@/lib/learning-path-item-return"
 import { appendFizicaMapItemQuery } from "@/lib/fizica-map-item-navigation"
 import { appendSubjectMapItemQuery } from "@/lib/subject-map/navigation"
 import type { SubjectMapAssignmentItemRoute } from "@/lib/subject-map/types"
 import { LearningPathItemView } from "@/components/invata/learning-path-item-view"
-import { FreePlanComparisonScreen } from "@/components/invata/free-plan-comparison-screen"
+import { FreePlanLearningPathItemsPaywall } from "@/components/invata/free-plan-learning-path-items-paywall"
 import { FizicaLessonCompletionScreen } from "@/components/invata/fizica-lesson-completion-screen"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { computeLearningPathLessonEloTotal } from "@/lib/learning-path-elo"
@@ -28,15 +33,18 @@ interface LearningPathItemExperienceProps {
 
 type MapAssignmentItemRoute = SubjectMapAssignmentItemRoute
 
+const FREE_PLAN_PAYWALL_DELAY_MS = 1000
+
 function buildItemUrl(payload: LearningPathItemPayload): string {
   const base = `${payload.lessonBaseHref}/${payload.itemIndex}`
+  let url = base
   if (payload.fizicaMapContext) {
-    return appendFizicaMapItemQuery(base, payload.fizicaMapContext)
+    url = appendFizicaMapItemQuery(url, payload.fizicaMapContext)
   }
   if (payload.subjectMapContext) {
-    return appendSubjectMapItemQuery(base, payload.subjectMapContext)
+    url = appendSubjectMapItemQuery(url, payload.subjectMapContext)
   }
-  return base
+  return appendLearningPathItemReturnFromLocation(url)
 }
 
 function getMapAssignmentItems(payload: LearningPathItemPayload): MapAssignmentItemRoute[] | undefined {
@@ -68,7 +76,8 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const { user } = useAuth()
   const [payload, setPayload] = useState(initialPayload)
   const [isNavigating, setIsNavigating] = useState(false)
-  const [freePlanPaywall, setFreePlanPaywall] = useState<{ lessonBaseHref: string } | null>(null)
+  const [freePlanPaywallDue, setFreePlanPaywallDue] = useState(initialPayload.showFreePlanPaywall ?? false)
+  const [freePlanPaywallVisible, setFreePlanPaywallVisible] = useState(false)
   const [slideDirection, setSlideDirection] = useState<LearningPathSlideDirection>("forward")
   const [showLessonCompletion, setShowLessonCompletion] = useState(false)
   // Masks the brief flash while navigating away from the onboarding lesson's offer step to
@@ -92,6 +101,19 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       setFirstItemEntryConsumed(true)
     }
   }, [payload.itemIndex])
+
+  useEffect(() => {
+    if (!freePlanPaywallDue) {
+      setFreePlanPaywallVisible(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setFreePlanPaywallVisible(true)
+    }, FREE_PLAN_PAYWALL_DELAY_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [freePlanPaywallDue, payload.item.id])
 
   const syncUrl = useCallback((next: LearningPathItemPayload, mode: "replace" | "push" = "replace") => {
     const url = buildItemUrl(next)
@@ -168,8 +190,8 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         payload.subjectMapContext,
       )
       if (cached) {
-        setFreePlanPaywall(null)
         applyPayload(cached, { urlMode: options?.urlMode })
+        setFreePlanPaywallDue(cached.showFreePlanPaywall ?? false)
         isPopstateRef.current = false
         return
       }
@@ -184,21 +206,8 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
           payload.subjectMapContext,
         )
         if (result.status === "ok") {
-          setFreePlanPaywall(null)
           applyPayload(result.payload, { urlMode: options?.urlMode })
-          return
-        }
-        if (result.status === "blocked") {
-          setFreePlanPaywall({ lessonBaseHref: result.lessonBaseHref })
-          if (!isPopstateRef.current) {
-            const blockedPayload = { ...payload, ...target }
-            const url = buildItemUrl(blockedPayload as LearningPathItemPayload)
-            if (options?.urlMode === "push") {
-              window.history.pushState({ learningPathItemIndex: target.itemIndex }, "", url)
-            } else {
-              window.history.replaceState({ learningPathItemIndex: target.itemIndex }, "", url)
-            }
-          }
+          setFreePlanPaywallDue(result.payload.showFreePlanPaywall ?? false)
           return
         }
         const fallbackUrl = buildItemUrl({
@@ -302,7 +311,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     lastUserIdRef.current = user?.id ?? null
 
     clearLearningPathItemCache()
-    setFreePlanPaywall(null)
+    setFreePlanPaywallDue(false)
     void (async () => {
       const refreshed = await loadItem(
         payload.chapterSlug,
@@ -313,6 +322,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       )
       if (refreshed.status === "ok") {
         applyPayload(refreshed.payload, { skipPrefetch: false })
+        setFreePlanPaywallDue(refreshed.payload.showFreePlanPaywall ?? false)
       }
     })()
   }, [applyPayload, loadItem, payload.chapterSlug, payload.fizicaMapContext, payload.subjectMapContext, payload.itemIndex, payload.lessonSlug, user?.id])
@@ -339,7 +349,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
       if (!Number.isFinite(targetIndex) || targetIndex < 1) return
 
       if (targetIndex === payload.itemIndex) {
-        setFreePlanPaywall(null)
+        setFreePlanPaywallDue(false)
         return
       }
 
@@ -351,16 +361,15 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     return () => window.removeEventListener("popstate", handlePopState)
   }, [goToItem, goToItemIndex, payload, payload.itemIndex])
 
+  const dismissFreePlanPaywall = useCallback(() => {
+    setFreePlanPaywallDue(false)
+    setFreePlanPaywallVisible(false)
+    const returnSource = getLearningPathItemReturnSourceFromLocation()
+    router.push(getLearningPathPaywallDismissHref(payload.lessonBaseHref, returnSource))
+  }, [payload.lessonBaseHref, router])
+
   if (isLeavingToDashboard) {
     return <LoadingVideoOverlay zIndex={500} />
-  }
-
-  if (freePlanPaywall) {
-    return (
-      <main className="min-h-screen bg-[#ffffff]">
-        <FreePlanComparisonScreen backHref={freePlanPaywall.lessonBaseHref} />
-      </main>
-    )
   }
 
   return (
@@ -384,6 +393,9 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
           showOfferPhase={payload.isOnboardingLesson}
           onContinue={dismissLessonCompletion}
         />
+      ) : null}
+      {freePlanPaywallVisible ? (
+        <FreePlanLearningPathItemsPaywall onClose={dismissFreePlanPaywall} />
       ) : null}
     </>
   )

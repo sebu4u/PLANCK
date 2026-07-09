@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { eloFromGrade } from "@/lib/parent/grade-estimate"
+import { initialEloFromSelfGrade } from "@/lib/parent/grade-estimate"
 import type { OnboardingSubjectId } from "@/lib/onboarding"
 import type { StudentDailyTimeOption } from "@/lib/student-onboarding-plan"
 
@@ -53,7 +53,7 @@ export async function finalizeStudentOnboarding(
     const shouldInitElo = solvedTotal === 0 && currentElo < DEFAULT_ELO_CEILING
 
     if (shouldInitElo) {
-      const initialElo = eloFromGrade(params.selfGrade)
+      const initialElo = initialEloFromSelfGrade(params.selfGrade)
       const { error: statsError } = await supabase.from("user_stats").upsert(
         {
           user_id: params.userId,

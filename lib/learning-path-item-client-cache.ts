@@ -21,7 +21,6 @@ const itemPayloadCache = new Map<string, LearningPathItemPayload>()
 
 export type LearningPathItemFetchResult =
   | { status: "ok"; payload: LearningPathItemPayload }
-  | { status: "blocked"; lessonBaseHref: string }
   | { status: "locked" }
   | { status: "not_found" }
   | { status: "error" }
@@ -94,13 +93,6 @@ export async function fetchLearningPathItemPayload(
     )
 
     if (res.status === 403) {
-      const body = (await res.json().catch(() => null)) as {
-        error?: string
-        lessonBaseHref?: string
-      } | null
-      if (body?.error === "blocked" && body.lessonBaseHref) {
-        return { status: "blocked", lessonBaseHref: body.lessonBaseHref }
-      }
       return { status: "locked" }
     }
 

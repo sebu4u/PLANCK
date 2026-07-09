@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Lock } from "lucide-react"
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2 } from "lucide-react"
 import {
   getLearningPathLessonHref,
   getLearningPathRouteSegments,
@@ -14,13 +14,19 @@ import {
   type LearningPathLessonItem,
 } from "@/lib/supabase-learning-paths"
 import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
+import { withLessonItemReturn } from "@/lib/learning-path-item-return"
 import { ITEM_TYPE_LABEL, getLessonItemDisplayIcon } from "@/components/invata/learning-path-item-body"
 import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-card"
 import { LearningPathTrail } from "@/components/invata/learning-path-trail"
-import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
+import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { LearningPathUpNextSection } from "@/components/invata/learning-path-up-next-section"
 import { cn } from "@/lib/utils"
+
+const PREMIUM_CONTINUE_BUTTON_STYLE = {
+  backgroundImage: "linear-gradient(to right, #c4b5fd 0%, #f472b6 52%, #fbbf24 100%)",
+  boxShadow: "0 3px 0 #c084fc",
+} as CSSProperties
 
 function scrollLearningPathItemIntoView(itemId: string, behavior: ScrollBehavior = "smooth") {
   document.getElementById(`learning-path-item-node-${itemId}`)?.scrollIntoView({ block: "center", behavior })
@@ -122,8 +128,8 @@ export function LearningPathLessonPage({
 }: LearningPathLessonPageProps) {
   const router = useRouter()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialSelectedItemId ?? items[0]?.id ?? null)
-  const [paywallOpen, setPaywallOpen] = useState(false)
   const [isOpeningItem, setIsOpeningItem] = useState(false)
+  const [premiumComparisonOpen, setPremiumComparisonOpen] = useState(false)
   const [isOpeningNextLesson, setIsOpeningNextLesson] = useState(false)
   const [isSelectedItemInViewport, setIsSelectedItemInViewport] = useState(false)
   const [progressScrollDirection, setProgressScrollDirection] = useState<"up" | "down" | null>(null)
@@ -140,7 +146,9 @@ export function LearningPathLessonPage({
   const lessonBaseHref = getLearningPathLessonHref(chapter, lesson)
   const levelCount = Math.ceil(items.length / ITEMS_PER_LEVEL)
   const selectedItemIndex = selectedItem ? Math.max(items.findIndex((item) => item.id === selectedItem.id), 0) : 0
-  const selectedItemHref = selectedItem ? `${lessonBaseHref}/${selectedItemIndex + 1}` : null
+  const selectedItemHref = selectedItem
+    ? withLessonItemReturn(`${lessonBaseHref}/${selectedItemIndex + 1}`)
+    : null
   const selectedTheme = LEVEL_CARD_THEMES[Math.floor(selectedItemIndex / ITEMS_PER_LEVEL) % LEVEL_CARD_THEMES.length]
   const nextItemId = useMemo(() => {
     const firstUncompleted = items.find((item) => !completedItemIdSet.has(item.id))
@@ -636,40 +644,25 @@ export function LearningPathLessonPage({
                       </p>
                       {(() => {
                         const isSelectedCompleted = completedItemIdSet.has(selectedItem.id)
-                        const showSkipPaywall =
-                          !!freeAccess && !isSelectedNextItem && !isSelectedCompleted
-                        const showLimitPaywall =
+                        const showPremiumGate =
                           !!freeAccess &&
-                          !isSelectedCompleted &&
                           freeAccess.itemsRemaining <= 0 &&
-                          isSelectedNextItem
-                        const requiresPaywall = showSkipPaywall || showLimitPaywall
-                        const buttonLabel = requiresPaywall
-                          ? "Deblochează cu Plus+"
+                          !isSelectedCompleted
+                        const buttonLabel = showPremiumGate
+                          ? "Începe cu Premium"
                           : isSelectedNextItem
                             ? "Continuă"
                             : "Sari către"
 
-                        const commonClassName =
-                          "dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] hover:translate-y-0.5"
-                        const commonStyle = {
-                          "--start-glow-tint": selectedTheme.glow,
-                          backgroundImage: `linear-gradient(to right, ${selectedTheme.from}, ${selectedTheme.to})`,
-                          boxShadow: `0 3px 0 ${selectedTheme.buttonShadow}`,
-                        } as CSSProperties
-
-                        if (requiresPaywall) {
+                        if (showPremiumGate) {
                           return (
                             <button
                               type="button"
-                              onClick={() => setPaywallOpen(true)}
-                              className={commonClassName}
-                              style={commonStyle}
+                              onClick={() => setPremiumComparisonOpen(true)}
+                              className="mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-[#1e293b] transition-[transform,box-shadow] hover:translate-y-0.5 active:translate-y-0.5"
+                              style={PREMIUM_CONTINUE_BUTTON_STYLE}
                             >
-                              <span className="relative z-[1] inline-flex items-center gap-2">
-                                <Lock className="h-3.5 w-3.5" />
-                                {buttonLabel}
-                              </span>
+                              {buttonLabel}
                             </button>
                           )
                         }
@@ -680,8 +673,12 @@ export function LearningPathLessonPage({
                             onClick={handleOpenItem}
                             disabled={isOpeningItem}
                             aria-busy={isOpeningItem}
-                            className={`${commonClassName} disabled:cursor-not-allowed disabled:opacity-70`}
-                            style={commonStyle}
+                            className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] hover:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                            style={{
+                              "--start-glow-tint": selectedTheme.glow,
+                              backgroundImage: `linear-gradient(to right, ${selectedTheme.from}, ${selectedTheme.to})`,
+                              boxShadow: `0 3px 0 ${selectedTheme.buttonShadow}`,
+                            } as CSSProperties}
                           >
                             <span className="relative z-[1] inline-flex items-center gap-2">
                               {buttonLabel}
@@ -710,7 +707,9 @@ export function LearningPathLessonPage({
           )}
         </section>
       </div>
-      {paywallOpen ? <FreePlanComparisonOverlay onClose={() => setPaywallOpen(false)} /> : null}
+      {premiumComparisonOpen ? (
+        <FreePlanComparisonOverlay onClose={() => setPremiumComparisonOpen(false)} />
+      ) : null}
     </div>
   )
 }

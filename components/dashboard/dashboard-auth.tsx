@@ -24,6 +24,7 @@ import type {
   DashboardUpdate,
   Project,
 } from "@/lib/dashboard-data"
+import { withDashboardItemReturn } from "@/lib/learning-path-item-return"
 import {
   getLearningPathChapters,
   getLearningPathLessonsByChapterId,
@@ -539,7 +540,7 @@ export function DashboardAuth() {
 
     setWelcomeCtaLoading(true)
     try {
-      const targetHref = await getLearningPathResumeHrefForUser(user.id, supabase)
+      const targetHref = withDashboardItemReturn(await getLearningPathResumeHrefForUser(user.id, supabase))
       persistWelcomeBackDismissState()
       router.prefetch(targetHref)
       router.push(targetHref)

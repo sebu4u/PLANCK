@@ -100,7 +100,15 @@ export function formatGrade(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-/** Inverse of estimateGradeFromElo — binary search with 0.05 tolerance. */
+/** Inverse of estimateGradeFromElo — binary search with 0.05 tolerance.
+ *
+ * NOTE: this spans the full competitive ELO scale (0–25000+, up through
+ * Masters/Ascendant/Singularity) and is meant for *estimating* a grade from
+ * ELO that a user has actually earned by solving problems over time. Do not
+ * use this to seed a brand-new user's starting ELO from a self-reported
+ * onboarding grade — that previously caused new accounts to start with
+ * multi-thousand ELO (Gold/Platinum/Diamond tiers) just for picking a normal
+ * grade like 8 or 9. Use `initialEloFromSelfGrade` for that instead. */
 export function eloFromGrade(targetGrade: number): number {
   const goal = clampGrade(targetGrade)
   let low = 0
@@ -118,4 +126,20 @@ export function eloFromGrade(targetGrade: number): number {
   const lowDiff = Math.abs(estimateGradeFromElo(low) - goal)
   const highDiff = Math.abs(estimateGradeFromElo(high) - goal)
   return lowDiff <= highDiff ? low : high
+}
+
+/**
+ * Starting ELO for a brand-new user based on their self-reported onboarding
+ * grade (nota, 4–10). Kept within the Bronze/low-Silver band (the same range
+ * new users already start in) so onboarding never launches an account
+ * straight into Gold/Platinum/Diamond territory.
+ */
+const INITIAL_ELO_MIN = 400
+const INITIAL_ELO_MAX = 950
+
+export function initialEloFromSelfGrade(selfGrade: number): number {
+  const grade = clampGrade(selfGrade)
+  const progress = (grade - MIN_GRADE) / (MAX_GRADE - MIN_GRADE)
+  const elo = INITIAL_ELO_MIN + progress * (INITIAL_ELO_MAX - INITIAL_ELO_MIN)
+  return Math.round(elo)
 }
