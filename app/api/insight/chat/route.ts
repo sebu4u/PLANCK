@@ -242,6 +242,7 @@ export async function POST(req: NextRequest) {
       typeof (body as Record<string, unknown>).source === 'string'
         ? String((body as Record<string, unknown>).source).trim()
         : '';
+    const isLearningPathItemRequest = requestSource === 'learning_path_item';
     const rawVisibleInput =
       typeof (body as Record<string, unknown>).visibleInput === 'string'
         ? String((body as Record<string, unknown>).visibleInput).trim()
@@ -650,6 +651,14 @@ Asigură-te că JSON-ul este valid.`;
 
       // Override system message
       systemMessage.content = problemTutorContent;
+      if (isLearningPathItemRequest) {
+        systemMessage.content += `
+
+REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
+- Răspunde cu un singur paragraf scurt, direct și explicativ (maximum 4 propoziții).
+- Începe direct cu explicația; nu adăuga salut, introducere, concluzie, încurajări sau informații care nu ajută la întrebarea curentă.
+- Nu folosi titluri, liste, pași numerotați sau blocul ---SUGGESTIONS---.`;
+      }
       if (threadHasVisionAttachments(history)) {
         systemMessage.content += PROBLEM_TUTOR_VISION_APPENDIX;
       }

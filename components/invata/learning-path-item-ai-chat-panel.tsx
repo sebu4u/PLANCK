@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Send, X } from "lucide-react"
+import { ArrowUp, Loader2, Mic, Send, Square, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { LP_AI_CHAT_PANEL_WIDTH_CLASS } from "@/lib/learning-path-ai-chat-layout"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
+import { InvataAskThinkingDots } from "@/components/invata/invata-ask-thinking"
 
 type ChatMessage = {
   role: "user" | "assistant" | "system"
@@ -46,8 +47,11 @@ function LearningPathAiChatDelimiter() {
 }
 
 export interface LearningPathItemAiChatPanelProps {
+  mobile?: boolean
   isOpen: boolean
   onClose: () => void
+  onMobileDisplacementChange?: (displacesContent: boolean) => void
+  mobileDefaultHeightRatio?: number
   resetKey: string
   problemId: string
   getContextStatement: () => string
@@ -58,8 +62,11 @@ export interface LearningPathItemAiChatPanelProps {
 }
 
 export function LearningPathItemAiChatPanel({
+  mobile = false,
   isOpen,
   onClose,
+  onMobileDisplacementChange,
+  mobileDefaultHeightRatio = 1 / 3,
   resetKey,
   problemId,
   getContextStatement,
@@ -81,13 +88,21 @@ export function LearningPathItemAiChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const getContextStatementRef = useRef(getContextStatement)
+  const mobileDragRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const [mobileHeight, setMobileHeight] = useState<number | null>(null)
+  const [mobileDragging, setMobileDragging] = useState(false)
   getContextStatementRef.current = getContextStatement
 
   const visibleMessages = useMemo(
     () => messages.filter((m) => m.role !== "system" && m.content.trim()),
     [messages],
   )
-  const showEmptyStateDecor = visibleMessages.length === 0
+  const isWaitingForAssistant = Boolean(
+    busy &&
+      messages[messages.length - 1]?.role === "assistant" &&
+      !messages[messages.length - 1]?.content.trim(),
+  )
+  const showEmptyStateDecor = visibleMessages.length === 0 && !busy
 
   useEffect(() => {
     setMessages([SYSTEM_MESSAGE])
@@ -127,6 +142,40 @@ export function LearningPathItemAiChatPanel({
       return () => window.clearTimeout(t)
     }
   }, [isOpen])
+
+  const getMobileDefaultHeight = useCallback(
+    () => Math.round(window.innerHeight * mobileDefaultHeightRatio),
+    [mobileDefaultHeightRatio],
+  )
+
+  const getMobileMaxHeight = useCallback(
+    () => Math.round(window.innerHeight * 0.9),
+    [],
+  )
+
+  useEffect(() => {
+    if (!mobile || !isOpen) {
+      if (mobile) onMobileDisplacementChange?.(false)
+      return
+    }
+
+    const resetHeight = () => setMobileHeight(getMobileDefaultHeight())
+    resetHeight()
+    onMobileDisplacementChange?.(true)
+    window.addEventListener("resize", resetHeight)
+    return () => window.removeEventListener("resize", resetHeight)
+  }, [getMobileDefaultHeight, isOpen, mobile, onMobileDisplacementChange])
+
+  useEffect(() => {
+    if (!mobile || !isOpen || mobileHeight === null) return
+    onMobileDisplacementChange?.(mobileHeight <= getMobileDefaultHeight() + 2)
+  }, [
+    getMobileDefaultHeight,
+    isOpen,
+    mobile,
+    mobileHeight,
+    onMobileDisplacementChange,
+  ])
 
   const submitMessage = useCallback(
     async (textOverride?: string, displayContentOverride?: string) => {
@@ -214,6 +263,7 @@ export function LearningPathItemAiChatPanel({
             input: finalContent,
             visibleInput: displayContent,
             persona: "problem_tutor",
+            source: "learning_path_item",
           }),
           signal: controller.signal,
         })
@@ -325,19 +375,93 @@ export function LearningPathItemAiChatPanel({
     }
   }
 
+  const stopGeneration = useCallback(() => {
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    setBusy(false)
+  }, [])
+
+  const handleMobilePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!mobile || !isOpen) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    mobileDragRef.current = {
+      startY: event.clientY,
+      startHeight: mobileHeight ?? getMobileDefaultHeight(),
+    }
+    setMobileDragging(true)
+  }
+
+  const handleMobilePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = mobileDragRef.current
+    if (!mobile || !drag) return
+    const nextHeight = Math.min(
+      getMobileMaxHeight(),
+      Math.max(getMobileDefaultHeight(), drag.startHeight - (event.clientY - drag.startY)),
+    )
+    setMobileHeight(nextHeight)
+  }
+
+  const handleMobilePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = mobileDragRef.current
+    if (!mobile || !drag) return
+    const pulledDown = event.clientY - drag.startY
+    mobileDragRef.current = null
+    setMobileDragging(false)
+    if (pulledDown > 72) {
+      onClose()
+      return
+    }
+    setMobileHeight((height) =>
+      Math.min(getMobileMaxHeight(), Math.max(getMobileDefaultHeight(), height ?? 0)),
+    )
+  }
+
   return (
     <div
       className={cn(
-        "relative fixed right-0 top-14 bottom-0 z-[500] hidden flex-col bg-white lg:flex",
-        LP_AI_CHAT_PANEL_WIDTH_CLASS,
-        "transition-transform duration-300 ease-out",
-        isOpen ? "translate-x-0" : "translate-x-full",
+        mobile
+          ? "fixed inset-x-0 bottom-0 z-[500] flex flex-col overflow-hidden rounded-t-[28px] border border-[#dedede] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.08)] transition-[height,transform] duration-300 ease-out lg:hidden"
+          : cn(
+              "relative fixed right-0 top-14 bottom-0 z-[500] hidden flex-col bg-white lg:flex",
+              LP_AI_CHAT_PANEL_WIDTH_CLASS,
+              "transition-transform duration-300 ease-out",
+            ),
+        mobile
+          ? isOpen
+            ? "translate-y-0"
+            : "translate-y-full pointer-events-none"
+          : isOpen
+            ? "translate-x-0"
+            : "translate-x-full",
+        mobileDragging && "transition-none",
       )}
+      style={
+        mobile
+          ? {
+              height:
+                mobileHeight === null
+                  ? `${mobileDefaultHeightRatio * 100}dvh`
+                  : `${mobileHeight}px`,
+            }
+          : undefined
+      }
       aria-hidden={!isOpen}
     >
-      <LearningPathAiChatDelimiter />
+      {!mobile ? <LearningPathAiChatDelimiter /> : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-visible">
+        {mobile ? (
+          <div
+            className="flex h-7 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+            onPointerDown={handleMobilePointerDown}
+            onPointerMove={handleMobilePointerMove}
+            onPointerUp={handleMobilePointerUp}
+            onPointerCancel={handleMobilePointerUp}
+            role="presentation"
+          >
+            <div className="h-1 w-12 rounded-full bg-[#bdbdbd]" />
+          </div>
+        ) : (
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <img
@@ -358,6 +482,7 @@ export function LearningPathItemAiChatPanel({
             <X className="h-4 w-4" />
           </button>
         </div>
+        )}
 
         <div
           ref={scrollRef}
@@ -367,23 +492,28 @@ export function LearningPathItemAiChatPanel({
           )}
         >
           {visibleMessages.length === 0 ? (
-            <p className="relative z-[1] text-center text-sm text-[#888]">
-              Întreabă orice despre exercițiul curent.
-            </p>
+            isWaitingForAssistant ? (
+              <div className="relative z-[1] flex py-2">
+                {mobile ? <InvataAskThinkingDots /> : <Loader2 className="h-4 w-4 animate-spin text-[#666]" />}
+              </div>
+            ) : (
+              <p className="relative z-[1] text-center text-sm text-[#888]">
+                Întreabă orice despre exercițiul curent.
+              </p>
+            )
           ) : (
             <div className="flex flex-col gap-3">
               {visibleMessages.map((message, index) => (
                 <div
                   key={`${message.role}-${index}`}
                   className={cn(
-                    "max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
                     message.role === "user"
-                      ? "ml-auto bg-[#f0f0f0] text-[#222]"
-                      : "mr-auto bg-[#eef6ff] text-[#1a1a1a]",
+                      ? "ml-auto max-w-[92%] rounded-2xl bg-[#f0f0f0] px-3.5 py-2.5 text-sm leading-relaxed text-[#222]"
+                      : "w-full py-1 text-[16px] leading-7 text-[#1a1a1a]",
                   )}
                 >
                   {message.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2">
+                    <div className="prose prose-base max-w-none text-[16px] leading-7 prose-p:my-2 prose-headings:my-3">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm, remarkMath]}
                         rehypePlugins={[rehypeKatex]}
@@ -396,10 +526,10 @@ export function LearningPathItemAiChatPanel({
                   )}
                 </div>
               ))}
-              {busy && visibleMessages[visibleMessages.length - 1]?.role === "user" ? (
-                <div className="mr-auto flex items-center gap-2 rounded-2xl bg-[#eef6ff] px-3.5 py-2.5 text-sm text-[#666]">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Insight scrie…
+              {isWaitingForAssistant ? (
+                <div className="mr-auto flex items-center gap-2 py-2 text-base text-[#666]">
+                  {mobile ? <InvataAskThinkingDots /> : <Loader2 className="h-4 w-4 animate-spin" />}
+                  {!mobile ? "Insight scrie…" : null}
                 </div>
               ) : null}
             </div>
@@ -421,7 +551,12 @@ export function LearningPathItemAiChatPanel({
                 />
               </div>
             ) : null}
-            <div className="relative z-[1] flex items-end gap-2 rounded-full border border-[#e8e8e8] bg-[#f5f5f5] px-3 py-2">
+            <div
+              className={cn(
+                "relative z-[1] flex gap-2 rounded-full border border-[#e8e8e8] bg-[#f5f5f5] px-3",
+                mobile ? "items-center py-1.5" : "items-end py-2",
+              )}
+            >
             <textarea
               ref={textareaRef}
               value={input}
@@ -430,16 +565,40 @@ export function LearningPathItemAiChatPanel({
               placeholder="Cum te pot ajuta?"
               rows={1}
               disabled={busy}
-              className="max-h-28 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-[#222] placeholder:text-[#999] focus:outline-none"
+              className={cn(
+                "max-h-28 flex-1 resize-none bg-transparent text-sm text-[#222] placeholder:text-[#999] focus:outline-none",
+                mobile ? "min-h-5 leading-5" : "min-h-[24px]",
+              )}
             />
             <button
               type="button"
-              onClick={() => void submitMessage()}
-              disabled={busy || !input.trim()}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#7c3aed] text-white transition-opacity disabled:opacity-40"
-              aria-label="Trimite mesaj"
+              onClick={() => {
+                if (busy) {
+                  stopGeneration()
+                  return
+                }
+                void submitMessage()
+              }}
+              disabled={!busy && !input.trim()}
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40",
+                mobile
+                  ? busy
+                    ? "bg-[#e5e5e5] text-[#565656]"
+                    : input.trim()
+                      ? "bg-[#58b9b3]"
+                      : "bg-transparent text-[#b6b6b6]"
+                  : "bg-[#7c3aed]",
+              )}
+              aria-label={busy ? "Oprește generarea" : "Trimite mesaj"}
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {busy ? (
+                mobile ? <Square className="h-3.5 w-3.5 fill-current" /> : <Loader2 className="h-4 w-4 animate-spin" />
+              ) : mobile ? (
+                input.trim() ? <ArrowUp className="h-4 w-4" strokeWidth={2.5} /> : <Mic className="h-4 w-4" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
           </div>

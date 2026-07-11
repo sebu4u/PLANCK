@@ -120,6 +120,7 @@ function LessonItemShellInner({
   const insightDesktopOpen = Boolean(
     explainChat?.insightOpen && explainChat?.isDesktopViewport
   )
+  const mobileChatDisplacesContent = Boolean(explainChat?.mobileSheetDisplacesContent)
   const { user } = useAuth()
   const router = useRouter()
   const [streak, setStreak] = useState<number | null>(null)
@@ -407,7 +408,10 @@ function LessonItemShellInner({
         className={learningPathItemEnterUpClass(
           animateFirstItemEntry,
           0,
-          "fixed top-0 left-0 right-0 z-[300] flex h-14 items-center justify-between gap-3 border-b border-[#e5e5e5] bg-white px-4 shadow-sm sm:px-6",
+          cn(
+            "fixed top-0 left-0 right-0 z-[300] flex h-14 items-center justify-between gap-3 border-b border-[#e5e5e5] bg-white px-4 shadow-sm transition-transform duration-300 ease-out sm:px-6",
+            mobileChatDisplacesContent && "max-lg:-translate-y-full",
+          ),
         )}
       >
         <button
@@ -511,9 +515,13 @@ function LessonItemShellInner({
           lpAiChatDesktopMargin(insightDesktopOpen),
         )}
         style={{
-          paddingBottom: effectiveHideBottomCta
-            ? "max(16px, env(safe-area-inset-bottom, 0px))"
-            : "calc(6rem + env(safe-area-inset-bottom, 0px))",
+          paddingBottom: mobileChatDisplacesContent
+            ? effectiveHideBottomCta
+              ? "calc(33.333dvh + max(16px, env(safe-area-inset-bottom, 0px)))"
+              : "calc(33.333dvh + 6rem + env(safe-area-inset-bottom, 0px))"
+            : effectiveHideBottomCta
+              ? "max(16px, env(safe-area-inset-bottom, 0px))"
+              : "calc(6rem + env(safe-area-inset-bottom, 0px))",
         }}
       >
         <div

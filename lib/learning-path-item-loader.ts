@@ -81,7 +81,7 @@ export interface LearningPathItemPayload {
   subjectMapLessonTotalElo?: number
   /** Hidden onboarding chapter (see `ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG`): plain single lesson, own completion+offer flow. */
   isOnboardingLesson?: boolean
-  /** Free-plan quota exhausted or skip-ahead: item loads, paywall overlays content. */
+  /** Free-plan quota exhausted: item loads, paywall overlays content. */
   showFreePlanPaywall?: boolean
 }
 
@@ -276,24 +276,21 @@ async function getProgressState(
 
 function isBlockedByFreePlan(
   access: LearningPathAccess,
-  items: LearningPathLessonItem[],
-  item: LearningPathLessonItem,
-  completedItemIdsForLesson: string[],
   initialCurrentItemCompleted: boolean,
   itemsRemainingForFreePreview: number
 ): boolean {
   if (access.mode !== "free-preview") return false
 
-  const completedSet = new Set(completedItemIdsForLesson)
-  const nextItemId = items.find((i) => !completedSet.has(i.id))?.id ?? items[0]?.id ?? null
-  const isCurrentItemNext = item.id === nextItemId
   const isCurrentItemCompleted = initialCurrentItemCompleted
-
   if (isCurrentItemCompleted) return false
 
-  const blockedBySkip = !isCurrentItemNext
-  const blockedByLimit = isCurrentItemNext && itemsRemainingForFreePreview <= 0
-  return blockedBySkip || blockedByLimit
+  // The global quota (`FREE_PLAN_LEARNING_PATH_ITEM_LIMIT`) is the only thing that should
+  // ever trigger the "no more free items" paywall. Previously this also blocked whenever the
+  // opened item wasn't strictly the first incomplete one in the lesson ("skip-ahead"), which
+  // showed the "lecțiile gratuite s-au terminat" card even while the user still had quota left
+  // (e.g. after selecting a different node on the lesson map, or via direct navigation) —
+  // that's misleading and unrelated to the actual remaining quota, so it must not gate access.
+  return itemsRemainingForFreePreview <= 0
 }
 
 function isPersonalizedLearningPathChapter(chapter: LearningPathChapter): boolean {
@@ -540,9 +537,6 @@ export async function loadLearningPathItemPayload(
 
   const blockedByFreePlan = isBlockedByFreePlan(
     access,
-    staticPayload.items,
-    staticPayload.item,
-    completedItemIdsForLesson,
     initialCurrentItemCompleted,
     itemsRemainingForFreePreview,
   )

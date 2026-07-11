@@ -15,12 +15,14 @@ import { LearningPathItemAiChatPanel } from "@/components/invata/learning-path-i
 import { LearningPathItemAiChatFab } from "@/components/invata/learning-path-item-ai-chat-fab"
 import { useLearningPathItemChrome } from "@/components/invata/learning-path-item-chrome-context"
 
+const MOBILE_CHAT_DEFAULT_HEIGHT_RATIO = 1 / 3
+
 export type OpenLearningPathExplainChatArgs = {
   problemStatement: string
   /** Pass "" to omit default „Rezolva problema asta” prefix. */
   problemContextPreamble?: string
   initialUserMessage?: string
-  /** Shown as user bubble; defaults to initialUserMessage. */
+  /** Shown as user bubble; defaults to hidden for „De ce?”. */
   initialUserMessageDisplay?: string | null
   /** Override session key segment (default: learning-path-item:{currentItemId}). */
   problemId?: string
@@ -32,6 +34,8 @@ type LearningPathExplainChatContextValue = {
   /** True while panel is open or animating closed (layout margin). */
   insightOpen: boolean
   isDesktopViewport: boolean
+  /** True while the mobile sheet reserves room for the lesson item. */
+  mobileSheetDisplacesContent: boolean
 }
 
 const LearningPathExplainChatContext = createContext<LearningPathExplainChatContextValue | null>(
@@ -57,6 +61,7 @@ export function LearningPathExplainChatProvider({
   const [isDesktopViewport, setIsDesktopViewport] = useState(false)
   const [panelMounted, setPanelMounted] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [mobileSheetDisplacesContent, setMobileSheetDisplacesContent] = useState(false)
   const [explainStatement, setExplainStatement] = useState<string | null>(null)
   const [problemContextPreamble, setProblemContextPreamble] = useState("")
   const [problemId, setProblemId] = useState(`learning-path-item:${currentItemId}`)
@@ -90,7 +95,7 @@ export function LearningPathExplainChatProvider({
   }, [chrome, explainStatement])
 
   const openPanel = useCallback(() => {
-    if (!isDesktopViewport || isTest) return
+    if (isTest) return
     setPanelMounted(true)
     setPanelOpen(false)
     requestAnimationFrame(() => {
@@ -98,11 +103,11 @@ export function LearningPathExplainChatProvider({
         setPanelOpen(true)
       })
     })
-  }, [isDesktopViewport, isTest])
+  }, [isTest])
 
   const openExplainChat = useCallback(
     (args: OpenLearningPathExplainChatArgs) => {
-      if (!isDesktopViewport || isTest) return
+      if (isTest) return
       setExplainStatement(args.problemStatement)
       setProblemContextPreamble(args.problemContextPreamble ?? "")
       setProblemId(args.problemId ?? `learning-path-item:${currentItemId}`)
@@ -111,17 +116,18 @@ export function LearningPathExplainChatProvider({
       setInitialUserMessageDisplay(
         args.initialUserMessageDisplay !== undefined
           ? args.initialUserMessageDisplay
-          : userMsg,
+          : "",
       )
       openPanel()
     },
-    [currentItemId, isDesktopViewport, isTest, openPanel],
+    [currentItemId, isTest, openPanel],
   )
 
   const toggleAiChat = useCallback(() => {
-    if (!isDesktopViewport || isTest) return
+    if (isTest) return
     if (panelOpen) {
       setPanelOpen(false)
+      setMobileSheetDisplacesContent(false)
       return
     }
     setExplainStatement(null)
@@ -129,10 +135,11 @@ export function LearningPathExplainChatProvider({
     setInitialUserMessage(null)
     setInitialUserMessageDisplay(null)
     openPanel()
-  }, [isDesktopViewport, isTest, openPanel, panelOpen])
+  }, [isTest, openPanel, panelOpen])
 
   const closeInsight = useCallback(() => {
     setPanelOpen(false)
+    setMobileSheetDisplacesContent(false)
   }, [])
 
   const onInitialMessageSent = useCallback(() => {
@@ -141,6 +148,8 @@ export function LearningPathExplainChatProvider({
   }, [])
 
   const layoutOpen = panelMounted && panelOpen && isDesktopViewport
+  const mobileLayoutOpen =
+    panelMounted && panelOpen && !isDesktopViewport && mobileSheetDisplacesContent
 
   const value = useMemo(
     () => ({
@@ -148,8 +157,15 @@ export function LearningPathExplainChatProvider({
       toggleAiChat,
       insightOpen: layoutOpen,
       isDesktopViewport,
+      mobileSheetDisplacesContent: mobileLayoutOpen,
     }),
-    [openExplainChat, toggleAiChat, layoutOpen, isDesktopViewport],
+    [
+      openExplainChat,
+      toggleAiChat,
+      layoutOpen,
+      isDesktopViewport,
+      mobileLayoutOpen,
+    ],
   )
 
   const showFab = !isTest && isDesktopViewport && !panelOpen
@@ -161,6 +177,22 @@ export function LearningPathExplainChatProvider({
         <LearningPathItemAiChatPanel
           isOpen={panelOpen}
           onClose={closeInsight}
+          resetKey={currentItemId}
+          problemId={problemId}
+          getContextStatement={resolveContextStatement}
+          problemContextPreamble={problemContextPreamble}
+          initialUserMessage={initialUserMessage}
+          initialUserMessageDisplay={initialUserMessageDisplay}
+          onInitialMessageSent={onInitialMessageSent}
+        />
+      ) : null}
+      {!isTest && !isDesktopViewport && panelMounted ? (
+        <LearningPathItemAiChatPanel
+          mobile
+          isOpen={panelOpen}
+          onClose={closeInsight}
+          onMobileDisplacementChange={setMobileSheetDisplacesContent}
+          mobileDefaultHeightRatio={MOBILE_CHAT_DEFAULT_HEIGHT_RATIO}
           resetKey={currentItemId}
           problemId={problemId}
           getContextStatement={resolveContextStatement}
