@@ -8,6 +8,7 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 import { useAuth } from "@/components/auth-provider"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -76,12 +77,14 @@ export function LearningPathItemAiChatPanel({
   onInitialMessageSent,
 }: LearningPathItemAiChatPanelProps) {
   const { user } = useAuth()
+  const { isFree } = useSubscriptionPlan()
   const { toast } = useToast()
   const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_MESSAGE])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [freePromptLimitReached, setFreePromptLimitReached] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const initialMessageSentRef = useRef(false)
   const lastInitialMessageRef = useRef<string | null>(null)
@@ -102,13 +105,14 @@ export function LearningPathItemAiChatPanel({
       messages[messages.length - 1]?.role === "assistant" &&
       !messages[messages.length - 1]?.content.trim(),
   )
-  const showEmptyStateDecor = visibleMessages.length === 0 && !busy
+  const showEmptyStateDecor = visibleMessages.length === 0 && !busy && !mobile
 
   useEffect(() => {
     setMessages([SYSTEM_MESSAGE])
     setSessionId(null)
     setInput("")
     setError(null)
+    setFreePromptLimitReached(false)
     initialMessageSentRef.current = false
     lastInitialMessageRef.current = null
     abortControllerRef.current?.abort()
@@ -271,7 +275,12 @@ export function LearningPathItemAiChatPanel({
         if (res.status === 429) {
           const data = await res.json()
           setMessages((prev) => prev.slice(0, -2))
-          setError(data.error || "Limită zilnică atinsă.")
+          if (isFree) {
+            setFreePromptLimitReached(true)
+            setError(null)
+          } else {
+            setError(data.error || "Limită zilnică atinsă.")
+          }
           return
         }
 
@@ -365,7 +374,7 @@ export function LearningPathItemAiChatPanel({
         setBusy(false)
       }
     },
-    [busy, input, messages, problemContextPreamble, problemId, sessionId, toast, user],
+    [busy, input, isFree, messages, problemContextPreamble, problemId, sessionId, toast, user],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -448,8 +457,14 @@ export function LearningPathItemAiChatPanel({
       aria-hidden={!isOpen}
     >
       {!mobile ? <LearningPathAiChatDelimiter /> : null}
+      {freePromptLimitReached ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[min(88%,34rem)] bg-[radial-gradient(ellipse_120%_95%_at_50%_100%,rgba(205,131,219,0.72)_0%,rgba(143,145,241,0.52)_28%,rgba(242,185,61,0.2)_52%,transparent_92%)] blur-[32px]"
+        />
+      ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-visible">
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-visible">
         {mobile ? (
           <div
             className="flex h-7 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
@@ -487,7 +502,7 @@ export function LearningPathItemAiChatPanel({
         <div
           ref={scrollRef}
           className={cn(
-            "relative min-h-0 flex-1 overscroll-contain px-4 py-2",
+            "relative flex min-h-0 flex-1 flex-col overscroll-contain px-4 py-2",
             showEmptyStateDecor ? "overflow-visible" : "overflow-y-auto",
           )}
         >
@@ -534,6 +549,25 @@ export function LearningPathItemAiChatPanel({
               ) : null}
             </div>
           )}
+          {freePromptLimitReached ? (
+            <div className="relative z-[1] mt-auto px-1 pb-3 pt-5">
+              <p className="text-center text-base font-bold text-black">
+                Ai rămas fără mesaje disponibile
+              </p>
+              <a
+                href="/pricing"
+                className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#9a5aa8]"
+                style={
+                  {
+                    "--start-glow-tint": "rgba(248, 220, 228, 0.88)",
+                    backgroundImage: "linear-gradient(to right, #8f91f1, #cd83db, #f2b93d)",
+                  } as React.CSSProperties
+                }
+              >
+                Încearcă Premium
+              </a>
+            </div>
+          ) : null}
           {error ? <p className="mt-3 text-center text-xs text-red-500">{error}</p> : null}
         </div>
 
@@ -564,7 +598,7 @@ export function LearningPathItemAiChatPanel({
               onKeyDown={handleKeyDown}
               placeholder="Cum te pot ajuta?"
               rows={1}
-              disabled={busy}
+              disabled={busy || freePromptLimitReached}
               className={cn(
                 "max-h-28 flex-1 resize-none bg-transparent text-sm text-[#222] placeholder:text-[#999] focus:outline-none",
                 mobile ? "min-h-5 leading-5" : "min-h-[24px]",
@@ -579,7 +613,7 @@ export function LearningPathItemAiChatPanel({
                 }
                 void submitMessage()
               }}
-              disabled={!busy && !input.trim()}
+              disabled={freePromptLimitReached || (!busy && !input.trim())}
               className={cn(
                 "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40",
                 mobile

@@ -214,6 +214,7 @@ const ITEM_TYPES: LearningPathLessonType[] = [
 
 const MARKERS = ["FORMULA", "ENUNT", "IMPORTANT", "DEFINITIE", "EXEMPLU", "INDENT", "COD"] as const
 const INLINE_MARKERS = ["CODINLINE"] as const
+type MarkerField = "custom_text_body" | "simulation_intro_markdown" | "poll_question"
 
 function createPollOption(index: number): PollOption {
   const labelByIndex = ["A", "B", "C", "D", "E", "F"]
@@ -620,6 +621,7 @@ export function LearningPathsManager({
   const [biologyGrilaDraft, setBiologyGrilaDraft] = useState<BiologyGrilaDraft>(createDefaultBiologyGrilaDraft)
   const [previewCustomText, setPreviewCustomText] = useState(false)
   const [previewSimulationIntro, setPreviewSimulationIntro] = useState(false)
+  const [previewPollQuestion, setPreviewPollQuestion] = useState(false)
 
   const isDev = mode === "dev"
   /** În mod dev, fără prop = `all` (toate capitolele/lecțiile/itemii). */
@@ -668,6 +670,7 @@ export function LearningPathsManager({
   const serverOrderedItemIdsRef = useRef<string[]>([])
   const customTextRef = useRef<HTMLTextAreaElement>(null)
   const simulationIntroRef = useRef<HTMLTextAreaElement>(null)
+  const pollQuestionRef = useRef<HTMLTextAreaElement>(null)
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession()
@@ -941,6 +944,7 @@ export function LearningPathsManager({
     setBiologyGrilaDraft(createDefaultBiologyGrilaDraft())
     setPreviewCustomText(false)
     setPreviewSimulationIntro(false)
+    setPreviewPollQuestion(false)
     resetExistingItemPicker()
   }
 
@@ -948,8 +952,14 @@ export function LearningPathsManager({
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev))
   }
 
-  const insertIntoField = (field: "custom_text_body" | "simulation_intro_markdown", text: string, selectOffset = 0, selectLength = 0) => {
-    const targetRef = field === "custom_text_body" ? customTextRef : simulationIntroRef
+  const getMarkerFieldRef = (field: MarkerField) => {
+    if (field === "custom_text_body") return customTextRef
+    if (field === "simulation_intro_markdown") return simulationIntroRef
+    return pollQuestionRef
+  }
+
+  const insertIntoField = (field: MarkerField, text: string, selectOffset = 0, selectLength = 0) => {
+    const targetRef = getMarkerFieldRef(field)
     const textarea = targetRef.current
     if (!form || !textarea) return
 
@@ -968,10 +978,10 @@ export function LearningPathsManager({
   }
 
   const insertMarker = (
-    field: "custom_text_body" | "simulation_intro_markdown",
+    field: MarkerField,
     marker: (typeof MARKERS)[number] | (typeof INLINE_MARKERS)[number]
   ) => {
-    const targetRef = field === "custom_text_body" ? customTextRef : simulationIntroRef
+    const targetRef = getMarkerFieldRef(field)
     const textarea = targetRef.current
     if (!form || !textarea) return
 
@@ -984,11 +994,11 @@ export function LearningPathsManager({
     insertIntoField(field, insertion, placeholderOffset, placeholderLength)
   }
 
-  const insertInlineLatex = (field: "custom_text_body" | "simulation_intro_markdown") => {
+  const insertInlineLatex = (field: MarkerField) => {
     insertIntoField(field, "$...$", 1, 3)
   }
 
-  const insertBlockLatex = (field: "custom_text_body" | "simulation_intro_markdown") => {
+  const insertBlockLatex = (field: MarkerField) => {
     insertIntoField(field, "$$...$$", 2, 3)
   }
 
@@ -2104,7 +2114,7 @@ export function LearningPathsManager({
     existingItemChapterFilter,
   ])
 
-  const renderMarkerToolbar = (field: "custom_text_body" | "simulation_intro_markdown") => (
+  const renderMarkerToolbar = (field: MarkerField) => (
     <div className="flex flex-wrap items-center gap-2">
       {MARKERS.map((marker) => (
         <Button
@@ -2543,13 +2553,29 @@ export function LearningPathsManager({
             placeholder="Alt text imagine (opțional)"
             className="bg-black/40 border-white/20 text-gray-100"
           />
+          {renderMarkerToolbar("poll_question")}
           <Textarea
+            ref={pollQuestionRef}
             value={form.poll_question}
             onChange={(e) => updateForm("poll_question", e.target.value)}
             rows={3}
-            placeholder="Întrebarea pentru sondaj"
-            className="bg-black/40 border-white/20 text-gray-100"
+            placeholder="Întrebarea pentru sondaj. Suportă [FORMULA], [IMPORTANT], [COD] (Python), [CODINLINE] și LaTeX."
+            className="font-mono bg-black/40 border-white/20 text-gray-100"
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewPollQuestion((prev) => !prev)}
+            className="border-white/20 bg-white/5 text-gray-200 hover:bg-white/10 hover:text-white"
+          >
+            {previewPollQuestion ? "Ascunde preview" : "Arată preview"}
+          </Button>
+          {previewPollQuestion && (
+            <div className="rounded-lg border border-white/15 bg-white p-4">
+              <LessonRichContent content={form.poll_question} theme="light" />
+            </div>
+          )}
 
           <div className="space-y-2">
             {form.poll_options.map((option, index) => (

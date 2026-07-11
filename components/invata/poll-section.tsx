@@ -16,6 +16,7 @@ import {
 } from "@/lib/learning-path-insight-context"
 import { useRegisterLearningPathFixedBottomBar, useRegisterLearningPathAiContext } from "@/components/invata/learning-path-item-chrome-context"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
+import { LessonRichContent, hasLessonMarkers } from "@/components/lesson-rich-content"
 import { cn } from "@/lib/utils"
 import type { LearningPathFlashcardBridge } from "@/lib/learning-path-flashcard-bridge"
 
@@ -264,10 +265,14 @@ export function PollSection({
       >
         <div className={cn("w-full max-w-3xl space-y-6", hasImage && "mx-auto my-auto")}>
           <div className="text-center text-lg font-bold leading-snug text-[#111111] md:text-xl md:leading-snug">
-            <LatexRichText
-              content={displayText}
-              className="break-words [&_.katex]:text-[#111111] [&_p]:mx-auto"
-            />
+            {hasLessonMarkers(displayText) ? (
+              <LessonRichContent content={displayText} theme="light" />
+            ) : (
+              <LatexRichText
+                content={displayText}
+                className="break-words [&_.katex]:text-[#111111] [&_p]:mx-auto"
+              />
+            )}
           </div>
           {children}
         </div>

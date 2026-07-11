@@ -12,6 +12,13 @@ interface LessonRichContentProps {
   emphasizedBody?: boolean
 }
 
+const MARKER_TAG_PATTERN = /\[(FORMULA|COD|CODINLINE|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]/
+
+/** True if `value` contains any of the `[FORMULA]`/`[IMPORTANT]`/`[COD]`/... markers this component parses. */
+export function hasLessonMarkers(value: string): boolean {
+  return MARKER_TAG_PATTERN.test(value)
+}
+
 const TAG_CLASS_MAP = {
   formula: "formula",
   enunt: "enunt",
