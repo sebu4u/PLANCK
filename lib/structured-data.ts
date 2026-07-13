@@ -198,6 +198,7 @@ export const homepageFaqStructuredData = faqStructuredData(
 export const articleStructuredData = (articleData: {
   title: string
   description: string
+  url?: string
   image?: string
   author: string
   publishedDate?: string
@@ -207,6 +208,12 @@ export const articleStructuredData = (articleData: {
   "@type": "Article",
   "headline": articleData.title,
   "description": articleData.description,
+  "mainEntityOfPage": articleData.url
+    ? {
+        "@type": "WebPage",
+        "@id": articleData.url,
+      }
+    : undefined,
   "image": articleData.image,
   "author": {
     "@type": "Person",

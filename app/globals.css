@@ -2227,6 +2227,33 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
   mix-blend-mode: screen;
 }
 
+.blog-admin-editor .blog-inline-ad-card {
+  position: relative;
+  outline: 2px dashed rgba(34, 211, 238, 0.45);
+  outline-offset: 6px;
+}
+
+.blog-admin-editor .blog-inline-ad-card::before {
+  content: "Card promo";
+  position: absolute;
+  top: -0.75rem;
+  left: 1rem;
+  z-index: 1;
+  border-radius: 9999px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(8, 47, 73, 0.92);
+  padding: 0.125rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(165, 243, 252);
+}
+
+.blog-admin-editor .ProseMirror-selectednode.blog-inline-ad-card {
+  outline-color: rgba(34, 211, 238, 0.85);
+}
+
 @keyframes fizica-map-pop-in {
   0% {
     opacity: 0;

@@ -681,6 +681,8 @@ export function DashboardAuth() {
                       <DashboardRankCard
                         rank={dashboardData.stats.rank}
                         elo={dashboardData.stats.elo}
+                        studentName={profile?.nickname || profile?.name || "Tu"}
+                        userId={user.id}
                       />
                     </div>
                   </div>

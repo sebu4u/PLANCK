@@ -141,7 +141,9 @@ export function isMobileAppShellRoute(
     pathname.startsWith("/profil") ||
     isClassroomsRoute(pathname) ||
     isProfesorRoute(pathname) ||
-    isGrileRoute(pathname)
+    isGrileRoute(pathname) ||
+    pathname === "/blog" ||
+    pathname.startsWith("/blog/")
   )
 }
 
@@ -221,6 +223,10 @@ export function getMobileTopBarContent(
 
   if (pathname === "/grile") {
     return { primary: "Grile" }
+  }
+
+  if (pathname === "/blog" || pathname?.startsWith("/blog/")) {
+    return { primary: "Blog" }
   }
 
   if (isClassroomsRoute(pathname)) {

@@ -12,6 +12,7 @@ import { slugify } from '@/lib/slug'
 import { supabase } from '@/lib/supabaseClient'
 import { createClient } from '@supabase/supabase-js'
 import { PLATFORM_SITE_URL } from '@/lib/platform-marketing'
+import { getPublishedBlogCategories, getPublishedBlogPosts } from '@/lib/blog'
 
 async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -61,6 +62,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = PLATFORM_SITE_URL
 
   const problemEntries = await fetchPhysicsProblemsSitemapEntries(baseUrl)
+  const [blogPosts, blogCategories] = await Promise.all([
+    getPublishedBlogPosts(),
+    getPublishedBlogCategories(),
+  ])
 
   // Learning path lesson URLs
   const learningPathLessons: Array<{ url: string; updated_at: string }> = []
@@ -107,6 +112,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 1,
+    },
+    {
+      url: `${baseUrl}/blog`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
     },
     // Paginated problems pages (first 10)
     ...Array.from({ length: 10 }, (_, i) => ({
@@ -236,6 +247,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(lesson.updated_at),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
+    })),
+    ...blogCategories.map((category) => ({
+      url: `${baseUrl}/blog/categorie/${encodeURIComponent(category.slug)}`,
+      lastModified: new Date(category.updated_at),
+      changeFrequency: 'weekly' as const,
+      priority: 0.65,
+    })),
+    ...blogPosts.map((post) => ({
+      url: `${baseUrl}${post.canonical_path || `/blog/${post.slug}`}`,
+      lastModified: new Date(post.updated_at),
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
     })),
     ...problemEntries,
   ]

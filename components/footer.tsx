@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 import { Facebook, Instagram, Youtube, Mail } from "lucide-react"
 
@@ -164,6 +165,17 @@ export function Footer({
                 </Link>
               </li>
             </ul>
+            <div className="mt-8">
+              <p className={`text-sm font-medium ${sectionTitleClass}`}>Plată în siguranță cu:</p>
+              <Image
+                src="/stripe-logo.png"
+                alt="Stripe"
+                width={96}
+                height={40}
+                unoptimized
+                className="mt-2 h-10 w-auto object-contain object-left"
+              />
+            </div>
           </div>
         </div>
 

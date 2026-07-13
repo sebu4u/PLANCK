@@ -12,6 +12,7 @@ import {
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound } from "lucide-react"
+import { BlogNotificationsDropdown } from "@/components/blog/blog-notifications-dropdown"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -441,6 +442,7 @@ export function Navigation() {
   const isRegisterRoute = pathname === '/register'
   const isTransparentRoute = isHomepage || isRegisterRoute
   const isPlanckCodeRoute = isPlanckCodeShellRoute(pathname)
+  const isBlogRoute = pathname?.startsWith("/blog") ?? false
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
   const isInvataSubjectHub =
@@ -468,7 +470,8 @@ export function Navigation() {
     isProfesorTemeRoute(pathname) ||
     isProfesorResurseRoute(pathname) ||
     isGrileRoute ||
-    isProfileRoute
+    isProfileRoute ||
+    isBlogRoute
   const isCoursePage = pathname?.startsWith('/cursuri') ?? false
   /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
   const isGuestProblemeOrCursuri =
@@ -541,6 +544,13 @@ export function Navigation() {
   const navHoverBg = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
+  const blogNotificationsBell = (
+    <BlogNotificationsDropdown
+      useLightNav={useLightNav}
+      dropdownBackground={navTheme.dropdownBackground}
+      dropdownBorder={navTheme.dropdownBorder}
+    />
+  )
   const navDropShadowOnDesktop =
     pathname?.startsWith('/invata') ||
     isGrileRoute ||
@@ -568,6 +578,8 @@ export function Navigation() {
           ? "shadow-none burger:shadow-md"
           : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
+  // Planck Code routes (IDE + enunț informatică) folosesc navbar-ul întunecat, nu shell-ul alb mobil.
+  const showMobileAppShellNav = showMobileAppShell && !isPlanckCodeRoute
   const showMobileBottomNav = shouldShowMobileBottomNav(pathname, Boolean(user))
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
@@ -610,17 +622,19 @@ export function Navigation() {
     }
     return () => document.body.classList.remove("mobile-app-shell")
   }, [showMobileAppShell])
-  const mobileShellNavSurfaceClass = showMobileFocusedShell
-    ? "bg-[#ffffff] border-transparent"
-    : showInvataHubMobileNav
-      ? useLightNav
-        ? `${navTheme.background} border-transparent`
-        : "bg-[#ffffff] border-transparent burger:bg-[#0d1117]"
-    : showMobileAppShell
-      ? useLightNav
-        ? `${navTheme.background} ${navTheme.border}`
-        : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
-      : `${navTheme.background} ${navTheme.border}`
+  const mobileShellNavSurfaceClass = isPlanckCodeRoute
+    ? `${navTheme.background} ${navTheme.border}`
+    : showMobileFocusedShell
+      ? "bg-[#ffffff] border-transparent"
+      : showInvataHubMobileNav
+        ? useLightNav
+          ? `${navTheme.background} border-transparent`
+          : "bg-[#ffffff] border-transparent burger:bg-[#0d1117]"
+      : showMobileAppShellNav
+        ? useLightNav
+          ? `${navTheme.background} ${navTheme.border}`
+          : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
+        : `${navTheme.background} ${navTheme.border}`
   const navBackdropClass = showMobileFocusedShell
     ? ""
     : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
@@ -669,26 +683,29 @@ export function Navigation() {
                     </nav>
                   )
                 ) : isGuestProblemeOrCursuri ? (
-                  <div className="flex min-w-0 flex-1 items-center gap-2 pr-1">
-                    <Link
-                      href="/"
-                      className={`flex min-w-0 items-center gap-1.5 text-base font-bold sm:gap-2 sm:text-lg ${navPrimaryText} title-font`}
-                    >
-                      <Rocket className="h-5 w-5 shrink-0" />
-                      <span className="min-w-0 truncate font-black">PLANCK</span>
-                    </Link>
-                    <Link
-                      href="/register"
-                      className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold transition-colors ${
-                        useLightNav
-                          ? "text-[#7c3aed] hover:text-[#6d28d9]"
-                          : "text-violet-400 hover:text-violet-300"
-                      }`}
-                    >
-                      <span className="whitespace-nowrap">Începe gratuit</span>
-                      <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                    </Link>
-                  </div>
+                  <>
+                    <div className="flex min-w-0 flex-1 items-center gap-2 pr-1">
+                      <Link
+                        href="/"
+                        className={`flex min-w-0 items-center gap-1.5 text-base font-bold sm:gap-2 sm:text-lg ${navPrimaryText} title-font`}
+                      >
+                        <Rocket className="h-5 w-5 shrink-0" />
+                        <span className="min-w-0 truncate font-black">PLANCK</span>
+                      </Link>
+                      <Link
+                        href="/register"
+                        className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold transition-colors ${
+                          useLightNav
+                            ? "text-[#7c3aed] hover:text-[#6d28d9]"
+                            : "text-violet-400 hover:text-violet-300"
+                        }`}
+                      >
+                        <span className="whitespace-nowrap">Începe gratuit</span>
+                        <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                      </Link>
+                    </div>
+                    <div className="flex shrink-0 items-center">{blogNotificationsBell}</div>
+                  </>
                 ) : showMobileLessonShell ? (
                   <>
                     <Link
@@ -698,8 +715,9 @@ export function Navigation() {
                     >
                       <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                     </Link>
-                    <div className="flex shrink-0 items-center">
-                      <NavbarTestBatteries useLightNav />
+                    <div className="flex shrink-0 items-center gap-2">
+                      <NavbarTestBatteries useLightNav variant="pill" />
+                      {blogNotificationsBell}
                     </div>
                   </>
                 ) : showMobileGrileShell ? (
@@ -711,11 +729,12 @@ export function Navigation() {
                     >
                       <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                     </Link>
-                    <div className="flex shrink-0 items-center">
-                      <NavbarTestBatteries useLightNav />
+                    <div className="flex shrink-0 items-center gap-2">
+                      <NavbarTestBatteries useLightNav variant="pill" />
+                      {blogNotificationsBell}
                     </div>
                   </>
-                ) : showMobileAppShell ? (
+                ) : showMobileAppShellNav ? (
                   <>
                     <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
                       {showMobilePracticeSubjectSwitcher ? (
@@ -739,7 +758,8 @@ export function Navigation() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <NavbarEloDisplay userElo={userElo} useLightNav />
-                      <NavbarTestBatteries useLightNav />
+                      <NavbarTestBatteries useLightNav variant="pill" />
+                      {blogNotificationsBell}
                     </div>
                   </>
                 ) : (
@@ -823,6 +843,7 @@ export function Navigation() {
                           —
                         </span>
                       )}
+                      {blogNotificationsBell}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -1010,6 +1031,8 @@ export function Navigation() {
                   <span className="flex-1 text-left">Search...</span>
                   <kbd className={`px-1.5 py-0.5 text-xs ${useLightNav ? 'bg-gray-200 border-gray-300' : 'bg-white/10 border-white/10'} border rounded`}>/</kbd>
                 </button>
+
+                {blogNotificationsBell}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

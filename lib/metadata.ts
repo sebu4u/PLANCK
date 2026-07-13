@@ -73,6 +73,26 @@ export const baseMetadata: Metadata = {
 
 // Page-specific metadata configurations
 export const pageMetadata: Record<string, Metadata> = {
+  blog: {
+    title: "Blog educațional pentru liceu – BAC, admitere și învățare",
+    description:
+      "Ghiduri, explicații și resurse pentru liceu: pregătire pentru BAC și admitere la fizică, matematică, informatică și biologie.",
+    keywords: "blog educațional, bac, admitere, liceu, fizică, matematică, informatică, biologie",
+    alternates: {
+      canonical: "/blog",
+    },
+    openGraph: {
+      title: "Blog educațional PLANCK",
+      description: "Ghiduri și resurse pentru BAC, admitere și învățarea la liceu.",
+      url: `${PLATFORM_SITE_URL}/blog`,
+      type: "website",
+    },
+    twitter: {
+      title: "Blog educațional PLANCK",
+      description: "Ghiduri și resurse pentru BAC, admitere și liceu.",
+      card: "summary_large_image",
+    },
+  },
   "planckcode-ide": {
     title: "PlanckCode IDE – C++ & Python Online în Browser",
     description: "IDE online C++ și Python cu compilator integrat: scrii, compilezi și rulezi cod direct în browser, cu autocompletare, erori în timp real și asistent AI.",

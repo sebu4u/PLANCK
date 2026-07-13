@@ -7,7 +7,7 @@ import { LP_TEST_MAX_BATTERIES } from "@/hooks/use-lp-test-battery-state"
 interface LpTestBatteryStripProps {
   count: number
   max?: number
-  variant?: "default" | "compact"
+  variant?: "default" | "compact" | "pill"
   useLightNav?: boolean
 }
 
@@ -17,6 +17,33 @@ export function LpTestBatteryStrip({
   variant = "default",
   useLightNav = false,
 }: LpTestBatteryStripProps) {
+  if (variant === "pill") {
+    const hasBatteries = count > 0
+    const iconClass = hasBatteries
+      ? useLightNav
+        ? "text-amber-500"
+        : "text-amber-400"
+      : useLightNav
+        ? "text-gray-400"
+        : "text-gray-500"
+
+    return (
+      <div
+        className={cn(
+          "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5",
+          useLightNav
+            ? "border-gray-200 bg-white text-gray-900"
+            : "border-white/10 bg-white/5 text-white",
+        )}
+      >
+        <span className="min-w-[0.75rem] text-center text-base font-bold tabular-nums leading-none">
+          {count}
+        </span>
+        <TestBatteryIcon filled={hasBatteries} className={cn("h-5 w-5", iconClass)} />
+      </div>
+    )
+  }
+
   if (variant === "compact") {
     const filledClass = useLightNav ? "text-emerald-600" : "text-emerald-400"
     const emptyClass = useLightNav ? "text-gray-400" : "text-gray-500"

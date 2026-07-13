@@ -6,9 +6,10 @@ import { LP_TEST_MAX_BATTERIES, useLpTestBatteryState } from "@/hooks/use-lp-tes
 
 interface NavbarTestBatteriesProps {
   useLightNav: boolean
+  variant?: "compact" | "pill"
 }
 
-export function NavbarTestBatteries({ useLightNav }: NavbarTestBatteriesProps) {
+export function NavbarTestBatteries({ useLightNav, variant = "compact" }: NavbarTestBatteriesProps) {
   const { state, loading } = useLpTestBatteryState()
   const count = state?.count ?? 0
 
@@ -22,10 +23,10 @@ export function NavbarTestBatteries({ useLightNav }: NavbarTestBatteriesProps) {
     >
       {loading ? (
         <span className="inline-flex opacity-50" aria-hidden>
-          <LpTestBatteryStrip count={0} variant="compact" useLightNav={useLightNav} />
+          <LpTestBatteryStrip count={0} variant={variant} useLightNav={useLightNav} />
         </span>
       ) : (
-        <LpTestBatteryStrip count={count} variant="compact" useLightNav={useLightNav} />
+        <LpTestBatteryStrip count={count} variant={variant} useLightNav={useLightNav} />
       )}
     </NavbarInfoTooltip>
   )
