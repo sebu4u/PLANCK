@@ -15,7 +15,6 @@ import { toast } from "@/lib/sonner"
 import { playNotificationSound } from "@/lib/platform-sounds"
 import { useAuth } from "@/components/auth-provider"
 import { EngagementCard } from "@/components/engagement/engagement-card"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { ENGAGEMENT_QUEUE_LIMIT } from "@/lib/engagement/cooldowns"
 import { isLearningPathItemRoute } from "@/lib/engagement/routes"
 import {
@@ -53,24 +52,22 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const isMobile = useIsMobile()
-  const suppressMobileLearningPathNotifications =
-    isMobile && isLearningPathItemRoute(pathname)
+  const suppressLearningPathNotifications = isLearningPathItemRoute(pathname)
   const [queue, setQueue] = useState<EngagementNotification[]>([])
   const [activeCard, setActiveCard] = useState<EngagementNotification | null>(null)
   const [cardVisible, setCardVisible] = useState(false)
   const processingRef = useRef(false)
 
   useEffect(() => {
-    if (!suppressMobileLearningPathNotifications) return
+    if (!suppressLearningPathNotifications) return
     setQueue([])
     setCardVisible(false)
     setActiveCard(null)
-  }, [suppressMobileLearningPathNotifications])
+  }, [suppressLearningPathNotifications])
 
   const renderNotification = useCallback(
     (notification: EngagementNotification) => {
-      if (suppressMobileLearningPathNotifications) return
+      if (suppressLearningPathNotifications) return
 
       markEngagementNotificationShown(notification, user?.id)
       logEngagementNotificationShown(notification, user?.id)
@@ -96,7 +93,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
       playNotificationSound()
       window.setTimeout(() => setCardVisible(true), 50)
     },
-    [router, suppressMobileLearningPathNotifications, user?.id]
+    [router, suppressLearningPathNotifications, user?.id]
   )
 
   const processQueue = useCallback(() => {
@@ -128,7 +125,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback(
     (input: EngagementNotificationInput) => {
-      if (suppressMobileLearningPathNotifications) return
+      if (suppressLearningPathNotifications) return
 
       const notification = createNotification(input)
       if (
@@ -157,15 +154,15 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
           .slice(0, ENGAGEMENT_QUEUE_LIMIT)
       )
     },
-    [activeCard, renderNotification, suppressMobileLearningPathNotifications, user?.id]
+    [activeCard, renderNotification, suppressLearningPathNotifications, user?.id]
   )
 
   useEffect(() => {
-    if (suppressMobileLearningPathNotifications || !queue.length || activeCard) return
+    if (suppressLearningPathNotifications || !queue.length || activeCard) return
     const waitMs = Math.max(500, getMsUntilGlobalAvailable(user?.id))
     const timer = window.setTimeout(processQueue, waitMs)
     return () => window.clearTimeout(timer)
-  }, [activeCard, processQueue, queue.length, suppressMobileLearningPathNotifications, user?.id])
+  }, [activeCard, processQueue, queue.length, suppressLearningPathNotifications, user?.id])
 
   const dismissActiveCard = useCallback(() => {
     if (!activeCard) return

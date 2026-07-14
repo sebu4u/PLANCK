@@ -23,7 +23,14 @@ export function LessonPoll({ imageSrc, imageAlt, options }: LessonPollProps) {
   const pollState = usePollState()
   if (!pollState) return null
 
-  const { selectedId, setSelectedId, verified, correctAnswerId } = pollState
+  const {
+    selectedId,
+    setSelectedId,
+    verified,
+    isCorrect,
+    disabledWrongIds,
+    correctAnswerId,
+  } = pollState
 
   const showImage = imageSrc.trim().length > 0
 
@@ -38,27 +45,34 @@ export function LessonPoll({ imageSrc, imageAlt, options }: LessonPollProps) {
         {options.map((opt) => {
           const isSelected = selectedId === opt.id
           const isCorrectOpt = opt.id === correctAnswerId
+          const isExcludedWrong = disabledWrongIds.has(opt.id)
           const isChosenWrong = verified && isSelected && !isCorrectOpt
-          const showFeedback = verified
+          const showAsCorrect = verified && isCorrect === true && isCorrectOpt
+          const canSelect = !verified && !isExcludedWrong
 
           return (
             <button
               key={opt.id}
               type="button"
-              onClick={() => !verified && setSelectedId(opt.id)}
-              disabled={verified}
+              onClick={() => canSelect && setSelectedId(opt.id)}
+              disabled={verified || isExcludedWrong}
               className={cn(
                 POLL_OPTION_CARD_BASE,
-                !showFeedback && !isSelected && "border-[#cfc3dc] shadow-[0_4px_0_#9d8ab3]",
-                !showFeedback && isSelected && "border-violet-500 shadow-[0_4px_0_#5b21b6]",
-                showFeedback && isCorrectOpt && "border-emerald-500 shadow-[0_4px_0_#047857]",
+                canSelect && !isSelected && "border-[#cfc3dc] shadow-[0_4px_0_#9d8ab3]",
+                canSelect && isSelected && "border-violet-500 shadow-[0_4px_0_#5b21b6]",
+                showAsCorrect && "border-emerald-500 shadow-[0_4px_0_#047857]",
                 isChosenWrong && "border-red-500 shadow-[0_4px_0_#b91c1c]",
-                verified && "cursor-default"
+                isExcludedWrong &&
+                  "cursor-not-allowed border-[#e0e0e0] bg-[#f3f3f3] text-[#999999] shadow-none",
+                verified && !isExcludedWrong && "cursor-default"
               )}
             >
               <LatexRichText
                 content={opt.label}
-                className="break-words text-[#222] [&_.katex]:text-[#222] [&_p]:mx-auto [&_p]:my-0"
+                className={cn(
+                  "break-words [&_.katex]:text-[#222] [&_p]:mx-auto [&_p]:my-0",
+                  isExcludedWrong && "text-[#999999] [&_.katex]:text-[#999999]",
+                )}
               />
             </button>
           )

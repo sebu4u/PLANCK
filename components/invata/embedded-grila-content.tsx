@@ -43,8 +43,9 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
     throw new Error("EmbeddedGrilaContent must be used inside GrilaLessonProvider")
   }
 
-  const { selectedAnswers, toggleAnswer, isVerified } = ctx
+  const { selectedAnswers, disabledWrongAnswers, toggleAnswer, isVerified, isCorrect } = ctx
   const selectedSet = new Set(selectedAnswers)
+  const disabledWrongSet = new Set(disabledWrongAnswers)
   const correctSet = new Set(getCorrectAnswerKeys(question))
   const answerEntries = getActiveAnswerEntries(question.answers)
   const displayTitle = question.title?.trim() || question.question_id
@@ -91,24 +92,27 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {answerEntries.map(([key, text]) => {
           const isSelected = selectedSet.has(key)
-          const state = !isVerified
-            ? isSelected
-              ? "selected"
-              : "default"
-            : correctSet.has(key) && isSelected
-              ? "correct"
-              : correctSet.has(key)
+          const isExcludedWrong = disabledWrongSet.has(key)
+          const state = isExcludedWrong
+            ? "excluded"
+            : !isVerified
+              ? isSelected
+                ? "selected"
+                : "default"
+              : isCorrect === true && correctSet.has(key)
                 ? "correct"
-                : isSelected
+                : isSelected && !correctSet.has(key)
                   ? "incorrect"
-                  : "disabled"
+                  : "default"
+
+          const canSelect = !isVerified && !isExcludedWrong
 
           return (
             <button
               key={key}
               type="button"
-              onClick={() => !isVerified && toggleAnswer(key)}
-              disabled={isVerified}
+              onClick={() => canSelect && toggleAnswer(key)}
+              disabled={isVerified || isExcludedWrong}
               className={cn(
                 "flex w-full items-start gap-3 rounded-2xl border border-[#ececec] bg-white p-4 text-left shadow-[0_1px_0_rgba(0,0,0,0.04)] transition-all",
                 state === "default" &&
@@ -119,9 +123,9 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
                   "border-emerald-500/55 bg-emerald-50/90",
                 state === "incorrect" &&
                   "border-rose-500/55 bg-rose-50/90",
-                state === "disabled" &&
-                  "border-[#ececec] bg-[#fafafa] opacity-65",
-                isVerified && "cursor-default"
+                state === "excluded" &&
+                  "cursor-not-allowed border-[#e0e0e0] bg-[#f3f3f3] opacity-80",
+                isVerified && state !== "excluded" && "cursor-default"
               )}
             >
               <div
@@ -131,7 +135,7 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
                   state === "selected" && "bg-[#8b5cf6]/30 text-[#7c3aed]",
                   state === "correct" && "bg-emerald-500/30 text-emerald-700",
                   state === "incorrect" && "bg-rose-500/30 text-rose-700",
-                  state === "disabled" && "bg-[#e5e5e5] text-[#999999]"
+                  state === "excluded" && "bg-[#d9d9d9] text-[#999999]"
                 )}
               >
                 {state === "correct" ? (
@@ -149,7 +153,7 @@ export function EmbeddedGrilaContent({ question }: EmbeddedGrilaContentProps) {
                   state === "selected" && "text-[#111111]",
                   state === "correct" && "text-emerald-800",
                   state === "incorrect" && "text-rose-800",
-                  state === "disabled" && "text-[#999999]"
+                  state === "excluded" && "text-[#999999]"
                 )}
               >
                 <LatexContent content={text} />

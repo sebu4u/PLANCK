@@ -11,7 +11,11 @@ import {
 import type { AnswerKey, QuizQuestion } from "@/lib/types/quiz-questions"
 import { markQuestionAsSolved } from "@/lib/supabase-quiz"
 import { playErrorSound } from "@/lib/platform-sounds"
-import { isMultiSelectQuizQuestion, verifyQuizSelection } from "@/lib/quiz-question-utils"
+import {
+  getCorrectAnswerKeys,
+  isMultiSelectQuizQuestion,
+  verifyQuizSelection,
+} from "@/lib/quiz-question-utils"
 
 function playSuccessSound() {
   try {
@@ -41,6 +45,7 @@ const ANSWER_KEYS_ORDER: AnswerKey[] = ["A", "B", "C", "D", "E", "F"]
 
 type GrilaLessonContextValue = {
   selectedAnswers: AnswerKey[]
+  disabledWrongAnswers: AnswerKey[]
   toggleAnswer: (key: AnswerKey) => void
   isVerified: boolean
   /** După verificare: true/false; înainte de verificare null */
@@ -63,13 +68,15 @@ export function GrilaLessonProvider({
   children: ReactNode
 }) {
   const multiSelect = isMultiSelectQuizQuestion(question)
+  const correctAnswerKeys = useMemo(() => new Set(getCorrectAnswerKeys(question)), [question])
   const [selectedAnswers, setSelectedAnswers] = useState<AnswerKey[]>([])
+  const [disabledWrongAnswers, setDisabledWrongAnswers] = useState<AnswerKey[]>([])
   const [isVerified, setIsVerified] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
 
   const toggleAnswer = useCallback(
     (key: AnswerKey) => {
-      if (isVerified) return
+      if (isVerified || disabledWrongAnswers.includes(key)) return
 
       setSelectedAnswers((prev) => {
         if (!multiSelect) {
@@ -84,7 +91,7 @@ export function GrilaLessonProvider({
         return ANSWER_KEYS_ORDER.filter((answerKey) => next.has(answerKey))
       })
     },
-    [isVerified, multiSelect],
+    [disabledWrongAnswers, isVerified, multiSelect],
   )
 
   const verify = useCallback(async () => {
@@ -102,21 +109,38 @@ export function GrilaLessonProvider({
   }, [selectedAnswers, isVerified, question])
 
   const reset = useCallback(() => {
+    if (isCorrect === false && selectedAnswers.length > 0) {
+      const wrongSelected = selectedAnswers.filter((key) => !correctAnswerKeys.has(key))
+      if (wrongSelected.length > 0) {
+        setDisabledWrongAnswers((prev) =>
+          ANSWER_KEYS_ORDER.filter((key) => new Set([...prev, ...wrongSelected]).has(key)),
+        )
+      }
+    }
     setSelectedAnswers([])
     setIsVerified(false)
     setIsCorrect(null)
-  }, [])
+  }, [correctAnswerKeys, isCorrect, selectedAnswers])
 
   const value = useMemo(
     () => ({
       selectedAnswers,
+      disabledWrongAnswers,
       toggleAnswer,
       isVerified,
       isCorrect,
       verify,
       reset,
     }),
-    [selectedAnswers, isVerified, isCorrect, verify, reset, toggleAnswer],
+    [
+      selectedAnswers,
+      disabledWrongAnswers,
+      isVerified,
+      isCorrect,
+      verify,
+      reset,
+      toggleAnswer,
+    ],
   )
 
   return (

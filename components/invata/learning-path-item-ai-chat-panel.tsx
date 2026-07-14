@@ -10,7 +10,6 @@ import "katex/dist/katex.min.css"
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
-import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { LP_AI_CHAT_PANEL_WIDTH_CLASS } from "@/lib/learning-path-ai-chat-layout"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
@@ -78,7 +77,6 @@ export function LearningPathItemAiChatPanel({
 }: LearningPathItemAiChatPanelProps) {
   const { user } = useAuth()
   const { isFree } = useSubscriptionPlan()
-  const { toast } = useToast()
   const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_MESSAGE])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState("")
@@ -186,15 +184,6 @@ export function LearningPathItemAiChatPanel({
       const textToSend = textOverride ?? input
       if (!textToSend.trim() || busy) return
 
-      if (!user) {
-        toast({
-          title: "Cont necesar",
-          description: "Autentifică-te pentru a folosi asistentul AI.",
-          variant: "destructive",
-        })
-        return
-      }
-
       setBusy(true)
       setError(null)
 
@@ -203,19 +192,20 @@ export function LearningPathItemAiChatPanel({
         const controller = new AbortController()
         abortControllerRef.current = controller
 
-        const { data: sessionData } = await supabase.auth.getSession()
-        const accessToken = sessionData.session?.access_token
-        if (!accessToken) {
-          toast({
-            title: "Eroare",
-            description: "Necesită autentificare.",
-            variant: "destructive",
-          })
-          return
+        const isGuest = !user
+
+        let accessToken: string | null = null
+        if (!isGuest) {
+          const { data: sessionData } = await supabase.auth.getSession()
+          accessToken = sessionData.session?.access_token ?? null
+          if (!accessToken) {
+            setError("Necesită autentificare.")
+            return
+          }
         }
 
         let currentSessionId = sessionId
-        if (!currentSessionId) {
+        if (!isGuest && accessToken && !currentSessionId) {
           const sessRes = await fetch("/api/insight/sessions", {
             method: "POST",
             headers: {
@@ -255,27 +245,38 @@ export function LearningPathItemAiChatPanel({
         ])
         if (!textOverride) setInput("")
 
+        const fetchHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        }
+        if (accessToken) {
+          fetchHeaders.Authorization = `Bearer ${accessToken}`
+        }
+
         const res = await fetch("/api/insight/chat", {
           method: "POST",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            sessionId: currentSessionId,
-            input: finalContent,
-            visibleInput: displayContent,
-            persona: "problem_tutor",
-            source: "learning_path_item",
-          }),
+          headers: fetchHeaders,
+          body: JSON.stringify(
+            isGuest
+              ? {
+                  messages: [...priorForApi, { role: "user", content: finalContent }],
+                  persona: "problem_tutor",
+                }
+              : {
+                  sessionId: currentSessionId,
+                  input: finalContent,
+                  visibleInput: displayContent,
+                  persona: "problem_tutor",
+                  source: "learning_path_item",
+                },
+          ),
           signal: controller.signal,
         })
 
         if (res.status === 429) {
           const data = await res.json()
           setMessages((prev) => prev.slice(0, -2))
-          if (isFree) {
+          if (isGuest || isFree) {
             setFreePromptLimitReached(true)
             setError(null)
           } else {
@@ -342,6 +343,16 @@ export function LearningPathItemAiChatPanel({
                   }
                   return next
                 })
+              } else if (data.type === "done" && data.anonLimitReached) {
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1]
+                  if (last?.role === "assistant") {
+                    return prev.slice(0, -1)
+                  }
+                  return prev
+                })
+                setFreePromptLimitReached(true)
+                setError(null)
               } else if (data.type === "error") {
                 throw new Error(data.error || "Eroare la procesarea răspunsului.")
               }
@@ -368,13 +379,12 @@ export function LearningPathItemAiChatPanel({
         })
         const errorMsg = e instanceof Error ? e.message : "Eroare la comunicarea cu Insight."
         setError(errorMsg)
-        toast({ title: "Eroare", description: errorMsg, variant: "destructive" })
       } finally {
         abortControllerRef.current = null
         setBusy(false)
       }
     },
-    [busy, input, isFree, messages, problemContextPreamble, problemId, sessionId, toast, user],
+    [busy, input, isFree, messages, problemContextPreamble, problemId, sessionId, user],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

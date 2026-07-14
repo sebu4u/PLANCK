@@ -51,6 +51,7 @@ interface PollStateContextValue {
   setSelectedId: (id: string | null) => void
   verified: boolean
   isCorrect: boolean | null
+  disabledWrongIds: ReadonlySet<string>
   displayText: string
   question: string
   correctAnswerId: string
@@ -100,6 +101,7 @@ export function PollSection({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [verified, setVerified] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
+  const [disabledWrongIds, setDisabledWrongIds] = useState<Set<string>>(() => new Set())
   const [displayText, setDisplayText] = useState(question)
   const [eloAward, setEloAward] = useState<LearningPathEloAward | null>(null)
   const explainChat = useLearningPathExplainChat()
@@ -132,12 +134,15 @@ export function PollSection({
   }, [selectedId, correctAnswerId, options, awardCorrectAnswerElo, registerFailure, resetFailures])
 
   const onRetry = useCallback(() => {
+    if (selectedId !== null && selectedId !== correctAnswerId) {
+      setDisabledWrongIds((prev) => new Set([...prev, selectedId]))
+    }
     setSelectedId(null)
     setVerified(false)
     setIsCorrect(null)
     setDisplayText(question)
     setEloAward(null)
-  }, [question])
+  }, [question, selectedId, correctAnswerId])
 
   const barState: PollBarState = !verified ? "verify" : isCorrect ? "correct" : "incorrect"
   const onContinue = useLearningPathItemCompletion({
@@ -243,6 +248,7 @@ export function PollSection({
         setSelectedId,
         verified,
         isCorrect,
+        disabledWrongIds,
         displayText,
         question,
         correctAnswerId,

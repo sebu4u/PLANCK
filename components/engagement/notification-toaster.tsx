@@ -1,8 +1,13 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import { Toaster } from "sonner"
+import { isLearningPathItemRoute } from "@/lib/engagement/routes"
 
 export function EngagementNotificationToaster() {
+  const pathname = usePathname()
+  if (isLearningPathItemRoute(pathname)) return null
+
   return (
     <Toaster
       richColors
