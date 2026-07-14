@@ -1,4 +1,6 @@
 import { ConcursNavbar } from "@/components/concurs/concurs-navbar"
+import { pageTitle } from "@/lib/metadata"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft, PlayCircle, BookOpen, ExternalLink, ChevronRight, FileQuestion } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -62,6 +64,11 @@ const problemIds = [
     "M036", "M039", "M042", "M045", "M048", "M051", "M054", "M057", "M060", "M063",
     "M066", "M069", "M072", "M075", "M078", "M081", "M084", "M087", "M089", "M090"
 ];
+
+export const metadata: Metadata = {
+  title: pageTitle("Materiale concurs clasa a IX-a"),
+  description: "Materiale de pregătire pentru Concursul Național de Fizică PLANCK – clasa a IX-a.",
+}
 
 export default function MaterialsPage() {
     return (

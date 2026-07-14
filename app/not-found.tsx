@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { pageTitle } from "@/lib/metadata"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
@@ -6,6 +7,7 @@ import { Footer } from "@/components/footer"
 import { AlertTriangle, Home } from "lucide-react"
 
 export const metadata: Metadata = {
+  title: pageTitle("Pagină negăsită"),
   robots: {
     index: false,
     follow: false,

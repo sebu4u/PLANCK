@@ -1,7 +1,14 @@
 import { ConcursNavbar } from "@/components/concurs/concurs-navbar"
+import { pageTitle } from "@/lib/metadata"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: pageTitle("Regulament concurs"),
+  description: "Regulamentul oficial al Concursului Național de Fizică PLANCK.",
+}
 
 export default function RegulamentPage() {
     return (

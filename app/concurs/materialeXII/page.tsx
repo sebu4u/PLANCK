@@ -1,7 +1,14 @@
 import { ConcursNavbar } from "@/components/concurs/concurs-navbar"
+import { pageTitle } from "@/lib/metadata"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft, BookOpen, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: pageTitle("Materiale concurs clasa a XII-a"),
+  description: "Materiale de pregătire pentru Concursul Național de Fizică PLANCK – clasa a XII-a.",
+}
 
 export default function MaterialsXIIPage() {
     const previousGrades = [

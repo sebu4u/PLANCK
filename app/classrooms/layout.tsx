@@ -1,11 +1,18 @@
 import type { ReactNode } from "react"
+import type { Metadata } from "next"
 import nextDynamic from "next/dynamic"
+import { pageTitle } from "@/lib/metadata"
 import { ClassroomAssignmentDraftProvider } from "@/components/classrooms/classroom-assignment-draft-context"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
 import { ClassroomsPageSkeleton } from "@/components/classrooms/classroom-skeletons"
 import { getClassroomsForUser, requireAuthenticatedUser } from "@/lib/classrooms/server"
 
 const Navigation = nextDynamic(() => import("@/components/navigation").then((module) => module.Navigation))
+
+export const metadata: Metadata = {
+  title: pageTitle("Săli de clasă"),
+  robots: { index: false, follow: false },
+}
 
 const ClassroomsShell = nextDynamic(
   () => import("@/components/classrooms/classrooms-shell").then((module) => module.ClassroomsShell),

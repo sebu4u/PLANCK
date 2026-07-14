@@ -4,11 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
-import { ArrowLeft, Loader2, Lock, Sparkles } from "lucide-react"
+import { ArrowLeft, Loader2, Lock, Pencil, Sparkles, X } from "lucide-react"
 import { Navigation } from "@/components/navigation"
-import { ProblemStatementSection } from "./problem-statement-section"
+import { useAuth } from "@/components/auth-provider"
+import { ProblemStatementSection, ProblemStatementTabsList, type ProblemContentTab } from "./problem-statement-section"
 import { CodingProblem, CodingProblemExample } from "./types"
 import { Button } from "@/components/ui/button"
+import { Tabs } from "@/components/ui/tabs"
+import { canAccessCatalog } from "@/lib/dev-subjects"
+import {
+  buildPatchPayloadFromDraft,
+  problemToContentDraft,
+  type InformaticsContentDraft,
+  type InformaticsPatchMetadata,
+} from "@/lib/informatics-problem-content"
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -101,14 +110,34 @@ type DetailState =
   | { status: "error"; message: string }
   | { status: "locked" }
 
+async function getAuthJsonHeaders(): Promise<Record<string, string> | null> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) return null
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  }
+}
+
 export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientProps) {
   const pathname = usePathname()
+  const { isDev, devSubjects, isAdmin, profileSyncedUserId, user } = useAuth()
   const floatingIde = usePlanckIdeFloatingOptional()
   const registerLiveSession = floatingIde?.registerLiveSession
   const [state, setState] = useState<DetailState>({ status: "idle" })
   const [isAgentOpen, setIsAgentOpen] = useState(false)
   const [agentBridge, setAgentBridge] = useState<EmbeddedIdeAgentBridge | null>(null)
   const [isDesktopViewport, setIsDesktopViewport] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState<InformaticsContentDraft | null>(null)
+  const [editMetadata, setEditMetadata] = useState<InformaticsPatchMetadata>({})
+  const [editBusy, setEditBusy] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editFlash, setEditFlash] = useState<string | null>(null)
+  const [ideRevision, setIdeRevision] = useState(0)
+  const [contentTab, setContentTab] = useState<ProblemContentTab>("enunt")
 
   useEffect(() => {
     const syncViewport = () => {
@@ -119,8 +148,10 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
     return () => window.removeEventListener("resize", syncViewport)
   }, [])
 
-  const loadDetails = useCallback(async () => {
-    setState({ status: "loading" })
+  const loadDetails = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setState({ status: "loading" })
+    }
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const accessToken = sessionData.session?.access_token
@@ -173,13 +204,97 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
     return Number.isFinite(loadedProblem.class) ? `Clasa a ${loadedProblem.class}-a` : undefined
   }, [loadedProblem])
 
-  const metaText = useMemo(() => {
-    if (!loadedProblem) return ""
-    const items = [loadedProblem.difficulty, classLabel, loadedProblem.chapter].filter(
-      (item): item is string => Boolean(item && item.trim().length > 0)
-    )
-    return items.join(" • ")
+  const problemMetaLine = useMemo(() => {
+    if (!loadedProblem) return []
+    return [
+      loadedProblem.difficulty?.trim() || null,
+      classLabel ?? null,
+      loadedProblem.chapter?.trim() || null,
+    ].filter((item): item is string => Boolean(item))
   }, [loadedProblem, classLabel])
+
+  const profileSynced = Boolean(user && profileSyncedUserId === user.id)
+  const canEditProblem =
+    profileSynced && canAccessCatalog(isDev, devSubjects, "informatics", isAdmin)
+
+  const handleEnterEdit = useCallback(async () => {
+    if (!loadedProblem) return
+    setEditError(null)
+    setEditFlash(null)
+    setEditLoading(true)
+    try {
+      const headers = await getAuthJsonHeaders()
+      if (!headers) {
+        setEditError("Sesiune indisponibilă.")
+        return
+      }
+
+      const res = await fetch(`/api/dev/problems/${encodeURIComponent(slug)}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setEditError(typeof data.error === "string" ? data.error : "Nu am putut încărca datele pentru editare.")
+        return
+      }
+
+      const problem = data.problem as Record<string, unknown>
+      const tests = (data.tests as Array<Record<string, unknown>>) ?? []
+      setEditDraft(problemToContentDraft(problem, tests))
+      setEditMetadata({
+        is_active: problem.is_active !== false,
+        explanation_markdown:
+          typeof problem.explanation_markdown === "string" ? problem.explanation_markdown : "",
+      })
+      setIsEditing(true)
+    } finally {
+      setEditLoading(false)
+    }
+  }, [loadedProblem, slug])
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false)
+    setEditDraft(null)
+    setEditMetadata({})
+    setEditError(null)
+    setEditFlash(null)
+  }, [])
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!loadedProblem || !editDraft) return
+    setEditBusy(true)
+    setEditError(null)
+    setEditFlash(null)
+    try {
+      const headers = await getAuthJsonHeaders()
+      if (!headers) {
+        setEditError("Sesiune indisponibilă.")
+        return
+      }
+
+      const res = await fetch(`/api/dev/problems/${encodeURIComponent(slug)}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(buildPatchPayloadFromDraft(loadedProblem, editDraft, editMetadata)),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setEditError(typeof data.error === "string" ? data.error : "Eroare la salvare.")
+        return
+      }
+
+      setEditFlash("Problema a fost actualizată.")
+      setIsEditing(false)
+      setEditDraft(null)
+      setEditMetadata({})
+      setIdeRevision((n) => n + 1)
+      await loadDetails({ silent: true })
+    } finally {
+      setEditBusy(false)
+    }
+  }, [loadedProblem, editDraft, editMetadata, slug, loadDetails])
+
+  const handleDraftChange = useCallback((patch: Partial<InformaticsContentDraft>) => {
+    setEditDraft((current) => (current ? { ...current, ...patch } : current))
+  }, [])
 
   const renderStatusContent = () => {
     switch (state.status) {
@@ -197,7 +312,7 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
             <p className="text-lg font-semibold text-white">Nu am putut încărca problema</p>
             <p className="max-w-md text-sm text-white/60">{state.message}</p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button onClick={loadDetails} className="rounded-full border border-white/15 bg-white text-black">
+              <Button onClick={() => void loadDetails()} className="rounded-full border border-white/15 bg-white text-black">
                 Reîncearcă
               </Button>
               <Link href="/informatica/probleme">
@@ -239,6 +354,9 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   }
 
   const isReady = state.status === "loaded" && loadedProblem
+  const showPremiumHintsContent = Boolean(
+    isEditing || loadedProblem?.canAccessPremiumHints
+  )
   const floatingSession = floatingIde?.session
   const restoreFloatingWorkspace =
     Boolean(floatingSession && floatingSession.returnPath === pathname && floatingSession.files.length > 0)
@@ -269,11 +387,62 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
               <ResizablePanelGroup direction="horizontal" className="flex-1 max-md:flex-col">
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-auto max-md:!min-h-[50vh]">
                   <StatementPanelBackground defaultBackgroundClass="bg-[#121212]">
-                    <ResizablePanelGroup direction="vertical" className="h-full">
+                    <Tabs
+                      value={contentTab}
+                      onValueChange={(value) => setContentTab(value as ProblemContentTab)}
+                      className="flex h-full min-h-0 flex-col"
+                    >
+                      <div className="z-20 w-full shrink-0 bg-[#282828]">
+                        <ProblemStatementTabsList
+                          showPremiumContent={showPremiumHintsContent}
+                          theme="dark"
+                          variant="panel-header"
+                        />
+                      </div>
+                      <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
                       <ResizablePanel defaultSize={isAgentOpen ? 58 : 100} minSize={30}>
                         <ScrollArea className="h-full">
                           <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 lg:px-12">
-                            <div className="mb-8 flex flex-wrap items-center gap-3">
+                            <div className="mb-8 space-y-3">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                                {problemMetaLine.map((item, index) => (
+                                  <span key={item} className="inline-flex items-center gap-2">
+                                    {index > 0 ? (
+                                      <span className="text-white/25" aria-hidden>
+                                        •
+                                      </span>
+                                    ) : null}
+                                    <span className="text-white/60">{item}</span>
+                                  </span>
+                                ))}
+                                {loadedProblem.language ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    {problemMetaLine.length > 0 ? (
+                                      <span className="text-white/25" aria-hidden>
+                                        •
+                                      </span>
+                                    ) : null}
+                                    {loadedProblem.language === "python" ? (
+                                      <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
+                                        Python
+                                      </span>
+                                    ) : (
+                                      <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-100/90">
+                                        C++
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : null}
+                                {loadedProblem.isFreeMonthly ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="text-white/25" aria-hidden>
+                                      •
+                                    </span>
+                                    <span className="text-xs font-medium text-emerald-300">Free luna aceasta</span>
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-3">
                               <Button
                                 asChild
                                 variant="outline"
@@ -288,12 +457,54 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                                   Înapoi la catalog
                                 </Link>
                               </Button>
+                              {canEditProblem && !isEditing ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={editLoading}
+                                  onClick={() => void handleEnterEdit()}
+                                  className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                >
+                                  {editLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Pencil className="h-4 w-4" />
+                                  )}
+                                  Editează
+                                </Button>
+                              ) : null}
+                              {isEditing ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={editBusy}
+                                    onClick={() => void handleSaveEdit()}
+                                    className="rounded-full bg-white text-black hover:bg-white/90"
+                                  >
+                                    {editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvează"}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={editBusy}
+                                    onClick={handleCancelEdit}
+                                    className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                  >
+                                    <X className="h-4 w-4" />
+                                    Anulează
+                                  </Button>
+                                </>
+                              ) : null}
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setIsAgentOpen((open) => !open)}
                                 aria-pressed={isAgentOpen}
+                                disabled={isEditing}
                                 className={`rounded-full border-white/20 text-white hover:bg-white/20 ${
                                   isAgentOpen ? "bg-white/15" : "bg-white/10"
                                 }`}
@@ -301,28 +512,29 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                                 <Sparkles className="h-4 w-4" />
                                 {isAgentOpen ? "Închide Agent" : "Planck Agent"}
                               </Button>
-                              {metaText && (
-                                <span className="text-sm font-medium text-white/50">
-                                  {metaText}
-                                </span>
-                              )}
-                              {loadedProblem?.language === "python" && (
-                                <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
-                                  Python
-                                </span>
-                              )}
-                              {loadedProblem?.language !== "python" && (
-                                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-100/90">
-                                  C++
-                                </span>
-                              )}
-                              {loadedProblem?.isFreeMonthly && (
-                                <span className="text-xs font-medium text-emerald-300">
-                                  Free luna aceasta
-                                </span>
-                              )}
+                              </div>
                             </div>
-                            <ProblemStatementSection problem={loadedProblem} examples={loadedExamples} />
+                            {editFlash ? (
+                              <p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                                {editFlash}
+                              </p>
+                            ) : null}
+                            {editError ? (
+                              <p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                                {editError}
+                              </p>
+                            ) : null}
+                            <ProblemStatementSection
+                              problem={loadedProblem}
+                              examples={loadedExamples}
+                              mode={isEditing && editDraft ? "edit" : "view"}
+                              draft={editDraft ?? undefined}
+                              onDraftChange={handleDraftChange}
+                              editDisabled={editBusy}
+                              activeTab={contentTab}
+                              onActiveTabChange={setContentTab}
+                              tabsRootPlacement="external"
+                            />
                           </div>
                         </ScrollArea>
                       </ResizablePanel>
@@ -342,6 +554,7 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                         </>
                       ) : null}
                     </ResizablePanelGroup>
+                    </Tabs>
                   </StatementPanelBackground>
                 </ResizablePanel>
 
@@ -350,6 +563,7 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-[50vh]">
                   <div className="h-full overflow-hidden bg-black">
                     <EmbeddedIDE
+                      key={`${slug}-${ideRevision}`}
                       defaultLanguage={loadedProblem.language === "python" ? "python" : "cpp"}
                       initialFiles={restoreFloatingWorkspace ? floatingSession!.files : undefined}
                       initialActiveFileId={

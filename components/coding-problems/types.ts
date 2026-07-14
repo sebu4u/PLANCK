@@ -18,6 +18,11 @@ export interface CodingProblem {
   sample_input?: string | null;
   sample_output?: string | null;
   explanation_markdown?: string | null;
+  hint_1_markdown?: string | null;
+  hint_2_markdown?: string | null;
+  solution_markdown?: string | null;
+  /** Hint 2 și soluția sunt vizibile doar pentru Plus/Premium (setat de API). */
+  canAccessPremiumHints?: boolean;
   boilerplate_cpp?: string | null;
   /** Limbajul oficial al problemei (starter + IDE embed). */
   language?: "cpp" | "python";

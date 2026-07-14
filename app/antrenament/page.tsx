@@ -1,9 +1,10 @@
 import { TrainingPageContent } from "@/components/antrenament/training-page-content"
+import { pageTitle } from "@/lib/metadata"
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
 export const metadata: Metadata = {
-    title: { absolute: "Antrenament | Planck" },
+    title: pageTitle("Antrenament"),
     description: "Teste de antrenament pentru concursul de fizică PLANCK.",
 }
 

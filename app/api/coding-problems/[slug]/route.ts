@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import type { CodingProblem } from "@/components/coding-problems/types";
 import { parseAccessToken } from "@/lib/subscription-plan-server";
 import { createServerClientWithToken } from "@/lib/supabaseServer";
 import { logger } from "@/lib/logger";
-import { getActiveCodingProblemBySlug, isCodingProblemUnlocked } from "@/lib/coding-problems-access";
+import {
+  applyCodingProblemPremiumGating,
+  getActiveCodingProblemBySlug,
+  isCodingProblemUnlocked,
+  resolveCanAccessPremiumHints,
+} from "@/lib/coding-problems-access";
 
 // Server-side: access environment variables directly
 // These are validated at build time in next.config.mjs
@@ -45,6 +51,9 @@ export async function GET(
     );
   }
 
+  const userPlan = await resolveCanAccessPremiumHints(authedSupabase, accessToken);
+  const canAccessPremiumHints = userPlan;
+
   const { data: examples, error: examplesError } = await supabase
     .from("coding_problem_examples")
     .select("*")
@@ -56,11 +65,14 @@ export async function GET(
   }
 
   return NextResponse.json({
-    problem: {
-      ...problem,
-      tags: Array.isArray(problem.tags) ? problem.tags : [],
-      isFreeMonthly,
-    },
+    problem: applyCodingProblemPremiumGating(
+      {
+        ...(problem as CodingProblem),
+        tags: Array.isArray(problem.tags) ? problem.tags : [],
+        isFreeMonthly,
+      },
+      canAccessPremiumHints
+    ),
     examples: examples ?? [],
   });
 }

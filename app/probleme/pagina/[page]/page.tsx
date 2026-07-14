@@ -28,10 +28,10 @@ export async function generateMetadata({ params }: { params: Promise<{ page: str
   const { page } = await params
   const pageNum = Number(page) || 1
   return generatePageMetadata('problems', {
-    title: `Probleme de fizică - Pagina ${pageNum}`,
+    title: `Probleme fizică – pagina ${pageNum}`,
     alternates: { canonical: `/probleme/pagina/${pageNum}` },
     openGraph: {
-      title: `Probleme de fizică - Pagina ${pageNum}`,
+      title: `Probleme fizică – pagina ${pageNum}`,
       url: `https://www.planck.academy/probleme/pagina/${pageNum}`,
     }
   })

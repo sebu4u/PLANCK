@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { notFound } from "next/navigation"
 import ProblemDetailClient from "@/app/probleme/[id]/ProblemDetailClient"
+import { dynamicTitleSegment, pageTitle } from "@/lib/metadata"
 import { MATH_PROBLEMS_SOLVE_COLUMNS } from "@/data/math-problems"
 import { mathProblemRowToProblem } from "@/lib/math-problem-to-learning-path-problem"
 
@@ -62,11 +63,11 @@ export async function generateMetadata(props: MathProblemDetailPageProps) {
   const problem = id ? await fetchProblem(id) : null
 
   if (!problem) {
-    return { title: "Problemă negăsită" }
+    return { title: pageTitle('Problemă negăsită') }
   }
 
   return {
-    title: `${problem.title} – Probleme de Matematică | PLANCK`,
+    title: dynamicTitleSegment(problem.title),
     description: problem.description || problem.statement.slice(0, 160),
   }
 }

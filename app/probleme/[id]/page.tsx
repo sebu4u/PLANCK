@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { createClient } from "@supabase/supabase-js"
 import type { Problem } from "@/data/problems"
 import ProblemDetailClient from "./ProblemDetailClient"
-import { baseMetadata } from "@/lib/metadata"
+import { baseMetadata, pageTitle } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
 import {
   buildProblemKeywords,
@@ -72,7 +72,7 @@ export async function generateMetadata({ params }: ProblemPageProps): Promise<Me
   const { id } = await params
   const problem = await getProblemCached(id)
   if (!problem) {
-    return { title: { absolute: "Problemă negăsită | PLANCK" } }
+    return { title: pageTitle('Problemă negăsită') }
   }
 
   const description = buildProblemMetaDescription(problem)

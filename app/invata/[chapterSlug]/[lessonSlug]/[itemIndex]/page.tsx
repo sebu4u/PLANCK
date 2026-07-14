@@ -4,7 +4,7 @@ import { Navigation } from "@/components/navigation"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
 import { LearningPathItemExperience } from "@/components/invata/learning-path-item-experience"
 import { ITEM_TYPE_LABEL } from "@/components/invata/learning-path-item-body"
-import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
+import { generateMetadata as generatePageMetadata, dynamicTitleSegment } from "@/lib/metadata"
 import {
   getCanonicalLearningPathLessonPath,
   getLearningPathLessonItems,
@@ -48,7 +48,7 @@ export async function generateMetadata({
   const canonicalPath = getCanonicalLearningPathLessonPath(chapter, lesson, parsedIndex)
 
   return {
-    title: `${item.title || ITEM_TYPE_LABEL[item.item_type]} | ${lesson.title} | PLANCK`,
+    title: dynamicTitleSegment(item.title || ITEM_TYPE_LABEL[item.item_type]),
     description: lesson.description || `Item din lecția ${lesson.title}.`,
     alternates: {
       canonical: canonicalPath,

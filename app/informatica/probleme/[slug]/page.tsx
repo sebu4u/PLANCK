@@ -1,3 +1,4 @@
+import { dynamicTitleSegment, pageTitle } from "@/lib/metadata"
 import { CodingProblemDetailClient } from "@/components/coding-problems/problem-detail-client"
 import { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import { createClient } from "@supabase/supabase-js"
@@ -69,12 +70,12 @@ export async function generateMetadata(props: CodingProblemDetailPageProps) {
 
   if (!data) {
     return {
-      title: "Problemă negăsită",
+      title: pageTitle('Problemă negăsită'),
     }
   }
 
   return {
-    title: `${data.problem.title} - Probleme de Informatică | PLANCK`,
+    title: dynamicTitleSegment(data.problem.title),
     description: data.problem.requirement_markdown || data.problem.statement_markdown,
   }
 }

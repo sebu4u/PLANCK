@@ -5,6 +5,7 @@ import { Footer } from "@/components/footer"
 import { BlogContentLayout } from "@/components/blog/blog-content-layout"
 import { BlogPostCard } from "@/components/blog/blog-post-card"
 import { getPublishedBlogCategories, getPublishedPostsByCategory } from "@/lib/blog"
+import { dynamicTitleSegment } from "@/lib/metadata"
 import { PLATFORM_SITE_URL } from "@/lib/platform-marketing"
 
 export const revalidate = 3600
@@ -20,15 +21,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!result) return { robots: { index: false, follow: false } }
 
   const { category } = result
-  const title = category.meta_title || `${category.name}: ghiduri și resurse pentru liceu`
+  const titleSegment = dynamicTitleSegment(
+    category.meta_title || `${category.name} – ghiduri liceu`,
+  )
   const description = category.meta_description || category.description || `Articole PLANCK despre ${category.name}.`
   const url = `${PLATFORM_SITE_URL}/blog/categorie/${category.slug}`
   return {
-    title,
+    title: titleSegment,
     description,
     alternates: { canonical: `/blog/categorie/${category.slug}` },
-    openGraph: { type: "website", title, description, url },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: { type: "website", title: titleSegment, description, url },
+    twitter: { card: "summary_large_image", title: titleSegment, description },
   }
 }
 

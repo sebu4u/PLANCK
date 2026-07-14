@@ -1,4 +1,5 @@
 import type { Problem } from "@/data/problems"
+import { BRAND_SUFFIX, truncateForPageTitle } from "@/lib/metadata"
 
 const META_DESC_MAX = 158
 const VISIBLE_EXCERPT_MAX = 420
@@ -43,8 +44,7 @@ export function buildProblemMetaDescription(problem: Problem): string {
 
 export function buildProblemPageTitle(problem: Problem): string {
   const title = stripMarkupForSeo(problem.title) || `Problemă ${problem.id}`
-  const cat = problem.category?.trim()
-  return cat ? `${title} – ${cat} | PLANCK` : `${title} – Probleme de fizică | PLANCK`
+  return `${truncateForPageTitle(title)}${BRAND_SUFFIX}`
 }
 
 export function buildProblemKeywords(problem: Problem): string {

@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import { createAdminClient } from "@/lib/supabaseAdmin"
-import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
+import { dynamicTitleSegment } from "@/lib/metadata"
 import type { Metadata } from "next"
 import type { LearningPathLesson } from "@/lib/supabase-learning-paths"
 
@@ -18,7 +18,9 @@ export async function generateMetadata({
     .select("title, generation_status")
     .eq("slug", chapterSlug.trim())
     .maybeSingle()
-  return generatePageMetadata(data?.title ?? "Curs personalizat")
+  return {
+    title: dynamicTitleSegment(data?.title ?? "Curs personalizat"),
+  }
 }
 
 export default async function PersonalizedChapterStatusPage({

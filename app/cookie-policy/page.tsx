@@ -4,8 +4,10 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { CookieManager } from '@/lib/cookie-management'
 
+import { pageTitle } from '@/lib/metadata'
+
 export const metadata: Metadata = {
-  title: 'Politica Cookie-uri - PLANCK',
+  title: pageTitle('Politica cookie-uri'),
   description: 'Informații despre cookie-urile utilizate pe platforma PLANCK și modul în care le gestionăm conform GDPR.',
   robots: 'index, follow'
 }

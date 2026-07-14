@@ -3,10 +3,8 @@ import {
   PLATFORM_DESCRIPTION,
   PLATFORM_KEYWORDS,
   PLATFORM_SITE_URL,
-  PLATFORM_TAGLINE,
   HOME_TITLE,
   LEARNING_PATHS_DESCRIPTION,
-  LEARNING_PATHS_TITLE,
   INSIGHT_DESCRIPTION,
   PLANCKCODE_DESCRIPTION,
   QUIZ_COUNT,
@@ -17,11 +15,37 @@ import {
 
 const OG_IMAGE = 'https://i.ibb.co/DHgVg7gr/Untitled-design-4.png'
 
+/** Suffix appended to every page title (also used as Next.js title template). */
+export const BRAND_SUFFIX = ' | Planck'
+
+/** Max characters for dynamic title content before the brand suffix. */
+export const PAGE_TITLE_CONTENT_MAX = 45
+
+/** Build a full absolute page title: "{segment} | Planck". */
+export function pageTitle(segment: string): Metadata['title'] {
+  return { absolute: `${segment}${BRAND_SUFFIX}` }
+}
+
+/** Truncate dynamic content so the final title stays within SEO-friendly length. */
+export function truncateForPageTitle(text: string, max = PAGE_TITLE_CONTENT_MAX): string {
+  const t = text.trim()
+  if (t.length <= max) return t
+  const slice = t.slice(0, max - 1)
+  const lastSpace = slice.lastIndexOf(' ')
+  const cut = lastSpace > max * 0.5 ? slice.slice(0, lastSpace) : slice
+  return `${cut.trim()}…`
+}
+
+/** Title segment for dynamic pages — template adds BRAND_SUFFIX automatically. */
+export function dynamicTitleSegment(content: string): string {
+  return truncateForPageTitle(content)
+}
+
 // Base metadata configuration
 export const baseMetadata: Metadata = {
   title: {
-    default: `Planck Academy – ${PLATFORM_TAGLINE}`,
-    template: "%s – Planck Academy"
+    default: `${HOME_TITLE}${BRAND_SUFFIX}`,
+    template: `%s${BRAND_SUFFIX}`,
   },
   description: PLATFORM_DESCRIPTION,
   keywords: PLATFORM_KEYWORDS,
@@ -42,7 +66,7 @@ export const baseMetadata: Metadata = {
     locale: 'ro_RO',
     url: PLATFORM_SITE_URL,
     siteName: 'Planck Academy',
-    title: `Planck Academy – ${PLATFORM_TAGLINE}`,
+    title: `${HOME_TITLE}${BRAND_SUFFIX}`,
     description: PLATFORM_DESCRIPTION,
     images: [
       {
@@ -54,7 +78,7 @@ export const baseMetadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Planck Academy – ${PLATFORM_TAGLINE}`,
+    title: `${HOME_TITLE}${BRAND_SUFFIX}`,
     description: PLATFORM_DESCRIPTION,
     images: [OG_IMAGE],
   },
@@ -74,7 +98,7 @@ export const baseMetadata: Metadata = {
 // Page-specific metadata configurations
 export const pageMetadata: Record<string, Metadata> = {
   blog: {
-    title: "Blog educațional pentru liceu – BAC, admitere și învățare",
+    title: pageTitle('Blog educațional liceu'),
     description:
       "Ghiduri, explicații și resurse pentru liceu: pregătire pentru BAC și admitere la fizică, matematică, informatică și biologie.",
     keywords: "blog educațional, bac, admitere, liceu, fizică, matematică, informatică, biologie",
@@ -94,7 +118,7 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
   "planckcode-ide": {
-    title: "PlanckCode IDE – C++ & Python Online în Browser",
+    title: pageTitle('PlanckCode IDE – C++ & Python online'),
     description: "IDE online C++ și Python cu compilator integrat: scrii, compilezi și rulezi cod direct în browser, cu autocompletare, erori în timp real și asistent AI.",
     keywords: "C++ compiler online, Python IDE online, compilator C++ online, IDE C++ online, Python in browser, editor C++ online, browser IDE, coding environment",
     alternates: {
@@ -111,17 +135,15 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
   home: {
-    title: {
-      absolute: `${HOME_TITLE} | Planck Academy`
-    },
+    title: pageTitle(HOME_TITLE),
     description: PLATFORM_DESCRIPTION,
     keywords: PLATFORM_KEYWORDS,
     openGraph: {
-      title: `${HOME_TITLE} | Planck Academy`,
+      title: `${HOME_TITLE}${BRAND_SUFFIX}`,
       description: PLATFORM_DESCRIPTION,
     },
     twitter: {
-      title: `${HOME_TITLE} | Planck Academy`,
+      title: `${HOME_TITLE}${BRAND_SUFFIX}`,
       description: PLATFORM_DESCRIPTION,
       images: [OG_IMAGE],
       card: 'summary_large_image',
@@ -129,7 +151,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   courses: {
-    title: "Cursuri Video – Integrate în Traseele Planck",
+    title: pageTitle('Cursuri video liceu'),
     description: "Lecții video HD integrate în traseele de învățare Planck Academy. Fizică, matematică și informatică pentru clasele 9–12, cu explicații clare pentru notă la clasă, BAC și admitere.",
     keywords: "cursuri liceu, lecții video liceu, trasee invatare, fizică liceu, clasa 9, clasa 10, clasa 11, clasa 12",
     openGraph: {
@@ -139,7 +161,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "physics-lessons": {
-    title: "Lecții de Fizică – Trasee și Capitole Structurate",
+    title: pageTitle('Lecții fizică – capitole structurate'),
     description: "Lecții de fizică pentru clasele 9–12, structurate pe capitole și integrate în traseele Planck. Explicații clare, exemple practice și pregătire pentru BAC și admitere.",
     keywords: "lecții fizică, lecții clasa 9, lecții clasa 10, capitole fizică, trasee invatare fizica, bac fizica",
     alternates: {
@@ -172,14 +194,14 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "learning-paths": {
-    title: LEARNING_PATHS_TITLE,
+    title: pageTitle('Trasee învățare liceu 9–12'),
     description: LEARNING_PATHS_DESCRIPTION,
     keywords: "trasee invatare, learning paths liceu, invata, capitole, lectii, clasa 9 10 11 12, bac, admitere, planck academy",
     alternates: {
       canonical: "/invata",
     },
     openGraph: {
-      title: `${LEARNING_PATHS_TITLE} | Planck Academy`,
+      title: `Trasee învățare liceu 9–12${BRAND_SUFFIX}`,
       description: LEARNING_PATHS_DESCRIPTION,
       url: `${PLATFORM_SITE_URL}/invata`,
       type: "website",
@@ -193,7 +215,7 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: LEARNING_PATHS_TITLE,
+      title: `Trasee învățare liceu 9–12${BRAND_SUFFIX}`,
       description: LEARNING_PATHS_DESCRIPTION,
       images: [OG_IMAGE],
       card: "summary_large_image",
@@ -201,7 +223,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   exerseaza: {
-    title: "Exersează – Probleme, Grile, Teste și Flashcard | PLANCK",
+    title: pageTitle('Exersează – probleme, grile, teste'),
     description:
       "Alege cum vrei să exersezi: catalog de probleme, grile, teste și flashcard-uri personalizate din traseele de învățare.",
     keywords:
@@ -223,7 +245,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   invataFizica: {
-    title: "Învață Fizică – Harta Lecțiilor | PLANCK",
+    title: pageTitle('Fizică – harta lecțiilor'),
     description:
       "Parcurge lecțiile de fizică pas cu pas pe harta interactivă. Traseu structurat pentru liceu, de la mecanică la termodinamică.",
     keywords:
@@ -245,7 +267,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   invataMate: {
-    title: "Învață Matematică – Harta Lecțiilor | PLANCK",
+    title: pageTitle('Matematică – harta lecțiilor'),
     description:
       "Parcurge lecțiile de matematică pas cu pas pe harta interactivă. Traseu structurat pentru liceu, de la algebră la analiză.",
     keywords:
@@ -267,7 +289,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   invataInfo: {
-    title: "Învață Informatică – Harta Lecțiilor | PLANCK",
+    title: pageTitle('Informatică – harta lecțiilor'),
     description:
       "Parcurge lecțiile de informatică pas cu pas pe harta interactivă. Traseu structurat pentru liceu, de la algoritmi la programare.",
     keywords:
@@ -289,7 +311,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   problems: {
-    title: "Probleme Rezolvate Video & Catalog – BAC, Admitere, Clasă | PLANCK",
+    title: pageTitle('Probleme fizică – soluții video'),
     description: `Peste ${VIDEO_SOLUTIONS_COUNT} probleme cu soluții video explicate și catalog complet pentru liceu. Pregătire pentru BAC, admitere medicină și politehnică. ${TEACHER_VERIFICATION}.`,
     keywords: "probleme fizica, probleme rezolvate video, bacalaureat fizica, admitere medicina fizica, teste grila fizica, exercitii fizica rezolvate, culegere fizica online",
     openGraph: {
@@ -299,7 +321,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   about: {
-    title: { absolute: "Despre Planck — Echipa și Misiunea Noastră" },
+    title: pageTitle('Despre Planck'),
     description: `Planck Academy te ajută să obții nota dorită la clasă, BAC sau admitere. Trasee de învățare 9–12, ${QUIZ_COUNT} grile, ${VIDEO_SOLUTIONS_COUNT} soluții video, ${TESTIMONIALS_LABEL}. ${TEACHER_VERIFICATION}.`,
     keywords: "despre planck, echipa planck, trasee invatare, grile liceu, Insight AI, PlanckCode, Planck Sketch, Raptor1, platformă educațională, IDE C++ Python online",
     alternates: {
@@ -317,7 +339,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   contact: {
-    title: { absolute: "Contact | Planck" },
+    title: pageTitle('Contact'),
     description: "Contactează echipa PLANCK pentru întrebări, suport tehnic sau colaborări. Suntem aici să te ajutăm!",
     keywords: "contact planck, suport planck, întrebări planck, ajutor liceu",
     openGraph: {
@@ -327,7 +349,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   login: {
-    title: "Autentificare - PLANCK",
+    title: pageTitle('Autentificare'),
     description: "Autentifică-te în contul tău PLANCK pentru a accesa traseele de învățare, grilele și problemele video.",
     keywords: "autentificare planck, login planck, cont planck, acces trasee invatare",
     openGraph: {
@@ -337,7 +359,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   register: {
-    title: "Înregistrare - PLANCK",
+    title: pageTitle('Înregistrare'),
     description: "Creează-ți contul PLANCK gratuit și începe traseele de învățare pentru nota dorită la clasă, BAC sau admitere.",
     keywords: "înregistrare planck, cont nou planck, înscriere planck, gratuit, trasee invatare",
     openGraph: {
@@ -347,7 +369,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   profile: {
-    title: "Profil - PLANCK",
+    title: pageTitle('Profil'),
     description: "Gestionează-ți profilul PLANCK, vezi progresul în trasee și personalizează-ți experiența de învățare.",
     keywords: "profil planck, progres invatare, statistici planck, cont personal",
     openGraph: {
@@ -357,7 +379,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   help: {
-    title: { absolute: "Ajutor | Planck" },
+    title: pageTitle('Ajutor'),
     description: "Ghid complet pentru utilizarea platformei PLANCK. Află cum să navighezi prin trasee, grile și probleme video.",
     keywords: "ajutor planck, ghid planck, tutorial planck, suport utilizatori, trasee invatare",
     openGraph: {
@@ -367,7 +389,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   terms: {
-    title: "Termeni și Condiții - PLANCK",
+    title: pageTitle('Termeni și condiții'),
     description: "Termenii și condițiile de utilizare a platformei PLANCK. Citește cu atenție înainte de a utiliza serviciile noastre.",
     keywords: "termeni condiții planck, utilizare planck, drepturi planck, obligații utilizatori",
     openGraph: {
@@ -377,7 +399,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   privacy: {
-    title: "Politica de Confidențialitate - PLANCK",
+    title: pageTitle('Confidențialitate'),
     description: "Politica noastră de confidențialitate explică cum colectăm, utilizăm și protejăm datele tale personale.",
     keywords: "confidențialitate planck, date personale, protecție date, gdpr",
     openGraph: {
@@ -387,7 +409,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "class-9": {
-    title: "Fizică Clasa a 9-a - Trasee, Cursuri și Probleme | PLANCK",
+    title: pageTitle('Fizică clasa a 9-a'),
     description: "Trasee de învățare și cursuri complete de fizică pentru clasa a 9-a. Videoclipuri, grile și probleme practice pentru nota dorită.",
     keywords: "fizică clasa 9, trasee clasa 9, cursuri clasa 9, probleme clasa 9, mecanică, optică, termodinamică",
     openGraph: {
@@ -397,7 +419,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "class-10": {
-    title: "Fizică Clasa a 10-a - Trasee, Cursuri și Probleme | PLANCK",
+    title: pageTitle('Fizică clasa a 10-a'),
     description: "Trasee de învățare și cursuri complete de fizică pentru clasa a 10-a. Videoclipuri, grile și probleme pentru BAC și clasă.",
     keywords: "fizică clasa 10, trasee clasa 10, cursuri clasa 10, probleme clasa 10, electricitate, magnetism, undele",
     openGraph: {
@@ -407,7 +429,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "coming-soon": {
-    title: "În Curând - Trasee Noi | PLANCK",
+    title: pageTitle('Trasee noi – în curând'),
     description: "Trasee de învățare noi în pregătire. Fii primul care află când vor fi disponibile capitolele pentru clasele superioare.",
     keywords: "trasee noi, în curând, clasa 11, clasa 12, invatare liceu",
     openGraph: {
@@ -417,14 +439,14 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   insight: {
-    title: "Planck Insight - AI Assistant pentru Toate Materiile | PLANCK",
+    title: pageTitle('Insight – profesor AI pentru liceu'),
     description: INSIGHT_DESCRIPTION,
     keywords: "AI educatie, asistent AI, invatare liceu, chat AI, Planck Insight, inteligență artificială educație, trasee invatare, bac, admitere",
     alternates: {
       canonical: '/insight',
     },
     openGraph: {
-      title: "Planck Insight - AI Assistant pentru Toate Materiile",
+      title: `Insight – profesor AI pentru liceu${BRAND_SUFFIX}`,
       description: INSIGHT_DESCRIPTION,
       url: `${PLATFORM_SITE_URL}/insight`,
       type: 'website',
@@ -438,7 +460,7 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: "Planck Insight - AI Assistant pentru Toate Materiile",
+      title: `Insight – profesor AI pentru liceu${BRAND_SUFFIX}`,
       description: INSIGHT_DESCRIPTION,
       images: [OG_IMAGE],
       card: 'summary_large_image',
@@ -450,7 +472,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   sketch: {
-    title: "Whiteboard Online Gratuit pentru Elevi – Planck Sketch",
+    title: pageTitle('Planck Sketch – whiteboard online'),
     description: "Planck Sketch este un whiteboard colaborativ online, gratuit și fără cont, pentru desen, grafice matematice și explicații vizuale — complementar traseelor Planck.",
     keywords: "math whiteboard, online graphing calculator, interactive geometry, physics simulation, collaborative whiteboard, sketchpad, mathematics education",
     alternates: {
@@ -483,7 +505,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   planckcode: {
-    title: { absolute: "PlanckCode: IDE Online C++ & Python | Planck" },
+    title: pageTitle('PlanckCode – IDE C++ & Python'),
     description: PLANCKCODE_DESCRIPTION,
     keywords: "C++, Python, C++ compiler online, Python IDE online, compilator C++ online, IDE C++ online, online judge, competitive programming, informatica liceu, bac informatica",
     alternates: {
@@ -516,7 +538,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   pricing: {
-    title: "Deblochează trasee complete și note mai mari – PLANCK",
+    title: pageTitle('Planuri și prețuri'),
     description: "Deblochează trasee de învățare complete, Insight AI și PlanckCode. Planuri flexibile Free, Plus și Pro pentru elevi și școli.",
     keywords: "prețuri planck, planuri planck, abonament planck, trasee invatare, planuri educaționale, planuri școli",
     alternates: {
@@ -549,7 +571,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "bac-simulations": {
-    title: "Simulări BAC – Subiecte și Variante | PLANCK",
+    title: pageTitle('Simulări BAC – subiecte și variante'),
     description: "Pregătește-te pentru BAC cu simulări oficiale, integrate în traseele Planck. Subiecte și variante din anii anteriori pentru nota dorită.",
     keywords: "simulari bac, subiecte bac, bacalaureat, variante bac, modele bac, examen bac, trasee invatare bac",
     alternates: {
@@ -582,7 +604,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   gratuit: {
-    title: "Ai nevoie de ajutor pentru nota dorită? – PLANCK",
+    title: pageTitle('Ajutor pentru nota dorită'),
     description:
       "Completează formularul să vedem cum te putem ajuta la clasă, BAC sau admitere. Îți ia sub 2 minute.",
     keywords: "webinar liceu, bac, admitere, planck academy, gratuit, ajutor invatare, trasee invatare",
@@ -603,7 +625,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "math-problems": {
-    title: "Probleme de Matematică – Catalog pentru Liceu | Planck Academy",
+    title: pageTitle('Probleme matematică – catalog'),
     description:
       "Probleme de matematică pentru liceu, pe clase și nivele de dificultate, integrate în traseele Planck. Enunțuri clare și resurse video opționale.",
     keywords:
@@ -625,7 +647,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "coding-problems": {
-    title: "Probleme de Informatică – Catalog C++ & Python | Planck Academy",
+    title: pageTitle('Probleme informatică C++ & Python'),
     description:
       "Probleme de informatică pentru liceu, cu suport C++ și Python. Catalog filtrabil pe clasă și dificultate, integrat în traseele Planck și PlanckCode IDE.",
     keywords:
@@ -647,7 +669,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   grile: {
-    title: `Teste Grilă Liceu – ${QUIZ_COUNT} Grile Rezolvate | Planck Academy`,
+    title: pageTitle(`Grile liceu – ${QUIZ_COUNT} rezolvate`),
     description: `Peste ${QUIZ_COUNT} grile rezolvate pentru clasele 9–12. Teste grilă de fizică, matematică și informatică pentru pregătire BAC, admitere și notă la clasă. ${TEACHER_VERIFICATION}.`,
     keywords: "grile fizica, teste grila, grile liceu, bac grila, clasa 9 10 11 12, quiz fizica, grile matematica",
     alternates: {
@@ -665,7 +687,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "biologie-grile": {
-    title: "Teste Grilă Biologie – Catalog Grile Liceu | Planck Academy",
+    title: pageTitle('Grile biologie liceu'),
     description:
       "Catalog de grile de biologie pentru clasele 9–12. Întrebări cu răspunsuri multiple, imagini și rezolvări video pentru pregătire la clasă și BAC.",
     keywords:
@@ -685,7 +707,7 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "gratuit-confirmare": {
-    title: "Înscriere confirmată – Webinar PLANCK",
+    title: pageTitle('Înscriere confirmată'),
     description:
       "O să te contactăm pentru mai multe detalii despre webinar!",
     alternates: {

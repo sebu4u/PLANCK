@@ -91,6 +91,9 @@ function initialInformaticsForm() {
     tags: "",
     sample_input: "",
     sample_output: "",
+    hint_1_markdown: "",
+    hint_2_markdown: "",
+    solution_markdown: "",
     explanation_markdown: "",
     boilerplate_cpp: "",
     boilerplate_python: "",
@@ -267,6 +270,9 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: DevSubjectKey }) {
           tags: tagList,
           sample_input: infoForm.sample_input,
           sample_output: infoForm.sample_output,
+          hint_1_markdown: infoForm.hint_1_markdown.trim(),
+          hint_2_markdown: infoForm.hint_2_markdown.trim(),
+          solution_markdown: infoForm.solution_markdown.trim(),
           explanation_markdown: infoForm.explanation_markdown.trim(),
           boilerplate_cpp: infoForm.boilerplate_cpp,
           boilerplate_python: infoForm.boilerplate_python,
@@ -893,6 +899,37 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: DevSubjectKey }) {
                       onChange={(e) => setInfoForm({ ...infoForm, sample_output: e.target.value })}
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Hint-uri & soluție</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="info-hint-1">Hint 1 (markdown)</Label>
+                  <Textarea
+                    id="info-hint-1"
+                    rows={4}
+                    value={infoForm.hint_1_markdown}
+                    onChange={(e) => setInfoForm({ ...infoForm, hint_1_markdown: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="info-hint-2">Hint 2 (markdown, Plus/Premium)</Label>
+                  <Textarea
+                    id="info-hint-2"
+                    rows={4}
+                    value={infoForm.hint_2_markdown}
+                    onChange={(e) => setInfoForm({ ...infoForm, hint_2_markdown: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="info-solution">Soluție (markdown, Plus/Premium)</Label>
+                  <Textarea
+                    id="info-solution"
+                    rows={6}
+                    value={infoForm.solution_markdown}
+                    onChange={(e) => setInfoForm({ ...infoForm, solution_markdown: e.target.value })}
+                  />
                 </div>
               </div>
 

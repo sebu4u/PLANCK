@@ -2,8 +2,10 @@ import { Metadata } from "next"
 import { Navigation } from "@/components/navigation"
 import { SpacePageContent } from "@/components/space/space-page-content"
 
+import { pageTitle } from "@/lib/metadata"
+
 export const metadata: Metadata = {
-    title: { absolute: "Memorator de Fizică | Planck" },
+    title: pageTitle("Memorator de fizică"),
     description: "Explorează conceptele și formulele de fizică într-un graf interactiv. Vizualizează conexiunile dintre concepte pentru o învățare mai eficientă.",
     keywords: ["fizică", "memorator", "formule", "concepte", "graf", "învățare", "liceu", "bac"],
     openGraph: {

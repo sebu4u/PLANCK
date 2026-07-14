@@ -3,8 +3,10 @@ import { ConcursRezultateClientShell } from "@/components/concurs/concurs-rezult
 import { createClient } from "@supabase/supabase-js"
 import { ContestResultRow, RezultatePublicContent } from "./rezultate-public-content"
 
+import { pageTitle } from "@/lib/metadata"
+
 export const metadata: Metadata = {
-  title: "Rezultate Concurs PLANCK",
+  title: pageTitle("Rezultate concurs"),
   description: "Rezultatele oficiale ale Concursului Național de Fizică PLANCK, organizate pe clasele IX-XII."
 }
 

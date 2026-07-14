@@ -9,6 +9,10 @@ import { fetchQuizQuestionById } from "@/lib/supabase-quiz"
 import { getLearningPathAccess, type LearningPathAccess } from "@/lib/learning-path-access"
 import { createClient } from "@/lib/supabase/server"
 import {
+  applyCodingProblemPremiumGating,
+  resolveCanAccessPremiumHintsFromSession,
+} from "@/lib/coding-problems-access"
+import {
   getLearningPathLessonHref,
   getLearningPathRouteSegments,
   getLearningPathChapterById,
@@ -198,10 +202,15 @@ async function loadItemContent(item: LearningPathLessonItem) {
       .eq("is_active", true)
       .maybeSingle()
     if (codingRow) {
-      sourceCodingProblem = {
-        ...(codingRow as CodingProblem),
-        tags: Array.isArray(codingRow.tags) ? codingRow.tags : [],
-      }
+      const serverSupabase = await createClient()
+      const canAccessPremiumHints = await resolveCanAccessPremiumHintsFromSession(serverSupabase)
+      sourceCodingProblem = applyCodingProblemPremiumGating(
+        {
+          ...(codingRow as CodingProblem),
+          tags: Array.isArray(codingRow.tags) ? codingRow.tags : [],
+        },
+        canAccessPremiumHints
+      )
       const { data: examples } = await supabase
         .from("coding_problem_examples")
         .select("*")

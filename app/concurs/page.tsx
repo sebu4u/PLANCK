@@ -3,8 +3,10 @@ import { ConcursContent } from "@/components/concurs/concurs-content"
 import { ConcursNavbar } from "@/components/concurs/concurs-navbar"
 import ScrollAnimationProvider from "@/components/scroll-animation-provider"
 
+import { pageTitle } from "@/lib/metadata"
+
 export const metadata: Metadata = {
-    title: "Concursul Național de Fizică PLANCK | Ediția 2026",
+    title: pageTitle("Concurs național de fizică 2026"),
     description: "Participă la Concursul Național de Fizică PLANCK, ediția 2026. Înscrie-te acum și demonstrează-ți cunoștințele de fizică!",
 }
 

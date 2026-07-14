@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { MarkLearningPathLessonProgress } from "@/components/invata/mark-learning-path-lesson-progress"
 import { LearningPathLessonPage } from "@/components/invata/learning-path-lesson-page"
 import { LearningPathLessonLockedPreview } from "@/components/invata/learning-path-lesson-locked-preview"
-import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
+import { generateMetadata as generatePageMetadata, dynamicTitleSegment } from "@/lib/metadata"
 import { getLearningPathAccess } from "@/lib/learning-path-access"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
@@ -100,7 +100,7 @@ export async function generateMetadata({
     `Lecție din traseul Planck Academy: ${chapter.title}. Pregătire pentru notă la clasă, BAC sau admitere.`
 
   return {
-    title: `${lesson.title} | ${chapter.title} | PLANCK`,
+    title: dynamicTitleSegment(lesson.title),
     description,
     alternates: {
       canonical: canonicalPath,

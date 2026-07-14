@@ -47,8 +47,7 @@ export const LEARNING_PATHS_TITLE =
 export const LEARNING_PATHS_DESCRIPTION =
   "Parcurge trasee structurate pe capitole, lecții și itemi (video, grile, probleme, teste) pentru fizică, matematică, informatică și biologie. Pregătire pentru notă la clasă, BAC, admitere și olimpiade."
 
-export const HOME_TITLE =
-  "Trasee de învățare pentru nota dorită – BAC, admitere, clasă"
+export const HOME_TITLE = "Învață pentru BAC"
 
 export const HOME_HERO_HEADLINE = "Obține nota pe care o vrei"
 

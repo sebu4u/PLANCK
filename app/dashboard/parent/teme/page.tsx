@@ -3,8 +3,10 @@ import { ParentAssignmentsPage } from "@/components/dashboard/parent/parent-assi
 import { getChildAssignmentsForParent } from "@/lib/parent/server"
 import { requireParentUser } from "@/lib/parent/require-parent"
 
+import { pageTitle } from "@/lib/metadata"
+
 export const metadata: Metadata = {
-  title: "Teme | PLANCK",
+  title: pageTitle("Teme copii"),
   description: "Toate temele copiilor tăi.",
 }
 

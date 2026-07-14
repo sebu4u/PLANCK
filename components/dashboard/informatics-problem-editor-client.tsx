@@ -11,15 +11,14 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { CODING_DIFFICULTIES } from "@/lib/dev-informatics-problem"
+import {
+  initialInformaticsTestRow,
+  type InformaticsTestRow,
+} from "@/lib/informatics-problem-content"
+import { InformaticsBoilerplateEditor } from "@/components/coding-problems/informatics-boilerplate-editor"
+import { InformaticsTestsEditor } from "@/components/coding-problems/informatics-tests-editor"
 import { InformaticsProblemLivePreview } from "@/components/dashboard/informatics-problem-live-preview"
-import { ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react"
-
-type InformaticsTestRow = {
-  stdin: string
-  expected_stdout: string
-  is_sample: boolean
-  weight: number
-}
+import { ArrowLeft, Loader2 } from "lucide-react"
 
 type InformaticsFormState = {
   slug: string
@@ -40,14 +39,13 @@ type InformaticsFormState = {
   tags: string
   sample_input: string
   sample_output: string
+  hint_1_markdown: string
+  hint_2_markdown: string
+  solution_markdown: string
   explanation_markdown: string
   boilerplate_cpp: string
   boilerplate_python: string
   tests: InformaticsTestRow[]
-}
-
-function initialTestRow(isSample = false): InformaticsTestRow {
-  return { stdin: "", expected_stdout: "", is_sample: isSample, weight: 1 }
 }
 
 function problemToForm(problem: Record<string, unknown>, tests: Array<Record<string, unknown>>): InformaticsFormState {
@@ -76,6 +74,9 @@ function problemToForm(problem: Record<string, unknown>, tests: Array<Record<str
     tags,
     sample_input: typeof problem.sample_input === "string" ? problem.sample_input : "",
     sample_output: typeof problem.sample_output === "string" ? problem.sample_output : "",
+    hint_1_markdown: typeof problem.hint_1_markdown === "string" ? problem.hint_1_markdown : "",
+    hint_2_markdown: typeof problem.hint_2_markdown === "string" ? problem.hint_2_markdown : "",
+    solution_markdown: typeof problem.solution_markdown === "string" ? problem.solution_markdown : "",
     explanation_markdown: typeof problem.explanation_markdown === "string" ? problem.explanation_markdown : "",
     boilerplate_cpp: typeof problem.boilerplate_cpp === "string" ? problem.boilerplate_cpp : "",
     boilerplate_python: typeof problem.boilerplate_python === "string" ? problem.boilerplate_python : "",
@@ -87,7 +88,7 @@ function problemToForm(problem: Record<string, unknown>, tests: Array<Record<str
             is_sample: t.is_sample === true,
             weight: typeof t.weight === "number" ? t.weight : Number.parseFloat(String(t.weight)) || 1,
           }))
-        : [initialTestRow(true)],
+        : [initialInformaticsTestRow(true)],
   }
 }
 
@@ -175,6 +176,9 @@ export function InformaticsProblemEditorClient({ slug }: { slug: string }) {
           tags: tagList,
           sample_input: form.sample_input,
           sample_output: form.sample_output,
+          hint_1_markdown: form.hint_1_markdown.trim(),
+          hint_2_markdown: form.hint_2_markdown.trim(),
+          solution_markdown: form.solution_markdown.trim(),
           explanation_markdown: form.explanation_markdown.trim(),
           boilerplate_cpp: form.boilerplate_cpp,
           boilerplate_python: form.boilerplate_python,
@@ -478,6 +482,37 @@ export function InformaticsProblemEditorClient({ slug }: { slug: string }) {
           </div>
 
           <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Hint-uri & soluție</p>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-hint-1">Hint 1 (markdown)</Label>
+              <Textarea
+                id="edit-hint-1"
+                rows={4}
+                value={form.hint_1_markdown}
+                onChange={(e) => setForm({ ...form, hint_1_markdown: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-hint-2">Hint 2 (markdown, Plus/Premium)</Label>
+              <Textarea
+                id="edit-hint-2"
+                rows={4}
+                value={form.hint_2_markdown}
+                onChange={(e) => setForm({ ...form, hint_2_markdown: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-solution">Soluție (markdown, Plus/Premium)</Label>
+              <Textarea
+                id="edit-solution"
+                rows={6}
+                value={form.solution_markdown}
+                onChange={(e) => setForm({ ...form, solution_markdown: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Explicație & șabloane</p>
             <div className="space-y-1.5">
               <Label htmlFor="edit-explanation">Explicație (markdown)</Label>
@@ -488,139 +523,29 @@ export function InformaticsProblemEditorClient({ slug }: { slug: string }) {
                 onChange={(e) => setForm({ ...form, explanation_markdown: e.target.value })}
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-boiler-cpp">Boilerplate C++</Label>
-                <Textarea
-                  id="edit-boiler-cpp"
-                  rows={6}
-                  className="font-mono text-xs"
-                  value={form.boilerplate_cpp}
-                  onChange={(e) => setForm({ ...form, boilerplate_cpp: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-boiler-py">Boilerplate Python</Label>
-                <Textarea
-                  id="edit-boiler-py"
-                  rows={6}
-                  className="font-mono text-xs"
-                  value={form.boilerplate_python}
-                  onChange={(e) => setForm({ ...form, boilerplate_python: e.target.value })}
-                />
-              </div>
-            </div>
+            <InformaticsBoilerplateEditor
+              theme="light"
+              disabled={busy}
+              boilerplateCpp={form.boilerplate_cpp}
+              boilerplatePython={form.boilerplate_python}
+              onChange={(patch) =>
+                setForm({
+                  ...form,
+                  ...(patch.boilerplate_cpp !== undefined ? { boilerplate_cpp: patch.boilerplate_cpp } : {}),
+                  ...(patch.boilerplate_python !== undefined
+                    ? { boilerplate_python: patch.boilerplate_python }
+                    : {}),
+                })
+              }
+            />
           </div>
 
-          <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">Teste judge</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => setForm({ ...form, tests: [...form.tests, initialTestRow(false)] })}
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Adaugă test
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {form.tests.map((test, index) => (
-                <div key={index} className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-gray-800">Test #{index + 1}</p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className="flex items-center gap-2 text-xs text-gray-700">
-                        <Checkbox
-                          checked={test.is_sample}
-                          onCheckedChange={(checked) =>
-                            setForm({
-                              ...form,
-                              tests: form.tests.map((row, i) =>
-                                i === index ? { ...row, is_sample: checked === true } : row
-                              ),
-                            })
-                          }
-                        />
-                        Exemplu
-                      </label>
-                      <label className="flex items-center gap-2 text-xs text-gray-700">
-                        Pondere
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          className="h-8 w-20"
-                          value={test.weight}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              tests: form.tests.map((row, i) =>
-                                i === index
-                                  ? { ...row, weight: Number.parseFloat(e.target.value) || 0 }
-                                  : row
-                              ),
-                            })
-                          }
-                        />
-                      </label>
-                      {form.tests.length > 1 ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-red-600 hover:text-red-700"
-                          disabled={busy}
-                          onClick={() =>
-                            setForm({ ...form, tests: form.tests.filter((_, i) => i !== index) })
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label>Intrare (stdin)</Label>
-                      <Textarea
-                        rows={4}
-                        className="font-mono text-xs"
-                        value={test.stdin}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            tests: form.tests.map((row, i) =>
-                              i === index ? { ...row, stdin: e.target.value } : row
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Ieșire așteptată</Label>
-                      <Textarea
-                        rows={4}
-                        className="font-mono text-xs"
-                        value={test.expected_stdout}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            tests: form.tests.map((row, i) =>
-                              i === index ? { ...row, expected_stdout: e.target.value } : row
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <InformaticsTestsEditor
+            theme="light"
+            disabled={busy}
+            tests={form.tests}
+            onChange={(tests) => setForm({ ...form, tests })}
+          />
 
           <div className="flex flex-wrap gap-3">
             <Button type="button" disabled={busy} onClick={() => void handleSave()}>

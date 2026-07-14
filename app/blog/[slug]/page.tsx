@@ -8,6 +8,7 @@ import { RichTextContent } from "@/components/blog/rich-text-content"
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { StructuredData } from "@/components/structured-data"
 import { getPublishedBlogPost, getPublishedBlogPosts } from "@/lib/blog"
+import { dynamicTitleSegment } from "@/lib/metadata"
 import { PLATFORM_SITE_URL } from "@/lib/platform-marketing"
 import { articleStructuredData, breadcrumbStructuredData, faqStructuredData } from "@/lib/structured-data"
 
@@ -23,17 +24,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const post = await getPublishedBlogPost(slug)
   if (!post) return { robots: { index: false, follow: false } }
 
-  const title = post.meta_title || post.title
+  const titleSegment = dynamicTitleSegment(post.meta_title || post.title)
   const description = post.meta_description || post.excerpt
   const canonical = post.canonical_path || `/blog/${post.slug}`
   const image = post.cover_image_url || undefined
   return {
-    title,
+    title: titleSegment,
     description,
     alternates: { canonical },
     openGraph: {
       type: "article",
-      title,
+      title: titleSegment,
       description,
       url: `${PLATFORM_SITE_URL}${canonical}`,
       publishedTime: post.published_at ?? undefined,
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       authors: ["Planck Academy"],
       images: image ? [{ url: image, alt: post.cover_image_alt || post.title }] : undefined,
     },
-    twitter: { card: "summary_large_image", title, description, images: image ? [image] : undefined },
+    twitter: { card: "summary_large_image", title: titleSegment, description, images: image ? [image] : undefined },
   }
 }
 

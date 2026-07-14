@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { PhysicsLessonsClient } from "@/components/physics-lessons-client"
-import { generateMetadata as generatePageMetadata } from "@/lib/metadata"
+import { generateMetadata as generatePageMetadata, dynamicTitleSegment } from "@/lib/metadata"
 import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import {
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 
   return {
-    title: `${targetLesson.title} | PLANCK`,
+    title: dynamicTitleSegment(targetLesson.title),
     description: `Lecție de fizică: ${targetLesson.title}. Durată estimată: ${targetLesson.estimated_duration || 0} minute.`,
     keywords: `lecție fizică, ${targetLesson.title}, cursuri fizică, educație fizică`,
     alternates: {

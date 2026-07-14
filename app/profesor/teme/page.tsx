@@ -4,8 +4,10 @@ import { getClassroomsForUser } from "@/lib/classrooms/server"
 import { requireTeacherUser } from "@/lib/teacher/require-teacher"
 import { getTeacherAssignmentsOverview } from "@/lib/teacher/server"
 
+import { pageTitle } from "@/lib/metadata"
+
 export const metadata: Metadata = {
-  title: "Teme | PLANCK",
+  title: pageTitle("Teme profesor"),
   description: "Toate temele pe care le-ai dat la clasele tale.",
 }
 
