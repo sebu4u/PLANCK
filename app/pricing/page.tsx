@@ -11,6 +11,9 @@ import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
+import { PricingMobileExitSheet } from "@/components/pricing/pricing-mobile-exit-sheet"
+
+const MOBILE_BREAKPOINT_PX = 768
 
 type PlanId = "free" | "plus" | "premium"
 
@@ -108,6 +111,7 @@ function PricingPageContent() {
   const [checkoutLoadingPlan, setCheckoutLoadingPlan] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
+  const [mobileExitSheetOpen, setMobileExitSheetOpen] = useState(false)
   const purchasesEnabled = canPurchaseSubscriptions()
   const hasPaidSubscription = subscriptionPlan === "plus" || subscriptionPlan === "premium"
   const currentPlanRank =
@@ -174,7 +178,10 @@ function PricingPageContent() {
     }
   }, [searchParams])
 
-  const startCheckout = async (planId: "plus" | "premium") => {
+  const startCheckout = async (
+    planId: "plus" | "premium",
+    interval: "month" | "year" = isYearly ? "year" : "month",
+  ) => {
     if (!user) {
       router.push("/login")
       return
@@ -197,7 +204,7 @@ function PricingPageContent() {
         },
         body: JSON.stringify({
           plan: planId,
-          interval: isYearly ? "year" : "month",
+          interval,
         }),
       })
 
@@ -372,6 +379,34 @@ function PricingPageContent() {
     router.push("/probleme")
   }
 
+  const handleClosePricing = () => {
+    setMobileExitSheetOpen(false)
+    router.push("/")
+  }
+
+  const handleCloseButtonClick = () => {
+    const isMobileViewport =
+      typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT_PX
+
+    if (isMobileViewport && subscriptionPlan !== "premium") {
+      setMobileExitSheetOpen(true)
+      return
+    }
+
+    handleClosePricing()
+  }
+
+  const premiumUi = getPlanUiState("premium")
+
+  const handleMobileExitCheckout = async (interval: "month" | "year") => {
+    if (premiumUi.shouldManageInPortal) {
+      await openBillingPortal()
+      return
+    }
+
+    await startCheckout("premium", interval)
+  }
+
   return (
     <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-white text-[#111111] selection:bg-sky-200/70">
       {/* Gradient orizontal + fade lung spre alb (fără „tăietură” la granița cu fundalul alb) */}
@@ -391,7 +426,7 @@ function PricingPageContent() {
 
       <button
         type="button"
-        onClick={() => router.push("/")}
+        onClick={handleCloseButtonClick}
         className="absolute right-3 top-3 z-30 inline-flex items-center justify-center rounded-md p-1.5 text-gray-800 transition hover:opacity-75 active:opacity-60 sm:right-5 sm:top-5"
         aria-label="Înapoi acasă"
         title="Înapoi acasă"
@@ -418,7 +453,7 @@ function PricingPageContent() {
             Deblochează note mai mari cu PLANCK
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-600 sm:mt-2.5 sm:text-base sm:leading-relaxed">
-            Mai puțin decât o oră de meditații. Fără contracte, fără riscuri.
+            Mai puțin decât o oră de meditații.
           </p>
 
           {user && hasPaidSubscription && (
@@ -608,6 +643,14 @@ function PricingPageContent() {
           </button>
         </div>
       </div>
+
+      <PricingMobileExitSheet
+        isOpen={mobileExitSheetOpen}
+        isCheckoutLoading={checkoutLoadingPlan === "premium" || portalLoading}
+        isCheckoutDisabled={premiumUi.isPaidPlanPurchaseDisabled}
+        onCheckout={handleMobileExitCheckout}
+        onDismiss={handleClosePricing}
+      />
     </div>
   )
 }
