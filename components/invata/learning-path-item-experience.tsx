@@ -26,6 +26,8 @@ import { FizicaLessonCompletionScreen } from "@/components/invata/fizica-lesson-
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { computeLearningPathLessonEloTotal } from "@/lib/learning-path-elo"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
+import { getFizicaMapHref } from "@/lib/supabase-fizica-learning-map"
+import { getSubjectMapHref } from "@/lib/subject-map/navigation"
 
 interface LearningPathItemExperienceProps {
   initialPayload: LearningPathItemPayload
@@ -71,6 +73,51 @@ function findMapAssignmentIndex(
   )
 }
 
+function resolveLessonExitHref(payload: LearningPathItemPayload): string {
+  if (payload.isOnboardingLesson) return "/dashboard"
+  if (payload.fizicaMapContext) {
+    return getFizicaMapHref(
+      payload.fizicaMapContext.routeSlug,
+      payload.fizicaMapContext.chapterSlug,
+    )
+  }
+  if (payload.subjectMapContext) {
+    return getSubjectMapHref(
+      payload.subjectMapContext.subject,
+      payload.subjectMapContext.routeSlug,
+      payload.subjectMapContext.chapterSlug,
+    )
+  }
+  return payload.lessonBaseHref
+}
+
+function resolveCompletionFinishHref(payload: LearningPathItemPayload): string {
+  if (payload.isOnboardingLesson) return "/dashboard"
+  if (payload.fizicaMapContext || payload.subjectMapContext) {
+    return payload.nextItemHref
+  }
+  return payload.lessonBaseHref
+}
+
+/** True when this visit completed ≥2 adjacent items in lesson order (ignores prior progress). */
+function hasMinConsecutiveSessionCompletions(
+  items: ReadonlyArray<{ id: string }>,
+  sessionCompletedIds: ReadonlySet<string>,
+  min = 2,
+): boolean {
+  if (sessionCompletedIds.size < min) return false
+  let streak = 0
+  for (const item of items) {
+    if (sessionCompletedIds.has(item.id)) {
+      streak += 1
+      if (streak >= min) return true
+    } else {
+      streak = 0
+    }
+  }
+  return false
+}
+
 export function LearningPathItemExperience({ initialPayload }: LearningPathItemExperienceProps) {
   const router = useRouter()
   const { user } = useAuth()
@@ -80,6 +127,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const [freePlanPaywallVisible, setFreePlanPaywallVisible] = useState(false)
   const [slideDirection, setSlideDirection] = useState<LearningPathSlideDirection>("forward")
   const [showLessonCompletion, setShowLessonCompletion] = useState(false)
+  const [completionExitHref, setCompletionExitHref] = useState<string | null>(null)
   // Masks the brief flash while navigating away from the onboarding lesson's offer step to
   // /dashboard, with the same loading screen used elsewhere (dashboard load, name-save redirect).
   const [isLeavingToDashboard, setIsLeavingToDashboard] = useState(false)
@@ -87,14 +135,55 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const isPopstateRef = useRef(false)
   const eligibleForFirstItemEntryRef = useRef(initialPayload.itemIndex === 1)
   const [firstItemEntryConsumed, setFirstItemEntryConsumed] = useState(false)
-  const usesFizicaLessonCompletionScreen = Boolean(
-    payload.fizicaMapContext || payload.subjectMapContext || payload.isOnboardingLesson,
+  const sessionCompletedIdsRef = useRef<Set<string>>(new Set())
+  const baselineCompletedIdsRef = useRef<Set<string>>(
+    new Set(initialPayload.completedItemIdsForLesson ?? []),
   )
+  const usesFizicaLessonCompletionScreen = true
 
   const animateFirstItemEntry =
     eligibleForFirstItemEntryRef.current &&
     !firstItemEntryConsumed &&
     payload.itemIndex === 1
+
+  const openLessonCompletion = useCallback((exitHref: string) => {
+    setCompletionExitHref(exitHref)
+    setShowLessonCompletion(true)
+  }, [])
+
+  const recordSessionItemCompletion = useCallback((itemId: string) => {
+    if (!itemId) return
+    if (baselineCompletedIdsRef.current.has(itemId)) return
+    sessionCompletedIdsRef.current.add(itemId)
+  }, [])
+
+  const wasCompletedAtSessionStart = useCallback((itemId: string) => {
+    return baselineCompletedIdsRef.current.has(itemId)
+  }, [])
+
+  const requestLessonExit = useCallback(() => {
+    const exitHref = resolveLessonExitHref(payload)
+    if (
+      !hasMinConsecutiveSessionCompletions(
+        payload.items,
+        sessionCompletedIdsRef.current,
+        2,
+      )
+    ) {
+      if (payload.isOnboardingLesson) {
+        setIsLeavingToDashboard(true)
+      }
+      router.push(exitHref)
+      return
+    }
+    openLessonCompletion(exitHref)
+  }, [openLessonCompletion, payload, router])
+
+  useEffect(() => {
+    // New lesson visit → reset session streak; keep only progress already done before entry.
+    sessionCompletedIdsRef.current = new Set()
+    baselineCompletedIdsRef.current = new Set(payload.completedItemIdsForLesson ?? [])
+  }, [payload.lessonId])
 
   useEffect(() => {
     if (payload.itemIndex !== 1 && eligibleForFirstItemEntryRef.current) {
@@ -245,14 +334,14 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
 
   const goToNextItem = useCallback(async () => {
     if (payload.isOnboardingLesson && payload.isLastItem) {
-      setShowLessonCompletion(true)
+      openLessonCompletion(resolveCompletionFinishHref(payload))
       return
     }
 
     const assignmentItems = getMapAssignmentItems(payload)
     if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
       if (payload.isLastItem) {
-        setShowLessonCompletion(true)
+        openLessonCompletion(resolveCompletionFinishHref(payload))
         return
       }
       const currentIndex = findMapAssignmentIndex(assignmentItems, payload)
@@ -264,19 +353,23 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     }
 
     if (payload.isLastItem) {
-      router.push(payload.lessonBaseHref)
+      openLessonCompletion(resolveCompletionFinishHref(payload))
       return
     }
     await goToItemIndex(payload.itemIndex + 1, { urlMode: "push", direction: "forward" })
-  }, [goToItem, goToItemIndex, payload, router])
+  }, [goToItem, goToItemIndex, openLessonCompletion, payload])
 
   const dismissLessonCompletion = useCallback(() => {
+    const exitHref =
+      completionExitHref ??
+      (payload.isOnboardingLesson ? "/dashboard" : payload.nextItemHref)
     setShowLessonCompletion(false)
-    if (payload.isOnboardingLesson) {
+    setCompletionExitHref(null)
+    if (payload.isOnboardingLesson || exitHref === "/dashboard") {
       setIsLeavingToDashboard(true)
     }
-    router.push(payload.isOnboardingLesson ? "/dashboard" : payload.nextItemHref)
-  }, [payload.isOnboardingLesson, payload.nextItemHref, router])
+    router.push(exitHref)
+  }, [completionExitHref, payload.isOnboardingLesson, payload.nextItemHref, router])
 
   const goToPrevItem = useCallback(async () => {
     const assignmentItems = getMapAssignmentItems(payload)
@@ -382,14 +475,18 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
         slideDirection={slideDirection}
         usesFizicaLessonCompletionScreen={usesFizicaLessonCompletionScreen}
         animateFirstItemEntry={animateFirstItemEntry}
+        requestLessonExit={requestLessonExit}
+        recordSessionItemCompletion={recordSessionItemCompletion}
+        wasCompletedAtSessionStart={wasCompletedAtSessionStart}
       />
       {showLessonCompletion ? (
         <FizicaLessonCompletionScreen
           totalElo={
             payload.fizicaLessonTotalElo ??
             payload.subjectMapLessonTotalElo ??
-            (payload.isOnboardingLesson ? computeLearningPathLessonEloTotal(payload.items) : 0)
+            computeLearningPathLessonEloTotal(payload.items)
           }
+          itemIds={payload.items.map((lessonItem) => lessonItem.id)}
           showOfferPhase={payload.isOnboardingLesson}
           onContinue={dismissLessonCompletion}
         />

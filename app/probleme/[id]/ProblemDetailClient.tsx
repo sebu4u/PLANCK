@@ -353,6 +353,10 @@ export default function ProblemDetailClient({
     setLoadingSolved(true);
 
     if (subject === "math") {
+      // Math catalog doesn't use solved_problems / ELO trigger — still grant PlanckPass XP
+      void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForProblem }) =>
+        awardPlanckPassXpForProblem(String(problem.id), problem.difficulty),
+      )
       setIsSolved(true);
       setLoadingSolved(false);
       showSolvedCelebration();
@@ -372,6 +376,11 @@ export default function ProblemDetailClient({
       setLoadingSolved(false);
       return;
     }
+
+    // PlanckPass XP (idempotent; also attempted in SQL trigger if migration applied)
+    void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForProblem }) =>
+      awardPlanckPassXpForProblem(String(problem.id), problem.difficulty),
+    )
 
     // Verifică dacă utilizatorul a câștigat un badge nou (în ultimele 5 secunde)
     const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();

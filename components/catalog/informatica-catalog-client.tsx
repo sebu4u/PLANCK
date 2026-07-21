@@ -17,7 +17,6 @@ import {
 } from "@/components/problems/problems-catalog-sidebar"
 import {
   CATALOG_CLASS_OPTIONS as CLASS_OPTIONS,
-  mapProfileGradeToCatalogClass,
   mapNumericClassToLabel,
 } from "@/lib/catalog-class-labels"
 import {
@@ -42,11 +41,82 @@ import { CatalogMobileTopBanner } from "@/components/catalog/catalog-mobile-top-
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 const STORAGE_PREFIX = "informaticaCatalog"
+const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
 const CODING_PROBLEM_LIST_COLUMNS =
   "id,slug,title,statement_markdown,difficulty,class,chapter,points,time_limit_ms,memory_limit_kb,tags,language,created_at,updated_at"
 
 function getStorageKey(key: string) {
   return `${STORAGE_PREFIX}:${key}`
+}
+
+function loadStoredFilters(storageKey: string): FilterState | null {
+  try {
+    const raw = sessionStorage.getItem(storageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== "object") return null
+    const o = parsed as Record<string, unknown>
+    if (
+      typeof o.search !== "string" ||
+      typeof o.category !== "string" ||
+      typeof o.difficulty !== "string" ||
+      typeof o.chapter !== "string" ||
+      typeof o.class !== "string" ||
+      !VALID_PROGRESS.includes(o.progress as FilterState["progress"])
+    ) {
+      return null
+    }
+    return {
+      search: o.search,
+      category: o.category,
+      difficulty: o.difficulty,
+      progress: o.progress as FilterState["progress"],
+      class: o.class,
+      chapter: o.chapter,
+    }
+  } catch {
+    return null
+  }
+}
+
+function loadStoredPage(storageKey: string): number | null {
+  try {
+    const raw = sessionStorage.getItem(storageKey)
+    if (raw == null) return null
+    const n = parseInt(raw, 10)
+    if (!Number.isFinite(n) || n < 1) return null
+    return n
+  } catch {
+    return null
+  }
+}
+
+function loadStoredSelectedClass(storageKey: string): string | null {
+  try {
+    const storedClass = sessionStorage.getItem(storageKey)
+    if (storedClass && CLASS_OPTIONS.includes(storedClass as (typeof CLASS_OPTIONS)[number])) {
+      return storedClass
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+function saveStoredFilters(storageKey: string, filters: FilterState) {
+  try {
+    sessionStorage.setItem(storageKey, JSON.stringify(filters))
+  } catch {
+    // ignore
+  }
+}
+
+function saveStoredPage(storageKey: string, page: number) {
+  try {
+    sessionStorage.setItem(storageKey, String(page))
+  } catch {
+    // ignore
+  }
 }
 
 interface InformaticaCatalogClientProps {
@@ -62,9 +132,13 @@ export function InformaticaCatalogClient({
   initialMonthlyFreeSet = [],
   initialChapter,
 }: InformaticaCatalogClientProps) {
-  const { user, profile, isDev, profileSyncedUserId } = useAuth()
+  const { user, isDev, profileSyncedUserId } = useAuth()
   const { isFree, isPaid } = useSubscriptionPlan()
   const showDevEdit = Boolean(user && profileSyncedUserId === user.id && isDev)
+
+  const filtersStorageKey = getStorageKey("filters")
+  const pageStorageKey = getStorageKey("page")
+  const selectedClassStorageKey = getStorageKey("selectedClass")
 
   const normalizedInitialChapter = typeof initialChapter === "string" ? initialChapter.trim() : ""
   const defaultFilters: FilterState = {
@@ -76,20 +150,42 @@ export function InformaticaCatalogClient({
     chapter: normalizedInitialChapter || "Toate",
   }
 
-  const [filters, setFilters] = useState<FilterState>(defaultFilters)
-  const [currentPage, setCurrentPage] = useState(1)
+  const restoredFiltersRef = useRef<FilterState | null | undefined>(undefined)
+  if (restoredFiltersRef.current === undefined) {
+    restoredFiltersRef.current = loadStoredFilters(filtersStorageKey)
+  }
+  const restoredFilters = restoredFiltersRef.current
+
+  const restoredSelectedClassRef = useRef<string | null | undefined>(undefined)
+  if (restoredSelectedClassRef.current === undefined) {
+    restoredSelectedClassRef.current = loadStoredSelectedClass(selectedClassStorageKey)
+  }
+
+  const restoredPageRef = useRef<number | null | undefined>(undefined)
+  if (restoredPageRef.current === undefined) {
+    restoredPageRef.current = loadStoredPage(pageStorageKey)
+  }
+
+  const initialFilters =
+    restoredFilters && normalizedInitialChapter && restoredFilters.chapter === "Toate"
+      ? { ...restoredFilters, chapter: normalizedInitialChapter }
+      : (restoredFilters ?? defaultFilters)
+
+  const [filters, setFilters] = useState<FilterState>(initialFilters)
+  const [currentPage, setCurrentPage] = useState(restoredPageRef.current ?? 1)
+  const hasRestoredFiltersRef = useRef(Boolean(restoredFilters))
   const [problems, setProblems] = useState<CodingProblem[]>(initialProblems)
   const [loading, setLoading] = useState(initialProblems.length === 0)
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [selectedClassGate, setSelectedClassGate] = useState<string | null>(null)
+  const [selectedClassGate, setSelectedClassGate] = useState<string | null>(restoredSelectedClassRef.current)
   const [sidebarScrolling, setSidebarScrolling] = useState(false)
   const sidebarScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const profileClass = useMemo(() => mapProfileGradeToCatalogClass(profile?.grade), [profile?.grade])
-  const requiresClassSelection = !user || !profileClass
-  const catalogReady = !requiresClassSelection || Boolean(selectedClassGate)
-  const effectiveUserClass = profileClass ?? selectedClassGate ?? CLASS_OPTIONS[0]
+  // Always ask for class on first visit; restore from sessionStorage within the same tab session.
+  const requiresClassSelection = true
+  const catalogReady = Boolean(selectedClassGate)
+  const effectiveUserClass = selectedClassGate ?? CLASS_OPTIONS[0]
 
   const chapterOptions = useMemo(() => {
     const fromDb: Record<string, string[]> = {}
@@ -182,28 +278,24 @@ export function InformaticaCatalogClient({
   }, [fetchSolvedProblems])
 
   useEffect(() => {
-    if (!requiresClassSelection) {
-      setSelectedClassGate(null)
-      return
-    }
-    try {
-      const storedClass = sessionStorage.getItem(getStorageKey("selectedClass"))
-      if (storedClass && CLASS_OPTIONS.includes(storedClass as (typeof CLASS_OPTIONS)[number])) {
-        setSelectedClassGate(storedClass)
-      }
-    } catch {
-      // ignore
-    }
-  }, [requiresClassSelection])
+    if (hasRestoredFiltersRef.current) return
+    if (!selectedClassGate) return
+    if (filters.class !== "Toate") return
 
-  useEffect(() => {
-    if (requiresClassSelection || !profileClass || filters.class !== "Toate") return
     setFilters((prev) => ({
       ...prev,
-      class: profileClass,
-      chapter: normalizedInitialChapter || "Toate",
+      class: selectedClassGate,
+      chapter: "Toate",
     }))
-  }, [filters.class, normalizedInitialChapter, profileClass, requiresClassSelection])
+  }, [filters.class, selectedClassGate])
+
+  useEffect(() => {
+    saveStoredFilters(filtersStorageKey, filters)
+  }, [filters, filtersStorageKey])
+
+  useEffect(() => {
+    saveStoredPage(pageStorageKey, currentPage)
+  }, [currentPage, pageStorageKey])
 
   const filteredProblems = useMemo(
     () =>
@@ -287,17 +379,29 @@ export function InformaticaCatalogClient({
   }, [])
 
   const selectClassAndOpenCatalog = (classValue: (typeof CLASS_OPTIONS)[number]) => {
+    const nextFilters = { ...filters, class: classValue, chapter: "Toate" as const }
     setSelectedClassGate(classValue)
-    setFilters((prev) => ({ ...prev, class: classValue, chapter: "Toate" }))
+    setFilters(nextFilters)
     setCurrentPage(1)
     try {
-      sessionStorage.setItem(getStorageKey("selectedClass"), classValue)
+      sessionStorage.setItem(selectedClassStorageKey, classValue)
+      saveStoredFilters(filtersStorageKey, nextFilters)
+      saveStoredPage(pageStorageKey, 1)
     } catch {
       // ignore
     }
   }
 
-  const handleSidebarScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+  const clearClassGate = useCallback(() => {
+    setSelectedClassGate(null)
+    try {
+      sessionStorage.removeItem(selectedClassStorageKey)
+    } catch {
+      // ignore
+    }
+  }, [selectedClassStorageKey])
+
+  const handleSidebarScroll = useCallback((_event: UIEvent<HTMLDivElement>) => {
     setSidebarScrolling(true)
     if (sidebarScrollTimeoutRef.current) clearTimeout(sidebarScrollTimeoutRef.current)
     sidebarScrollTimeoutRef.current = setTimeout(() => {
@@ -312,17 +416,13 @@ export function InformaticaCatalogClient({
     }
   }, [])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [filters])
-
   return (
     <SubjectCatalogLayout
       catalogReady={catalogReady}
       requiresClassSelection={requiresClassSelection}
       selectedClassGate={selectedClassGate}
       onSelectClass={(cls) => selectClassAndOpenCatalog(cls as (typeof CLASS_OPTIONS)[number])}
-      onClearClassGate={() => setSelectedClassGate(null)}
+      onClearClassGate={clearClassGate}
       classOptions={CLASS_OPTIONS}
       classCardCopy={INFORMATICA_CLASS_CARD_COPY}
       title="Probleme de informatica"

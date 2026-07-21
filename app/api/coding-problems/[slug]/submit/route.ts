@@ -314,6 +314,27 @@ export async function POST(
     if (row) elo = row
   }
 
+  // PlanckPass XP once per coding problem (idempotent by source_key)
+  if (newBest > oldBest) {
+    try {
+      const { awardPlanckPassXpServer, resolvePlanckPassXpAmount } = await import(
+        "@/lib/planckpass/award-server"
+      )
+      const difficulty =
+        typeof (problemRow as { difficulty?: string }).difficulty === "string"
+          ? (problemRow as { difficulty?: string }).difficulty
+          : null
+      await awardPlanckPassXpServer({
+        userId,
+        amount: resolvePlanckPassXpAmount("coding", difficulty),
+        source: "coding",
+        sourceKey: problem.id,
+      })
+    } catch (xpErr) {
+      logger.error("[coding-submit] planckpass xp", xpErr)
+    }
+  }
+
   return NextResponse.json({
     submissionId,
     status: aggStatus,

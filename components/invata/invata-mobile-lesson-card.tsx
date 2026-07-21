@@ -43,7 +43,7 @@ export function InvataMobileLessonList({
     <div className="relative flex flex-col gap-5">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-4 left-[31px] top-4 z-0 w-0.5 bg-[#e6e6e6]"
+        className="pointer-events-none absolute bottom-4 left-1/2 top-4 z-0 w-1.5 -translate-x-1/2 bg-[#e6e6e6]"
       />
 
       {lessons.map((lesson) => {

@@ -1,8 +1,17 @@
 "use client"
 
+import { useCallback, useState } from "react"
+import dynamic from "next/dynamic"
 import { Trophy } from "lucide-react"
-import { NavbarInfoTooltip } from "@/components/navbar-info-tooltip"
 import { cn } from "@/lib/utils"
+
+const TrophyRoadOverlay = dynamic(
+  () =>
+    import("@/components/trophy-road/trophy-road-overlay").then(
+      (mod) => mod.TrophyRoadOverlay,
+    ),
+  { ssr: false },
+)
 
 interface NavbarEloDisplayProps {
   userElo: number | null
@@ -23,24 +32,38 @@ export function NavbarEloDisplay({
 }: NavbarEloDisplayProps) {
   const elo = userElo ?? 500
   const secondaryText = useLightNav ? "text-gray-600" : "text-gray-300"
+  const [open, setOpen] = useState(false)
 
-  const content = (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-medium", secondaryText, className)}>
-      <Trophy className={iconClassName} />
-      <span className={valueClassName}>{elo}</span>
-    </span>
-  )
+  const handleOpen = useCallback(() => {
+    if (!enabled) return
+    setOpen(true)
+  }, [enabled])
+
+  const handleClose = useCallback(() => setOpen(false), [])
 
   return (
-    <NavbarInfoTooltip
-      useLightNav={useLightNav}
-      enabled={enabled}
-      ariaLabel={`ELO curent: ${elo}`}
-      title="ELO-ul tău"
-      description="Măsoară progresul tău în parcursul de învățare. Câștigi puncte când răspunzi corect la exerciții și teste."
-      footer={`Ai ${elo} ELO.`}
-    >
-      {content}
-    </NavbarInfoTooltip>
+    <>
+      <button
+        type="button"
+        onClick={handleOpen}
+        disabled={!enabled}
+        aria-label={`Trophy Road — ${elo} trofee`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className={cn(
+          "inline-flex items-center gap-1 text-xs font-medium transition-opacity",
+          secondaryText,
+          className,
+          enabled ? "cursor-pointer hover:opacity-80" : "cursor-default opacity-60",
+        )}
+      >
+        <Trophy className={iconClassName} />
+        <span className={valueClassName}>{elo}</span>
+      </button>
+
+      {open ? (
+        <TrophyRoadOverlay open={open} onClose={handleClose} userElo={elo} />
+      ) : null}
+    </>
   )
 }

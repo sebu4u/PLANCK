@@ -61,7 +61,12 @@ export function EmbeddedProblemContent({ problem }: EmbeddedProblemContentProps)
       problem_id: problem.id,
       solved_at: new Date().toISOString(),
     })
-    if (!error) setIsSolved(true)
+    if (!error) {
+      setIsSolved(true)
+      void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForProblem }) =>
+        awardPlanckPassXpForProblem(String(problem.id), problem.difficulty),
+      )
+    }
     setLoadingSolved(false)
   }
 

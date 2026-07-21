@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { X, ChevronLeft, ChevronRight, Flame } from "lucide-react"
+import { X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import {
   Dialog,
@@ -21,14 +21,12 @@ import {
 } from "@/components/invata/grila-lesson-context"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
-import {
-  PLANCK_STREAK_UPDATED_EVENT,
-  useLearningPathItemCompletion,
-} from "@/hooks/use-learning-path-item-completion"
+import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
 import { useLearningPathCorrectAnswerElo } from "@/hooks/use-learning-path-correct-answer-elo"
 import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
+import { LessonXpBadge } from "@/components/invata/lesson-xp-badge"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import {
   formatGrilaLearningPathContext,
@@ -123,7 +121,6 @@ function LessonItemShellInner({
   const mobileChatDisplacesContent = Boolean(explainChat?.mobileSheetDisplacesContent)
   const { user } = useAuth()
   const router = useRouter()
-  const [streak, setStreak] = useState<number | null>(null)
   const [showQuitDialog, setShowQuitDialog] = useState(false)
   const [isExitingLesson, setIsExitingLesson] = useState(false)
   const [showPrevItemCue, setShowPrevItemCue] = useState(false)
@@ -300,43 +297,10 @@ function LessonItemShellInner({
     }
   }, [user?.id, currentItemId, initialCurrentItemCompleted])
 
-  useEffect(() => {
-    if (!user) {
-      setStreak(null)
-      return
-    }
-
-    let cancelled = false
-
-    const fetchStreak = async () => {
-      const { error: streakRpcError } = await supabase.rpc("check_and_reset_streak_if_needed", {
-        user_uuid: user.id,
-      })
-      if (streakRpcError) {
-        console.warn("Streak reset check failed:", streakRpcError.message)
-      }
-      const { data } = await supabase
-        .from("user_stats")
-        .select("current_streak")
-        .eq("user_id", user.id)
-        .single()
-      if (!cancelled) {
-        setStreak(data?.current_streak ?? 0)
-      }
-    }
-
-    void fetchStreak()
-
-    const onStreakUpdated = () => {
-      void fetchStreak()
-    }
-    window.addEventListener(PLANCK_STREAK_UPDATED_EVENT, onStreakUpdated)
-
-    return () => {
-      cancelled = true
-      window.removeEventListener(PLANCK_STREAK_UPDATED_EVENT, onStreakUpdated)
-    }
-  }, [user])
+  const lessonXpItemIds = useMemo(
+    () => items.map((lessonItem) => lessonItem.id),
+    [items],
+  )
 
   useEffect(() => {
     const canShowNextCue = currentItemCompleted
@@ -434,12 +398,7 @@ function LessonItemShellInner({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-[#4d4d4d]">
-          <Flame className="h-4 w-4 text-orange-500 sm:h-4.5 sm:w-4.5" />
-          <span className="tabular-nums">
-            {streak !== null ? streak : "—"}
-          </span>
-        </div>
+        <LessonXpBadge itemIds={lessonXpItemIds} />
       </nav>
 
       {prevItemHref && !flashcardFlow.isActive ? (
@@ -623,6 +582,11 @@ function LessonItemShellInner({
             <button
               type="button"
               onClick={() => {
+                setShowQuitDialog(false)
+                if (itemNavigation?.requestLessonExit) {
+                  itemNavigation.requestLessonExit()
+                  return
+                }
                 if (isOnboardingLesson) setIsExitingLesson(true)
                 router.push(exitTargetHref)
               }}

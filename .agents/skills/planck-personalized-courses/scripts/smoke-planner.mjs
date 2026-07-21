@@ -79,7 +79,15 @@ if (verification.issues.length) {
 // --- Assertions -----------------------------------------------------------
 
 assert(plan.lessons.length >= 2, `has >= 2 lessons (got ${plan.lessons.length})`)
-assert(items.length >= 20, `has >= 20 items (got ${items.length})`)
+assert(items.length >= 12, `has >= 12 items (got ${items.length})`)
+
+// First item of each lesson should be custom_text (teaching rhythm).
+for (const lesson of plan.lessons) {
+  assert(
+    lesson.items[0]?.item_type === "custom_text",
+    `lesson "${lesson.title}" starts with custom_text`,
+  )
+}
 
 // Variety: at least 3 distinct non-custom_text types present.
 const nonCtTypes = Object.keys(byType).filter((t) => t !== "custom_text")

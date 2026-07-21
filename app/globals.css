@@ -962,6 +962,215 @@
   }
 }
 
+/* PLANCKPASS: subtle repeating icon drift (bottom → top, seamless loop) */
+@keyframes planckpass-bg-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -50%, 0);
+  }
+}
+
+.planckpass-bg-drift {
+  animation: planckpass-bg-drift 28s linear infinite;
+}
+
+/* PLANCKPASS: claimable card — Brawl-style yellow outline + shine */
+@keyframes planckpass-claim-shine {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+@keyframes planckpass-claim-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 5px #ffd000,
+      0 0 12px 2px rgba(255, 208, 0, 0.75),
+      0 0 22px 4px rgba(255, 180, 0, 0.45);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 5px #ffe566,
+      0 0 18px 4px rgba(255, 220, 80, 0.95),
+      0 0 28px 6px rgba(255, 200, 0, 0.55);
+  }
+}
+
+@keyframes planckpass-claim-spark {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.planckpass-claimable-card {
+  border-color: #ffd000 !important;
+  background: linear-gradient(180deg, #ffe566 0%, #ffc400 48%, #ff9800 100%) !important;
+  animation: planckpass-claim-glow 1.6s ease-in-out infinite;
+}
+
+.planckpass-claimable-shine {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.planckpass-claimable-shine::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 42%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 35%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0.15) 65%,
+    transparent 100%
+  );
+  animation: planckpass-claim-shine 2.1s ease-in-out infinite;
+}
+
+.planckpass-claimable-spark {
+  position: absolute;
+  z-index: 2;
+  width: 7px;
+  height: 7px;
+  pointer-events: none;
+  background: radial-gradient(circle, #fff 0%, #ffe566 40%, transparent 70%);
+  clip-path: polygon(
+    50% 0%,
+    62% 38%,
+    100% 50%,
+    62% 62%,
+    50% 100%,
+    38% 62%,
+    0% 50%,
+    38% 38%
+  );
+  animation: planckpass-claim-spark 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planckpass-bg-drift {
+    animation: none;
+  }
+
+  .planckpass-claimable-card {
+    animation: none;
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 5px #ffd000,
+      0 0 14px 2px rgba(255, 208, 0, 0.8);
+  }
+
+  .planckpass-claimable-shine::before,
+  .planckpass-claimable-spark {
+    animation: none;
+  }
+
+  .planckpass-claimable-shine::before {
+    display: none;
+  }
+
+  .planckpass-claim-sparkle {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+/* PLANCKPASS: Starr-drop claim reveal */
+.planckpass-claim-outline {
+  color: #fff;
+  -webkit-text-stroke: 0.065em #111;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0.08em 0 #111,
+    0 0.12em 0.02em rgba(0, 0, 0, 0.35);
+}
+
+.planckpass-claim-reward-card {
+  border-radius: 1.35rem;
+  border: 5px solid #1a0a4a;
+  background: linear-gradient(180deg, #8b5cff 0%, #5b2fd6 48%, #3b1499 100%);
+  box-shadow:
+    0 10px 0 #1a0a4a,
+    0 18px 40px rgba(0, 0, 0, 0.28),
+    inset 0 2px 0 rgba(255, 255, 255, 0.28);
+}
+
+/* Trophy Road placeholder */
+.trophy-road-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(26, 10, 74, 0.45) transparent;
+}
+
+.trophy-road-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.trophy-road-scroll::-webkit-scrollbar-thumb {
+  background: rgba(26, 10, 74, 0.4);
+  border-radius: 999px;
+}
+
+.trophy-road-node {
+  content-visibility: auto;
+  contain-intrinsic-size: 96px 120px;
+}
+
+@keyframes planckpass-claim-sparkle-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.65) rotate(0deg);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(18deg);
+  }
+}
+
+.planckpass-claim-sparkle {
+  background: radial-gradient(circle, #fff 0%, #b8f4ff 42%, transparent 72%);
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    100% 50%,
+    61% 65%,
+    50% 100%,
+    39% 65%,
+    0% 50%,
+    39% 35%
+  );
+  animation: planckpass-claim-sparkle-twinkle 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(180, 255, 255, 0.85));
+}
+
 @keyframes pulse-scale {
 
   0%,

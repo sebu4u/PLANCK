@@ -11,9 +11,18 @@ AI-generated courses are stored as official `learning_path_chapters`/`_lessons`/
 
 1. **`POST /api/personalized-courses`** (`app/api/personalized-courses/route.ts`): auth + (dev bypass) + rate limit → insert chapter row (`generation_status="creating"`, `is_active=false`) → return `202` immediately with `{ chapterId, chapterSlug, title, description }`. **Never** run the AI call in the synchronous handler.
 2. **`after(async () => { … })`** (import `after` from `next/server`, **not** `afterResponse`): the heavy work runs detached. Stages write `{ stage, percent, message }` to `generation_metadata.progress` so the UI can show real progress. On success: flip to `generation_status="ready"` + `is_active=true`. On error: `markChapterFailed` → `generation_status="failed"` + `reason` in metadata.
-3. **`planPersonalizedCourse`** (`lib/personalized-courses/planner.ts`): `searchPlanckContentForPrompt` → build messages → call the model (retry loop, tolerant parse) → `normalizePlan` (coerce/validate each item) → `verifyGeneratedPlan` (second pass, replace broken items) → return `{ plan, verification }`.
-4. **`searchPlanckContentForPrompt`** (`lib/personalized-courses/search.ts`): fetches real Planck candidates (learning_path_item, problem, quiz_question, math_problem, coding_problem) matching the prompt; returns `PersonalizedCourseCatalogCandidate[]` with `source_key`s.
-5. **UI** (`app/invata/page.tsx` + `components/invata/`): the generator pushes an **optimistic** in-progress chapter into `PersonalizedCourseGenerationProvider` context → `LearningPathsList` prepends it → `PersonalizedCourseProgressCard` polls `/api/personalized-courses/status` every 3s → on `ready` removes the optimistic entry and `router.refresh()` so the real card replaces it in place.
+3. **`classifyPromptIntent`** (`lib/personalized-courses/classify-intent.ts`): short AI JSON → `PersonalizedCourseIntentScope` (`mode`, `materie`, `chapterIds`). Non-catalog or no matching chapter → empty candidates / full generation. Keyword fallback if classifier fails.
+4. **`searchPlanckContentForPrompt(..., scope)`** (`lib/personalized-courses/search.ts`): only items from `scope.chapterIds` + materie-aligned problems/quizzes. Metadata includes `lesson_order_index` / `item_order_index`.
+5. **`planPersonalizedCourse(..., scope)`** (`lib/personalized-courses/planner.ts`): model → `normalizePlan`/`finalizePlan` (strip off-scope sources, pad with generated items) → `enforceSourceChronology` → `enforceTeachingRhythm` → `verifyGeneratedPlan` → `verifyQuizFidelity` → `{ plan, verification }`.
+6. **UI** (`app/invata/page.tsx` + `components/invata/`): optimistic chapter → poll status → `ready` → refresh.
+
+### Hard quality rules (code-enforced)
+
+- No cross-materie / cross-chapter reuse (`classify-intent` + scoped search + `removeIrrelevantSourceItems` / `stripAllSourceKeys`)
+- Source chronology by `(lesson_order_index, item_order_index)` with generated items as glue (`enforce-chronology.ts`)
+- First item `custom_text`; after teaching → 1–3 interactives, poll preferred (`enforce-rhythm.ts`)
+- Generated interactives must test prior explanations only (`verify-fidelity.ts`)
+- Volume: ~12–25 items/lesson, max 30
 
 ## Provider config (OpenAI-compatible via env)
 
@@ -50,13 +59,14 @@ The AI may generate items for these types only (`GENERATABLE_ITEM_TYPES`), chose
 - **Never escape `'` or `"`** — not XSS vectors in body context, and `'` breaks KaTeX primes (`f'(x)` → `f&#x27;(x)` → raw source dumped).
 - URL fields (`url`, `imageUrl`, `embedUrl`, …) go through `sanitizeUrl`.
 
-## Verifier pipeline (`verifyGeneratedPlan`)
+## Verifier pipeline (`verifyGeneratedPlan` + `verifyQuizFidelity`)
 
-Runs after `normalizePlan` as a second pass, catching quality issues that pass schema validation but still produce a broken experience:
-- **Hard checks** (replace the item with a `custom_text` connector): fill_slot `?`/mismatched slots/answer-in-instructions, answer leak (correct option text in question/statement/prompt), ≠4 options, structural mismatches (match pairs, card_sort permutation, table_fill cells, memory_flip ≥2 pairs), `code_trace` `lineIndex` out of range.
-- **Soft checks** (flag only, never replace — replacing would destroy the lesson): bare math outside `$...$` (`countBareMath`).
-- **Auto-repair:** `applyBareMathWrap` wraps bare single-letter `+ _/^ + alnum` tokens (e.g. `L_0`, `x^2`) in `$...$` in `custom_text` bodies and `reveal_steps` markdown before checks run.
-- The `VerificationReport` (`{ totalItems, replaced, byType, issues[], bareMathFlags, passed }`) is stored in `generation_metadata.verification`.
+Runs after `normalizePlan` as quality passes:
+
+1. **Structural** (`verifyGeneratedPlan`): fill_slot markers, answer leaks, ≠4 options, structural mismatches, bare-math soft flags, off-topic source drops.
+2. **Pedagogical fidelity** (`verifyQuizFidelity` in `verify-fidelity.ts`): for each generated interactive, an AI check/rewrite so questions only test prior `custom_text` explanations (never new facts). Source-keyed items are not rewritten. Placeholder polls from `enforceTeachingRhythm` (`_needs_fidelity_rewrite`) are always rewritten.
+
+The `VerificationReport` stores structural fields plus optional `fidelity: { checked, rewritten, skippedSource, failed }` in `generation_metadata.verification`.
 
 **Gotcha:** `countBareMath`'s regex middle class must be `[_^]` only — NOT `[_^a-zA-Z0-9]`, which matches every adjacent letter pair in prose ("es" in "este") and over-flags/replaces the whole lesson.
 

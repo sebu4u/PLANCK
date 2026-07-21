@@ -40,6 +40,8 @@ import {
 } from "@/components/dashboard/cards/dashboard-streak-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { FreeMobileDashboard } from "@/components/dashboard/free-mobile/free-mobile-dashboard"
+import { PlanckPassDesktopShell } from "@/components/dashboard/free-mobile/planckpass-desktop-shell"
+import { PlanckPassMobileShell } from "@/components/dashboard/free-mobile/planckpass-sheet"
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
@@ -586,20 +588,88 @@ export function DashboardAuth() {
 
         {/* Content Wrapper - takes remaining width */}
         <div className="flex-1 h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
-          {/* Floating Card Container */}
-          <div className="m-[3px] mt-0 flex-1 min-h-0 bg-white md:bg-[#ffffff] lg:rounded-xl overflow-hidden flex flex-col lg:mt-0">
-
-            {/* Scrollable Content Area — locked on mobile, scrollable from md up */}
-            <div className="flex-1 min-h-0 overflow-hidden overscroll-none md:overflow-y-auto dashboard-scrollbar bg-white md:bg-[#ffffff]">
-              {!isPaid ? (
-                <div className="hidden md:block">
-                  <PremiumUpgradeBanner className="burger:flex" />
+          {/* Mobile — floating card; free uses PlanckPass top band */}
+          <div
+            className={
+              isFree
+                ? "m-0 flex flex-1 min-h-0 flex-col overflow-hidden bg-white md:hidden"
+                : "m-[3px] mt-0 flex flex-1 min-h-0 flex-col overflow-hidden bg-white md:hidden"
+            }
+          >
+            <div className="flex-1 min-h-0 overflow-hidden overscroll-none bg-white">
+              <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 animate-fade-in-up">
+                <div className="mx-auto flex h-full min-h-0 w-full flex-col">
+                  {isFree ? (
+                    <PlanckPassMobileShell>
+                      <FreeMobileDashboard
+                        primaryChapter={dashboardData.dashboardLearningPaths[0] ?? null}
+                        level={
+                          dashboardData.dashboardLearningPaths[0]
+                            ? dashboardData.dashboardLevelByChapter[dashboardData.dashboardLearningPaths[0].id]
+                            : 1
+                        }
+                        hasStarted={
+                          dashboardData.dashboardLearningPaths[0]
+                            ? Boolean(
+                                dashboardData.dashboardHasStartedByChapter[
+                                  dashboardData.dashboardLearningPaths[0].id
+                                ],
+                              )
+                            : false
+                        }
+                        resumeHref={
+                          dashboardData.dashboardLearningPaths[0]
+                            ? dashboardData.dashboardStartHrefByChapter[
+                                dashboardData.dashboardLearningPaths[0].id
+                              ]
+                            : "/invata"
+                        }
+                        lessonProgress={
+                          dashboardData.dashboardLearningPaths[0]
+                            ? dashboardData.dashboardLessonProgressByChapter[
+                                dashboardData.dashboardLearningPaths[0].id
+                              ]
+                            : undefined
+                        }
+                        currentLessonTitle={
+                          dashboardData.dashboardLearningPaths[0]
+                            ? dashboardData.dashboardCurrentLessonTitleByChapter[
+                                dashboardData.dashboardLearningPaths[0].id
+                              ]
+                            : null
+                        }
+                        rank={dashboardData.stats.rank}
+                      />
+                    </PlanckPassMobileShell>
+                  ) : (
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                      <DashboardLearningPathsCarousel
+                        key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
+                        chapters={dashboardData.dashboardLearningPaths}
+                        lessonsByChapter={dashboardData.dashboardLessonsByChapter}
+                        startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
+                        levelByChapter={dashboardData.dashboardLevelByChapter}
+                        hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
+                      />
+                    </div>
+                  )}
                 </div>
+              </main>
+            </div>
+          </div>
+
+          {/* Desktop — PlanckPass right panel (free + paid) */}
+          <PlanckPassDesktopShell className="hidden md:flex flex-1 min-h-0 w-full">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-none dashboard-scrollbar bg-white">
+              {!isPaid ? (
+                <PremiumUpgradeBanner className="burger:flex" />
               ) : null}
-              <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:block md:h-auto md:overflow-visible md:p-8 lg:p-10 animate-fade-in-up">
-                <div className="mx-auto flex h-full min-h-0 w-full max-w-[1000px] flex-col md:h-auto md:min-h-0">
-                  <div className={`grid min-h-0 flex-1 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[340px_minmax(0,1fr)] md:flex-none ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}>
-                    <div className="order-1 hidden md:block xl:col-start-1 xl:row-start-1">
+              <main className="block h-auto overflow-visible p-8 lg:p-10 animate-fade-in-up">
+                <div className="mx-auto flex h-auto min-h-0 w-full max-w-[1000px] flex-col">
+                  <div
+                    className={`grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-[340px_minmax(0,1fr)] ${isPaid ? "xl:grid-rows-[auto_1fr]" : ""}`}
+                  >
+                    <div className="xl:col-start-1 xl:row-start-1">
                       {isStudent ? (
                         <div className="mb-4">
                           <PracticeSubjectSwitcher
@@ -621,63 +691,18 @@ export function DashboardAuth() {
                       ) : null}
                     </div>
 
-                    <div className="order-2 flex min-h-0 flex-col overflow-hidden md:order-3 md:overflow-visible xl:order-none xl:col-start-2 xl:row-span-2 md:min-h-0">
-                      {isFree ? (
-                        <div className="h-full min-h-0 overflow-y-auto md:hidden">
-                          <FreeMobileDashboard
-                            primaryChapter={dashboardData.dashboardLearningPaths[0] ?? null}
-                            level={
-                              dashboardData.dashboardLearningPaths[0]
-                                ? dashboardData.dashboardLevelByChapter[dashboardData.dashboardLearningPaths[0].id]
-                                : 1
-                            }
-                            hasStarted={
-                              dashboardData.dashboardLearningPaths[0]
-                                ? Boolean(
-                                    dashboardData.dashboardHasStartedByChapter[
-                                      dashboardData.dashboardLearningPaths[0].id
-                                    ],
-                                  )
-                                : false
-                            }
-                            resumeHref={
-                              dashboardData.dashboardLearningPaths[0]
-                                ? dashboardData.dashboardStartHrefByChapter[
-                                    dashboardData.dashboardLearningPaths[0].id
-                                  ]
-                                : "/invata"
-                            }
-                            lessonProgress={
-                              dashboardData.dashboardLearningPaths[0]
-                                ? dashboardData.dashboardLessonProgressByChapter[
-                                    dashboardData.dashboardLearningPaths[0].id
-                                  ]
-                                : undefined
-                            }
-                            currentLessonTitle={
-                              dashboardData.dashboardLearningPaths[0]
-                                ? dashboardData.dashboardCurrentLessonTitleByChapter[
-                                    dashboardData.dashboardLearningPaths[0].id
-                                  ]
-                                : null
-                            }
-                            rank={dashboardData.stats.rank}
-                          />
-                        </div>
-                      ) : null}
-                      <div className={isFree ? "hidden h-full min-h-0 flex-col overflow-hidden md:flex md:overflow-visible" : "flex h-full min-h-0 flex-col overflow-hidden md:overflow-visible"}>
-                        <DashboardLearningPathsCarousel
-                          key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
-                          chapters={dashboardData.dashboardLearningPaths}
-                          lessonsByChapter={dashboardData.dashboardLessonsByChapter}
-                          startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
-                          levelByChapter={dashboardData.dashboardLevelByChapter}
-                          hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
-                        />
-                      </div>
+                    <div className="flex min-h-0 flex-col overflow-visible xl:col-start-2 xl:row-span-2">
+                      <DashboardLearningPathsCarousel
+                        key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
+                        chapters={dashboardData.dashboardLearningPaths}
+                        lessonsByChapter={dashboardData.dashboardLessonsByChapter}
+                        startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
+                        levelByChapter={dashboardData.dashboardLevelByChapter}
+                        hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
+                      />
                     </div>
 
-                    <div className="order-3 hidden md:block md:order-2 xl:order-none xl:col-start-1 xl:row-start-2">
+                    <div className="xl:col-start-1 xl:row-start-2">
                       <DashboardRankCard
                         rank={dashboardData.stats.rank}
                         elo={dashboardData.stats.elo}
@@ -689,7 +714,7 @@ export function DashboardAuth() {
                 </div>
               </main>
             </div>
-          </div>
+          </PlanckPassDesktopShell>
         </div>
       </div>
 

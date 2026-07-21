@@ -62,7 +62,7 @@ export function FreeMobileDashboard({
   const studentName = profile?.nickname || profile?.name || "Tu"
 
   return (
-    <div className="mobile-bottom-nav-pad flex flex-col gap-4 px-4 pt-7">
+    <div className="mobile-bottom-nav-pad flex flex-col gap-4 px-4 pt-3">
       <div className="mb-2">
         <InvataPersonalizedCourseEntry />
       </div>

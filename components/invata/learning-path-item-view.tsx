@@ -25,6 +25,9 @@ interface LearningPathItemViewProps {
   slideDirection: LearningPathSlideDirection
   usesFizicaLessonCompletionScreen?: boolean
   animateFirstItemEntry?: boolean
+  requestLessonExit?: () => void
+  recordSessionItemCompletion?: (itemId: string) => void
+  wasCompletedAtSessionStart?: (itemId: string) => boolean
 }
 
 export function LearningPathItemView({
@@ -35,6 +38,9 @@ export function LearningPathItemView({
   slideDirection,
   usesFizicaLessonCompletionScreen = false,
   animateFirstItemEntry = false,
+  requestLessonExit,
+  recordSessionItemCompletion,
+  wasCompletedAtSessionStart,
 }: LearningPathItemViewProps) {
   const {
     chapterSlug,
@@ -109,6 +115,9 @@ export function LearningPathItemView({
     slideDirection,
     goToNextItem,
     goToPrevItem,
+    requestLessonExit,
+    recordSessionItemCompletion,
+    wasCompletedAtSessionStart,
     usesFizicaLessonCompletionScreen,
     animateFirstItemEntry,
   }

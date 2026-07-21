@@ -10,6 +10,11 @@ import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav";
 import { Pencil, Settings, Lock, Shield, Trophy, Gift, GraduationCap, Copy, Check, CreditCard, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserBadges } from "@/components/user-badges";
+import { CosmeticsAvatarFrame } from "@/components/planckpass/cosmetics-avatar-frame";
+import {
+  PlanckPassInventory,
+  useEquippedCosmetics,
+} from "@/components/planckpass/planckpass-inventory";
 import { ChangePasswordModal } from "@/components/change-password-modal";
 import { PrivacySettings } from "@/components/privacy-settings";
 import { Progress } from "@/components/ui/progress";
@@ -71,6 +76,7 @@ const ProfilPage = () => {
   } | null>(null);
   const [contestLoading, setContestLoading] = useState(true);
   const [codeCopied, setCodeCopied] = useState(false);
+  const cosmetics = useEquippedCosmetics();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -300,18 +306,27 @@ const ProfilPage = () => {
                     <ProfileSkeleton />
                   ) : (
                     <div className="flex flex-col items-center gap-6">
-                      {/* Avatar with Rank Badge */}
+                      {/* Avatar with Rank Badge + PLANCKPASS cosmetics */}
                       <div className="relative group">
                         <div className="relative">
-                          <Avatar className="h-32 w-32 border-4 border-white shadow-lg shadow-black/10">
-                            {avatarUrl ? (
-                              <AvatarImage src={avatarUrl} alt={profile?.name || user.email} />
-                            ) : (
-                              <AvatarFallback className="bg-[#f1f1f1] text-4xl text-[#191919]">
-                                {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
+                          <CosmeticsAvatarFrame
+                            size={128}
+                            borderImageUrl={cosmetics.border?.imageUrl}
+                            badgeImageUrl={cosmetics.badge?.imageUrl}
+                          >
+                            <Avatar className="h-full w-full border-4 border-white shadow-lg shadow-black/10">
+                              {cosmetics.icon?.imageUrl || avatarUrl ? (
+                                <AvatarImage
+                                  src={cosmetics.icon?.imageUrl || avatarUrl}
+                                  alt={profile?.name || user.email}
+                                />
+                              ) : (
+                                <AvatarFallback className="bg-[#f1f1f1] text-4xl text-[#191919]">
+                                  {(profile?.name || user.email || "U").charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                          </CosmeticsAvatarFrame>
                           {uploadingAvatar && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full z-10">
                               <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -321,7 +336,7 @@ const ProfilPage = () => {
                             </div>
                           )}
                           {/* Rank Badge Overlay */}
-                          {userStats && (
+                          {userStats && !cosmetics.badge?.imageUrl && (
                             <div className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-lg shadow-black/10">
                               <Image
                                 src={rankIconPath}
@@ -637,6 +652,10 @@ const ProfilPage = () => {
 
                     {/* Badges Card */}
                     <UserBadges />
+
+                    <PlanckPassInventory
+                      onEquippedChange={cosmetics.setFromInventory}
+                    />
                   </>
                 )}
               </div>

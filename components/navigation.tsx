@@ -569,14 +569,33 @@ export function Navigation() {
     isInvataSubjectHub ||
     isMatematicaProblemsCatalog ||
     isInformaticaProblemsCatalog
+  const [planckPassExpanded, setPlanckPassExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!isDashboardPage) {
+      setPlanckPassExpanded(false)
+      return
+    }
+    const sync = () =>
+      setPlanckPassExpanded(document.body.classList.contains("planckpass-expanded"))
+    sync()
+    const observer = new MutationObserver(sync)
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] })
+    return () => observer.disconnect()
+  }, [isDashboardPage])
+
   const navbarElevationClass =
     isProblemDetailPage
       ? "shadow-none"
       : showMobileFocusedShell
         ? "shadow-none burger:shadow-md"
-        : isDashboardPage || isCatalogHubPage
-          ? "shadow-none burger:shadow-md"
-          : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
+        : isDashboardPage
+          ? planckPassExpanded
+            ? "shadow-[0_6px_20px_rgba(26,10,74,0.28)] transition-shadow duration-300 burger:shadow-md"
+            : "shadow-none transition-shadow duration-300 burger:shadow-md"
+          : isCatalogHubPage
+            ? "shadow-none burger:shadow-md"
+            : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
   // Planck Code routes (IDE + enunț informatică) folosesc navbar-ul întunecat, nu shell-ul alb mobil.
   const showMobileAppShellNav = showMobileAppShell && !isPlanckCodeRoute
@@ -587,14 +606,17 @@ export function Navigation() {
     user &&
       isStudent &&
       (isStudentDashboardRoute(pathname) ||
+        isProblemsCatalog ||
         isMatematicaProblemsCatalog ||
         isInformaticaProblemsCatalog),
   )
-  const mobilePracticeSubject: PracticeSubjectId = isMatematicaProblemsCatalog
-    ? "matematica"
-    : isInformaticaProblemsCatalog
-      ? "informatica"
-      : normalizePracticeSubject(profile?.preferred_materie)
+  const mobilePracticeSubject: PracticeSubjectId = isProblemsCatalog
+    ? "fizica"
+    : isMatematicaProblemsCatalog
+      ? "matematica"
+      : isInformaticaProblemsCatalog
+        ? "informatica"
+        : normalizePracticeSubject(profile?.preferred_materie)
   const invataHubChapters = useInvataHubChapters()
   const showInvataHubMobileNav =
     isMobile && isInvataHubRoute(pathname) && Boolean(invataHubChapters?.length)
@@ -742,7 +764,9 @@ export function Navigation() {
                           currentSubject={mobilePracticeSubject}
                           size={isStudentDashboardRoute(pathname) ? "navbar-lg" : "navbar"}
                           navigateOnChange={
-                            isMatematicaProblemsCatalog || isInformaticaProblemsCatalog
+                            isProblemsCatalog ||
+                            isMatematicaProblemsCatalog ||
+                            isInformaticaProblemsCatalog
                           }
                         />
                       ) : (

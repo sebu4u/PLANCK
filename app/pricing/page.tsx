@@ -11,7 +11,10 @@ import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
+import { PricingDiscountUrgencyBanner } from "@/components/pricing/pricing-discount-urgency-banner"
 import { PricingMobileExitSheet } from "@/components/pricing/pricing-mobile-exit-sheet"
+import { PricingPlanFeaturesButton } from "@/components/pricing/pricing-plan-features-button"
+import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
 
 const MOBILE_BREAKPOINT_PX = 768
 
@@ -114,6 +117,9 @@ function PricingPageContent() {
   const [mobileExitSheetOpen, setMobileExitSheetOpen] = useState(false)
   const purchasesEnabled = canPurchaseSubscriptions()
   const hasPaidSubscription = subscriptionPlan === "plus" || subscriptionPlan === "premium"
+  const postOnboardingDiscount = usePostOnboardingDiscountWindow(user?.id)
+  const showDiscountUrgency =
+    Boolean(user) && !hasPaidSubscription && postOnboardingDiscount.active
   const currentPlanRank =
     subscriptionPlan === "premium" ? 2 : subscriptionPlan === "plus" ? 1 : 0
 
@@ -456,6 +462,10 @@ function PricingPageContent() {
             Mai puțin decât o oră de meditații.
           </p>
 
+          {showDiscountUrgency ? (
+            <PricingDiscountUrgencyBanner remainingLabel={postOnboardingDiscount.remainingLabel} />
+          ) : null}
+
           {user && hasPaidSubscription && (
             <button
               onClick={openBillingPortal}
@@ -500,54 +510,60 @@ function PricingPageContent() {
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlan(plan.id)}
-                    aria-pressed={isSelected}
+                  <div
                     className={cn(
-                      "relative flex h-full w-full flex-col rounded-[25px] bg-white p-3 text-left transition duration-200 sm:rounded-[26.5px] sm:p-5",
+                      "relative flex h-full w-full flex-col rounded-[25px] bg-white text-left transition duration-200 sm:rounded-[26.5px]",
                       isSelected ? "shadow-[0_18px_40px_rgba(15,23,42,0.12)]" : "shadow-[0_10px_30px_rgba(15,23,42,0.06)]",
                       "min-h-[148px] sm:min-h-[188px]"
                     )}
                   >
-                    <div className="flex flex-1 flex-col">
-                      <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4">
-                        <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#171717] sm:text-2xl">
-                          {plan.name}
-                        </h2>
-                        {ui.isCurrentPlan && (
-                          <span className="rounded-full bg-[#f3f4f6] px-3 py-1 text-xs font-medium text-gray-600">
-                            Planul tău
-                          </span>
+                    <PricingPlanFeaturesButton planId={plan.id} />
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlan(plan.id)}
+                      aria-pressed={isSelected}
+                      className="relative flex h-full w-full flex-col p-3 pr-11 text-left sm:p-5 sm:pr-12"
+                    >
+                      <div className="flex flex-1 flex-col">
+                        <div className="mb-2 flex flex-wrap items-center gap-2 pr-1 sm:mb-4">
+                          <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#171717] sm:text-2xl">
+                            {plan.name}
+                          </h2>
+                          {ui.isCurrentPlan && (
+                            <span className="rounded-full bg-[#f3f4f6] px-3 py-1 text-xs font-medium text-gray-600">
+                              Planul tău
+                            </span>
+                          )}
+                        </div>
+
+                        {plan.id === "free" ? (
+                          <>
+                            <div className="flex items-end gap-1.5">
+                              <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
+                                {plan.priceLabel}
+                              </span>
+                            </div>
+                            <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                              {plan.description}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <PaidPlanPrice plan={plan} isYearly={isYearly} />
+
+                            <p className="mt-2 max-w-[18rem] text-xs font-normal leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
+                              {plan.id === "plus" && plan.priceValue != null
+                                ? isYearly
+                                  ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
+                                  : plan.description
+                                : plan.description}
+                            </p>
+                          </>
                         )}
                       </div>
-
-                      {plan.id === "free" ? (
-                        <>
-                          <div className="flex items-end gap-1.5">
-                            <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111] sm:text-[2.35rem]">
-                              {plan.priceLabel}
-                            </span>
-                          </div>
-                          <p className="mt-2 max-w-[18rem] text-xs leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
-                            {plan.description}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <PaidPlanPrice plan={plan} isYearly={isYearly} />
-
-                          <p className="mt-2 max-w-[18rem] text-xs font-normal leading-snug text-gray-600 sm:mt-3 sm:text-sm sm:leading-6">
-                            {plan.id === "plus" && plan.priceValue != null
-                              ? isYearly
-                                ? `Doar ${(plan.priceValue / 365).toFixed(2)} lei/zi`
-                                : plan.description
-                              : plan.description}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 </div>
               )
             })}

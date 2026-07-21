@@ -1,6 +1,11 @@
 import "server-only"
 
-import type { SupabaseAnyClient, PersonalizedCourseCatalogCandidate } from "@/lib/personalized-courses/types"
+import type {
+  PersonalizedCourseCatalogCandidate,
+  PersonalizedCourseIntentScope,
+  PersonalizedCourseMaterie,
+  SupabaseAnyClient,
+} from "@/lib/personalized-courses/types"
 import type { LearningPathLessonType } from "@/lib/supabase-learning-paths"
 import { slugify } from "@/lib/slug"
 
@@ -82,21 +87,6 @@ function escapeIlike(value: string): string {
   return value.replace(/[%_]/g, "")
 }
 
-function buildOrPattern(terms: string[]): string {
-  // Use the longest term for ilike (most specific), plus OR for each term
-  if (!terms.length) return "%a%"
-  const escaped = terms.map(escapeIlike).filter(Boolean)
-  if (!escaped.length) return "%a%"
-  // Single broad pattern with the first term
-  return `%${escaped[0]}%`
-}
-
-function buildMultiOrFilter(column: string, terms: string[]): string {
-  const escaped = terms.map(escapeIlike).filter((t) => t.length >= 3)
-  if (!escaped.length) return `${column}.ilike.%a%`
-  return escaped.map((t) => `${column}.ilike.%${t}%`).join(",")
-}
-
 function scoreCandidate(promptTerms: string[], haystack: string): number {
   const normalized = normalizeText(haystack)
   let score = 0
@@ -106,13 +96,6 @@ function scoreCandidate(promptTerms: string[], haystack: string): number {
   return score
 }
 
-/**
- * Item titles that have appeared as low-content "template" titles in past
- * personalized courses. We drop these from the catalog search results so the
- * planner doesn't try to reuse them — they're almost always off-topic
- * (e.g. "Exercitiu intelegere" with whatever the AI filled in last time).
- * Mirrors the verifier's GENERIC_LEARNED_ITEM_TITLES set.
- */
 const GENERIC_ITEM_TITLES_FOR_SEARCH = new Set([
   "exercitiu intelegere",
   "exercițiu intelegere",
@@ -157,6 +140,8 @@ function sortAndLimit(
   candidates: PersonalizedCourseCatalogCandidate[],
   terms: string[],
   limit: number,
+  /** When true, keep all in-scope candidates even with low term score (chapter already matched). */
+  relaxTermScore = false,
 ): PersonalizedCourseCatalogCandidate[] {
   const deduped = new Map<string, PersonalizedCourseCatalogCandidate>()
   for (const candidate of candidates) {
@@ -171,13 +156,7 @@ function sortAndLimit(
         `${candidate.title} ${candidate.summary} ${Object.values(candidate.metadata ?? {}).join(" ")}`,
       ),
     }))
-    // Require a score of 3+ to include: that's either one 6+ char term (3
-    // points) or two 3-5 char terms (2 each). A single 2-point match (one
-    // short word like "totul", "tot", "intr", "plm") is not enough — it
-    // catches every generic item, which is exactly how the off-topic
-    // pollution happens in the first place. If the prompt yielded zero
-    // terms, accept everything (we have no signal to filter on).
-    .filter((row) => row.score >= 3 || terms.length === 0)
+    .filter((row) => relaxTermScore || row.score >= 3 || terms.length === 0)
     .sort((a, b) => b.score - a.score || a.candidate.title.localeCompare(b.candidate.title))
     .slice(0, candidateLimit(limit))
     .map((row) => row.candidate)
@@ -193,6 +172,7 @@ type LearningPathItemSearchRow = {
   quiz_question_id: string | null
   problem_id: string | null
   content_json?: unknown
+  order_index?: number | null
 }
 
 function addLearningPathItemCandidate(
@@ -200,10 +180,6 @@ function addLearningPathItemCandidate(
   row: LearningPathItemSearchRow,
   context: Record<string, unknown> = {},
 ) {
-  // Drop items whose title is one of the known generic-template titles
-  // (e.g. "Exercitiu intelegere", "Pasii de lucru"). These almost always have
-  // placeholder content from a previous personalized course and are the #1
-  // source of off-topic items in newly-generated courses.
   const normalizedTitle = normalizeText(row.title ?? "")
   if (normalizedTitle && GENERIC_ITEM_TITLES_FOR_SEARCH.has(normalizedTitle)) {
     return
@@ -228,6 +204,7 @@ function addLearningPathItemCandidate(
     metadata: {
       ...context,
       lesson_id: row.lesson_id,
+      item_order_index: typeof row.order_index === "number" ? row.order_index : 0,
       cursuri_lesson_slug: row.cursuri_lesson_slug,
       youtube_url: row.youtube_url,
       quiz_question_id: row.quiz_question_id,
@@ -236,171 +213,69 @@ function addLearningPathItemCandidate(
   })
 }
 
-async function fetchLearningPathCandidates(
+/**
+ * Fetch all active lesson items from the given official chapter IDs.
+ * Used when intent classification already pinned the topic to specific chapters.
+ */
+async function fetchLearningPathCandidatesForChapters(
   supabase: SupabaseAnyClient,
-  terms: string[],
+  chapterIds: string[],
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
+  if (!chapterIds.length) return []
+
   const candidates: PersonalizedCourseCatalogCandidate[] = []
 
-  // If a prompt matches a chapter, offer that chapter's concrete lesson items.
-  for (const term of terms.slice(0, 4)) {
-    const pattern = `%${escapeIlike(term)}%`
-    const { data: chapters } = await supabase
-      .from("learning_path_chapters")
-      .select("id, slug, title, description, problem_category, materie, is_personalized")
-      .eq("is_active", true)
-      // Drop personalized chapters — they were AI-generated for a previous
-      // user prompt and their items usually have generic titles + random
-      // content. Reusing them is the #1 cause of off-topic items sneaking
-      // into a new personalized course (e.g. a grammar question inside
-      // a Jujutsu Kaisen chapter).
-      .eq("is_personalized", false)
-      .or(`title.ilike.${pattern},description.ilike.${pattern},problem_category.ilike.${pattern}`)
-      .limit(20)
+  const { data: chapters } = await supabase
+    .from("learning_path_chapters")
+    .select("id, slug, title, description, problem_category, materie, is_personalized, order_index")
+    .eq("is_active", true)
+    .eq("is_personalized", false)
+    .in("id", chapterIds)
 
-    const chapterRows = chapters ?? []
-    const chapterIds = chapterRows.map((row) => String(row.id)).filter(Boolean)
-    if (!chapterIds.length) continue
+  const chapterRows = chapters ?? []
+  if (!chapterRows.length) return []
 
-    const chapterById = new Map(chapterRows.map((row) => [String(row.id), row]))
-    const { data: lessons } = await supabase
-      .from("learning_path_lessons")
-      .select("id, chapter_id, title, description")
-      .eq("is_active", true)
-      .in("chapter_id", chapterIds)
-      .order("order_index", { ascending: true })
-      .limit(80)
+  const chapterById = new Map(chapterRows.map((row) => [String(row.id), row]))
+  const safeChapterIds = chapterRows.map((row) => String(row.id))
 
-    const lessonRows = lessons ?? []
-    const lessonIds = lessonRows.map((row) => String(row.id)).filter(Boolean)
-    if (!lessonIds.length) continue
+  const { data: lessons } = await supabase
+    .from("learning_path_lessons")
+    .select("id, chapter_id, title, description, order_index")
+    .eq("is_active", true)
+    .in("chapter_id", safeChapterIds)
+    .order("order_index", { ascending: true })
+    .limit(200)
 
-    const lessonById = new Map(lessonRows.map((row) => [String(row.id), row]))
+  const lessonRows = lessons ?? []
+  const lessonIds = lessonRows.map((row) => String(row.id)).filter(Boolean)
+  if (!lessonIds.length) return []
+
+  const lessonById = new Map(lessonRows.map((row) => [String(row.id), row]))
+
+  // Batch in chunks of 80 to stay within PostgREST URL limits.
+  for (let i = 0; i < lessonIds.length; i += 80) {
+    const chunk = lessonIds.slice(i, i + 80)
     const { data: items } = await supabase
       .from("learning_path_lesson_items")
-      .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
+      .select(
+        "id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json, order_index",
+      )
       .eq("is_active", true)
-      .in("lesson_id", lessonIds)
+      .in("lesson_id", chunk)
       .order("order_index", { ascending: true })
-      .limit(120)
+      .limit(400)
 
     for (const row of items ?? []) {
       const lesson = row.lesson_id ? lessonById.get(String(row.lesson_id)) : null
       const chapter = lesson?.chapter_id ? chapterById.get(String(lesson.chapter_id)) : null
       addLearningPathItemCandidate(candidates, row, {
-        matched_by: "chapter",
+        matched_by: "chapter_scope",
         chapter_id: chapter?.id ?? null,
         chapter_title: chapter?.title ?? null,
+        chapter_order_index: typeof chapter?.order_index === "number" ? chapter.order_index : 0,
+        materie: chapter?.materie ?? null,
         lesson_title: lesson?.title ?? null,
-      })
-    }
-  }
-
-  // If a prompt matches a lesson, offer that lesson's concrete items.
-  for (const term of terms.slice(0, 4)) {
-    const pattern = `%${escapeIlike(term)}%`
-    const { data: lessons } = await supabase
-      .from("learning_path_lessons")
-      .select("id, slug, chapter_id, title, description")
-      .eq("is_active", true)
-      .or(`title.ilike.${pattern},description.ilike.${pattern}`)
-      .limit(25)
-
-    const lessonRows = lessons ?? []
-    if (!lessonRows.length) continue
-
-    // Look up each lesson's chapter to drop items from personalized chapters.
-    const chapterIds = Array.from(
-      new Set(lessonRows.map((row) => row.chapter_id).filter((id): id is string => Boolean(id))),
-    )
-    const { data: chapterRows } = chapterIds.length
-      ? await supabase
-          .from("learning_path_chapters")
-          .select("id, is_personalized")
-          .in("id", chapterIds)
-      : { data: [] as Array<{ id: string; is_personalized: boolean | null }> }
-    const personalizedChapters = new Set<string>(
-      (chapterRows ?? []).filter((c) => c.is_personalized === true).map((c) => String(c.id)),
-    )
-    const safeLessonRows = lessonRows.filter(
-      (row) => !row.chapter_id || !personalizedChapters.has(String(row.chapter_id)),
-    )
-    const lessonIds = safeLessonRows.map((row) => String(row.id)).filter(Boolean)
-    if (!lessonIds.length) continue
-
-    const lessonById = new Map(safeLessonRows.map((row) => [String(row.id), row]))
-    const { data: items } = await supabase
-      .from("learning_path_lesson_items")
-      .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
-      .eq("is_active", true)
-      .in("lesson_id", lessonIds)
-      .order("order_index", { ascending: true })
-      .limit(80)
-
-    for (const row of items ?? []) {
-      const lesson = row.lesson_id ? lessonById.get(String(row.lesson_id)) : null
-      addLearningPathItemCandidate(candidates, row, {
-        matched_by: "lesson",
-        chapter_id: lesson?.chapter_id ?? null,
-        lesson_title: lesson?.title ?? null,
-      })
-    }
-  }
-
-  // Search lesson items with each term. We must filter out items whose
-  // chapter is `is_personalized = true` — otherwise a previous personalized
-  // course's items (e.g. an old "Jujutsu Kaisen" run) leak into the
-  // candidate pool of a new course on the same topic, polluting it with
-  // stale content.
-  for (const term of terms.slice(0, 4)) {
-    const pattern = `%${escapeIlike(term)}%`
-    const { data: items } = await supabase
-      .from("learning_path_lesson_items")
-      .select("id, lesson_id, item_type, title, cursuri_lesson_slug, youtube_url, quiz_question_id, problem_id, content_json")
-      .eq("is_active", true)
-      .or(`title.ilike.${pattern},cursuri_lesson_slug.ilike.${pattern}`)
-      .limit(80)
-
-    const itemRows = items ?? []
-    if (!itemRows.length) continue
-
-    // Look up each item's lesson + chapter to drop items from personalized
-    // chapters. We do a single batched chapter query.
-    const lessonIds = Array.from(
-      new Set(itemRows.map((row) => row.lesson_id).filter((id): id is string => Boolean(id))),
-    )
-    const { data: lessonRows } = lessonIds.length
-      ? await supabase.from("learning_path_lessons").select("id, chapter_id").in("id", lessonIds)
-      : { data: [] as Array<{ id: string; chapter_id: string | null }> }
-    const lessonToChapter = new Map(
-      (lessonRows ?? []).map((row) => [String(row.id), row.chapter_id]),
-    )
-    const chapterIds = Array.from(
-      new Set(
-        (lessonRows ?? [])
-          .map((row) => row.chapter_id)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    )
-    const { data: chapterRows } = chapterIds.length
-      ? await supabase
-          .from("learning_path_chapters")
-          .select("id, is_personalized")
-          .in("id", chapterIds)
-      : { data: [] as Array<{ id: string; is_personalized: boolean | null }> }
-    const personalizedChapters = new Set<string>(
-      (chapterRows ?? []).filter((c) => c.is_personalized === true).map((c) => String(c.id)),
-    )
-    const safeItemRows = itemRows.filter((row) => {
-      const chId = row.lesson_id ? lessonToChapter.get(String(row.lesson_id)) : null
-      return !chId || !personalizedChapters.has(String(chId))
-    })
-
-    for (const row of safeItemRows) {
-      const lesson = row.lesson_id ? lessonToChapter.get(String(row.lesson_id)) : null
-      addLearningPathItemCandidate(candidates, row, {
-        matched_by: "item",
-        chapter_id: lesson ?? null,
+        lesson_order_index: typeof lesson?.order_index === "number" ? lesson.order_index : 0,
       })
     }
   }
@@ -411,14 +286,20 @@ async function fetchLearningPathCandidates(
 async function fetchProblemCandidates(
   supabase: SupabaseAnyClient,
   terms: string[],
+  materie: PersonalizedCourseMaterie | null,
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
+  // Physics problems live in `problems`. Only allow when materie is fizica (or unset catalog).
+  if (materie && materie !== "fizica") return []
+
   const candidates: PersonalizedCourseCatalogCandidate[] = []
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
     const { data } = await supabase
       .from("problems")
       .select("id, title, description, statement, difficulty, category, tags, class")
-      .or(`title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},category.ilike.${pattern},tags.ilike.${pattern}`)
+      .or(
+        `title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},category.ilike.${pattern},tags.ilike.${pattern}`,
+      )
       .limit(30)
     for (const row of data ?? []) {
       candidates.push({
@@ -430,7 +311,13 @@ async function fetchProblemCandidates(
         title: String(row.title ?? row.id),
         summary: compactSummary(row.description, row.statement, row.category, row.difficulty, row.tags),
         url: `/probleme/${row.id}`,
-        metadata: { difficulty: row.difficulty, category: row.category, class: row.class, tags: row.tags },
+        metadata: {
+          difficulty: row.difficulty,
+          category: row.category,
+          class: row.class,
+          tags: row.tags,
+          materie: "fizica",
+        },
       })
     }
   }
@@ -440,16 +327,31 @@ async function fetchProblemCandidates(
 async function fetchQuizCandidates(
   supabase: SupabaseAnyClient,
   terms: string[],
+  materie: PersonalizedCourseMaterie | null,
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
+  // quiz_questions.materie is only fizica | biologie.
+  if (materie && materie !== "fizica" && materie !== "biologie") return []
+
   const candidates: PersonalizedCourseCatalogCandidate[] = []
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
-    const { data } = await supabase
+    let query = supabase
       .from("quiz_questions")
       .select("id, question_id, title, description, statement, difficulty, class, materie, tags")
-      .or(`title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},question_id.ilike.${pattern}`)
+      .or(
+        `title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},question_id.ilike.${pattern}`,
+      )
       .limit(30)
+
+    if (materie === "biologie") {
+      query = query.eq("materie", "biologie")
+    } else if (materie === "fizica") {
+      query = query.or("materie.eq.fizica,materie.is.null")
+    }
+
+    const { data } = await query
     for (const row of data ?? []) {
+      const rowMaterie = typeof row.materie === "string" ? row.materie : "fizica"
       candidates.push({
         key: `quiz_question:${row.id}`,
         source_type: "quiz_question",
@@ -457,9 +359,21 @@ async function fetchQuizCandidates(
         source_table: "quiz_questions",
         item_type: "grila",
         title: String(row.title ?? row.question_id ?? "Întrebare grilă"),
-        summary: compactSummary(row.description, row.statement, row.difficulty, row.class, row.materie, Array.isArray(row.tags) ? row.tags.join(", ") : ""),
+        summary: compactSummary(
+          row.description,
+          row.statement,
+          row.difficulty,
+          row.class,
+          rowMaterie,
+          Array.isArray(row.tags) ? row.tags.join(", ") : "",
+        ),
         url: `/grile?question=${row.id}`,
-        metadata: { question_id: row.question_id, difficulty: row.difficulty, class: row.class, materie: row.materie },
+        metadata: {
+          question_id: row.question_id,
+          difficulty: row.difficulty,
+          class: row.class,
+          materie: rowMaterie,
+        },
       })
     }
   }
@@ -469,7 +383,10 @@ async function fetchQuizCandidates(
 async function fetchMathCandidates(
   supabase: SupabaseAnyClient,
   terms: string[],
+  materie: PersonalizedCourseMaterie | null,
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
+  if (materie && materie !== "matematica") return []
+
   const candidates: PersonalizedCourseCatalogCandidate[] = []
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
@@ -477,7 +394,9 @@ async function fetchMathCandidates(
       .from("math_problems")
       .select("id, title, description, statement, tags, class, difficulty, chapter, is_active")
       .eq("is_active", true)
-      .or(`title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},chapter.ilike.${pattern}`)
+      .or(
+        `title.ilike.${pattern},description.ilike.${pattern},statement.ilike.${pattern},chapter.ilike.${pattern}`,
+      )
       .limit(30)
     for (const row of data ?? []) {
       candidates.push({
@@ -487,9 +406,21 @@ async function fetchMathCandidates(
         source_table: "math_problems",
         item_type: "math_problem",
         title: String(row.title ?? row.id),
-        summary: compactSummary(row.description, row.statement, row.chapter, row.difficulty, Array.isArray(row.tags) ? row.tags.join(", ") : ""),
+        summary: compactSummary(
+          row.description,
+          row.statement,
+          row.chapter,
+          row.difficulty,
+          Array.isArray(row.tags) ? row.tags.join(", ") : "",
+        ),
         url: `/matematica/probleme/${row.id}`,
-        metadata: { difficulty: row.difficulty, class: row.class, chapter: row.chapter, tags: row.tags },
+        metadata: {
+          difficulty: row.difficulty,
+          class: row.class,
+          chapter: row.chapter,
+          tags: row.tags,
+          materie: "matematica",
+        },
       })
     }
   }
@@ -499,7 +430,10 @@ async function fetchMathCandidates(
 async function fetchCodingCandidates(
   supabase: SupabaseAnyClient,
   terms: string[],
+  materie: PersonalizedCourseMaterie | null,
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
+  if (materie && materie !== "informatica" && materie !== "AI") return []
+
   const candidates: PersonalizedCourseCatalogCandidate[] = []
   for (const term of terms.slice(0, 4)) {
     const pattern = `%${escapeIlike(term)}%`
@@ -507,7 +441,9 @@ async function fetchCodingCandidates(
       .from("coding_problems")
       .select("id, slug, title, statement_markdown, difficulty, class, chapter, tags, is_active, language")
       .eq("is_active", true)
-      .or(`title.ilike.${pattern},statement_markdown.ilike.${pattern},chapter.ilike.${pattern},slug.ilike.${pattern}`)
+      .or(
+        `title.ilike.${pattern},statement_markdown.ilike.${pattern},chapter.ilike.${pattern},slug.ilike.${pattern}`,
+      )
       .limit(30)
     for (const row of data ?? []) {
       candidates.push({
@@ -517,31 +453,63 @@ async function fetchCodingCandidates(
         source_table: "coding_problems",
         item_type: "coding_problem",
         title: String(row.title ?? row.slug ?? row.id),
-        summary: compactSummary(row.statement_markdown, row.chapter, row.difficulty, row.language, Array.isArray(row.tags) ? row.tags.join(", ") : ""),
+        summary: compactSummary(
+          row.statement_markdown,
+          row.chapter,
+          row.difficulty,
+          row.language,
+          Array.isArray(row.tags) ? row.tags.join(", ") : "",
+        ),
         url: `/informatica/probleme/${row.slug ?? slugify(String(row.title ?? row.id))}`,
-        metadata: { slug: row.slug, difficulty: row.difficulty, class: row.class, chapter: row.chapter, language: row.language, tags: row.tags },
+        metadata: {
+          slug: row.slug,
+          difficulty: row.difficulty,
+          class: row.class,
+          chapter: row.chapter,
+          language: row.language,
+          tags: row.tags,
+          materie: "informatica",
+        },
       })
     }
   }
   return candidates
 }
 
+/**
+ * Search Planck catalog content for a personalized course, constrained by intent scope.
+ *
+ * - non_catalog or empty chapterIds → [] (force full generation)
+ * - catalog with chapterIds → learning-path items only from those chapters + materie-aligned problems/quizzes
+ */
 export async function searchPlanckContentForPrompt(
   supabase: SupabaseAnyClient,
   prompt: string,
   limit = 80,
+  scope?: PersonalizedCourseIntentScope | null,
 ): Promise<PersonalizedCourseCatalogCandidate[]> {
+  if (scope?.mode === "non_catalog") return []
+  if (scope && scope.chapterIds.length === 0) return []
+
   const terms = extractTerms(prompt)
-  if (!terms.length) return []
+  const materie = scope?.materie ?? null
 
-  const results = await Promise.allSettled([
-    fetchLearningPathCandidates(supabase, terms),
-    fetchProblemCandidates(supabase, terms),
-    fetchQuizCandidates(supabase, terms),
-    fetchMathCandidates(supabase, terms),
-    fetchCodingCandidates(supabase, terms),
-  ])
+  if (scope?.chapterIds.length) {
+    const learningPath = await fetchLearningPathCandidatesForChapters(supabase, scope.chapterIds)
+    const sideResults = await Promise.allSettled([
+      terms.length ? fetchProblemCandidates(supabase, terms, materie) : Promise.resolve([]),
+      terms.length ? fetchQuizCandidates(supabase, terms, materie) : Promise.resolve([]),
+      terms.length ? fetchMathCandidates(supabase, terms, materie) : Promise.resolve([]),
+      terms.length ? fetchCodingCandidates(supabase, terms, materie) : Promise.resolve([]),
+    ])
+    const side = sideResults.flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+    // Chapter-scoped LP items are already on-topic; relax term score so we don't drop them.
+    return sortAndLimit([...learningPath, ...side], terms, limit, true)
+  }
 
-  const candidates = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []))
-  return sortAndLimit(candidates, terms, limit)
+  // No scope passed (legacy / tests): return empty rather than unfiltered cross-subject search.
+  // Callers should always pass a scope from classifyPromptIntent.
+  if (!scope) return []
+
+  return []
 }

@@ -13,6 +13,12 @@ export interface LearningPathItemNavigationContextValue {
   slideDirection: LearningPathSlideDirection
   goToNextItem: () => Promise<void>
   goToPrevItem: () => Promise<void>
+  /** Opens the lesson completion overlay (celebration → leaderboard → PlanckPass), then exits. */
+  requestLessonExit?: () => void
+  /** Record an item first-completed during this lesson visit (for exit-completion gating). */
+  recordSessionItemCompletion?: (itemId: string) => void
+  /** True if the item was already done before this visit (should not count toward exit streak). */
+  wasCompletedAtSessionStart?: (itemId: string) => boolean
   usesFizicaLessonCompletionScreen?: boolean
   animateFirstItemEntry?: boolean
 }

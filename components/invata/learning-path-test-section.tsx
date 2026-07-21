@@ -447,6 +447,10 @@ export function LearningPathTestSection({
 
       if (parsed.passed && user?.id) {
         if (typeof window !== "undefined") {
+          itemNavigation?.recordSessionItemCompletion?.(itemId)
+          void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForLpTest }) =>
+            awardPlanckPassXpForLpTest(itemId),
+          )
           window.dispatchEvent(new CustomEvent(PLANCK_STREAK_UPDATED_EVENT))
         }
 
@@ -474,7 +478,7 @@ export function LearningPathTestSection({
     } finally {
       setSubmitting(false)
     }
-  }, [answers, isLastItem, itemId, lessonId, pushProgress, submitting, user?.id])
+  }, [answers, isLastItem, itemId, itemNavigation, lessonId, pushProgress, submitting, user?.id])
 
   useEffect(() => {
     if (autoSubmitArmed && screen === "test" && !submitting) {

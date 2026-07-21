@@ -71,6 +71,29 @@ export interface PersonalizedCourseWithStructure extends PersonalizedCourse {
   completedItemIds: string[]
 }
 
+export type PersonalizedCourseMaterie =
+  | "matematica"
+  | "fizica"
+  | "informatica"
+  | "biologie"
+  | "AI"
+
+export type PersonalizedCourseIntentMode = "catalog" | "non_catalog"
+
+/**
+ * Result of AI (or fallback) classification of the user's learning goal.
+ * Drives which Planck catalog chapters/materii may be reused as source_key items.
+ */
+export interface PersonalizedCourseIntentScope {
+  mode: PersonalizedCourseIntentMode
+  /** Primary subject when mode is catalog; null for non-catalog. */
+  materie: PersonalizedCourseMaterie | null
+  /** Official chapter IDs allowed for reuse. Empty ⇒ generate everything. */
+  chapterIds: string[]
+  chapterTitles: string[]
+  topicSummary: string
+}
+
 export interface PersonalizedCourseCatalogCandidate {
   key: string
   source_type: Exclude<PersonalizedCourseSourceType, "generated">

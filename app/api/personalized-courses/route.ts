@@ -10,6 +10,7 @@ import { isDevFromDB } from "@/lib/admin-check"
 import type { PersonalizedCourseCatalogCandidate, PersonalizedCourseGeneratedPlanItem, SupabaseAnyClient } from "@/lib/personalized-courses/types"
 import { searchPlanckContentForPrompt } from "@/lib/personalized-courses/search"
 import { planPersonalizedCourse, getPlannerModel } from "@/lib/personalized-courses/planner"
+import { classifyPromptIntent } from "@/lib/personalized-courses/classify-intent"
 import { sanitizeContentJson } from "@/lib/personalized-courses/sanitize"
 import { isPersonalizedChapterStillCreating } from "@/lib/personalized-courses/chapter-generation-status"
 import {
@@ -406,16 +407,37 @@ export async function POST(request: Request) {
     try {
       if (!(await ensureStillCreating())) return
 
-      await updateProgress("searching", 5, "Caut conținut Planck relevant...")
+      await updateProgress("searching", 5, "Analizez obiectivul și caut conținut Planck...")
+      const scope = await classifyPromptIntent(supabaseBg, prompt)
+      if (!(await ensureStillCreating())) return
+
+      await updateProgress(
+        "searching",
+        8,
+        scope.mode === "non_catalog"
+          ? "Subiect nou — generez conținut de la zero..."
+          : scope.chapterTitles.length
+            ? `Potrivit cu: ${scope.chapterTitles.slice(0, 2).join(", ")}...`
+            : "Caut conținut Planck relevant...",
+        {
+          intentScope: {
+            mode: scope.mode,
+            materie: scope.materie,
+            chapterTitles: scope.chapterTitles,
+            topicSummary: scope.topicSummary,
+          },
+        },
+      )
+
       const candidates = await runWithProgressHeartbeat(
         (progress) => updateProgress(progress.stage, progress.percent, progress.message),
         {
           stage: "searching",
-          startPercent: 5,
+          startPercent: 8,
           endPercent: 15,
           messages: GENERATION_STAGE_FALLBACK_MESSAGES.searching,
         },
-        () => searchPlanckContentForPrompt(supabaseBg, prompt, 140),
+        () => searchPlanckContentForPrompt(supabaseBg, prompt, 140, scope),
       )
 
       if (!(await ensureStillCreating())) return
@@ -431,7 +453,7 @@ export async function POST(request: Request) {
           endPercent: 64,
           messages: GENERATION_STAGE_FALLBACK_MESSAGES.planning,
         },
-        () => planPersonalizedCourse(prompt, candidates, sourceContentByKey),
+        () => planPersonalizedCourse(prompt, candidates, sourceContentByKey, scope),
       )
       if (!(await ensureStillCreating())) return
 

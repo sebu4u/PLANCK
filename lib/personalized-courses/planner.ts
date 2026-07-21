@@ -7,7 +7,14 @@ import type {
   PersonalizedCourseGeneratedPlan,
   PersonalizedCourseGeneratedPlanItem,
   PersonalizedCourseGeneratedPlanLesson,
+  PersonalizedCourseIntentScope,
 } from "@/lib/personalized-courses/types"
+import { enforceSourceChronology } from "@/lib/personalized-courses/enforce-chronology"
+import { enforceTeachingRhythm } from "@/lib/personalized-courses/enforce-rhythm"
+import {
+  verifyQuizFidelity,
+  type FidelityReport,
+} from "@/lib/personalized-courses/verify-fidelity"
 import {
   LEARNING_PATH_INTERACTIVE_ITEM_TYPE_LIST,
   isInteractiveLessonItemType,
@@ -30,7 +37,7 @@ const PERSONALIZED_ITEM_TYPES = [
   ...LEARNING_PATH_INTERACTIVE_ITEM_TYPE_LIST,
 ] as const satisfies readonly LearningPathLessonType[]
 
-const MIN_ITEMS_PER_LESSON = 20
+const MIN_ITEMS_PER_LESSON = 12
 const MAX_ITEMS_PER_LESSON = 30
 
 const PLANNER_STOP_WORDS = new Set([
@@ -557,7 +564,11 @@ function removeIrrelevantSourceItems(
   plan: PersonalizedCourseGeneratedPlan,
   candidatesByKey: Map<string, PersonalizedCourseCatalogCandidate>,
   userPrompt: string,
+  scope?: PersonalizedCourseIntentScope | null,
 ): PersonalizedCourseGeneratedPlan {
+  const allowedChapters =
+    scope?.chapterIds.length ? new Set(scope.chapterIds) : null
+
   const lessons = plan.lessons.map((lesson) => {
     const items = lesson.items.filter((item) => {
       const sourceKey = item.source_key?.trim() || null
@@ -566,6 +577,24 @@ function removeIrrelevantSourceItems(
       const candidate = candidatesByKey.get(sourceKey)
       if (!candidate) return false
 
+      if (scope?.mode === "non_catalog") return false
+
+      if (allowedChapters && candidate.source_type === "learning_path_item") {
+        const chapterId = candidate.metadata?.chapter_id
+        if (typeof chapterId !== "string" || !allowedChapters.has(chapterId)) {
+          return false
+        }
+      }
+
+      if (scope?.materie) {
+        const candMaterie = candidate.metadata?.materie
+        if (typeof candMaterie === "string" && candMaterie && candMaterie !== scope.materie) {
+          if (!(scope.materie === "AI" && candMaterie === "informatica")) {
+            return false
+          }
+        }
+      }
+
       return scoreCandidateForLesson(candidate, lesson, userPrompt) > 0
     })
 
@@ -573,6 +602,26 @@ function removeIrrelevantSourceItems(
   })
 
   return { ...plan, lessons }
+}
+
+function stripAllSourceKeys(
+  plan: PersonalizedCourseGeneratedPlan,
+  userPrompt: string,
+): PersonalizedCourseGeneratedPlan {
+  return {
+    ...plan,
+    lessons: plan.lessons.map((lesson) => ({
+      ...lesson,
+      items: lesson.items.map((item) => {
+        if (!item.source_key) return item
+        return buildGeneratedItem(
+          { ...item, source_key: null, content_json: item.content_json ?? null },
+          userPrompt,
+          lesson.title,
+        )
+      }),
+    })),
+  }
 }
 
 const FALLBACK_ITEM_TITLES = [
@@ -620,6 +669,7 @@ function ensureMinimumItemsPerLesson(
   plan: PersonalizedCourseGeneratedPlan,
   candidates: PersonalizedCourseCatalogCandidate[],
   userPrompt: string,
+  allowSourceFill: boolean,
 ): PersonalizedCourseGeneratedPlan {
   const usedKeys = new Set<string>()
   for (const lesson of plan.lessons) {
@@ -631,6 +681,7 @@ function ensureMinimumItemsPerLesson(
   function takeBestCandidateForLesson(
     lesson: PersonalizedCourseGeneratedPlanLesson,
   ): PersonalizedCourseGeneratedPlanItem | null {
+    if (!allowSourceFill) return null
     const best = candidates
       .filter((candidate) => !usedKeys.has(candidate.key))
       .map((candidate) => ({
@@ -680,28 +731,55 @@ function finalizePlan(
   plan: PersonalizedCourseGeneratedPlan,
   candidates: PersonalizedCourseCatalogCandidate[],
   userPrompt: string,
+  scope?: PersonalizedCourseIntentScope | null,
 ): PersonalizedCourseGeneratedPlan {
+  const forceGenerate =
+    scope?.mode === "non_catalog" ||
+    !candidates.length ||
+    (scope != null && scope.chapterIds.length === 0)
+
+  const working = forceGenerate ? stripAllSourceKeys(plan, userPrompt) : plan
   const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
-  const withoutDuplicates = replaceDuplicateSourceKeys(plan)
+  const withoutDuplicates = replaceDuplicateSourceKeys(working)
   const withoutIrrelevantSources = removeIrrelevantSourceItems(
     withoutDuplicates,
     candidatesByKey,
     userPrompt,
+    scope,
   )
 
-  return ensureMinimumItemsPerLesson(withoutIrrelevantSources, candidates, userPrompt)
+  const padded = ensureMinimumItemsPerLesson(
+    withoutIrrelevantSources,
+    forceGenerate ? [] : candidates,
+    userPrompt,
+    !forceGenerate && candidates.length > 0,
+  )
+
+  const chronological = enforceSourceChronology(padded, candidatesByKey)
+  return enforceTeachingRhythm(chronological, userPrompt)
 }
 
 function normalizePlan(
   plan: PersonalizedCourseGeneratedPlan,
   candidates: PersonalizedCourseCatalogCandidate[],
   userPrompt: string,
+  scope?: PersonalizedCourseIntentScope | null,
 ): PersonalizedCourseGeneratedPlan {
   const validSourceKeys = new Set(candidates.map((candidate) => candidate.key))
   const candidatesByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
+  const forceGenerate =
+    scope?.mode === "non_catalog" ||
+    !candidates.length ||
+    (scope != null && scope.chapterIds.length === 0)
 
   const lessons: PersonalizedCourseGeneratedPlanLesson[] = plan.lessons.slice(0, 8).map((lesson) => {
-    const items = lesson.items.slice(0, MAX_ITEMS_PER_LESSON).map((item) => coerceItem(item, validSourceKeys, candidatesByKey, userPrompt, lesson.title))
+    const items = lesson.items.slice(0, MAX_ITEMS_PER_LESSON).map((item) => {
+      const coerced = coerceItem(item, validSourceKeys, candidatesByKey, userPrompt, lesson.title)
+      if (forceGenerate && coerced.source_key) {
+        return buildGeneratedItem({ ...coerced, source_key: null }, userPrompt, lesson.title)
+      }
+      return coerced
+    })
     if (items.length >= 2) {
       return { ...lesson, title: lesson.title.trim(), description: lesson.description?.trim() || null, items }
     }
@@ -718,11 +796,11 @@ function normalizePlan(
 
   if (lessons.length >= 2) {
     const finalPlan = { title: plan.title.trim(), description: plan.description.trim(), lessons }
-    return finalizePlan(finalPlan, candidates, userPrompt)
+    return finalizePlan(finalPlan, candidates, userPrompt, scope)
   }
 
-  // AI returned only 1 lesson — add a second from real candidates
-  if (lessons.length === 1 && candidates.length >= 2) {
+  // AI returned only 1 lesson — add a second from real candidates (catalog only)
+  if (lessons.length === 1 && candidates.length >= 2 && !forceGenerate) {
     const usedKeys = new Set<string>()
     for (const item of lessons[0].items) {
       if (item.source_key) usedKeys.add(item.source_key)
@@ -747,13 +825,12 @@ function normalizePlan(
           },
         ],
       }
-      return finalizePlan(finalPlan, candidates, userPrompt)
+      return finalizePlan(finalPlan, candidates, userPrompt, scope)
     }
   }
 
-  // Fallback: build entirely from real candidates if AI failed
-  if (candidates.length >= 2) {
-    // Distribute all candidates across 3 lessons
+  // Fallback: build entirely from real candidates if AI failed (catalog only)
+  if (candidates.length >= 2 && !forceGenerate) {
     const allItems = candidates.map((c) => ({
       title: c.title,
       item_type: c.item_type,
@@ -761,44 +838,74 @@ function normalizePlan(
       content_json: null as Record<string, unknown> | null,
     }))
 
-    const lessons: PersonalizedCourseGeneratedPlanLesson[] = []
+    const fallbackLessons: PersonalizedCourseGeneratedPlanLesson[] = []
     for (let i = 0; i < 3; i++) {
-      const slice: PersonalizedCourseGeneratedPlanItem[] = allItems.slice(i * Math.ceil(allItems.length / 3), (i + 1) * Math.ceil(allItems.length / 3))
-      lessons.push({
+      const slice: PersonalizedCourseGeneratedPlanItem[] = allItems.slice(
+        i * Math.ceil(allItems.length / 3),
+        (i + 1) * Math.ceil(allItems.length / 3),
+      )
+      fallbackLessons.push({
         title: i === 0 ? "Baze și introducere" : i === 1 ? "Aprofundare" : "Aplicare și probleme",
-        description: i === 0 ? "Noțiuni fundamentale și intuiție." : i === 1 ? "Aprofundare și exemple." : "Probleme și aplicare.",
+        description:
+          i === 0
+            ? "Noțiuni fundamentale și intuiție."
+            : i === 1
+              ? "Aprofundare și exemple."
+              : "Probleme și aplicare.",
         items: slice.slice(0, 30),
       })
     }
 
-    return finalizePlan({
-      title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
-      description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
-      lessons,
-    }, candidates, userPrompt)
+    return finalizePlan(
+      {
+        title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
+        description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
+        lessons: fallbackLessons,
+      },
+      candidates,
+      userPrompt,
+      scope,
+    )
   }
 
   // Last resort: minimal generated content
-  return finalizePlan({
-    title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
-    description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
-    lessons: [
-      {
-        title: "Start rapid",
-        description: "Clarificăm obiectivul și construim baza.",
-        items: [
-          coerceItem({ title: "Imaginea de ansamblu", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt, "Start rapid"),
-        ],
-      },
-      {
-        title: "Aplicare ghidată",
-        description: "Fixăm ideile prin exerciții.",
-        items: [
-          coerceItem({ title: "Pași de rezolvare", item_type: "custom_text" }, validSourceKeys, candidatesByKey, userPrompt, "Aplicare ghidată"),
-        ],
-      },
-    ],
-  }, candidates, userPrompt)
+  return finalizePlan(
+    {
+      title: plan.title.trim() || `Curs personalizat: ${userPrompt.slice(0, 48)}`,
+      description: plan.description.trim() || `Un traseu personalizat pentru: ${userPrompt}`,
+      lessons: [
+        {
+          title: "Start rapid",
+          description: "Clarificăm obiectivul și construim baza.",
+          items: [
+            coerceItem(
+              { title: "Imaginea de ansamblu", item_type: "custom_text" },
+              validSourceKeys,
+              candidatesByKey,
+              userPrompt,
+              "Start rapid",
+            ),
+          ],
+        },
+        {
+          title: "Aplicare ghidată",
+          description: "Fixăm ideile prin exerciții.",
+          items: [
+            coerceItem(
+              { title: "Pași de rezolvare", item_type: "custom_text" },
+              validSourceKeys,
+              candidatesByKey,
+              userPrompt,
+              "Aplicare ghidată",
+            ),
+          ],
+        },
+      ],
+    },
+    candidates,
+    userPrompt,
+    scope,
+  )
 }
 
 // ===================== VERIFIER PIPELINE =====================
@@ -831,6 +938,7 @@ export interface VerificationReport {
   /** Source-keyed items that the on-topic check rejected and converted to generated items. */
   offTopicSourceDrops: number
   passed: boolean
+  fidelity?: FidelityReport
 }
 
 /** Strip LaTeX delimiters and whitespace for answer-leak substring matching. */
@@ -1279,12 +1387,14 @@ const GENERATED_CONTENT_GUIDE = `TIPURI DE ITEMI GENERAȚI (fără source_key) �
 - test: {"icon": "Zap", "description": "...", "difficulty": 1-5, "timeLimitSeconds": 300, "problems": [{"id":"q1","statement":"...?","imageUrl":null,"options":[{"id":"q1_a","label":"..."},{"id":"q1_b","label":"..."},{"id":"q1_c","label":"..."},{"id":"q1_d","label":"..."}],"correctOptionId":"q1_a"}]} — minim 2 probleme, FIECARE cu EXACT 4 opțiuni și correctOptionId printre ele; id-uri unice; imageUrl null sau URL http(s). Enunțul NU trebuie să conțină răspunsul corect. Bine pentru mini-test de recapitulare la final de lecție.
 
 REGULI PENTRU ITEMI GENERAȚI:
-- Fiecare lecție trebuie să conțină un MIX VARIAT, ca în lecțiile oficiale Planck: minim 2 itemi custom_text cu explicații substaniale ȘI minim 4 itemi interactivi/de verificare de tipuri DIFERITE din lista de mai sus (poll, match, card_sort, fill_slot, reveal_steps, table_fill, swipe_classify, memory_flip, code_trace). NU folosi doar custom_text.
-- Ponderie naturală: folosește des poll (verificări cu feedback), match, code_trace, reveal_steps, swipe_classify, fill_slot, card_sort; mai rar memory_flip și table_fill. NU genera tipurile care nu sunt în lista de mai sus (flow_build, graph_build, slider_explore, speed_round).
-- La finalul ultimei lecții adaugă de obicei un item test (mini-test de recapitulare).
-- Conținutul generat trebuie să fie relevant pentru TITLUL lecției și obiectivul userului, calitate de manual, NU text generic de legătură.
-- RĂSPUNS CORECT NU SE DEZVĂLUI: întrebarea/enunțul/instrucțiunile/promptul NU trebuie să conțină răspunsul corect sau formula rezolvată. La fill_slot, instructions e doar un scurt context („Completează formula alungirii”), NU formula cu valori puse. La poll/test, enunțul nu conține textul opțiunii corectă. La code_trace, promptul nu conține valoarea answer.
-- 4 OPȚIUNI: toate itemile cu variante (poll, test problems, code_trace choice, reveal_steps quiz) trebuie să aibă EXACT 4 opțiuni/variante — niciodată 3, niciodată 5. Patru opțiuni = calitate de bacalaureat/examen.
+- RITM PEDAGOGIC OBLIGATORIU: primul item din fiecare lecție este custom_text. După fiecare bloc de predare (1–3 custom_text consecutive sunt OK), urmează 1–3 itemi interactivi de verificare (preferă poll). Itemii de verificare testează DOAR ce s-a predat în textul anterior — NU introduce noțiuni noi.
+- Fiecare lecție: minim 2 custom_text substanțiale + mix de interactivi (poll dominant). NU doar custom_text.
+- Ponderie: poll cel mai des; apoi match, swipe_classify, reveal_steps, fill_slot, card_sort; mai rar memory_flip și table_fill. NU genera flow_build, graph_build, slider_explore, speed_round.
+- La finalul ultimei lecții adaugă de obicei un item test (fără text obligatoriu imediat înainte).
+- Conținut relevant pentru TITLUL lecției și obiectivul userului, calitate de manual.
+- RĂSPUNS CORECT NU SE DEZVĂLUI în question/instructions/prompt.
+- 4 OPȚIUNI exact pentru poll/test/code_trace choice/reveal_steps quiz.
+- Volum: 12–25 itemi per lecție (maxim 30). Preferă calitate peste umplutură.
 
 FORMAT MATEMATIC (CRITIC — fără excepții):
 - ORICE matematică (variabile, indici, exponenți, formule, fracții, inegalități, prime) TREBUIE încadrată cu delimitatori LaTeX: $...$ pentru matematică inline (în text) și $$...$$ pentru formule pe rând propriu (display). EXEMPLE CORECTE: „Derivata funcției $f$ în punctul $x_0$...”, „pentru $f(x)=x^2$, derivata în $x=3$ este $f'(3)=6$”, „dacă $f'(x_0)>0$ funcția este crescătoare”, „$$f'(x_0)=\\lim_{h\\to 0}\\frac{f(x_0+h)-f(x_0)}{h}$$”.
@@ -1302,40 +1412,42 @@ FORMAT MATEMATIC (CRITIC — fără excepții):
  * a non-STEM course.
  */
 const ON_TOPIC_RULES_CATALOG = `DECIZIA source_key vs GENERAT (subiect din CATALOG):
-- O sursă Planck se folosește DOAR dacă e o potrivire evidentă: titlul ei specific se referă la un concept central al lecției (de ex. o problemă de fizică cu titlu specific se potrivește cu o lecție de fizică).
-- Pentru itemi de umplutură, itemi introductivi sau recapitulare, folosește GENERAT nu sursă.`
+- Folosește source_key DOAR din lista available_planck_content — acestea sunt deja filtrate pe CAPITOLUL/tema cerută. Nu inventa alte surse.
+- Dacă lista e goală sau sursa nu e o potrivire evidentă cu conceptul lecției, GENEREAZĂ (source_key: null).
+- Nu amesteca materii: un traseu de biologie nu ia grile/probleme de mate sau fizică.
+- Pentru umplutură / introducere / recapitulare: preferă GENERAT, nu sursă slab potrivită.
+- Păstrează ordinea cronologică a surselor din aceeași lecție oficială (order_index crescător); poți sări itemi, dar nu inversa ordinea.`
 
 const ON_TOPIC_RULES_NON_CATALOG = `DECIZIA source_key vs GENERAT (subiect NON-CATALOG):
-- ACEST SUBIECT NU FACE PARTE DIN CATALOGUL PLANCK. Catalogul conține DOAR conținut pentru matematică, fizică, chimie, biologie, informatică, gramatică și istorie. Orice alt subiect (anime, filme, sport, bucătărie, călătorii, hobby-uri, muzică, jocuri, manhwa, seriale, parenting, fitness, orice cultură pop, orice domeniu non-academic) este NON-CATALOG.
-- REGULĂ ABSOLUTĂ: NU FOLOSI source_key. Setează întotdeauna source_key: null. Chiar dacă vezi surse în available_planck_content (sunt candidate nepotrivite rămase din căutare), NU le folosi. Itemii trebuie să fie 100% GENERAȚI pe acest subiect.
-- Orice încercare de a reutiliza un source_key pentru un subiect non-catalog produce conținut off-topic (itemi generici de legătură, probleme de matematică fabricate, exerciții de gramatică străine de subiect) și va fi respinsă de validator.`
+- ACEST SUBIECT NU EXISTĂ CA CAPITOL PLANCK (ex. medicină veterinară, anime, hobby).
+- REGULĂ ABSOLUTĂ: source_key: null pentru TOȚI itemii. Generează 100% de la zero pe subiect.
+- Ignoră orice candidat din listă (false positive). Cross-materie e INTERZIS.`
 
 const SYSTEM_PROMPT = `Ești plannerul de cursuri personalizate PLANCK Academy.
 Răspunzi DOAR cu JSON valid, fără Markdown în afara valorilor din content_json.
 
-REGULA PRINCIPALĂ: Folosește cât mai mult conținut real din Planck (via source_key). Nu inventa probleme, grile, teste sau lecții care deja există în lista de mai jos.
+REGULA PRINCIPALĂ: Reutilizează conținut Planck (source_key) DOAR din capitolele potrivite temei. Dacă nu există itemi potriviți, creează-i de la zero. Niciodată itemi din alte materii/capitole.
 
-Pentru itemii cu source_key: content_json = null, item_type = tipul din listă. Nu repeta niciun source_key în curs — fiecare item real apare o singură dată.
+Pentru itemii cu source_key: content_json = null, item_type = tipul din listă. Fără duplicate de source_key.
 
-Pentru itemii FĂRĂ source_key (generați): creează conținut rich și variat, exact ca în lecțiile oficiale Planck. Urmează ghidul de mai jos. Fiecare item generat trebuie să aibă un item_type permis și un content_json valid complet — nu lăsa câmpuri goale.
+Pentru itemii FĂRĂ source_key: conținut rich valid conform ghidului.
 
 ${GENERATED_CONTENT_GUIDE}
 
 REGULI ON-TOPIC (FOARTE IMPORTANTE — fără excepții):
-- OBIECTIVUL utilizatorului este descris în mesajul user mai jos (câmpul user_learning_goal). FIE CARE item din curs (cu sau fără source_key) TREBUIE să fie despre acest subiect. Nu introduce itemi despre alte domenii (de ex. matematică, gramatică, probleme de logică abstractă) decât dacă fac parte natural din subiect.
+- OBIECTIVUL e în user_learning_goal. Fiecare item e pe acest subiect.
 - {{ON_TOPIC_RULES}}
-- Dacă folosești o sursă și titlul ei e generic ("Exercitiu intelegere", "Obiectivul lectiei", "Grila intelegere", "Mini-recapitulare", "Intrebare de control", "Pasii de lucru", "Verificare de intelegere", "Conexiune cu practica", "Gresala frecventa", "Vocabular esential", "Ideea centrala", "Intuitie rapida", "De ce conteaza", "Exemplu ghidat"), verifică dacă conținutul ei (din summary) se potrivește cu subiectul. Dacă nu se potrivește, NU folosi sursa — generează în schimb un item propriu pe subiect.
-- Pentru itemii cu schemă matematică (fill_slot, table_fill) folosește-i DOAR dacă subiectul este unul în care formulele au sens natural (matematică, fizică, chimie, informatică). Pentru orice alt subiect, folosește în schimb match, swipe_classify, custom_text cu explicație, sau alt tip non-matematic. Inventarea de formule pentru subiecte unde matematica nu e naturală (ex. "P_Gojo = E × k" pe un curs despre anime) este INTERZISĂ.
-- ID-uri HALUCINATE INTERZISE: nu inventa niciodată ID-uri precum problem_id, quiz_question_id, cursuri_lesson_slug. Schema itemului conține DOAR source_key (unul din lista de mai sus sau null) și content_json (null dacă ai source_key; altfel obiectul complet). Orice referință la ID-uri externe va fi respinsă de validator.
+- Titluri generice + conținut off-topic → nu folosi sursa; generează.
+- fill_slot/table_fill doar unde formulele au sens (mate/fizică/chimie/info).
+- Nu inventa ID-uri externe — doar source_key din listă sau null.
 
-Creează un traseu complet, cu 3-5 lecții. FIECARE lecție trebuie să aibă 20-25 itemi relevanți pentru titlul lecției. Pentru surse Planck folosește cele care sunt potriviri clare (fără duplicate), apoi completează cu itemi generați rich și variați (explicații custom_text + itemi interactivi), NU cu text generic de legătură.
+Creează 3–5 lecții, fiecare cu 12–25 itemi (max 30). Ordine logică: introducere → aplicare.
+Structură lecție: custom_text (primul) → 1–3 verificări interactive (poll dominant) → repetă; 2–3 custom_text consecutive OK; test final OK.
 
-Distribuie itemii pe lecții în ordine logică: prima lecție = introducere/baze, ultimele = aplicare/probleme. Fiecare lecție trebuie să arate ca o lecție oficială Planck: explicații clare urmate de practică interactivă.
-
-Ponderi orientative (nu sunt reguli dure, urmărește calitatea conținutului pe subiect):
-- Subiect din catalog Planck (matematică, fizică, chimie, biologie, informatică, gramatică, istorie): include câteva surse Planck reale pentru itemi concreți (definiții, probleme, exerciții din lecțiile oficiale), restul generează.
-- Subiect non-catalog (anime, filme, sport, bucătărie, călătorii, hobby, orice cultură pop): 100% generat, nicio sursă. Itemii trebuie să fie creați din zero pe subiect.
-- Itemii generați trebuie să fie un MIX VARIAT, exact ca în lecțiile oficiale: minim 2 custom_text cu explicații substanțiale + minim 4 itemi interactivi/de verificare de tipuri DIFERITE per lecție (poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, code_trace, test). NU genera doar custom_text.`
+Ponderi:
+- Catalog cu surse: câteva source_key clare + restul generat pe ritmul de mai sus.
+- Non-catalog / fără surse: 100% generat.
+- Mix: minim 2 custom_text + interactivi variați; NU doar custom_text.`
 
 function normalizeParsedPlan(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -1361,17 +1473,21 @@ function buildPlannerMessages(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
   repairNote: string | null,
+  scope?: PersonalizedCourseIntentScope | null,
 ): { role: "system" | "user"; content: string }[] {
-  const isCatalogSubject = isPlanckCatalogSubject(userPrompt)
-  // For non-catalog subjects (anime, cooking, pop culture, etc.), explicitly
-  // tell the planner NOT to use source items. The catalog has no relevant
-  // content for those topics and any candidate it found is a false positive
-  // (e.g. a previous personalized course's items). The planner should
-  // generate 100% of the items from scratch.
-  const subjectKind = isCatalogSubject ? "catalog" : "non-catalog"
+  const isCatalogSubject =
+    scope != null
+      ? scope.mode === "catalog" && (scope.chapterIds.length > 0 || candidates.length > 0)
+      : isPlanckCatalogSubject(userPrompt)
+  const forceGenerate =
+    scope?.mode === "non_catalog" ||
+    (scope != null && scope.chapterIds.length === 0 && !candidates.length) ||
+    !isCatalogSubject
+
+  const subjectKind = forceGenerate ? "non-catalog" : "catalog"
   const systemPrompt = SYSTEM_PROMPT.replace(
     "{{ON_TOPIC_RULES}}",
-    isCatalogSubject ? ON_TOPIC_RULES_CATALOG : ON_TOPIC_RULES_NON_CATALOG,
+    forceGenerate ? ON_TOPIC_RULES_NON_CATALOG : ON_TOPIC_RULES_CATALOG,
   )
   const base: { role: "system" | "user"; content: string }[] = [
     { role: "system", content: systemPrompt },
@@ -1381,14 +1497,20 @@ function buildPlannerMessages(
         {
           user_learning_goal: userPrompt,
           subject_kind: subjectKind,
-          // For non-catalog subjects, omit the candidate list entirely so the
-          // planner doesn't try to reuse items from unrelated past courses.
-          available_planck_content: isCatalogSubject
-            ? stringifyCandidates(candidates)
-            : "Nu există conținut Planck relevant. Generează toți itemii de la zero pe acest subiect.",
-          instruction: isCatalogSubject
-            ? "Alege iteme prin source_key din lista de mai sus (fără duplicate) DOAR pentru itemi unde titlul sursei e o potrivire evidentă cu conceptul central al lecției (de ex. o problemă de fizică cu titlu specific se potrivește cu o lecție de fizică). Pentru itemi de umplutură, itemi introductivi, sau itemi de recapitulare, folosește GENERAT nu sursă. Fiecare lecție trebuie să aibă 20-25 itemi. Completează cu itemi GENERAȚI rich și variați — minim 2 custom_text cu explicații substanțiale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, code_trace, test), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text."
-            : "NU folosi surse Planck. Generează toți itemii de la zero pe acest subiect. Fiecare lecție trebuie să aibă 20-25 itemi — minim 2 custom_text cu explicații substanțiale ȘI minim 4 itemi interactivi/de verificare de tipuri diferite per lecție (poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, code_trace, test), cu content_json valid conform ghidului. La finalul ultimei lecții adaugă un item test. Nu genera doar custom_text și nu genera tipurile care nu sunt în ghid (flow_build, graph_build, slider_explore, speed_round). IMPORTANT: pentru acest subiect, folosește DOAR tipuri non-matematice (custom_text, poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, test, code_trace). NU folosi fill_slot sau table_fill deoarece subiectul nu e unul în care formulele matematice au sens.",
+          intent_scope: scope
+            ? {
+                mode: scope.mode,
+                materie: scope.materie,
+                chapter_titles: scope.chapterTitles,
+                topic_summary: scope.topicSummary,
+              }
+            : null,
+          available_planck_content: forceGenerate
+            ? "Nu există conținut Planck relevant. Generează toți itemii de la zero pe acest subiect."
+            : stringifyCandidates(candidates),
+          instruction: forceGenerate
+            ? "NU folosi surse Planck. Generează toți itemii de la zero. Primul item din fiecare lecție = custom_text. După fiecare explicație: 1–3 interactivi (poll dominant) care testează DOAR ce ai predat. 12–25 itemi/lecție (max 30). Minim 2 custom_text + interactivi. Test final OK. Tipuri non-matematice dacă subiectul nu e STEM: custom_text, poll, match, card_sort, reveal_steps, swipe_classify, memory_flip, test, code_trace."
+            : "Folosește source_key DOAR din listă, fără duplicate, doar potriviri clare pe tema capitolului. Păstrează ordinea cronologică a surselor (order_index). Completează cu GENERAȚI: custom_text → 1–3 poll/interactivi care testează textul anterior. Primul item = custom_text. 12–25 itemi/lecție (max 30). Test la finalul ultimei lecții.",
           required_json_shape: {
             title: "string",
             description: "string",
@@ -1399,13 +1521,14 @@ function buildPlannerMessages(
                 items: [
                   {
                     title: "string",
-                    item_type: "custom_text | poll | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | code_trace | test | text | grila | problem | ...",
-                    source_key: isCatalogSubject
-                      ? "exact un source_key din listă sau null"
-                      : "întotdeauna null (subiect non-catalog — nu folosi surse)",
-                    content_json: isCatalogSubject
-                      ? "null dacă ai source_key; altfel obiectul content_json complet pentru tipul ales, conform ghidului"
-                      : "mereu obiectul content_json complet (nu folosi source_key)",
+                    item_type:
+                      "custom_text | poll | match | card_sort | fill_slot | reveal_steps | table_fill | swipe_classify | memory_flip | code_trace | test | text | grila | problem | ...",
+                    source_key: forceGenerate
+                      ? "întotdeauna null"
+                      : "exact un source_key din listă sau null",
+                    content_json: forceGenerate
+                      ? "mereu obiectul content_json complet"
+                      : "null dacă ai source_key; altfel obiectul complet",
                   },
                 ],
               },
@@ -1465,6 +1588,7 @@ export async function planPersonalizedCourse(
   userPrompt: string,
   candidates: PersonalizedCourseCatalogCandidate[],
   sourceContentByKey?: Map<string, Record<string, unknown> | null>,
+  scope?: PersonalizedCourseIntentScope | null,
 ): Promise<{ plan: PersonalizedCourseGeneratedPlan; verification: VerificationReport }> {
   const openai = getOpenAIClient()
   const { model, maxTokens } = getPlannerProviderConfig()
@@ -1485,15 +1609,14 @@ export async function planPersonalizedCourse(
     const repairNote =
       attempt === 0
         ? null
-        : "Răspunsul trecut NU a fost JSON valid sau a fost trunchiat. Răspunde din nou cu JSON-ul complet și valid, fără text în afara obiectului JSON, fără ```cod fences```. Asigură-te că obiectul JSON este complet închis. Redă planul întreg (3-5 lecții, 20-25 itemi fiecare)."
-    // On retry, raise the token budget in case the first attempt was truncated.
+        : "Răspunsul trecut NU a fost JSON valid sau a fost trunchiat. Răspunde din nou cu JSON-ul complet și valid, fără text în afara obiectului JSON, fără ```cod fences```. Asigură-te că obiectul JSON este complet închis. Redă planul întreg (3-5 lecții, 12-25 itemi fiecare)."
     const attemptMaxTokens = attempt === 0 ? maxTokens : maxTokens + 8000
 
     let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
     try {
       completion = await openai.chat.completions.create({
         model,
-        messages: buildPlannerMessages(userPrompt, candidates, repairNote),
+        messages: buildPlannerMessages(userPrompt, candidates, repairNote, scope),
         response_format: { type: "json_object" },
         temperature: attempt === 0 ? 0.4 : 0.2,
         max_tokens: attemptMaxTokens,
@@ -1521,7 +1644,6 @@ export async function planPersonalizedCourse(
       lastError = new Error(
         `AI returned invalid JSON (attempt ${attempt + 1}, finish_reason=${finishReason ?? "unknown"}, len=${rawContent.length}): ${preview}`,
       )
-      // Truncation (finish_reason=length) or stray text → retry with repair note + more tokens.
       continue
     }
     parsed = tolerantResult
@@ -1539,7 +1661,28 @@ export async function planPersonalizedCourse(
 
   if (!validated) throw lastError ?? new Error("AI course generation failed")
 
-  const normalizedPlan = normalizePlan(validated.data, candidates, userPrompt)
-  const { plan: verifiedPlan, report } = verifyGeneratedPlan(normalizedPlan, userPrompt, sourceContentByKey)
-  return { plan: verifiedPlan, verification: report }
+  const normalizedPlan = normalizePlan(validated.data, candidates, userPrompt, scope)
+  const { plan: verifiedPlan, report } = verifyGeneratedPlan(
+    normalizedPlan,
+    userPrompt,
+    sourceContentByKey,
+  )
+
+  // Pedagogical fidelity: generated interactives must only test prior explanations.
+  let finalPlan = verifiedPlan
+  let fidelity: FidelityReport | undefined
+  try {
+    if (Date.now() < deadline - 30_000) {
+      const fidelityResult = await verifyQuizFidelity(verifiedPlan, userPrompt)
+      finalPlan = fidelityResult.plan
+      fidelity = fidelityResult.report
+    }
+  } catch {
+    // Non-fatal — structural plan is still usable.
+  }
+
+  return {
+    plan: finalPlan,
+    verification: { ...report, fidelity },
+  }
 }

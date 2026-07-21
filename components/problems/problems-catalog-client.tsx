@@ -31,6 +31,7 @@ import {
   SidebarClassProgress,
 } from "@/components/problems/problems-catalog-sidebar"
 import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/catalog-desktop-sidebar-discount-offer-card"
+import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 
 const ProblemCard = lazy(() => import("@/components/problem-card").then((module) => ({ default: module.ProblemCard })))
 
@@ -188,18 +189,6 @@ const scoreProblemForMonth = (problemId: string, monthKey: string) => {
 
 const normalizeValue = (value?: string | null) => (value ?? "").trim().toLowerCase()
 
-const mapProfileGradeToClass = (grade: unknown): string | null => {
-  if (grade == null) return null
-  const raw = String(grade).trim()
-  if (!raw) return null
-  if (["9", "10", "11", "12"].includes(raw)) return `a ${raw}-a`
-  const numeric = Number(raw)
-  if ([9, 10, 11, 12].includes(numeric)) return `a ${numeric}-a`
-  const normalized = normalizeValue(raw)
-  const directMatch = CATALOG_CLASS_OPTIONS.find((opt) => normalizeValue(opt) === normalized)
-  return directMatch ?? null
-}
-
 const mapProblemClassLabel = (problem: Problem): string | null => {
   const normalizedClassString = normalizeValue(problem.classString)
   if (normalizedClassString) {
@@ -249,7 +238,7 @@ export default function ProblemsCatalogClient({
   topSlot,
   assignmentPicker,
 }: ProblemsClientProps) {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const { isFree, isPaid } = useSubscriptionPlan()
   const isMobile = useIsMobile()
   const didMountRef = useRef(false)
@@ -292,8 +281,15 @@ export default function ProblemsCatalogClient({
   const restoredCatalogState = restoredCatalogStateRef.current
   const restoredFilters = restoredCatalogState?.filters ?? loadStoredFilters(filtersStorageKey)
   const restoredPage = restoredCatalogState?.page ?? loadStoredPage(pageStorageKey)
+  const restoredSelectedClassRaw =
+    restoredCatalogState && "selectedClass" in restoredCatalogState
+      ? restoredCatalogState.selectedClass ?? null
+      : loadStoredSelectedClass(selectedClassStorageKey)
   const restoredSelectedClass =
-    restoredCatalogState?.selectedClass ?? loadStoredSelectedClass(selectedClassStorageKey)
+    restoredSelectedClassRaw &&
+    CATALOG_CLASS_OPTIONS.includes(restoredSelectedClassRaw as (typeof CATALOG_CLASS_OPTIONS)[number])
+      ? restoredSelectedClassRaw
+      : null
   const initialProblemsFromCache = getFreshPhysicsCatalogProblems()
   const normalizedInitialProblems =
     initialProblemsFromCache ?? normalizePhysicsCatalogProblems(initialProblems || [])
@@ -332,10 +328,9 @@ export default function ProblemsCatalogClient({
     [assignmentPicker?.selectedProblemIds],
   )
 
-  const profileClass = useMemo(() => mapProfileGradeToClass(profile?.grade), [profile?.grade])
-  const requiresClassSelection = !user || !profileClass
-  const catalogReady = !requiresClassSelection || Boolean(selectedClassGate)
-  const effectiveUserClass = profileClass ?? selectedClassGate ?? CATALOG_CLASS_OPTIONS[0]
+  // Always ask for class on first visit; restore from sessionStorage within the same tab session.
+  const catalogReady = Boolean(selectedClassGate)
+  const effectiveUserClass = selectedClassGate ?? CATALOG_CLASS_OPTIONS[0]
 
   const fetchProblems = useCallback(async (options?: { background?: boolean }) => {
     const cached = physicsCatalogProblemsCache.get(PHYSICS_CATALOG_LIST_CACHE_KEY)
@@ -425,24 +420,8 @@ export default function ProblemsCatalogClient({
   }, [fetchSolvedProblems])
 
   useEffect(() => {
-    if (!requiresClassSelection) {
-      setSelectedClassGate(null)
-      return
-    }
-
-    try {
-      const storedClass = sessionStorage.getItem(selectedClassStorageKey)
-      if (storedClass && CATALOG_CLASS_OPTIONS.includes(storedClass as (typeof CATALOG_CLASS_OPTIONS)[number])) {
-        setSelectedClassGate(storedClass)
-      }
-    } catch {
-      // ignore storage errors
-    }
-  }, [requiresClassSelection, selectedClassStorageKey])
-
-  useEffect(() => {
     if (hasRestoredFiltersRef.current) return
-    if (!requiresClassSelection || !selectedClassGate) return
+    if (!selectedClassGate) return
     if (filters.class !== "Toate") return
 
     setFilters((prev) => ({
@@ -450,34 +429,17 @@ export default function ProblemsCatalogClient({
       class: selectedClassGate,
       chapter: "Toate",
     }))
-  }, [filters.class, requiresClassSelection, selectedClassGate])
+  }, [filters.class, selectedClassGate])
 
-  useEffect(() => {
-    if (hasRestoredFiltersRef.current) return
-    if (requiresClassSelection) return
-    if (!profileClass) return
-    if (filters.class !== "Toate") return
-
-    setFilters((prev) => ({
-      ...prev,
-      class: profileClass,
-      chapter: normalizedInitialChapter || "Toate",
-    }))
-  }, [filters.class, normalizedInitialChapter, profileClass, requiresClassSelection])
-
-  useEffect(() => {
-    if (hasRestoredFiltersRef.current) return
-    if (!requiresClassSelection) return
-    if (!catalogReady) return
-    if (filters.class !== "Toate") return
-
-    const fallbackClass = selectedClassGate ?? CATALOG_CLASS_OPTIONS[0]
-    setFilters((prev) => ({
-      ...prev,
-      class: fallbackClass,
-      chapter: "Toate",
-    }))
-  }, [catalogReady, filters.class, requiresClassSelection, selectedClassGate])
+  const clearClassGate = useCallback(() => {
+    setSelectedClassGate(null)
+    try {
+      sessionStorage.removeItem(selectedClassStorageKey)
+      saveCatalogSessionState(sessionStateStorageKey, { selectedClass: null })
+    } catch {
+      // ignore storage errors
+    }
+  }, [selectedClassStorageKey, sessionStateStorageKey])
 
   const filteredProblems = useMemo(() => {
     const hasSearch = Boolean(filters.search?.trim())
@@ -966,6 +928,11 @@ export default function ProblemsCatalogClient({
             </section>
           ) : (
             <>
+              {!assignmentPicker ? (
+                <div className="hidden burger:block">
+                  <PracticeSubjectSwitcher currentSubject="fizica" />
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">
                   {assignmentPicker ? "Alege exercițiile" : "Probleme de fizica"}
@@ -987,11 +954,11 @@ export default function ProblemsCatalogClient({
                   <SlidersHorizontal className="mr-2 h-4 w-4" />
                   Search si filtre
                 </Button>
-                {requiresClassSelection && selectedClassGate && profileClass && (
+                {selectedClassGate && (
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setSelectedClassGate(null)}
+                    onClick={clearClassGate}
                     className="rounded-full text-xs font-semibold text-[#2c2f33]/70 hover:bg-transparent hover:text-[#0b0c0f]"
                   >
                     Schimba clasa

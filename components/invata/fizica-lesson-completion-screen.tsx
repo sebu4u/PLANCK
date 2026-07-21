@@ -4,22 +4,25 @@ import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { FizicaLessonLeaderboardPhase } from "@/components/invata/fizica-lesson-leaderboard-phase"
-import { FizicaLessonBatteryPhase } from "@/components/invata/fizica-lesson-battery-phase"
+import { LessonPlanckPassPhase } from "@/components/invata/lesson-planckpass-phase"
 import { OnboardingLessonOfferPhase } from "@/components/invata/onboarding-lesson-offer-phase"
 import { fireFizicaLessonCompletionConfetti } from "@/lib/learning-path-confetti"
 import { playButtonClickSound } from "@/lib/platform-sounds"
 
 interface FizicaLessonCompletionScreenProps {
   totalElo: number
+  /** Learning-path item IDs for this lesson — used to sum XP and animate PlanckPass. */
+  itemIds: string[]
   onContinue: () => void
-  /** Adds a 4th "ofertă unică" phase after the battery screen (onboarding custom lessons only). */
+  /** Adds a final "ofertă unică" phase after the PlanckPass screen (onboarding custom lessons only). */
   showOfferPhase?: boolean
 }
 
-type CompletionScreen = "celebration" | "leaderboard" | "battery" | "offer"
+type CompletionScreen = "celebration" | "leaderboard" | "planckpass" | "offer"
 
 export function FizicaLessonCompletionScreen({
   totalElo,
+  itemIds,
   onContinue,
   showOfferPhase = false,
 }: FizicaLessonCompletionScreenProps) {
@@ -70,16 +73,17 @@ export function FizicaLessonCompletionScreen({
     return <OnboardingLessonOfferPhase onDecline={onContinue} />
   }
 
-  if (screen === "battery") {
+  if (screen === "planckpass") {
     return (
-      <FizicaLessonBatteryPhase
+      <LessonPlanckPassPhase
+        itemIds={itemIds}
         onClose={showOfferPhase ? () => setScreen("offer") : onContinue}
       />
     )
   }
 
   if (screen === "leaderboard") {
-    return <FizicaLessonLeaderboardPhase onContinue={() => setScreen("battery")} />
+    return <FizicaLessonLeaderboardPhase onContinue={() => setScreen("planckpass")} />
   }
 
   return (

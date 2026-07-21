@@ -4,6 +4,7 @@ import { useCallback } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useProgressTrigger } from "@/hooks/engagement/use-progress-trigger"
+import { useOptionalLearningPathItemNavigation } from "@/components/invata/learning-path-item-navigation-context"
 
 export const PLANCK_STREAK_UPDATED_EVENT = "planck:streak-updated"
 
@@ -25,12 +26,19 @@ export function useLearningPathItemCompletion({
 }: LearningPathItemCompletionInput) {
   const { user } = useAuth()
   const pushProgress = useProgressTrigger()
+  const itemNavigation = useOptionalLearningPathItemNavigation()
 
   return useCallback(async () => {
     if (!itemId) return
 
+    const recordSessionCompletion = (isNew: boolean) => {
+      if (!isNew) return
+      itemNavigation?.recordSessionItemCompletion?.(itemId)
+    }
+
     if (!user?.id) {
       if (!lessonId) return
+      const alreadyDone = Boolean(itemNavigation?.wasCompletedAtSessionStart?.(itemId))
       const response = await fetch("/api/learning-path/guest-item-progress", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -40,6 +48,7 @@ export function useLearningPathItemCompletion({
       if (!response.ok) {
         console.error("guest learning path item progress:", await response.text().catch(() => ""))
       }
+      recordSessionCompletion(!alreadyDone)
       pushProgress(undefined, itemId)
       return
     }
@@ -69,6 +78,8 @@ export function useLearningPathItemCompletion({
       return
     }
 
+    recordSessionCompletion(isFirstCompletion)
+
     if (isFirstCompletion) {
       const { error: streakError } = await supabase.rpc("record_user_streak_activity", {
         user_uuid: user.id,
@@ -77,6 +88,21 @@ export function useLearningPathItemCompletion({
         console.warn("learning path streak activity:", streakError.message || streakError)
       } else {
         notifyStreakUpdated()
+      }
+
+      // Interactive + test XP is awarded inside SQL RPCs; award lesson/other items here.
+      const { data: itemRow } = await supabase
+        .from("learning_path_lesson_items")
+        .select("item_type")
+        .eq("id", itemId)
+        .maybeSingle()
+
+      const itemType = (itemRow as { item_type?: string } | null)?.item_type
+      const interactiveTypes = new Set(["grila", "problem", "poll", "fill_slot", "test"])
+      if (itemType && !interactiveTypes.has(itemType)) {
+        void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForLpItem }) =>
+          awardPlanckPassXpForLpItem(itemId),
+        )
       }
     }
 
@@ -103,5 +129,5 @@ export function useLearningPathItemCompletion({
     if (lessonError) {
       console.error("learning path lesson progress upsert:", lessonError)
     }
-  }, [isLastItem, itemId, lessonId, pushProgress, user?.id])
+  }, [isLastItem, itemId, itemNavigation, lessonId, pushProgress, user?.id])
 }
