@@ -7,6 +7,7 @@ import {
   PLANCKPASS_CARD_WIDTH,
   PLANCKPASS_SIDE_PAD,
   PLANCKPASS_VERTICAL_SIDE_PAD,
+  planckPassTrackFillEnd,
 } from "./planckpass-layout"
 
 interface PlanckPassProgressTrackProps {
@@ -27,20 +28,17 @@ export function PlanckPassProgressTrack({
   cardGap = PLANCKPASS_CARD_GAP,
   className,
 }: PlanckPassProgressTrackProps) {
-  const progressRatio = Math.min(
-    1,
-    Math.max(0, (currentTier - 1) / Math.max(1, tierCount - 1)),
-  )
-
   if (orientation === "vertical") {
     const step = cardHeight + cardGap
     const trackHeight =
       PLANCKPASS_VERTICAL_SIDE_PAD * 2 +
       tierCount * cardHeight +
       (tierCount - 1) * cardGap
-    const filledHeight =
-      PLANCKPASS_VERTICAL_SIDE_PAD +
-      progressRatio * (trackHeight - PLANCKPASS_VERTICAL_SIDE_PAD * 2)
+    const filledHeight = planckPassTrackFillEnd(currentTier, tierCount, {
+      step,
+      sidePad: PLANCKPASS_VERTICAL_SIDE_PAD,
+      cardSize: cardHeight,
+    })
 
     return (
       <div className={cn("relative w-8 shrink-0", className)} style={{ height: trackHeight }}>
@@ -91,8 +89,11 @@ export function PlanckPassProgressTrack({
     PLANCKPASS_SIDE_PAD * 2 +
     tierCount * PLANCKPASS_CARD_WIDTH +
     (tierCount - 1) * PLANCKPASS_CARD_GAP
-  const filledWidth =
-    PLANCKPASS_SIDE_PAD + progressRatio * (trackWidth - PLANCKPASS_SIDE_PAD * 2)
+  const filledWidth = planckPassTrackFillEnd(currentTier, tierCount, {
+    step,
+    sidePad: PLANCKPASS_SIDE_PAD,
+    cardSize: PLANCKPASS_CARD_WIDTH,
+  })
 
   return (
     <div className={cn("relative h-8", className)} style={{ width: trackWidth }}>

@@ -222,8 +222,8 @@ function InvataChapterSection({
       id={invataChapterSectionDomId(chapter.id)}
       className={
         chapterIndex === 0
-          ? "relative max-sm:scroll-mt-[calc(5.875rem+3rem)] sm:scroll-mt-0"
-          : "relative max-sm:scroll-mt-[calc(5.875rem+3rem)] border-t border-[#ececec] pt-10 sm:scroll-mt-0 sm:pt-10"
+          ? "relative max-sm:scroll-mt-4 sm:scroll-mt-0"
+          : "relative max-sm:scroll-mt-4 border-t border-[#ececec] pt-10 sm:scroll-mt-0 sm:pt-10"
       }
       aria-label={chapter.title}
     >

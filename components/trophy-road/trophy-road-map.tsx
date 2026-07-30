@@ -1,192 +1,448 @@
 "use client"
 
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react"
 import { cn } from "@/lib/utils"
 import {
-  TROPHY_ROAD_MILESTONES,
-  getMilestoneOffset,
+  buildTrophyRoadMapLayouts,
+  computeTrophyRoadMapMinHeight,
+  isMobileLeftSide,
+  type TrophyRoadMapLayout,
+} from "@/lib/trophy-road/map-layout"
+import {
   getMilestoneState,
   getNextMilestone,
-  getProgressFillLength,
-  getTrophyRoadTrackLength,
 } from "@/lib/trophy-road/milestones"
-import { TrophyRoadRewardNode } from "./trophy-road-reward-node"
+import {
+  TrophyRoadCircleNode,
+  TrophyRoadRewardCard,
+} from "./trophy-road-reward-node"
 
-interface TrophyRoadMapProps {
-  userElo: number
-  orientation: "horizontal" | "vertical"
-  className?: string
+const PATH_STROKE = "#9ca3af"
+const NODE_RADIUS_MOBILE = 36
+const NODE_RADIUS_DESKTOP = 52
+const CARD_CLEARANCE = 18
+const POP_STAGGER_MS = 40
+
+interface PathSegment {
+  d: string
+  pairIndex: number
 }
 
-function DecorShape({ shape }: { shape: "tree" | "crate" | "bench" }) {
-  if (shape === "tree") {
-    return (
-      <div className="relative h-10 w-8" aria-hidden>
-        <div className="absolute bottom-3 left-1/2 h-7 w-7 -translate-x-1/2 rounded-full border-2 border-[#1a3a12] bg-[#3d9e3a]" />
-        <div className="absolute bottom-0 left-1/2 h-4 w-2 -translate-x-1/2 rounded-sm bg-[#6b3e1a]" />
-      </div>
-    )
+function rectRelativeTo(rect: DOMRect, container: DOMRect) {
+  return {
+    left: rect.left - container.left,
+    right: rect.right - container.left,
+    top: rect.top - container.top,
+    bottom: rect.bottom - container.top,
   }
-  if (shape === "crate") {
-    return (
-      <div
-        className="h-7 w-7 rounded-md border-2 border-[#5c3a14] bg-[#c4843a] shadow-[inset_0_0_0_2px_rgba(0,0,0,0.12)]"
-        aria-hidden
-      />
-    )
+}
+
+function buildMobileZigzagPath(
+  fromNode: DOMRect,
+  toNode: DOMRect,
+  fromCard: DOMRect | null,
+  toCard: DOMRect | null,
+  containerRect: DOMRect,
+  nodeRadius: number,
+): { d: string } {
+  const ax = fromNode.left + fromNode.width / 2 - containerRect.left
+  const ay = fromNode.top + fromNode.height / 2 - containerRect.top
+  const bx = toNode.left + toNode.width / 2 - containerRect.left
+  const by = toNode.top + toNode.height / 2 - containerRect.top
+
+  const startY = ay + nodeRadius
+  const endY = by - nodeRadius
+  let midY = (startY + endY) / 2
+
+  const horizontalMinX = Math.min(ax, bx)
+  const horizontalMaxX = Math.max(ax, bx)
+
+  for (const card of [fromCard, toCard]) {
+    if (!card) continue
+    const cardRect = rectRelativeTo(card, containerRect)
+    const intersectsHorizontalBand =
+      midY >= cardRect.top - CARD_CLEARANCE && midY <= cardRect.bottom + CARD_CLEARANCE
+    const intersectsHorizontalSpan =
+      horizontalMaxX >= cardRect.left - CARD_CLEARANCE &&
+      horizontalMinX <= cardRect.right + CARD_CLEARANCE
+
+    if (intersectsHorizontalBand && intersectsHorizontalSpan) {
+      midY = Math.max(midY, cardRect.bottom + CARD_CLEARANCE)
+    }
   }
+
+  const minMidY = startY + CARD_CLEARANCE
+  const maxMidY = endY - CARD_CLEARANCE
+  midY = Math.min(Math.max(midY, minMidY), maxMidY)
+
+  return {
+    d: `M ${ax} ${startY} L ${ax} ${midY} L ${bx} ${midY} L ${bx} ${endY}`,
+  }
+}
+
+function buildOrthogonalSegments(
+  fromNode: DOMRect,
+  toNode: DOMRect,
+  fromCard: DOMRect | null,
+  toCard: DOMRect | null,
+  toCardBelow: boolean,
+  containerRect: DOMRect,
+  nodeRadius: number,
+): { d: string }[] {
+  const ax = fromNode.left + fromNode.width / 2 - containerRect.left
+  const ay = fromNode.top + fromNode.height / 2 - containerRect.top
+  const bx = toNode.left + toNode.width / 2 - containerRect.left
+  const by = toNode.top + toNode.height / 2 - containerRect.top
+
+  const sameColumn = Math.abs(ax - bx) < 48
+
+  if (sameColumn) {
+    const goingDown = by > ay
+    const startY = ay + (goingDown ? nodeRadius : -nodeRadius)
+    const endY = by + (goingDown ? -nodeRadius : nodeRadius)
+    return [{ d: `M ${ax} ${startY} L ${ax} ${endY}` }]
+  }
+
+  const goingRight = bx > ax
+  const direction = goingRight ? 1 : -1
+  const fromCardRect = fromCard ? rectRelativeTo(fromCard, containerRect) : null
+  const toCardRect = toCard ? rectRelativeTo(toCard, containerRect) : null
+
+  const startX = ax + direction * nodeRadius
+  const targetSideX = bx - direction * nodeRadius
+
+  const fromOuterEdge = fromCardRect
+    ? goingRight
+      ? fromCardRect.right
+      : fromCardRect.left
+    : ax
+  const toOuterEdge = toCardRect
+    ? goingRight
+      ? toCardRect.left
+      : toCardRect.right
+    : bx
+
+  const fromLaneX = fromOuterEdge + direction * CARD_CLEARANCE
+  const toLaneLimitX = toOuterEdge - direction * CARD_CLEARANCE
+  const hasClearLane = goingRight ? fromLaneX <= toLaneLimitX : fromLaneX >= toLaneLimitX
+  const laneX =
+    hasClearLane || !fromCardRect || !toCardRect
+      ? fromLaneX
+      : (fromOuterEdge + toOuterEdge) / 2
+
+  const endY = !toCardBelow ? by : by - nodeRadius
+
+  return [
+    {
+      d: [
+        `M ${startX} ${ay}`,
+        `L ${laneX} ${ay}`,
+        `L ${laneX} ${endY}`,
+        `L ${targetSideX} ${endY}`,
+      ].join(" "),
+    },
+  ]
+}
+
+function useMapPathLayout(
+  containerRef: RefObject<HTMLDivElement | null>,
+  updatePaths: () => void,
+  nodeCount: number,
+) {
+  useEffect(() => {
+    const timeouts: number[] = []
+    const schedule = (delay: number) => {
+      timeouts.push(window.setTimeout(updatePaths, delay))
+    }
+
+    updatePaths()
+    const raf = window.requestAnimationFrame(() => {
+      updatePaths()
+      window.requestAnimationFrame(updatePaths)
+    })
+
+    schedule(50)
+    schedule(Math.max(0, nodeCount - 1) * POP_STAGGER_MS + 200)
+
+    const container = containerRef.current
+    if (!container) {
+      return () => {
+        window.cancelAnimationFrame(raf)
+        timeouts.forEach(clearTimeout)
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(updatePaths)
+    resizeObserver.observe(container)
+    container.querySelectorAll("[data-map-node], [data-map-card]").forEach((el) => {
+      resizeObserver.observe(el)
+    })
+
+    window.addEventListener("resize", updatePaths)
+
+    return () => {
+      window.cancelAnimationFrame(raf)
+      timeouts.forEach(clearTimeout)
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", updatePaths)
+    }
+  }, [containerRef, updatePaths, nodeCount])
+}
+
+function MapPathSvg({
+  containerRef,
+  layouts,
+  mode,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>
+  layouts: TrophyRoadMapLayout[]
+  mode: "desktop" | "mobile"
+}) {
+  const [paths, setPaths] = useState<PathSegment[]>([])
+  const [svgSize, setSvgSize] = useState({ width: 0, height: 0 })
+
+  const updatePaths = useCallback(() => {
+    const container = containerRef.current
+    if (!container || layouts.length < 2) {
+      setPaths([])
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    setSvgSize({
+      width: container.scrollWidth || containerRect.width,
+      height: container.scrollHeight || containerRect.height,
+    })
+
+    const nextPaths: PathSegment[] = []
+
+    const nodeRadius = mode === "mobile" ? NODE_RADIUS_MOBILE : NODE_RADIUS_DESKTOP
+
+    for (let i = 0; i < layouts.length - 1; i++) {
+      const from = layouts[i]
+      const to = layouts[i + 1]
+      const fromNode = container.querySelector<HTMLElement>(`[data-map-node="${from.id}"]`)
+      const toNode = container.querySelector<HTMLElement>(`[data-map-node="${to.id}"]`)
+      if (!fromNode || !toNode) continue
+
+      const fromCard = container.querySelector<HTMLElement>(`[data-map-card="${from.id}"]`)
+      const toCard = container.querySelector<HTMLElement>(`[data-map-card="${to.id}"]`)
+
+      if (mode === "mobile") {
+        nextPaths.push({
+          ...buildMobileZigzagPath(
+            fromNode.getBoundingClientRect(),
+            toNode.getBoundingClientRect(),
+            fromCard?.getBoundingClientRect() ?? null,
+            toCard?.getBoundingClientRect() ?? null,
+            containerRect,
+            nodeRadius,
+          ),
+          pairIndex: i,
+        })
+      } else {
+        nextPaths.push(
+          ...buildOrthogonalSegments(
+            fromNode.getBoundingClientRect(),
+            toNode.getBoundingClientRect(),
+            fromCard?.getBoundingClientRect() ?? null,
+            toCard?.getBoundingClientRect() ?? null,
+            to.cardPosition === "below",
+            containerRect,
+            nodeRadius,
+          ).map((segment) => ({ ...segment, pairIndex: i })),
+        )
+      }
+    }
+
+    setPaths(nextPaths)
+  }, [containerRef, layouts, mode])
+
+  useMapPathLayout(containerRef, updatePaths, layouts.length)
+
+  if (paths.length === 0 || svgSize.width === 0) return null
+
   return (
-    <div className="relative h-5 w-12" aria-hidden>
-      <div className="absolute inset-x-1 top-0 h-2 rounded-sm border border-[#3a2a12] bg-[#8b6914]" />
-      <div className="absolute bottom-0 left-1 h-3 w-1.5 rounded-sm bg-[#5c3a14]" />
-      <div className="absolute bottom-0 right-1 h-3 w-1.5 rounded-sm bg-[#5c3a14]" />
+    <svg
+      className="pointer-events-none absolute inset-0 z-[1] overflow-visible"
+      width={svgSize.width}
+      height={svgSize.height}
+      aria-hidden
+    >
+      {paths.map((path, index) => (
+        <path
+          key={`${path.pairIndex}-${index}`}
+          d={path.d}
+          fill="none"
+          stroke={PATH_STROKE}
+          strokeWidth={4.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="fizica-map-path-dashed"
+        />
+      ))}
+    </svg>
+  )
+}
+
+function DesktopMarker({
+  layout,
+  userElo,
+  trophiesNeeded,
+}: {
+  layout: TrophyRoadMapLayout
+  userElo: number
+  trophiesNeeded?: number
+}) {
+  const state = getMilestoneState(layout.threshold, userElo)
+  const cardAbove = layout.cardPosition === "above"
+  const node = <TrophyRoadCircleNode milestone={layout} state={state} size="lg" />
+  const card = (
+    <TrophyRoadRewardCard
+      milestone={layout}
+      state={state}
+      trophiesNeeded={state === "current" ? trophiesNeeded : undefined}
+      size="lg"
+    />
+  )
+
+  return (
+    <div
+      data-trophy-road-marker={layout.id}
+      data-threshold={layout.threshold}
+      className={cn(
+        "absolute flex -translate-x-1/2 scroll-my-28 flex-col items-center",
+        state === "current" ? "z-[4]" : "z-[2]",
+      )}
+      style={{
+        left: `${layout.xPercent}%`,
+        top: layout.y,
+        contentVisibility: "auto",
+        containIntrinsicSize: "340px 300px",
+      }}
+    >
+      <div
+        className="fizica-map-item-pop flex flex-col items-center"
+        style={{ animationDelay: `${layout.index * POP_STAGGER_MS}ms` }}
+      >
+        {cardAbove ? (
+          <>
+            <div className="mb-4">{card}</div>
+            {node}
+          </>
+        ) : (
+          <>
+            {node}
+            <div className="mt-4">{card}</div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
 
-export function TrophyRoadMap({ userElo, orientation, className }: TrophyRoadMapProps) {
-  const trackLength = getTrophyRoadTrackLength(orientation)
-  const fillLength = getProgressFillLength(userElo)
-  const next = getNextMilestone(userElo)
-  const isHorizontal = orientation === "horizontal"
-
-  const decorItems = isHorizontal
-    ? [
-        { at: 0.08, side: "above" as const, shape: "tree" as const },
-        { at: 0.18, side: "below" as const, shape: "crate" as const },
-        { at: 0.32, side: "above" as const, shape: "bench" as const },
-        { at: 0.48, side: "below" as const, shape: "tree" as const },
-        { at: 0.62, side: "above" as const, shape: "crate" as const },
-        { at: 0.78, side: "below" as const, shape: "bench" as const },
-        { at: 0.9, side: "above" as const, shape: "tree" as const },
-      ]
-    : [
-        { at: 0.08, side: "left" as const, shape: "tree" as const },
-        { at: 0.22, side: "right" as const, shape: "crate" as const },
-        { at: 0.38, side: "left" as const, shape: "bench" as const },
-        { at: 0.52, side: "right" as const, shape: "tree" as const },
-        { at: 0.68, side: "left" as const, shape: "crate" as const },
-        { at: 0.82, side: "right" as const, shape: "bench" as const },
-        { at: 0.94, side: "left" as const, shape: "tree" as const },
-      ]
+function MobileMarker({
+  layout,
+  userElo,
+  trophiesNeeded,
+}: {
+  layout: TrophyRoadMapLayout
+  userElo: number
+  trophiesNeeded?: number
+}) {
+  const state = getMilestoneState(layout.threshold, userElo)
+  const isLeft = isMobileLeftSide(layout.index)
 
   return (
     <div
-      className={cn("trophy-road-map relative", className)}
-      style={
-        isHorizontal
-          ? { width: trackLength, height: "100%", minHeight: 360 }
-          : { height: trackLength, width: "100%", minWidth: 280 }
-      }
+      data-trophy-road-marker={layout.id}
+      data-threshold={layout.threshold}
+      className={cn(
+        "relative flex w-full scroll-my-20 items-start gap-3",
+        state === "current" ? "z-[4]" : "z-[2]",
+        isLeft ? "flex-row justify-start pl-2 pr-3" : "flex-row-reverse justify-start pr-2 pl-3",
+      )}
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "100% 120px",
+      }}
     >
-      {/* Atmosphere layers */}
       <div
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        aria-hidden
+        className={cn(
+          "fizica-map-item-pop flex w-full items-start gap-3",
+          isLeft ? "flex-row justify-start" : "flex-row-reverse justify-start",
+        )}
+        style={{ animationDelay: `${Math.min(layout.index, 12) * POP_STAGGER_MS}ms` }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,255,200,0.35),transparent_50%),radial-gradient(ellipse_at_80%_70%,rgba(80,180,255,0.25),transparent_45%)]" />
-        <div
-          className={cn(
-            "absolute bg-[#5bb85a]",
-            isHorizontal ? "inset-x-0 top-0 h-[42%]" : "inset-y-0 left-0 w-[38%]",
-          )}
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(0,0,0,0.04) 18px, rgba(0,0,0,0.04) 19px)",
-          }}
-        />
-        <div
-          className={cn(
-            "absolute bg-[#7ecf6e]",
-            isHorizontal ? "inset-x-0 bottom-[28%] h-[30%]" : "inset-y-0 right-0 w-[34%]",
-          )}
-        />
-        <div
-          className={cn(
-            "absolute bg-gradient-to-t from-[#e8c87a] via-[#d4b06a] to-[#6ec4e8]",
-            isHorizontal ? "inset-x-0 bottom-0 h-[28%]" : "inset-y-0 right-0 w-[28%] opacity-90",
-          )}
-        />
-      </div>
-
-      {/* Decor */}
-      {decorItems.map((item, i) => {
-        const along = item.at * trackLength
-        const style = isHorizontal
-          ? {
-              left: along,
-              ...(item.side === "above" ? { top: "18%" } : { bottom: "22%" }),
-            }
-          : {
-              top: along,
-              ...(item.side === "left" ? { left: "10%" } : { right: "10%" }),
-            }
-        return (
-          <div
-            key={i}
-            className="pointer-events-none absolute z-[1] -translate-x-1/2 -translate-y-1/2 opacity-90"
-            style={style}
-          >
-            <DecorShape shape={item.shape} />
-          </div>
-        )
-      })}
-
-      {/* Tiled path */}
-      <div
-        className={cn(
-          "absolute z-[2] rounded-2xl border-[3px] border-[#9a4a5a] shadow-[0_4px_0_rgba(0,0,0,0.2)]",
-          isHorizontal
-            ? "left-0 right-0 top-1/2 h-[72px] -translate-y-1/2"
-            : "top-0 bottom-0 left-1/2 w-[72px] -translate-x-1/2",
-        )}
-        style={{
-          backgroundColor: "#e87888",
-          backgroundImage: isHorizontal
-            ? "repeating-linear-gradient(90deg, #e87888 0 28px, #d86878 28px 56px)"
-            : "repeating-linear-gradient(180deg, #e87888 0 28px, #d86878 28px 56px)",
-        }}
-      />
-
-      {/* Progress line base + fill */}
-      <div
-        className={cn(
-          "absolute z-[3] rounded-full bg-[#2a1570]",
-          isHorizontal
-            ? "left-0 top-1/2 h-3.5 -translate-y-1/2"
-            : "top-0 left-1/2 w-3.5 -translate-x-1/2",
-        )}
-        style={isHorizontal ? { width: trackLength } : { height: trackLength }}
-      />
-      <div
-        className={cn(
-          "absolute z-[4] rounded-full bg-[#8b5cf6] shadow-[0_0_10px_rgba(139,92,246,0.55)]",
-          isHorizontal
-            ? "left-0 top-1/2 h-3.5 -translate-y-1/2"
-            : "top-0 left-1/2 w-3.5 -translate-x-1/2",
-        )}
-        style={isHorizontal ? { width: fillLength } : { height: fillLength }}
-      />
-
-      {/* Milestone nodes */}
-      {TROPHY_ROAD_MILESTONES.map((milestone) => {
-        const state = getMilestoneState(milestone.threshold, userElo)
-        const offset = getMilestoneOffset(milestone.threshold)
-        const trophiesNeeded =
-          state === "current" && next
-            ? Math.max(0, next.threshold - userElo)
-            : undefined
-
-        return (
-          <TrophyRoadRewardNode
-            key={milestone.id}
-            milestone={milestone}
+        <div className="relative z-[5] shrink-0">
+          <TrophyRoadCircleNode milestone={layout} state={state} />
+        </div>
+        <div className="relative z-[5] min-w-0 flex-1 pt-0.5">
+          <TrophyRoadRewardCard
+            milestone={layout}
             state={state}
-            orientation={orientation}
-            offset={offset}
+            trophiesNeeded={state === "current" ? trophiesNeeded : undefined}
+            compact
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface TrophyRoadMapProps {
+  userElo: number
+  className?: string
+}
+
+export function TrophyRoadMap({ userElo, className }: TrophyRoadMapProps) {
+  const desktopRef = useRef<HTMLDivElement>(null)
+  const mobileRef = useRef<HTMLDivElement>(null)
+  const layouts = useMemo(() => buildTrophyRoadMapLayouts(), [])
+  const minHeight = computeTrophyRoadMapMinHeight(layouts)
+  const next = getNextMilestone(userElo)
+  const trophiesNeeded = next ? Math.max(0, next.threshold - userElo) : undefined
+
+  return (
+    <div className={cn("relative w-full bg-white", className)}>
+      {/* Desktop zigzag map */}
+      <div
+        ref={desktopRef}
+        className="relative mx-auto hidden max-w-5xl burger:block"
+        style={{ minHeight }}
+      >
+        <MapPathSvg containerRef={desktopRef} layouts={layouts} mode="desktop" />
+        {layouts.map((layout) => (
+          <DesktopMarker
+            key={layout.id}
+            layout={layout}
+            userElo={userElo}
             trophiesNeeded={trophiesNeeded}
           />
-        )
-      })}
+        ))}
+      </div>
+
+      {/* Mobile alternating map */}
+      <div ref={mobileRef} className="relative py-2 burger:hidden">
+        <MapPathSvg containerRef={mobileRef} layouts={layouts} mode="mobile" />
+        <div className="relative z-[2] flex flex-col gap-y-24 px-1 pb-8 pt-2">
+          {layouts.map((layout) => (
+            <MobileMarker
+              key={layout.id}
+              layout={layout}
+              userElo={userElo}
+              trophiesNeeded={trophiesNeeded}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

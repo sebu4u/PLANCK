@@ -59,6 +59,14 @@ export interface LearningPathItemAiChatPanelProps {
   initialUserMessage?: string | null
   initialUserMessageDisplay?: string | null
   onInitialMessageSent?: () => void
+  /** Extra classes on the root panel (e.g. sit above mobile bottom nav). */
+  className?: string
+  /** Empty-state hint; defaults to lesson-item copy. */
+  emptyHint?: string
+  /** Override composer bottom padding (mobile). */
+  composerPaddingClassName?: string
+  /** Show an X close button in the mobile header (top-right). */
+  showMobileCloseButton?: boolean
 }
 
 export function LearningPathItemAiChatPanel({
@@ -74,6 +82,10 @@ export function LearningPathItemAiChatPanel({
   initialUserMessage,
   initialUserMessageDisplay,
   onInitialMessageSent,
+  className,
+  emptyHint = "Întreabă orice despre exercițiul curent.",
+  composerPaddingClassName,
+  showMobileCloseButton = false,
 }: LearningPathItemAiChatPanelProps) {
   const { user } = useAuth()
   const { isFree } = useSubscriptionPlan()
@@ -453,6 +465,7 @@ export function LearningPathItemAiChatPanel({
             ? "translate-x-0"
             : "translate-x-full",
         mobileDragging && "transition-none",
+        className,
       )}
       style={
         mobile
@@ -476,15 +489,27 @@ export function LearningPathItemAiChatPanel({
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-visible">
         {mobile ? (
-          <div
-            className="flex h-7 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
-            onPointerDown={handleMobilePointerDown}
-            onPointerMove={handleMobilePointerMove}
-            onPointerUp={handleMobilePointerUp}
-            onPointerCancel={handleMobilePointerUp}
-            role="presentation"
-          >
-            <div className="h-1 w-12 rounded-full bg-[#bdbdbd]" />
+          <div className="relative flex h-10 shrink-0 items-center px-3">
+            <div
+              className="absolute inset-x-0 top-0 flex h-7 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+              onPointerDown={handleMobilePointerDown}
+              onPointerMove={handleMobilePointerMove}
+              onPointerUp={handleMobilePointerUp}
+              onPointerCancel={handleMobilePointerUp}
+              role="presentation"
+            >
+              <div className="h-1 w-12 rounded-full bg-[#bdbdbd]" />
+            </div>
+            {showMobileCloseButton ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="relative z-[1] ml-auto flex h-8 w-8 items-center justify-center rounded-full text-[#666] transition-colors hover:bg-black/[0.05] hover:text-[#111]"
+                aria-label="Închide chat"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         ) : (
         <div className="flex items-center justify-between px-4 py-3">
@@ -523,7 +548,7 @@ export function LearningPathItemAiChatPanel({
               </div>
             ) : (
               <p className="relative z-[1] text-center text-sm text-[#888]">
-                Întreabă orice despre exercițiul curent.
+                {emptyHint}
               </p>
             )
           ) : (
@@ -581,7 +606,12 @@ export function LearningPathItemAiChatPanel({
           {error ? <p className="mt-3 text-center text-xs text-red-500">{error}</p> : null}
         </div>
 
-        <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2">
+        <div
+          className={cn(
+            "shrink-0 px-4 pt-2",
+            composerPaddingClassName ?? "pb-[max(1rem,env(safe-area-inset-bottom,0px))]",
+          )}
+        >
           <div className="relative">
             {showEmptyStateDecor ? (
               <div

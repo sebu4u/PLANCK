@@ -6,6 +6,16 @@ import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { BadgePresetPreview } from "@/components/planckpass/badges/badge-preset-layer"
+import { BorderPresetPreview } from "@/components/planckpass/borders/border-preset-layer"
+import {
+  BADGE_PRESETS,
+  getBadgePresetByCosmeticId,
+} from "@/lib/planckpass/badge-presets"
+import {
+  BORDER_PRESETS,
+  getBorderPresetByCosmeticId,
+} from "@/lib/planckpass/border-presets"
 import type { PlanckPassRewardKind } from "@/lib/planckpass/types"
 
 type Season = {
@@ -22,6 +32,7 @@ type Cosmetic = {
   kind: string
   name: string
   image_url: string
+  meta?: Record<string, unknown> | null
 }
 
 type TierRow = {
@@ -228,7 +239,10 @@ export function PlanckPassManager() {
           streakFreezeHours: draft.streakFreezeHours,
           cosmeticId: draft.cosmeticId,
           cosmeticName: draft.cosmeticName || draft.label,
-          cosmeticImageUrl: draft.cosmeticImageUrl || null,
+          cosmeticImageUrl:
+            draft.rewardKind === "border" || draft.rewardKind === "badge"
+              ? null
+              : draft.cosmeticImageUrl || null,
         }),
       })
       const json = await res.json()
@@ -458,7 +472,95 @@ export function PlanckPassManager() {
                 ) : null}
               </div>
 
-              {["icon", "badge", "border", "skin"].includes(draft.rewardKind) ? (
+              {draft.rewardKind === "border" ? (
+                <div className="space-y-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                  <p className="text-sm text-white/70">Border preset (10 fixe, animate)</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    {BORDER_PRESETS.map((preset) => {
+                      const selected = draft.cosmeticId === preset.cosmeticId
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              cosmeticId: preset.cosmeticId,
+                              cosmeticName: preset.name,
+                              cosmeticImageUrl: preset.imageUrl,
+                              label: draft.label || preset.name,
+                            })
+                          }
+                          className={`flex flex-col items-center gap-1.5 rounded-lg border p-2 transition ${
+                            selected
+                              ? "border-yellow-400 bg-yellow-400/10"
+                              : "border-white/15 bg-black/30 hover:border-white/40"
+                          }`}
+                        >
+                          <BorderPresetPreview presetId={preset.id} size={56} />
+                          <span className="text-center text-[10px] font-medium leading-tight text-white/80">
+                            {preset.name}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {!draft.cosmeticId ? (
+                    <p className="text-xs text-amber-200/80">Selectează un border pentru acest tier.</p>
+                  ) : (
+                    <p className="text-xs text-white/50">
+                      Selectat:{" "}
+                      {getBorderPresetByCosmeticId(draft.cosmeticId)?.name ?? draft.cosmeticName}
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              {draft.rewardKind === "badge" ? (
+                <div className="space-y-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                  <p className="text-sm text-white/70">Badge preset (5 fixe, animate)</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    {BADGE_PRESETS.map((preset) => {
+                      const selected = draft.cosmeticId === preset.cosmeticId
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              cosmeticId: preset.cosmeticId,
+                              cosmeticName: preset.name,
+                              cosmeticImageUrl: preset.imageUrl,
+                              label: draft.label || preset.name,
+                            })
+                          }
+                          className={`flex flex-col items-center gap-1.5 rounded-lg border p-2 transition ${
+                            selected
+                              ? "border-yellow-400 bg-yellow-400/10"
+                              : "border-white/15 bg-black/30 hover:border-white/40"
+                          }`}
+                        >
+                          <BadgePresetPreview presetId={preset.id} size={48} />
+                          <span className="text-center text-[10px] font-medium leading-tight text-white/80">
+                            {preset.name}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {!draft.cosmeticId ? (
+                    <p className="text-xs text-amber-200/80">Selectează un badge pentru acest tier.</p>
+                  ) : (
+                    <p className="text-xs text-white/50">
+                      Selectat:{" "}
+                      {getBadgePresetByCosmeticId(draft.cosmeticId)?.name ?? draft.cosmeticName}
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              {["icon", "skin"].includes(draft.rewardKind) ? (
                 <div className="space-y-3 rounded-lg border border-white/10 bg-black/20 p-3">
                   <p className="text-sm text-white/70">Cosmetic ({draft.rewardKind})</p>
                   <label className="block space-y-1 text-sm">

@@ -55,6 +55,11 @@ export function isExerseazaRoute(pathname: string | null | undefined): boolean {
   )
 }
 
+export function isPregatireRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/pregatire" || pathname.startsWith("/pregatire/")
+}
+
 export function isGrileRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return pathname === "/grile" || pathname.startsWith("/grile/")
@@ -135,6 +140,7 @@ export function isMobileAppShellRoute(
     pathname.startsWith("/invata") ||
     pathname === "/exerseaza" ||
     pathname.startsWith("/exerseaza/") ||
+    isPregatireRoute(pathname) ||
     pathname.startsWith("/probleme") ||
     isSubjectPracticeRoute(pathname) ||
     pathname.startsWith("/abonament") ||
@@ -205,6 +211,10 @@ export function getMobileTopBarContent(
     return { primary: "Invata" }
   }
 
+  if (isPregatireRoute(pathname)) {
+    return { primary: "Pregatire" }
+  }
+
   if (pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/")) {
     return { primary: "Exerseaza" }
   }
@@ -247,8 +257,14 @@ export function getMobileTopBarContent(
 export interface MobileBottomNavItem {
   href: string
   label: string
-  icon: LucideIcon
+  icon?: LucideIcon
   isActive: (pathname: string | null | undefined) => boolean
+  /** Center action that protrudes above the bar */
+  elevated?: boolean
+  /** Image icon instead of Lucide */
+  imageSrc?: string
+  /** Hide the text label under the icon */
+  hideLabel?: boolean
 }
 
 export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
@@ -273,10 +289,10 @@ export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
     isActive: (pathname) => isExerseazaRoute(pathname),
   },
   {
-    href: "/abonament",
-    label: "Premium",
-    icon: KeyRound,
-    isActive: (pathname) => Boolean(pathname?.startsWith("/abonament")),
+    href: "/classrooms",
+    label: "Clasa ta",
+    icon: Users,
+    isActive: (pathname) => isClassroomsRoute(pathname),
   },
   {
     href: "/profil",

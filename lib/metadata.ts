@@ -539,14 +539,14 @@ export const pageMetadata: Record<string, Metadata> = {
 
   pricing: {
     title: pageTitle('Planuri și prețuri'),
-    description: "Deblochează trasee de învățare complete, Insight AI și PlanckCode. Planuri flexibile Free, Plus și Pro pentru elevi și școli.",
-    keywords: "prețuri planck, planuri planck, abonament planck, trasee invatare, planuri educaționale, planuri școli",
+    description: "Un singur abonament Premium: trasee de învățare, Insight 2.5, workshop-uri și PlanckPass. Săptămânal, lunar sau anual.",
+    keywords: "prețuri planck, abonament premium planck, planckpass, insight 2.5, trasee invatare",
     alternates: {
       canonical: '/pricing',
     },
     openGraph: {
-      title: "Deblochează trasee complete și note mai mari – PLANCK",
-      description: "Planuri flexibile pentru trasee complete, Insight AI și PlanckCode.",
+      title: "Un singur abonament. Acces complet la Planck.",
+      description: "Trasee, Insight 2.5, workshop-uri și PlanckPass — Premium săptămânal, lunar sau anual.",
       url: `${PLATFORM_SITE_URL}/pricing`,
       type: 'website',
       images: [
@@ -559,8 +559,8 @@ export const pageMetadata: Record<string, Metadata> = {
       ],
     },
     twitter: {
-      title: "Deblochează trasee complete – PLANCK",
-      description: "Planuri flexibile pentru trasee, Insight și PlanckCode.",
+      title: "Un singur abonament. Acces complet la Planck.",
+      description: "Premium: trasee, Insight 2.5, workshop-uri și PlanckPass.",
       images: [OG_IMAGE],
       card: 'summary_large_image',
     },

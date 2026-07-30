@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PlanckUserAvatar } from '@/components/planckpass/planck-user-avatar';
+import { useEquippedCosmetics } from '@/components/planckpass/planckpass-inventory';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -338,6 +339,7 @@ const consumeHeroPrefillPrompt = (token: string): string | null => {
 
 function InsightChatPageContent() {
   const { user, loading: authLoading, logout, profile } = useAuth();
+  const cosmetics = useEquippedCosmetics();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -1816,25 +1818,29 @@ function InsightChatPageContent() {
                   ? 'w-full justify-center mb-2 transform translate-y-0' 
                   : ''
               }`}>
-                <Avatar className={`w-8 h-8 flex-shrink-0 transition-all duration-300 ${
-                  sidebarCollapsed ? 'scale-100' : 'scale-100'
-                }`}>
-                  {profile?.user_icon ? (
-                    <AvatarImage
-                      src={profile.user_icon}
-                      alt={profile?.nickname || profile?.name || user?.email || 'U'}
-                    />
-                  ) : null}
-                  <AvatarFallback>
-                    {(profile?.nickname ||
-                      profile?.name ||
-                      user?.user_metadata?.name ||
-                      user?.email ||
-                      'U')
-                      .charAt(0)
-                      .toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <PlanckUserAvatar
+                  size={32}
+                  src={profile?.user_icon}
+                  name={
+                    profile?.nickname ||
+                    profile?.name ||
+                    user?.user_metadata?.name ||
+                    user?.email ||
+                    'U'
+                  }
+                  borderPresetId={cosmetics.borderPresetId}
+                  borderImageUrl={
+                    cosmetics.borderPresetId ? null : cosmetics.border?.imageUrl
+                  }
+                  badgePresetId={cosmetics.badgePresetId}
+                  badgeImageUrl={
+                    cosmetics.badgePresetId ? null : cosmetics.badge?.imageUrl
+                  }
+                  className={`flex-shrink-0 transition-all duration-300 ${
+                    sidebarCollapsed ? 'scale-100' : 'scale-100'
+                  }`}
+                  fallbackClassName="bg-[#2a2a2a] text-white"
+                />
                 {showCollapsedUI && !sidebarCollapsed && (
                   <span className="font-medium text-white text-sm truncate transition-opacity duration-300">
                     {profile?.nickname ||

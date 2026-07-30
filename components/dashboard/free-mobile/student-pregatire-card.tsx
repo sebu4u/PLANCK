@@ -1,0 +1,166 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { ArrowRight, Zap } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
+import {
+  formatWorkshopShortDateTime,
+  isWorkshopPast,
+} from "@/lib/pregatire/dates"
+import {
+  practiceSubjectToWorkshopSubject,
+  WORKSHOP_SUBJECT_COLORS,
+  WORKSHOP_SUBJECT_LABELS,
+  type WorkshopPublic,
+} from "@/lib/pregatire/types"
+import {
+  getPracticeSubjectLabel,
+  normalizePracticeSubject,
+} from "@/lib/practice-subject"
+import { cn } from "@/lib/utils"
+
+const LIVE_LOOKBACK_MS = 4 * 60 * 60 * 1000
+
+interface StudentPregatireCardProps {
+  preferredMaterie: unknown
+}
+
+function isWorkshopLive(workshop: WorkshopPublic, now = new Date()): boolean {
+  const start = new Date(workshop.starts_at).getTime()
+  if (Number.isNaN(start)) return false
+  return start <= now.getTime() && !isWorkshopPast(workshop.starts_at, workshop.duration_minutes, now)
+}
+
+export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardProps) {
+  const practiceSubject = normalizePracticeSubject(preferredMaterie)
+  const workshopSubject = practiceSubjectToWorkshopSubject(practiceSubject)
+  const subjectLabel = getPracticeSubjectLabel(practiceSubject)
+  const accent = WORKSHOP_SUBJECT_COLORS[workshopSubject]
+
+  const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function load() {
+      setLoading(true)
+      try {
+        const { data } = await supabase.auth.getSession()
+        const token = data.session?.access_token
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+
+        const from = new Date(Date.now() - LIVE_LOOKBACK_MS).toISOString()
+        const params = new URLSearchParams({
+          subject: workshopSubject,
+          from,
+        })
+
+        const response = await fetch(`/api/pregatire?${params.toString()}`, { headers })
+        if (!response.ok) {
+          if (isMounted) setWorkshops([])
+          return
+        }
+
+        const payload = (await response.json()) as { workshops?: WorkshopPublic[] }
+        const upcoming = (payload.workshops ?? [])
+          .filter((w) => !isWorkshopPast(w.starts_at, w.duration_minutes))
+          .slice(0, 2)
+
+        if (isMounted) setWorkshops(upcoming)
+      } catch {
+        if (isMounted) setWorkshops([])
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      isMounted = false
+    }
+  }, [workshopSubject])
+
+  return (
+    <section className="flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9aa0b4]">Pregătiri</p>
+          <p className="mt-1 truncate text-sm text-[#6b7280]">
+            Următoarele pentru {WORKSHOP_SUBJECT_LABELS[workshopSubject]}
+          </p>
+        </div>
+        <Link
+          href="/pregatire"
+          className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity active:opacity-70"
+        >
+          Calendar
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col gap-2.5" aria-busy>
+          <div className="h-[3.25rem] animate-pulse rounded-2xl bg-[#f3f4f6]" />
+          <div className="h-[3.25rem] animate-pulse rounded-2xl bg-[#f3f4f6]" />
+          <span className="sr-only">Se încarcă pregătirile</span>
+        </div>
+      ) : workshops.length === 0 ? (
+        <div className="rounded-2xl bg-[#f9fafb] px-3 py-4 text-center">
+          <p className="text-sm text-[#6b7280]">
+            Nu sunt pregătiri programate pentru {subjectLabel}.
+          </p>
+          <Link
+            href="/pregatire"
+            className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity active:opacity-70"
+          >
+            Vezi calendarul
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {workshops.map((workshop) => {
+            const live = isWorkshopLive(workshop)
+            return (
+              <li key={workshop.id}>
+                <Link
+                  href={`/pregatire/${workshop.id}`}
+                  className={cn(
+                    "flex items-start justify-between gap-3 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-3 py-2.5 transition",
+                    "active:scale-[0.99] active:bg-[#f3f4f6]",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: accent }}
+                        aria-hidden
+                      />
+                      <p className="truncate text-sm font-semibold text-[#111827]">{workshop.title}</p>
+                      {live ? (
+                        <span className="shrink-0 rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600">
+                          Acum
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 truncate pl-3.5 text-xs text-[#6b7280]">
+                      {formatWorkshopShortDateTime(workshop.starts_at)}
+                      {workshop.teacher?.name ? ` · ${workshop.teacher.name}` : ""}
+                    </p>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-0.5 pt-0.5 text-xs font-semibold tabular-nums text-amber-700">
+                    <Zap className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
+                    {workshop.energy_cost}
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}

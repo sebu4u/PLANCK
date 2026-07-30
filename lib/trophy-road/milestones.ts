@@ -76,25 +76,6 @@ export const TROPHY_ROAD_MILESTONES: TrophyRoadMilestone[] = [
 
 export const TROPHY_ROAD_MAX = 15_000
 
-/** Spacing along the road in px per trophy (visual density). */
-export const TROPHY_ROAD_PX_PER_TROPHY = 0.55
-
-export const TROPHY_ROAD_SIDE_PAD = 80
-
-export function getTrophyRoadTrackLength(_orientation?: "horizontal" | "vertical"): number {
-  const span = TROPHY_ROAD_MAX * TROPHY_ROAD_PX_PER_TROPHY
-  return TROPHY_ROAD_SIDE_PAD * 2 + span
-}
-
-export function getMilestoneOffset(threshold: number): number {
-  return TROPHY_ROAD_SIDE_PAD + threshold * TROPHY_ROAD_PX_PER_TROPHY
-}
-
-export function getProgressFillLength(elo: number): number {
-  const clamped = Math.max(0, Math.min(TROPHY_ROAD_MAX, elo))
-  return TROPHY_ROAD_SIDE_PAD + clamped * TROPHY_ROAD_PX_PER_TROPHY
-}
-
 export type TrophyRoadNodeState = "claimed" | "current" | "locked"
 
 export function getMilestoneState(
@@ -127,4 +108,19 @@ export function formatMilestoneAmount(milestone: TrophyRoadMilestone): string {
     return `${milestone.amount}h`
   }
   return milestone.label
+}
+
+export function getRewardKindLabel(kind: TrophyRoadMilestone["kind"]): string {
+  switch (kind) {
+    case "coins":
+      return "Monede"
+    case "elo_boost":
+      return "Boost ELO"
+    case "freeze":
+      return "Streak Freeze"
+    case "cosmetic":
+      return "Cosmetic"
+    case "special":
+      return "Unlock special"
+  }
 }

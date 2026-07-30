@@ -307,12 +307,18 @@ const ProfilPage = () => {
                   ) : (
                     <div className="flex flex-col items-center gap-6">
                       {/* Avatar with Rank Badge + PLANCKPASS cosmetics */}
-                      <div className="relative group">
-                        <div className="relative">
+                      <div className="group flex flex-col items-center gap-4">
+                        <div className="relative pb-1 pr-1">
                           <CosmeticsAvatarFrame
                             size={128}
-                            borderImageUrl={cosmetics.border?.imageUrl}
-                            badgeImageUrl={cosmetics.badge?.imageUrl}
+                            borderPresetId={cosmetics.borderPresetId}
+                            borderImageUrl={
+                              cosmetics.borderPresetId ? null : cosmetics.border?.imageUrl
+                            }
+                            badgePresetId={cosmetics.badgePresetId}
+                            badgeImageUrl={
+                              cosmetics.badgePresetId ? null : cosmetics.badge?.imageUrl
+                            }
                           >
                             <Avatar className="h-full w-full border-4 border-white shadow-lg shadow-black/10">
                               {cosmetics.icon?.imageUrl || avatarUrl ? (
@@ -328,16 +334,16 @@ const ProfilPage = () => {
                             </Avatar>
                           </CosmeticsAvatarFrame>
                           {uploadingAvatar && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full z-10">
-                              <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/60">
+                              <svg className="h-8 w-8 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                               </svg>
                             </div>
                           )}
                           {/* Rank Badge Overlay */}
-                          {userStats && !cosmetics.badge?.imageUrl && (
-                            <div className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-lg shadow-black/10">
+                          {userStats && !cosmetics.badgePresetId && !cosmetics.badge?.imageUrl && (
+                            <div className="absolute -bottom-1 -right-1 z-30 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-lg shadow-black/10">
                               <Image
                                 src={rankIconPath}
                                 alt={userStats.rank}
@@ -348,7 +354,7 @@ const ProfilPage = () => {
                             </div>
                           )}
                         </div>
-                        <label className="absolute bottom-0 left-1/2 translate-y-8 -translate-x-1/2 transform cursor-pointer rounded-full border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#191919] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all hover:bg-[#f7f7f7]">
+                        <label className="cursor-pointer whitespace-nowrap rounded-full border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#191919] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all hover:bg-[#f7f7f7]">
                           <input
                             type="file"
                             accept="image/*"
@@ -361,7 +367,7 @@ const ProfilPage = () => {
                       </div>
 
                       {/* User Info */}
-                      <div className="flex flex-col items-center gap-4 w-full mt-8">
+                      <div className="flex w-full flex-col items-center gap-4">
                         {/* Username */}
                         <div className="w-full">
                           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7f7f7f]">Username</label>

@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   useTransition,
-  type ComponentType,
   type CSSProperties,
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
@@ -30,8 +29,6 @@ import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
-import type { InvataMobilePathNavProps } from "@/components/invata/invata-mobile-path-nav"
-import { useInvataHubChapters } from "@/components/invata/invata-hub-nav-context"
 import {
   getMobileTopBarContent,
   isClassroomsRoute,
@@ -40,6 +37,7 @@ import {
   isInvataHubRoute,
   isMobileAppShellRoute,
   isMobileLessonItemsShellRoute,
+  isPregatireRoute,
   isProfesorResurseRoute,
   isProfesorTemeRoute,
   isParentCatalogRoute,
@@ -59,7 +57,6 @@ function isInsideMonacoEditor(element: EventTarget | null): boolean {
 }
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
-type InvataMobilePathNavComponent = ComponentType<InvataMobilePathNavProps>
 
 /** Desktop: ca butonul „Start” din dashboard (gradient + glow). */
 const GUEST_REGISTER_CTA_CLASS =
@@ -77,6 +74,7 @@ export function Navigation() {
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
+  const isInvataHub = isInvataHubRoute(pathname)
   const floatingIde = usePlanckIdeFloatingOptional()
   const codeNavHref = getPlanckCodeNavHref(floatingIde?.session, floatingIde?.isVisible ?? false)
 
@@ -100,8 +98,6 @@ export function Navigation() {
   const [hasMore, setHasMore] = useState(false)
   const [nextOffset, setNextOffset] = useState(0)
   const [highlightIndex, setHighlightIndex] = useState(-1)
-  const [LoadedInvataMobilePathNav, setLoadedInvataMobilePathNav] =
-    useState<InvataMobilePathNavComponent | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const resultsRef = useRef<HTMLDivElement | null>(null)
   const cacheRef = useRef<Map<string, { results: SearchResultItem[]; hasMore: boolean }>>(new Map())
@@ -433,7 +429,16 @@ export function Navigation() {
   // Don't render anything during initial auth loading - the DashboardRedirect overlay
   // will cover everything anyway. This prevents navbar flash during redirect.
   if (loading) {
-    return null
+    if (!isInvataHub) {
+      return null
+    }
+
+    return (
+      <div
+        className="relative z-[300] h-16 max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:fixed sm:inset-x-0 sm:top-0 sm:border-b sm:border-gray-200 sm:bg-[#ffffff]"
+        aria-hidden
+      />
+    )
   }
 
   const isHomepage = pathname === '/'
@@ -471,7 +476,8 @@ export function Navigation() {
     isProfesorResurseRoute(pathname) ||
     isGrileRoute ||
     isProfileRoute ||
-    isBlogRoute
+    isBlogRoute ||
+    isPregatireRoute(pathname)
   const isCoursePage = pathname?.startsWith('/cursuri') ?? false
   /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
   const isGuestProblemeOrCursuri =
@@ -593,9 +599,11 @@ export function Navigation() {
           ? planckPassExpanded
             ? "shadow-[0_6px_20px_rgba(26,10,74,0.28)] transition-shadow duration-300 burger:shadow-md"
             : "shadow-none transition-shadow duration-300 burger:shadow-md"
-          : isCatalogHubPage
-            ? "shadow-none burger:shadow-md"
-            : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
+          : isInvataHub
+            ? "max-sm:shadow-none transition-shadow duration-300 burger:shadow-md sm:shadow-md"
+            : isCatalogHubPage || isProfileRoute
+              ? "shadow-none burger:shadow-md"
+              : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
   // Planck Code routes (IDE + enunț informatică) folosesc navbar-ul întunecat, nu shell-ul alb mobil.
   const showMobileAppShellNav = showMobileAppShell && !isPlanckCodeRoute
@@ -617,24 +625,6 @@ export function Navigation() {
       : isInformaticaProblemsCatalog
         ? "informatica"
         : normalizePracticeSubject(profile?.preferred_materie)
-  const invataHubChapters = useInvataHubChapters()
-  const showInvataHubMobileNav =
-    isMobile && isInvataHubRoute(pathname) && Boolean(invataHubChapters?.length)
-
-  useEffect(() => {
-    if (!showInvataHubMobileNav || LoadedInvataMobilePathNav) return
-
-    let cancelled = false
-    void import("@/components/invata/invata-mobile-path-nav").then((mod) => {
-      if (!cancelled) {
-        setLoadedInvataMobilePathNav(() => mod.InvataMobilePathNav)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [LoadedInvataMobilePathNav, showInvataHubMobileNav])
 
   useEffect(() => {
     if (showMobileAppShell) {
@@ -646,65 +636,49 @@ export function Navigation() {
   }, [showMobileAppShell])
   const mobileShellNavSurfaceClass = isPlanckCodeRoute
     ? `${navTheme.background} ${navTheme.border}`
-    : showMobileFocusedShell
-      ? "bg-[#ffffff] border-transparent"
-      : showInvataHubMobileNav
-        ? useLightNav
-          ? `${navTheme.background} border-transparent`
-          : "bg-[#ffffff] border-transparent burger:bg-[#0d1117]"
-      : showMobileAppShellNav
-        ? useLightNav
-          ? `${navTheme.background} ${navTheme.border}`
-          : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
-        : `${navTheme.background} ${navTheme.border}`
+    : isInvataHub
+      ? "max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:bg-[#ffffff] sm:border-gray-200"
+      : showMobileFocusedShell
+        ? "bg-[#ffffff] border-transparent"
+        : showMobileAppShellNav
+          ? useLightNav
+            ? `${navTheme.background} ${navTheme.border}`
+            : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
+          : `${navTheme.background} ${navTheme.border}`
   const navBackdropClass = showMobileFocusedShell
     ? ""
-    : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
+    : isInvataHub
+      ? "max-sm:backdrop-blur-none sm:backdrop-blur-md"
+      : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
 
   return (
     <>
-      <div className={`${isHomepage ? 'fixed' : 'fixed'} top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${isHomepage && isNavbarHidden ? '-translate-y-full' : 'translate-y-0'} ${navbarElevationClass}`}>
-        <nav className={`w-full ${navBackdropClass} transition-all duration-300 ${mobileShellNavSurfaceClass}`}>
+      <div
+        className={`${
+          isInvataHub ? "max-sm:relative sm:fixed top-0 left-0 right-0" : "fixed top-0 left-0 right-0"
+        } z-[300] flex flex-col ${
+          isInvataHub
+            ? "max-sm:animate-none max-sm:transition-none max-sm:bg-[#DCE6FA] sm:animate-slide-down sm:transition-transform sm:duration-300"
+            : "animate-slide-down transition-transform duration-300"
+        } ${
+          !isInvataHub && isHomepage && isNavbarHidden ? "-translate-y-full" : "translate-y-0"
+        } ${navbarElevationClass}`}
+      >
+        <nav
+          className={`w-full ${navBackdropClass} ${
+            isInvataHub
+              ? "max-sm:transition-none max-sm:bg-[#DCE6FA] sm:transition-all sm:duration-300"
+              : "transition-all duration-300"
+          } ${mobileShellNavSurfaceClass}`}
+        >
           <div className="w-full px-4 sm:px-6 lg:px-8">
-            <div
-              className={`relative flex justify-between gap-4 ${
-                showInvataHubMobileNav
-                  ? "h-[5.875rem] items-stretch py-0"
-                  : "h-16 items-center"
-              }`}
-            >
+            <div className="relative flex h-16 items-center justify-between gap-4">
               <div
-                className={`burger:hidden flex w-full ${
-                  showInvataHubMobileNav
-                    ? "h-full items-stretch"
-                    : `items-center justify-between ${isTransparent ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : ""}`
+                className={`burger:hidden flex w-full items-center justify-between ${
+                  isTransparent ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : ""
                 }`}
               >
-                {showInvataHubMobileNav && invataHubChapters ? (
-                  LoadedInvataMobilePathNav ? (
-                    <LoadedInvataMobilePathNav chapters={invataHubChapters} embeddedInNavbar />
-                  ) : (
-                    <nav
-                      aria-label="Learning paths"
-                      className="relative flex h-full min-h-0 w-full flex-col"
-                    >
-                      <div className="flex min-h-0 flex-1 items-start gap-3 overflow-x-auto pt-1.5 scrollbar-hide">
-                        {invataHubChapters.map((chapter) => (
-                          <a
-                            key={chapter.id}
-                            href={`#invata-chapter-${chapter.id}`}
-                            className="relative flex w-[104px] shrink-0 flex-col items-center gap-1.5"
-                          >
-                            <span className="h-[52px] w-full rounded-xl border-2 border-[#e6e6e6] bg-white" />
-                            <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight text-[#4f4f4f]">
-                              {chapter.title}
-                            </span>
-                          </a>
-                        ))}
-                      </div>
-                    </nav>
-                  )
-                ) : isGuestProblemeOrCursuri ? (
+                {isGuestProblemeOrCursuri ? (
                   <>
                     <div className="flex min-w-0 flex-1 items-center gap-2 pr-1">
                       <Link

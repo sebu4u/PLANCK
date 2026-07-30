@@ -13,7 +13,9 @@ import {
   X,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { PlanckUserAvatar } from "@/components/planckpass/planck-user-avatar"
 import { formatGrade } from "@/lib/parent/grade-estimate"
+import type { BorderPresetId } from "@/lib/planckpass/border-presets"
 import { getRankIconPath } from "@/lib/rank-icon"
 import type { TeacherStudentProfileSnapshot } from "@/lib/teacher/server"
 import { cn } from "@/lib/utils"
@@ -22,6 +24,7 @@ interface ClassroomStudentProfileDialogProps {
   profile: TeacherStudentProfileSnapshot | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  borderPresetId?: BorderPresetId | null
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -58,10 +61,10 @@ export function ClassroomStudentProfileDialog({
   profile,
   open,
   onOpenChange,
+  borderPresetId = null,
 }: ClassroomStudentProfileDialogProps) {
   if (!profile) return null
 
-  const initial = (profile.display_name || "U").trim().charAt(0).toUpperCase()
   const rankIconSrc = getRankIconPath(profile.stats.rank)
 
   const values: Record<(typeof STAT_ITEMS)[number]["key"], string> = {
@@ -95,20 +98,13 @@ export function ClassroomStudentProfileDialog({
           </button>
 
           <div className="flex w-full flex-col items-center text-center">
-            <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-[#e5e7eb] bg-[#f3f4f6]">
-              {profile.user_icon ? (
-                <img
-                  src={profile.user_icon}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center text-2xl font-semibold text-[#4b5563]">
-                  {initial}
-                </span>
-              )}
-            </div>
+            <PlanckUserAvatar
+              size={80}
+              src={profile.user_icon}
+              name={profile.display_name}
+              borderPresetId={borderPresetId}
+              fallbackClassName="text-2xl font-semibold text-[#4b5563]"
+            />
 
             <p className="mt-3 w-full text-lg font-semibold text-[#111827]">{profile.display_name}</p>
 

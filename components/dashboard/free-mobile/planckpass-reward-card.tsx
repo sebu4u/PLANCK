@@ -1,8 +1,12 @@
 "use client"
 
 import { Check, Coins, Lock, Snowflake, Sparkles, Zap } from "lucide-react"
+import { BadgePresetPreview } from "@/components/planckpass/badges/badge-preset-layer"
+import { BorderPresetPreview } from "@/components/planckpass/borders/border-preset-layer"
+import { badgePresetIdFromCosmetic } from "@/lib/planckpass/badge-presets"
+import { borderPresetIdFromCosmetic } from "@/lib/planckpass/border-presets"
 import { cn } from "@/lib/utils"
-import type { PlanckPassRewardKind, PlanckPassTier } from "@/lib/planckpass/types"
+import type { PlanckPassCosmetic, PlanckPassRewardKind, PlanckPassTier } from "@/lib/planckpass/types"
 import { PLANCKPASS_CARD_HEIGHT, PLANCKPASS_CARD_WIDTH, PLANCKPASS_DESKTOP_CARD_HEIGHT, PLANCKPASS_DESKTOP_CARD_WIDTH } from "./planckpass-layout"
 
 interface PlanckPassRewardCardProps {
@@ -17,20 +21,28 @@ interface PlanckPassRewardCardProps {
 
 function RewardIcon({
   kind,
-  imageUrl,
+  cosmetic,
   claimable,
   large,
 }: {
   kind: PlanckPassRewardKind
-  imageUrl?: string | null
+  cosmetic?: PlanckPassCosmetic | null
   claimable?: boolean
   large?: boolean
 }) {
-  if (imageUrl) {
+  const borderPreset = borderPresetIdFromCosmetic(cosmetic)
+  if (borderPreset) {
+    return <BorderPresetPreview presetId={borderPreset} size={large ? 36 : 28} />
+  }
+  const badgePreset = badgePresetIdFromCosmetic(cosmetic)
+  if (badgePreset) {
+    return <BadgePresetPreview presetId={badgePreset} size={large ? 36 : 28} />
+  }
+  if (cosmetic?.imageUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={imageUrl}
+        src={cosmetic.imageUrl}
         alt=""
         className={cn("object-contain drop-shadow-sm", large ? "h-9 w-9" : "h-7 w-7")}
       />
@@ -113,7 +125,7 @@ export function PlanckPassRewardCard({
         >
           <RewardIcon
             kind={tier.kind}
-            imageUrl={tier.cosmetic?.imageUrl}
+            cosmetic={tier.cosmetic}
             claimable={claimable}
             large={desktop}
           />

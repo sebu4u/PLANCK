@@ -64,7 +64,7 @@ import {
 export function DashboardAuth() {
   const router = useRouter()
   const { user, loading: authLoading, profile, isStudent } = useAuth()
-  const { isFree, isPaid } = useSubscriptionPlan()
+  const { isPaid } = useSubscriptionPlan()
   const postOnboardingDiscount = usePostOnboardingDiscountWindow(user?.id)
   const [loading, setLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
@@ -588,71 +588,52 @@ export function DashboardAuth() {
 
         {/* Content Wrapper - takes remaining width */}
         <div className="flex-1 h-full transition-all duration-300 bg-[#ffffff] flex flex-col min-w-0">
-          {/* Mobile — floating card; free uses PlanckPass top band */}
-          <div
-            className={
-              isFree
-                ? "m-0 flex flex-1 min-h-0 flex-col overflow-hidden bg-white md:hidden"
-                : "m-[3px] mt-0 flex flex-1 min-h-0 flex-col overflow-hidden bg-white md:hidden"
-            }
-          >
+          {/* Mobile — same FreeMobileDashboard hub for free + plus/premium */}
+          <div className="m-0 flex flex-1 min-h-0 flex-col overflow-hidden bg-white md:hidden">
             <div className="flex-1 min-h-0 overflow-hidden overscroll-none bg-white">
               <main className="flex h-full min-h-0 flex-col overflow-hidden p-0 animate-fade-in-up">
                 <div className="mx-auto flex h-full min-h-0 w-full flex-col">
-                  {isFree ? (
-                    <PlanckPassMobileShell>
-                      <FreeMobileDashboard
-                        primaryChapter={dashboardData.dashboardLearningPaths[0] ?? null}
-                        level={
-                          dashboardData.dashboardLearningPaths[0]
-                            ? dashboardData.dashboardLevelByChapter[dashboardData.dashboardLearningPaths[0].id]
-                            : 1
-                        }
-                        hasStarted={
-                          dashboardData.dashboardLearningPaths[0]
-                            ? Boolean(
-                                dashboardData.dashboardHasStartedByChapter[
-                                  dashboardData.dashboardLearningPaths[0].id
-                                ],
-                              )
-                            : false
-                        }
-                        resumeHref={
-                          dashboardData.dashboardLearningPaths[0]
-                            ? dashboardData.dashboardStartHrefByChapter[
+                  <PlanckPassMobileShell>
+                    <FreeMobileDashboard
+                      primaryChapter={dashboardData.dashboardLearningPaths[0] ?? null}
+                      level={
+                        dashboardData.dashboardLearningPaths[0]
+                          ? dashboardData.dashboardLevelByChapter[dashboardData.dashboardLearningPaths[0].id]
+                          : 1
+                      }
+                      hasStarted={
+                        dashboardData.dashboardLearningPaths[0]
+                          ? Boolean(
+                              dashboardData.dashboardHasStartedByChapter[
                                 dashboardData.dashboardLearningPaths[0].id
-                              ]
-                            : "/invata"
-                        }
-                        lessonProgress={
-                          dashboardData.dashboardLearningPaths[0]
-                            ? dashboardData.dashboardLessonProgressByChapter[
-                                dashboardData.dashboardLearningPaths[0].id
-                              ]
-                            : undefined
-                        }
-                        currentLessonTitle={
-                          dashboardData.dashboardLearningPaths[0]
-                            ? dashboardData.dashboardCurrentLessonTitleByChapter[
-                                dashboardData.dashboardLearningPaths[0].id
-                              ]
-                            : null
-                        }
-                        rank={dashboardData.stats.rank}
-                      />
-                    </PlanckPassMobileShell>
-                  ) : (
-                    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                      <DashboardLearningPathsCarousel
-                        key={dashboardData.dashboardLearningPaths[0]?.id ?? "default"}
-                        chapters={dashboardData.dashboardLearningPaths}
-                        lessonsByChapter={dashboardData.dashboardLessonsByChapter}
-                        startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
-                        levelByChapter={dashboardData.dashboardLevelByChapter}
-                        hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
-                      />
-                    </div>
-                  )}
+                              ],
+                            )
+                          : false
+                      }
+                      resumeHref={
+                        dashboardData.dashboardLearningPaths[0]
+                          ? dashboardData.dashboardStartHrefByChapter[
+                              dashboardData.dashboardLearningPaths[0].id
+                            ]
+                          : "/invata"
+                      }
+                      lessonProgress={
+                        dashboardData.dashboardLearningPaths[0]
+                          ? dashboardData.dashboardLessonProgressByChapter[
+                              dashboardData.dashboardLearningPaths[0].id
+                            ]
+                          : undefined
+                      }
+                      currentLessonTitle={
+                        dashboardData.dashboardLearningPaths[0]
+                          ? dashboardData.dashboardCurrentLessonTitleByChapter[
+                              dashboardData.dashboardLearningPaths[0].id
+                            ]
+                          : null
+                      }
+                      rank={dashboardData.stats.rank}
+                    />
+                  </PlanckPassMobileShell>
                 </div>
               </main>
             </div>

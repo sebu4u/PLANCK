@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { BadgePresetPreview } from "@/components/planckpass/badges/badge-preset-layer"
+import { BorderPresetPreview } from "@/components/planckpass/borders/border-preset-layer"
 import { supabase } from "@/lib/supabaseClient"
+import { badgePresetIdFromCosmetic } from "@/lib/planckpass/badge-presets"
+import { borderPresetIdFromCosmetic } from "@/lib/planckpass/border-presets"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { PlanckPassCosmeticKind } from "@/lib/planckpass/types"
@@ -16,6 +20,7 @@ type InventoryItem = {
     kind: PlanckPassCosmeticKind
     name: string
     imageUrl: string
+    meta?: Record<string, unknown> | null
   } | null
 }
 
@@ -206,12 +211,24 @@ export function PlanckPassInventory({
                     : "border-[#e5e5e5] hover:border-[#cfcfcf]",
                 )}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.cosmetic.imageUrl}
-                  alt=""
-                  className="h-14 w-14 object-contain"
-                />
+                {(() => {
+                  const borderPreset = borderPresetIdFromCosmetic(item.cosmetic)
+                  if (borderPreset) {
+                    return <BorderPresetPreview presetId={borderPreset} size={56} />
+                  }
+                  const badgePreset = badgePresetIdFromCosmetic(item.cosmetic)
+                  if (badgePreset) {
+                    return <BadgePresetPreview presetId={badgePreset} size={48} />
+                  }
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.cosmetic.imageUrl}
+                      alt=""
+                      className="h-14 w-14 object-contain"
+                    />
+                  )
+                })()}
                 <span className="line-clamp-2 text-center text-[11px] font-medium text-[#333]">
                   {item.cosmetic.name}
                 </span>
@@ -284,5 +301,7 @@ export function useEquippedCosmetics() {
     border: find(equipped.borderId),
     badge: find(equipped.badgeId),
     skin: find(equipped.skinId),
+    borderPresetId: borderPresetIdFromCosmetic(find(equipped.borderId)),
+    badgePresetId: badgePresetIdFromCosmetic(find(equipped.badgeId)),
   }
 }

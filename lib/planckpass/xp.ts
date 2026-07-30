@@ -1,3 +1,10 @@
+/** First tier is unlocked for every user without XP; still requires manual claim. */
+export const PLANCK_PASS_AUTO_UNLOCK_TIER = 1
+
+export function isPlanckPassTierAutoUnlocked(tierNumber: number): boolean {
+  return tierNumber === PLANCK_PASS_AUTO_UNLOCK_TIER
+}
+
 /** Default incremental XP to unlock each tier (1-indexed). */
 export function defaultXpForTier(tier: number): number {
   if (tier >= 1 && tier <= 5) return 150

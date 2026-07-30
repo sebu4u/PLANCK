@@ -5,7 +5,9 @@ import Image from "next/image"
 import { removeStudentAction } from "@/app/classrooms/actions"
 import { ClassroomStudentProfileDialog } from "@/components/classrooms/classroom-student-profile-dialog"
 import { CopyJoinCodeButton } from "@/components/classrooms/copy-join-code-button"
+import { PlanckUserAvatar } from "@/components/planckpass/planck-user-avatar"
 import { Button } from "@/components/ui/button"
+import { useEquippedBorderPresets } from "@/lib/planckpass/equipped-borders"
 import { cn } from "@/lib/utils"
 import type { ClassroomMemberOverview } from "@/lib/classrooms/types"
 import { getRankIconPath } from "@/lib/rank-icon"
@@ -34,6 +36,9 @@ export function ClassroomStudentsList({
     [studentProfiles],
   )
 
+  const memberUserIds = useMemo(() => members.map((m) => m.user_id), [members])
+  const borderByUserId = useEquippedBorderPresets(memberUserIds)
+
   const openStudentProfile = (member: ClassroomMemberOverview) => {
     if (!isTeacher || member.role !== "student") return
     const profile = profileByUserId.get(member.user_id)
@@ -61,7 +66,6 @@ export function ClassroomStudentsList({
             <p className="text-sm text-[#6b7280]">Nu există încă membri în această clasă.</p>
           ) : (
             members.map((member) => {
-              const initial = (member.name || "U").trim().charAt(0).toUpperCase()
               const rankIconSrc = getRankIconPath(member.rank)
               const isClickableStudent = isTeacher && member.role === "student"
 
@@ -88,20 +92,12 @@ export function ClassroomStudentsList({
                     : {})}
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-                    <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-[#e5e7eb] bg-[#f3f4f6]">
-                      {member.user_icon ? (
-                        <img
-                          src={member.user_icon}
-                          alt={`Poza de profil: ${member.name}`}
-                          className="h-full w-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-[#4b5563]">
-                          {initial}
-                        </span>
-                      )}
-                    </div>
+                    <PlanckUserAvatar
+                      size={36}
+                      src={member.user_icon}
+                      name={member.name}
+                      borderPresetId={borderByUserId[member.user_id] ?? null}
+                    />
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#e5e7eb] bg-white">
                       <Image
                         src={rankIconSrc}
@@ -160,6 +156,9 @@ export function ClassroomStudentsList({
         profile={selectedProfile}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        borderPresetId={
+          selectedProfile ? borderByUserId[selectedProfile.user_id] ?? null : null
+        }
       />
     </>
   )

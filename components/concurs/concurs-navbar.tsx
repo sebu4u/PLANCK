@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation"
 import { Rocket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { PlanckUserAvatar } from "@/components/planckpass/planck-user-avatar"
+import { useEquippedCosmetics } from "@/components/planckpass/planckpass-inventory"
 
 export function ConcursNavbar() {
     const router = useRouter()
     const { user, loading, profile } = useAuth()
+    const cosmetics = useEquippedCosmetics()
 
     if (loading) {
         return null
@@ -50,14 +52,21 @@ export function ConcursNavbar() {
                             onClick={() => router.push('/profil')}
                             className="flex items-center justify-center"
                         >
-                            <Avatar className="w-8 h-8 border-2 border-gray-200 hover:border-gray-400 transition-colors">
-                                {profile?.user_icon ? (
-                                    <AvatarImage src={profile.user_icon} alt={profile?.nickname || profile?.name || user.email || "U"} />
-                                ) : null}
-                                <AvatarFallback className="bg-gray-100 text-gray-700">
-                                    {(profile?.nickname || profile?.name || user.user_metadata?.name || user.email || "U").charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                            </Avatar>
+                            <PlanckUserAvatar
+                              size={32}
+                              src={profile?.user_icon}
+                              name={profile?.nickname || profile?.name || user.email || "U"}
+                              borderPresetId={cosmetics.borderPresetId}
+                              borderImageUrl={
+                                cosmetics.borderPresetId ? null : cosmetics.border?.imageUrl
+                              }
+                              badgePresetId={cosmetics.badgePresetId}
+                              badgeImageUrl={
+                                cosmetics.badgePresetId ? null : cosmetics.badge?.imageUrl
+                              }
+                              avatarClassName="border-2 border-gray-200 hover:border-gray-400 transition-colors"
+                              fallbackClassName="bg-gray-100 text-gray-700"
+                            />
                         </button>
                     ) : (
                         <Button

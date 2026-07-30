@@ -15,9 +15,11 @@ import {
 
 export const runtime = "nodejs"
 
+type BillingInterval = "week" | "month" | "year"
+
 type CheckoutBody = {
   plan?: string
-  interval?: "month" | "year"
+  interval?: BillingInterval
 }
 
 const FORBIDDEN_CARD_FIELDS = new Set([
@@ -44,12 +46,16 @@ const hasRawCardData = (value: unknown): boolean => {
   return false
 }
 
-const resolvePriceId = (plan: "plus" | "premium", interval: "month" | "year") => {
+const resolvePriceId = (interval: BillingInterval) => {
   const { prices } = getStripeConfig()
-  if (plan === "plus") {
-    return interval === "year" ? prices.plus.yearly : prices.plus.monthly
-  }
-  return interval === "year" ? prices.premium.yearly : prices.premium.monthly
+  if (interval === "week") return prices.premium.weekly
+  if (interval === "year") return prices.premium.yearly
+  return prices.premium.monthly
+}
+
+const parseBillingInterval = (value: unknown): BillingInterval | null => {
+  if (value === "week" || value === "month" || value === "year") return value
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -89,12 +95,24 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedPlan = normalizeSubscriptionPlan(body?.plan)
-    if (normalizedPlan !== "plus" && normalizedPlan !== "premium") {
+    if (normalizedPlan === "plus") {
+      return NextResponse.json(
+        { error: "Planul Plus+ nu mai poate fi cumpărat. Alege Premium." },
+        { status: 400 }
+      )
+    }
+    if (normalizedPlan !== "premium") {
       return NextResponse.json({ error: "Plan invalid." }, { status: 400 })
     }
 
-    const interval = body?.interval === "year" ? "year" : "month"
-    const priceId = resolvePriceId(normalizedPlan, interval)
+    const interval = parseBillingInterval(body?.interval)
+    if (!interval) {
+      return NextResponse.json(
+        { error: "Interval invalid. Folosește week, month sau year." },
+        { status: 400 }
+      )
+    }
+    const priceId = resolvePriceId(interval)
     const stripe = getStripeClient()
     const { siteUrl } = getStripeConfig()
 

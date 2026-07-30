@@ -3,9 +3,14 @@ import { z } from "zod"
 import { getAccessTokenFromRequest, isAdminFromDB } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
+import { BORDER_PRESETS } from "@/lib/planckpass/border-presets"
+import { BADGE_PRESETS } from "@/lib/planckpass/badge-presets"
 import { defaultXpForTier } from "@/lib/planckpass/xp"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
+
+const BORDER_PRESET_COSMETIC_IDS = new Set(BORDER_PRESETS.map((p) => p.cosmeticId))
+const BADGE_PRESET_COSMETIC_IDS = new Set(BADGE_PRESETS.map((p) => p.cosmeticId))
 
 async function verifyAdmin(req: NextRequest) {
   const accessToken = getAccessTokenFromRequest(req.headers.get("authorization"))
@@ -62,7 +67,7 @@ const updateTierSchema = z.object({
   streakFreezeHours: z.number().int().nullable().optional(),
   cosmeticId: z.string().uuid().nullable().optional(),
   cosmeticName: z.string().max(80).nullable().optional(),
-  cosmeticImageUrl: z.string().url().nullable().optional(),
+  cosmeticImageUrl: z.string().max(2048).nullable().optional(),
 })
 
 const createCosmeticSchema = z.object({
@@ -113,7 +118,7 @@ export async function GET(req: NextRequest) {
 
     const { data: cosmetics } = await admin
       .from("planckpass_cosmetics")
-      .select("id, kind, name, image_url, created_at")
+      .select("id, kind, name, image_url, meta, created_at")
       .order("created_at", { ascending: false })
       .limit(200)
 
@@ -184,6 +189,17 @@ export async function POST(req: NextRequest) {
 
     const createCosmetic = createCosmeticSchema.safeParse(body)
     if (createCosmetic.success) {
+      if (createCosmetic.data.kind === "border" || createCosmetic.data.kind === "badge") {
+        return NextResponse.json(
+          {
+            error:
+              createCosmetic.data.kind === "border"
+                ? "Border-urile sunt preset-uri fixe — selectează din listă pe tier."
+                : "Badge-urile sunt preset-uri fixe — selectează din listă pe tier.",
+          },
+          { status: 400 },
+        )
+      }
       const { data, error } = await admin
         .from("planckpass_cosmetics")
         .insert({
@@ -204,8 +220,22 @@ export async function POST(req: NextRequest) {
       const d = updateTier.data
       let cosmeticId = d.cosmeticId ?? null
 
-      if (
-        ["icon", "badge", "border", "skin"].includes(d.rewardKind) &&
+      if (d.rewardKind === "border") {
+        if (!cosmeticId || !BORDER_PRESET_COSMETIC_IDS.has(cosmeticId)) {
+          return NextResponse.json(
+            { error: "Alege un border preset valid din listă." },
+            { status: 400 },
+          )
+        }
+      } else if (d.rewardKind === "badge") {
+        if (!cosmeticId || !BADGE_PRESET_COSMETIC_IDS.has(cosmeticId)) {
+          return NextResponse.json(
+            { error: "Alege un badge preset valid din listă." },
+            { status: 400 },
+          )
+        }
+      } else if (
+        ["icon", "skin"].includes(d.rewardKind) &&
         !cosmeticId &&
         d.cosmeticImageUrl
       ) {

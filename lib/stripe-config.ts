@@ -10,6 +10,7 @@ type StripePriceMap = {
     yearly: string
   }
   premium: {
+    weekly: string
     monthly: string
     yearly: string
   }
@@ -57,6 +58,7 @@ const resolvePriceMap = (mode: StripeMode): StripePriceMap => {
       yearly: requireEnv(`STRIPE_PRICE_PLUS_YEARLY${suffix}`, process.env[`STRIPE_PRICE_PLUS_YEARLY${suffix}`]),
     },
     premium: {
+      weekly: requireEnv(`STRIPE_PRICE_PREMIUM_WEEKLY${suffix}`, process.env[`STRIPE_PRICE_PREMIUM_WEEKLY${suffix}`]),
       monthly: requireEnv(`STRIPE_PRICE_PREMIUM_MONTHLY${suffix}`, process.env[`STRIPE_PRICE_PREMIUM_MONTHLY${suffix}`]),
       yearly: requireEnv(`STRIPE_PRICE_PREMIUM_YEARLY${suffix}`, process.env[`STRIPE_PRICE_PREMIUM_YEARLY${suffix}`]),
     },
@@ -106,7 +108,11 @@ export const resolvePlanFromPriceId = (
   if (priceId === prices.plus.monthly || priceId === prices.plus.yearly) {
     return "plus"
   }
-  if (priceId === prices.premium.monthly || priceId === prices.premium.yearly) {
+  if (
+    priceId === prices.premium.weekly ||
+    priceId === prices.premium.monthly ||
+    priceId === prices.premium.yearly
+  ) {
     return "premium"
   }
   return null

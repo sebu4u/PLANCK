@@ -1,0 +1,114 @@
+/* PLANCKPASS animated badge presets */
+.pp-badge {
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pp-badge svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-badge *,
+  .pp-badge *::before,
+  .pp-badge *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes pp-badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes pp-badge-spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pp-badge-shimmer {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pp-badge-flame {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-1.5px) scaleY(1.08);
+  }
+}
+
+@keyframes pp-badge-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+@keyframes pp-badge-comet {
+  0% {
+    opacity: 0.3;
+    stroke-dashoffset: 24;
+  }
+  50% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    opacity: 0.3;
+    stroke-dashoffset: -24;
+  }
+}
+
+.pp-badge-ray {
+  transform-origin: 50px 50px;
+  animation: pp-badge-spin-slow 10s linear infinite;
+}
+
+.pp-badge-core {
+  transform-origin: 50px 50px;
+  animation: pp-badge-pulse 2s ease-in-out infinite;
+}
+
+.pp-badge-shine {
+  animation: pp-badge-shimmer 2.2s ease-in-out infinite;
+}
+
+.pp-badge-flame {
+  transform-origin: 50px 70px;
+  animation: pp-badge-flame 1.1s ease-in-out infinite;
+}
+
+.pp-badge-bob {
+  animation: pp-badge-bob 2.4s ease-in-out infinite;
+}
+
+.pp-badge-trail {
+  stroke-dasharray: 12 16;
+  animation: pp-badge-comet 1.8s ease-in-out infinite;
+}

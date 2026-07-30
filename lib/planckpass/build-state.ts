@@ -5,7 +5,11 @@ import type {
   PlanckPassState,
   PlanckPassTier,
 } from "@/lib/planckpass/types"
-import { cumulativeXpToTier, xpBarForProgress } from "@/lib/planckpass/xp"
+import {
+  cumulativeXpToTier,
+  isPlanckPassTierAutoUnlocked,
+  xpBarForProgress,
+} from "@/lib/planckpass/xp"
 
 type TierRow = {
   tier_number: number
@@ -77,7 +81,8 @@ export function buildPlanckPassState(input: {
 
   const tiers: PlanckPassTier[] = sorted.map((t) => {
     const needed = cumulativeXpToTier(xpRequiredByTier, t.tier_number)
-    const unlocked = adminUnlockAll || input.xpTotal >= needed
+    const unlocked =
+      adminUnlockAll || isPlanckPassTierAutoUnlocked(t.tier_number) || input.xpTotal >= needed
     const isClaimed = claimed.has(t.tier_number)
     const premiumLocked = !adminUnlockAll && !t.is_free && !canClaimPremium
     const claimable =

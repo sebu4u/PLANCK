@@ -8,7 +8,11 @@ import {
   playPlanckPassClaimCollectSound,
   playPlanckPassClaimOpenSound,
 } from "@/lib/planckpass/claim-sounds"
+import { borderPresetIdFromCosmetic } from "@/lib/planckpass/border-presets"
+import { badgePresetIdFromCosmetic } from "@/lib/planckpass/badge-presets"
 import type { PlanckPassClaimResult } from "@/lib/planckpass/types"
+import { BadgePresetPreview } from "@/components/planckpass/badges/badge-preset-layer"
+import { BorderPresetPreview } from "@/components/planckpass/borders/border-preset-layer"
 
 const lilita = Lilita_One({
   weight: "400",
@@ -31,6 +35,14 @@ const SPARKLES = [
 ]
 
 function RewardVisual({ reward }: { reward: PlanckPassClaimResult }) {
+  const borderPreset = borderPresetIdFromCosmetic(reward.cosmetic)
+  if (borderPreset) {
+    return <BorderPresetPreview presetId={borderPreset} size={120} />
+  }
+  const badgePreset = badgePresetIdFromCosmetic(reward.cosmetic)
+  if (badgePreset) {
+    return <BadgePresetPreview presetId={badgePreset} size={110} />
+  }
   if (reward.cosmetic?.imageUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element

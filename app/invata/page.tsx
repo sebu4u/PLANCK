@@ -3,10 +3,7 @@ import { Navigation } from "@/components/navigation"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
-import {
-  getLearningPathLessonItemCountsByLessonIds,
-  type LearningPathHubChapter,
-} from "@/lib/supabase-learning-paths"
+import { getLearningPathLessonItemCountsByLessonIds } from "@/lib/supabase-learning-paths"
 import {
   getCachedPublicLearningPathHubCatalog,
   getCachedPublicLearningPathLessonItemCounts,
@@ -15,13 +12,8 @@ import { loadSsrPersonalizedLearningPathHub, sortLearningPathChaptersForHub } fr
 import { createClient } from "@/lib/supabase/server"
 import { InvataChapterImageLoadProvider } from "@/components/invata/invata-chapter-image-load-context"
 import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context"
-import { InvataHubTopGlow } from "@/components/invata/invata-hub-top-glow"
-import { LearningPathsList } from "@/components/invata/learning-paths-list"
-import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
-import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { InvataPremiumUpgradeBanner } from "@/components/invata/invata-premium-upgrade-banner"
-import { InvataHubMain } from "@/components/invata/invata-hub-main"
-import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
+import { InvataHubPageClient } from "@/components/invata/invata-hub-page-client"
 import {
   getFreePlanLockedChapterIds,
   resolveLearningPathHubChapterSplit,
@@ -92,41 +84,19 @@ export default async function InvataPage() {
     <InvataHubNavProvider chapters={visibleChapters}>
       <InvataChapterImageLoadProvider chapterCount={visibleChapters.length}>
         <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
-        <Navigation />
-        {visibleChapters.length > 0 ? <InvataHubTopGlow /> : null}
+        <div className="max-sm:bg-[#DCE6FA]">
+          <Navigation />
 
-        <InvataHubMain>
-          <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
-            <header className="mb-8 hidden flex-col gap-4 sm:flex sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">
-                  Trasee de învățare
-                </h1>
-                <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">
-                  Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
-                </p>
-              </div>
-              <div className="flex w-full max-w-[420px] flex-col items-start gap-3 sm:items-end">
-                <InvataPersonalizedCourseEntry className="hidden w-full sm:block" />
-                <InvataAdminLearningPathsLink />
-              </div>
-            </header>
+          <InvataHubPageClient
+            chapters={visibleChapters}
+            archivedChapters={archivedChapters}
+            lessonsByChapter={allLessonsByChapter}
+            lockedChapterIds={lockedChapterIds}
+            lessonProgressByLessonId={lessonProgressByLessonId}
+          />
 
-            <InvataPersonalizedCourseEntry className="mb-6 sm:hidden" />
-
-            <LearningPathsList
-              chapters={visibleChapters}
-              archivedChapters={archivedChapters}
-              lessonsByChapter={allLessonsByChapter}
-              lockedChapterIds={lockedChapterIds}
-              completedLessonIds={[]}
-              lessonProgressByLessonId={lessonProgressByLessonId}
-            />
-
-            <InvataSeoIntro />
-          </div>
-        </InvataHubMain>
-        <InvataPremiumUpgradeBanner />
+          <InvataPremiumUpgradeBanner />
+        </div>
       </InvataChapterImageLoadProvider>
     </InvataHubNavProvider>
   )

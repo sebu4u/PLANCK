@@ -3,15 +3,14 @@
 import { useState, type CSSProperties } from "react"
 import { Loader2, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  PREMIUM_MONTHLY_RON,
+  PREMIUM_YEARLY_RON,
+  PREMIUM_YEARLY_SAVE_PERCENT,
+  premiumDailyPrice,
+} from "@/components/pricing/premium-pricing"
 
 type BillingInterval = "year" | "month"
-
-const PREMIUM_YEARLY_RON = 590
-const PREMIUM_MONTHLY_RON = 59
-
-function premiumDailyPrice(totalRon: number, days: number) {
-  return (totalRon / days).toFixed(2)
-}
 
 const PLAN_OPTIONS: Array<{
   interval: BillingInterval
@@ -19,13 +18,15 @@ const PLAN_OPTIONS: Array<{
   paidLabel: string
   totalRon: number
   dailyRon: string
+  badge?: string
 }> = [
   {
     interval: "year",
     label: "Anual",
-    paidLabel: `Plătit ${PREMIUM_YEARLY_RON} RON anual`,
+    paidLabel: `Plătit ${PREMIUM_YEARLY_RON.toLocaleString("ro-RO")} RON anual`,
     totalRon: PREMIUM_YEARLY_RON,
     dailyRon: premiumDailyPrice(PREMIUM_YEARLY_RON, 365),
+    badge: `Economisești ${PREMIUM_YEARLY_SAVE_PERCENT}%`,
   },
   {
     interval: "month",
@@ -41,7 +42,7 @@ function PlanRadioIndicator({ selected }: { selected: boolean }) {
     <span
       className={cn(
         "mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 transition-colors",
-        selected ? "border-[#d39bff] bg-[#d39bff]" : "border-[#d4d4d4] bg-white",
+        selected ? "border-[#7C5CFC] bg-[#7C5CFC]" : "border-[#d4d4d4] bg-white",
       )}
       aria-hidden
     />
@@ -63,7 +64,7 @@ export function PricingMobileExitSheet({
   onCheckout,
   onDismiss,
 }: PricingMobileExitSheetProps) {
-  const [selectedInterval, setSelectedInterval] = useState<BillingInterval>("year")
+  const [selectedInterval, setSelectedInterval] = useState<BillingInterval>("month")
 
   return (
     <>
@@ -81,27 +82,24 @@ export function PricingMobileExitSheet({
         aria-labelledby="pricing-exit-sheet-title"
         aria-hidden={!isOpen}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-[500] flex flex-col overflow-hidden rounded-t-[28px] border border-[#dedede] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.08)] transition-transform duration-300 ease-out lg:hidden",
+          "fixed inset-x-0 bottom-0 z-[500] flex flex-col overflow-hidden rounded-t-[28px] border border-gray-200 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.08)] transition-transform duration-300 ease-out lg:hidden",
           isOpen ? "translate-y-0" : "pointer-events-none translate-y-full",
         )}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
-        <div
-          className="flex h-7 shrink-0 items-center justify-center"
-          role="presentation"
-        >
+        <div className="flex h-7 shrink-0 items-center justify-center" role="presentation">
           <div className="h-1 w-12 rounded-full bg-[#bdbdbd]" />
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-2 pt-1">
           <h2
             id="pricing-exit-sheet-title"
-            className="text-center text-xl font-bold tracking-[-0.03em] text-[#171717]"
+            className="text-center text-xl font-bold tracking-tight text-gray-900"
           >
             Încă nu ești decis?
           </h2>
-          <p className="mt-1 text-center text-sm text-gray-600">
-            Avem un traseu pentru oricine
+          <p className="mt-1 text-center text-sm text-gray-500">
+            Un singur abonament Premium — alege perioada
           </p>
 
           <div className="mt-5 flex flex-col gap-3">
@@ -117,21 +115,28 @@ export function PricingMobileExitSheet({
                   className={cn(
                     "flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors",
                     isSelected
-                      ? "border-[#d39bff]/60 bg-[#fdf4ff]"
-                      : "border-[#e8e8e8] bg-white",
+                      ? "border-[#7C5CFC]/40 bg-[#EBE8FF]/60"
+                      : "border-gray-200 bg-white",
                   )}
                 >
                   <PlanRadioIndicator selected={isSelected} />
 
                   <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold text-[#171717]">{option.label}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold text-gray-900">{option.label}</p>
+                      {option.badge ? (
+                        <span className="rounded-full bg-[#EBE8FF] px-2 py-0.5 text-[10px] font-semibold text-[#5B47D6]">
+                          {option.badge}
+                        </span>
+                      ) : null}
+                    </div>
                     {isSelected ? (
                       <p className="mt-0.5 text-xs text-gray-500">{option.paidLabel}</p>
                     ) : null}
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <p className="text-lg font-bold tabular-nums text-[#171717]">
+                    <p className="text-lg font-bold tabular-nums text-gray-900">
                       {option.dailyRon} lei
                     </p>
                     <p className="text-xs text-gray-500">pe zi</p>
@@ -144,7 +149,7 @@ export function PricingMobileExitSheet({
           <div className="mt-5 flex flex-col items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-200/80">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="text-xs font-bold">Poți anula oricând</span>
+              <span className="text-xs font-bold">Anulezi oricând, în 30 de secunde</span>
             </span>
 
             <button
@@ -155,11 +160,11 @@ export function PricingMobileExitSheet({
                 "inline-flex min-h-14 w-full items-center justify-center rounded-full px-8 text-base font-semibold",
                 isCheckoutDisabled || isCheckoutLoading
                   ? "cursor-not-allowed bg-gray-200 text-gray-500"
-                  : "dashboard-start-glow bg-[#333333] text-white shadow-[0_4px_0_#0a0a0a] transition-[transform,box-shadow,opacity] active:translate-y-1 active:shadow-[0_1px_0_#0a0a0a]",
+                  : "dashboard-start-glow bg-[#7C5CFC] text-white shadow-[0_4px_0_#5B47D6] transition-[filter,transform,box-shadow] hover:brightness-110 active:translate-y-1 active:shadow-[0_1px_0_#5B47D6]",
               )}
               style={
                 !isCheckoutDisabled && !isCheckoutLoading
-                  ? ({ "--start-glow-tint": "rgba(255, 255, 255, 0.42)" } as CSSProperties)
+                  ? ({ "--start-glow-tint": "rgba(224, 215, 255, 0.88)" } as CSSProperties)
                   : undefined
               }
             >
@@ -169,7 +174,7 @@ export function PricingMobileExitSheet({
                   Se deschide...
                 </span>
               ) : (
-                "Vreau nota mai mare"
+                "Devino Premium"
               )}
             </button>
           </div>

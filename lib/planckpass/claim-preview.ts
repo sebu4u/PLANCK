@@ -20,7 +20,7 @@ export async function buildPlanckPassClaimPreview(
   const { data: tier } = await supabase
     .from("planckpass_tiers")
     .select(
-      "tier_number, is_free, reward_kind, label, coins_amount, elo_amount, elo_multiplier_minutes, streak_freeze_hours, planckpass_cosmetics(id, kind, name, image_url)",
+      "tier_number, is_free, reward_kind, label, coins_amount, elo_amount, elo_multiplier_minutes, streak_freeze_hours, planckpass_cosmetics(id, kind, name, image_url, meta)",
     )
     .eq("season_id", season.id)
     .eq("tier_number", tierNumber)
@@ -47,6 +47,7 @@ export async function buildPlanckPassClaimPreview(
           kind: cosmeticRaw.kind as NonNullable<PlanckPassClaimResult["cosmetic"]>["kind"],
           name: String(cosmeticRaw.name),
           imageUrl: String(cosmeticRaw.image_url),
+          meta: (cosmeticRaw.meta as Record<string, unknown>) ?? undefined,
         }
       : null,
   }
@@ -69,6 +70,7 @@ export function mapPlanckPassClaimRpcResult(raw: Record<string, unknown>): Planc
           kind: cosmeticRaw.kind as NonNullable<PlanckPassClaimResult["cosmetic"]>["kind"],
           name: String(cosmeticRaw.name),
           imageUrl: String(cosmeticRaw.imageUrl),
+          meta: (cosmeticRaw.meta as Record<string, unknown>) ?? undefined,
         }
       : null,
     eloBoostUntil: (raw.eloBoostUntil as string | null) ?? null,

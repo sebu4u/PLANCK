@@ -16,6 +16,7 @@ import { AICodeAnalysisSection } from "@/components/ai-code-analysis-section"
 import { NewWayToLearnSection } from "@/components/new-way-to-learn-section"
 import { CoursesSectionHomepage } from "@/components/courses-section-homepage"
 import { HomePageReusiteSection } from "@/components/homepage-reusite-section"
+import { HomePagePlanckPassSection } from "@/components/homepage-planckpass-section"
 import { HomePageInteractiveSchoolSection } from "@/components/homepage-interactive-school-section"
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
@@ -35,6 +36,7 @@ const HowItWorksSection = dynamic(() => import("@/components/how-it-works-sectio
 const HOME_SECTION_IDS = [
   "home-hero",
   "home-reusite",
+  "home-planckpass",
   "home-interactive-school",
   "home-ai-demo",
   "home-mai-eficient",
@@ -42,6 +44,9 @@ const HOME_SECTION_IDS = [
   "home-reviews",
   "home-faq",
 ]
+
+/** Sections with dark backgrounds (gradient via background-image won't sample as bg-color). */
+const HOME_DARK_SECTION_IDS = new Set(["home-hero"])
 
 function HomeSectionIndicator() {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -125,20 +130,23 @@ function HomeSectionIndicator() {
 
   if (!mounted) return null
 
+  const activeIsDark =
+    HOME_DARK_SECTION_IDS.has(HOME_SECTION_IDS[activeIndex] ?? "") || isDarkBackground
+
   return createPortal(
     <div
       className="fixed right-4 top-1/2 -translate-y-1/2 z-[90] hidden lg:flex flex-col gap-3 py-4 items-end pointer-events-none"
       aria-label="Secțiuni homepage"
     >
-      {HOME_SECTION_IDS.map((_, index) => (
+      {HOME_SECTION_IDS.map((sectionId, index) => (
         <div
-          key={index}
+          key={sectionId}
           className={`h-0.5 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(0,0,0,0.22)] ${
             index === activeIndex
-              ? isDarkBackground
+              ? activeIsDark
                 ? "w-8 bg-white"
                 : "w-8 bg-zinc-900"
-              : isDarkBackground
+              : activeIsDark
                 ? "w-2 bg-zinc-600"
                 : "w-2 bg-zinc-300"
           }`}
@@ -169,6 +177,8 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
       </section>
 
       <HomePageReusiteSection />
+
+      <HomePagePlanckPassSection />
 
       <HomePageInteractiveSchoolSection />
 

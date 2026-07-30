@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/auth-provider"
+import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { supabase } from "@/lib/supabaseClient"
 import { estimateGradeFromElo } from "@/lib/parent/grade-estimate"
 import { getFreePlanItemsRemainingForUser } from "@/lib/learning-path-free-plan"
@@ -10,6 +11,7 @@ import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { StudentGradeGoalCard } from "@/components/dashboard/free-mobile/student-grade-goal-card"
 import { StudentCurrentPathCard } from "@/components/dashboard/free-mobile/student-current-path-card"
+import { StudentPregatireCard } from "@/components/dashboard/free-mobile/student-pregatire-card"
 import { StudentLeaderboardCard } from "@/components/dashboard/free-mobile/student-leaderboard-card"
 
 interface FreeMobileDashboardProps {
@@ -32,6 +34,7 @@ export function FreeMobileDashboard({
   rank,
 }: FreeMobileDashboardProps) {
   const { user, profile, userElo } = useAuth()
+  const { isFree } = useSubscriptionPlan()
   const [targetGrade, setTargetGrade] = useState<number | null>(null)
   const [freeItemsRemaining, setFreeItemsRemaining] = useState<number | null>(null)
 
@@ -49,14 +52,18 @@ export function FreeMobileDashboard({
         setTargetGrade(typeof data?.onboarding_target_grade === "number" ? data.onboarding_target_grade : null)
       })
 
-    getFreePlanItemsRemainingForUser(supabase, user.id).then((remaining) => {
-      if (isMounted) setFreeItemsRemaining(remaining)
-    })
+    if (isFree) {
+      getFreePlanItemsRemainingForUser(supabase, user.id).then((remaining) => {
+        if (isMounted) setFreeItemsRemaining(remaining)
+      })
+    } else {
+      setFreeItemsRemaining(null)
+    }
 
     return () => {
       isMounted = false
     }
-  }, [user?.id])
+  }, [user?.id, isFree])
 
   const elo = userElo ?? 500
   const studentName = profile?.nickname || profile?.name || "Tu"
@@ -81,6 +88,8 @@ export function FreeMobileDashboard({
           freeItemsRemaining={freeItemsRemaining}
         />
       ) : null}
+
+      <StudentPregatireCard preferredMaterie={profile?.preferred_materie} />
 
       <StudentLeaderboardCard studentName={studentName} elo={elo} rank={rank} />
 
