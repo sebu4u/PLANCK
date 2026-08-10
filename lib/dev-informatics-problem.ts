@@ -120,12 +120,23 @@ export function parseClassNumber(raw: unknown, fallback = 9): number | null {
   return CLASS_SET.has(classNum) ? classNum : null
 }
 
+export function normalizeCodingDisplayId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const normalized = raw.trim().toUpperCase()
+  if (!normalized) return null
+  if (!/^[A-Z][0-9]{3}$/.test(normalized)) {
+    return null
+  }
+  return normalized
+}
+
 export function buildInformaticsProblemRow(body: Record<string, unknown>): {
   ok: true
   row: Record<string, unknown>
   tests: ParsedCodingTest[]
 } | { ok: false; message: string } {
   const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : ""
+  const display_id = normalizeCodingDisplayId(body.display_id)
   const title = typeof body.title === "string" ? body.title.trim() : ""
   const statement_markdown = typeof body.statement_markdown === "string" ? body.statement_markdown.trim() : ""
   const chapter =
@@ -136,6 +147,12 @@ export function buildInformaticsProblemRow(body: Record<string, unknown>): {
     return {
       ok: false,
       message: "slug obligatoriu (litere mici, cifre și cratime, ex: suma-cifrelor).",
+    }
+  }
+  if (!display_id) {
+    return {
+      ok: false,
+      message: "display_id obligatoriu (ex: I001 — literă + 3 cifre).",
     }
   }
   if (!title || !statement_markdown) {
@@ -155,6 +172,7 @@ export function buildInformaticsProblemRow(body: Record<string, unknown>): {
   }
 
   const row: Record<string, unknown> = {
+    display_id,
     slug,
     title,
     statement_markdown,

@@ -14,6 +14,8 @@ interface PlanckPassRewardCardProps {
   currentTier: number
   claiming?: boolean
   onClaim?: (tier: PlanckPassTier) => void
+  /** Preview locked / future / premium-gated rewards */
+  onPreview?: (tier: PlanckPassTier) => void
   className?: string
   /** Desktop pass uses larger cards */
   size?: "default" | "desktop"
@@ -71,12 +73,15 @@ export function PlanckPassRewardCard({
   currentTier,
   claiming,
   onClaim,
+  onPreview,
   className,
   size = "default",
 }: PlanckPassRewardCardProps) {
   const isFuture = tier.tier > currentTier && !tier.unlocked
-  const dimmed = isFuture || (tier.premiumLocked && !tier.unlocked)
+  const dimmed = isFuture || (tier.premiumLocked && !tier.claimed)
   const claimable = tier.claimable
+  const previewable = !claimable && !tier.claimed
+  const interactive = (claimable && !!onClaim) || (previewable && !!onPreview)
   const desktop = size === "desktop"
   const width = desktop ? PLANCKPASS_DESKTOP_CARD_WIDTH : PLANCKPASS_CARD_WIDTH
   const height = desktop ? PLANCKPASS_DESKTOP_CARD_HEIGHT : PLANCKPASS_CARD_HEIGHT
@@ -84,14 +89,18 @@ export function PlanckPassRewardCard({
   return (
     <button
       type="button"
-      disabled={!tier.claimable || claiming}
+      disabled={claiming || !interactive}
       onClick={() => {
-        if (tier.claimable && onClaim) onClaim(tier)
+        if (claimable && onClaim) {
+          onClaim(tier)
+          return
+        }
+        if (previewable && onPreview) onPreview(tier)
       }}
-      aria-label={`Tier ${tier.tier}: ${tier.label}${tier.isFree ? " (free)" : " (premium)"}`}
+      aria-label={`Tier ${tier.tier}: ${tier.label}${tier.isFree ? " (free)" : " (premium)"}${previewable ? " — blocat" : ""}`}
       className={cn(
         "relative shrink-0 touch-manipulation outline-none transition-transform active:scale-[0.96]",
-        !tier.claimable && "cursor-default",
+        !interactive && "cursor-default",
         className,
       )}
       style={{ width, height }}
@@ -190,5 +199,63 @@ export function PlanckPassRewardCard({
         </span>
       ) : null}
     </button>
+  )
+}
+
+const SKELETON_COUNT_DEFAULT = 6
+
+export function PlanckPassRewardCardSkeleton({
+  className,
+  size = "default",
+}: {
+  className?: string
+  size?: "default" | "desktop"
+}) {
+  const desktop = size === "desktop"
+  const width = desktop ? PLANCKPASS_DESKTOP_CARD_WIDTH : PLANCKPASS_CARD_WIDTH
+  const height = desktop ? PLANCKPASS_DESKTOP_CARD_HEIGHT : PLANCKPASS_CARD_HEIGHT
+
+  return (
+    <div
+      aria-hidden
+      className={cn("relative shrink-0", className)}
+      style={{ width, height }}
+    >
+      <div
+        className="absolute inset-0 rounded-[10px] bg-[#1a0a4a]/55"
+        style={{ transform: "skewX(-12deg) translate(3px, 4px)" }}
+      />
+      <div
+        className="absolute inset-0 animate-pulse overflow-hidden rounded-[10px] border-2 border-[#2a1570]/80 bg-gradient-to-b from-[#7c4dff]/45 to-[#4a1fd6]/35"
+        style={{ transform: "skewX(-12deg)" }}
+      >
+        <div
+          className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-1.5"
+          style={{ transform: "skewX(12deg)" }}
+        >
+          <div
+            className={cn(
+              "rounded-md bg-white/20",
+              desktop ? "h-9 w-9" : "h-7 w-7",
+            )}
+          />
+          <div className="h-2 w-10 rounded bg-white/15" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function PlanckPassRewardCardsSkeletonRow({
+  count = SKELETON_COUNT_DEFAULT,
+}: {
+  count?: number
+}) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <PlanckPassRewardCardSkeleton key={index} />
+      ))}
+    </>
   )
 }

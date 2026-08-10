@@ -4,7 +4,6 @@ import nextDynamic from "next/dynamic"
 import { pageTitle } from "@/lib/metadata"
 import { ClassroomAssignmentDraftProvider } from "@/components/classrooms/classroom-assignment-draft-context"
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
-import { ClassroomsPageSkeleton } from "@/components/classrooms/classroom-skeletons"
 import { getClassroomsForUser, requireAuthenticatedUser } from "@/lib/classrooms/server"
 
 const Navigation = nextDynamic(() => import("@/components/navigation").then((module) => module.Navigation))
@@ -16,13 +15,6 @@ export const metadata: Metadata = {
 
 const ClassroomsShell = nextDynamic(
   () => import("@/components/classrooms/classrooms-shell").then((module) => module.ClassroomsShell),
-  {
-    loading: () => (
-      <div className="px-4 pb-8 pt-20 md:px-8">
-        <ClassroomsPageSkeleton />
-      </div>
-    ),
-  },
 )
 
 /** Server Components must read fresh cookies for Supabase session (see lib/supabaseClient.ts). */
@@ -33,11 +25,14 @@ export default async function ClassroomsLayout({ children }: { children: ReactNo
   const classrooms = user ? await getClassroomsForUser(user.id) : []
 
   return (
-    <DashboardSidebarProvider>
-      <ClassroomAssignmentDraftProvider>
-        <Navigation />
-        <ClassroomsShell classrooms={classrooms}>{children}</ClassroomsShell>
-      </ClassroomAssignmentDraftProvider>
-    </DashboardSidebarProvider>
+    <>
+      <div className="fixed inset-0 -z-10 bg-[#ffffff]" />
+      <DashboardSidebarProvider>
+        <ClassroomAssignmentDraftProvider>
+          <Navigation />
+          <ClassroomsShell classrooms={classrooms}>{children}</ClassroomsShell>
+        </ClassroomAssignmentDraftProvider>
+      </DashboardSidebarProvider>
+    </>
   )
 }

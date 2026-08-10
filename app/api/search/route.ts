@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         .limit(fetchCount),
       supabase
         .from('lessons')
-        .select('id, title, is_active')
+        .select('id, title, is_active, chapters!inner(grades!inner(subject))')
         .eq('is_active', true)
         .ilike('title', pattern)
         .order('order_index', { ascending: true })
@@ -67,7 +67,16 @@ export async function GET(request: Request) {
       for (const l of lessonsRes.data as any[]) {
         const hay = `${l.title}`.toLowerCase()
         if (hay.includes(qLower)) {
-          results.push({ type: 'lesson', id: l.id, title: l.title, url: `/cursuri/${slugify(l.title)}` })
+          const subject =
+            l.chapters?.grades?.subject ||
+            (Array.isArray(l.chapters) ? l.chapters[0]?.grades?.subject : null) ||
+            'fizica'
+          results.push({
+            type: 'lesson',
+            id: l.id,
+            title: l.title,
+            url: `/invata/cursuri/${subject}/${slugify(l.title)}`,
+          })
         }
       }
     }

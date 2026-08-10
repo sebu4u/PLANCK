@@ -323,6 +323,8 @@ export default function ProblemsCatalogClient({
   const skipNextVisibleStaggerRef = useRef(Boolean(restoredVisibleProblems))
   const restoredScrollTopRef = useRef(restoredCatalogState?.scrollTop ?? null)
   const didRestoreScrollRef = useRef(false)
+  // Route loading.tsx already painted the catalog skeleton — skip repeating it on first fetch.
+  const suppressInitialGridSkeletonRef = useRef(true)
   const selectedProblemIdsSet = useMemo(
     () => new Set(assignmentPicker?.selectedProblemIds ?? []),
     [assignmentPicker?.selectedProblemIds],
@@ -396,6 +398,14 @@ export default function ProblemsCatalogClient({
     }
   }, [fetchProblems, initialCatalogTotalCount, initialProblems])
 
+  useEffect(() => {
+    if (!loading) {
+      suppressInitialGridSkeletonRef.current = false
+    }
+  }, [loading])
+
+  const skipGridSkeleton = skipGridSkeletonOnce || suppressInitialGridSkeletonRef.current
+
   const fetchSolvedProblems = useCallback(async () => {
     if (!user) {
       setSolvedProblems([])
@@ -430,16 +440,6 @@ export default function ProblemsCatalogClient({
       chapter: "Toate",
     }))
   }, [filters.class, selectedClassGate])
-
-  const clearClassGate = useCallback(() => {
-    setSelectedClassGate(null)
-    try {
-      sessionStorage.removeItem(selectedClassStorageKey)
-      saveCatalogSessionState(sessionStateStorageKey, { selectedClass: null })
-    } catch {
-      // ignore storage errors
-    }
-  }, [selectedClassStorageKey, sessionStateStorageKey])
 
   const filteredProblems = useMemo(() => {
     const hasSearch = Boolean(filters.search?.trim())
@@ -944,7 +944,7 @@ export default function ProblemsCatalogClient({
                 </p>
               </div>
 
-              <div className="flex items-center justify-between lg:hidden">
+              <div className="lg:hidden">
                 <Button
                   type="button"
                   variant="outline"
@@ -954,16 +954,6 @@ export default function ProblemsCatalogClient({
                   <SlidersHorizontal className="mr-2 h-4 w-4" />
                   Search si filtre
                 </Button>
-                {selectedClassGate && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={clearClassGate}
-                    className="rounded-full text-xs font-semibold text-[#2c2f33]/70 hover:bg-transparent hover:text-[#0b0c0f]"
-                  >
-                    Schimba clasa
-                  </Button>
-                )}
               </div>
 
               {hasActiveFilters && (
@@ -1034,13 +1024,15 @@ export default function ProblemsCatalogClient({
                   />
                 </div>
 
-                <div className="relative z-10">
-                  {loading && !skipGridSkeletonOnce ? (
+                <div className="relative z-10 animate-fade-in-up">
+                  {loading && !skipGridSkeleton ? (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {Array.from({ length: 8 }).map((_, index) => (
                         <ProblemCardSkeleton key={index} />
                       ))}
                     </div>
+                  ) : loading ? (
+                    <div className="min-h-[16rem]" aria-busy="true" aria-label="Se încarcă problemele" />
                   ) : displayedProblems.length > 0 ? (
                     <>
                       <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -1054,7 +1046,7 @@ export default function ProblemsCatalogClient({
                           return (
                             <Suspense
                               key={problem.id}
-                              fallback={skipGridSkeletonOnce ? null : <ProblemCardSkeleton />}
+                              fallback={skipGridSkeleton ? null : <ProblemCardSkeleton />}
                             >
                               <ProblemCard
                                 problem={problem}

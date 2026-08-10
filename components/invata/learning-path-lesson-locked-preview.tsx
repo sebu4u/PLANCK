@@ -66,9 +66,9 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
   const levelCount = Math.ceil(PLACEHOLDER_LABELS.length / ITEMS_PER_LEVEL)
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 pb-10 pt-16 sm:px-8 lg:px-12 lg:pt-28">
-      <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
+    <div className="mx-auto w-full max-w-7xl px-5 pb-10 pt-16 sm:px-8 lg:px-12 lg:pt-32">
+      <div className="grid items-start gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
+        <aside className="border-0 bg-transparent p-0 shadow-none lg:ml-16 lg:max-h-[calc(100vh-8rem)] lg:w-[360px] lg:max-w-[360px] lg:self-start lg:sticky lg:top-28 lg:rounded-[24px] lg:border-[3px] lg:border-[#e5e5e5] lg:bg-white lg:p-5 xl:ml-28 xl:w-[400px] xl:max-w-[400px]">
           <div className="flex w-full justify-center bg-transparent lg:justify-start">
             {lesson.image_url ? (
               <img
@@ -112,6 +112,7 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
                   outlineColor={theme.outline}
                   labelColorClass={theme.label}
                   isColored={levelNumber === 1}
+                  className={levelNumber === 1 ? "lg:mb-12" : undefined}
                 />
 
                 <div className="flex flex-col items-center">
@@ -122,7 +123,7 @@ export function LearningPathLessonLockedPreview({ chapter, lesson }: LearningPat
                     const ItemIcon = getItemIcon(iconType)
 
                     return (
-                      <div key={`${label}-${globalIndex + 1}`} className={`relative mb-20 w-fit max-w-full sm:mb-10 ${offsetClass}`}>
+                      <div key={`${label}-${globalIndex + 1}`} className={`relative mb-20 w-fit max-w-full sm:mb-10 lg:mb-16 ${offsetClass}`}>
                         <div className="flex max-w-full items-center gap-4">
                           <span
                             data-learning-path-anchor="circle"

@@ -16,7 +16,6 @@ import type {
   DailyChallenge,
   RoadmapStep,
   Recommendation,
-  RecentSketch,
   ContinueLearningItem,
   Achievement,
   LearningInsights,
@@ -34,10 +33,7 @@ import {
   type LearningPathChapter,
   type LearningPathLesson,
 } from "@/lib/supabase-learning-paths"
-import {
-  DashboardStreakCard,
-  type DashboardStreakDay,
-} from "@/components/dashboard/cards/dashboard-streak-card"
+import { DashboardPregatireCard } from "@/components/dashboard/cards/dashboard-pregatire-card"
 import { DashboardLearningPathsCarousel } from "@/components/dashboard/cards/dashboard-learning-paths-carousel"
 import { FreeMobileDashboard } from "@/components/dashboard/free-mobile/free-mobile-dashboard"
 import { PlanckPassDesktopShell } from "@/components/dashboard/free-mobile/planckpass-desktop-shell"
@@ -48,13 +44,13 @@ import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-pr
 import { PostOnboardingDiscountPromoModal } from "@/components/dashboard/post-onboarding-discount-promo-modal"
 import { PremiumUpgradeBanner } from "@/components/premium-upgrade-banner"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
-import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import {
   getPostOnboardingDiscountMobilePromoSessionKey,
   usePostOnboardingDiscountWindow,
 } from "@/hooks/use-post-onboarding-discount-window"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
+import { useProductGuideBlocking } from "@/components/product-guide/product-guide-blocking"
 import { getDashboardPrimaryLearningPathSlug, normalizePracticeSubject } from "@/lib/practice-subject"
 import {
   SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
@@ -66,6 +62,7 @@ export function DashboardAuth() {
   const { user, loading: authLoading, profile, isStudent } = useAuth()
   const { isPaid } = useSubscriptionPlan()
   const postOnboardingDiscount = usePostOnboardingDiscountWindow(user?.id)
+  const { setBlocked: setProductGuideBlocked } = useProductGuideBlocking()
   const [loading, setLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
   const isFetchingRef = useRef(false)
@@ -81,7 +78,6 @@ export function DashboardAuth() {
     challenge: DailyChallenge | null
     roadmap: RoadmapStep[]
     recommendations: Recommendation[]
-    sketches: RecentSketch[]
     continueItems: ContinueLearningItem[]
     achievements: Achievement[]
     insights: LearningInsights
@@ -91,7 +87,6 @@ export function DashboardAuth() {
     eloWeekGain: number
     eloHistory: number[]
     lastProject: Project | null
-    streakDays: DashboardStreakDay[]
     dashboardLearningPaths: LearningPathChapter[]
     dashboardLessonsByChapter: Record<string, LearningPathLesson[]>
     dashboardStartHrefByChapter: Record<string, string>
@@ -101,9 +96,6 @@ export function DashboardAuth() {
     dashboardCurrentLessonTitleByChapter: Record<string, string | null>
   } | null>(null)
 
-  useStreakTrigger({
-    enabled: Boolean(user?.id) && !authLoading && !loading && !showWelcomeBack && !showMobileDiscountPromo,
-  })
   useSocialProofTrigger({
     enabled:
       Boolean(user?.id) &&
@@ -113,6 +105,22 @@ export function DashboardAuth() {
       !showMobileDiscountPromo,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
+
+  useEffect(() => {
+    setProductGuideBlocked("welcome-back", showWelcomeBack)
+    setProductGuideBlocked("discount-promo", showMobileDiscountPromo)
+    setProductGuideBlocked("premium-upgrade", premiumUpgradeOpen)
+    return () => {
+      setProductGuideBlocked("welcome-back", false)
+      setProductGuideBlocked("discount-promo", false)
+      setProductGuideBlocked("premium-upgrade", false)
+    }
+  }, [
+    setProductGuideBlocked,
+    showWelcomeBack,
+    showMobileDiscountPromo,
+    premiumUpgradeOpen,
+  ])
 
   const refreshDashboardLearningPaths = useCallback(
     async (preferredMaterie: string | null | undefined) => {
@@ -196,35 +204,30 @@ export function DashboardAuth() {
         }
 
         // Fetch ALL data before showing the dashboard
-        // Skip streak check on initial load to prevent triggering realtime updates
         const [
           statsData,
           recommendedLessonsData,
           challengeData,
           roadmapData,
           recommendationsData,
-          sketchesData,
           achievementsData,
           tasksData,
           updatesData,
           eloQuickStats,
           eloHistoryData,
-          streakDaysData,
           learningPathsData,
         ] = await Promise.all([
-          fetchUserStats(user.id, isInitialLoadRef.current),
+          fetchUserStats(user.id),
           fetchRandomLessons(),
           fetchDailyChallenge(user.id),
           fetchUserRoadmap(user.id),
           fetchRecommendations(user.id),
-          fetchRecentSketches(user.id),
           fetchAchievements(user.id),
           fetchUserTasks(user.id),
           fetchDashboardUpdates(),
           fetchEloQuickStats(user.id),
           fetchEloHistory(user.id),
-          fetchLastFiveStreakDays(user.id),
-              fetchDashboardLearningPaths(user.id, profile?.preferred_materie),
+          fetchDashboardLearningPaths(user.id, profile?.preferred_materie),
         ])
 
         const continueLearningData = await fetchContinueLearning()
@@ -237,7 +240,6 @@ export function DashboardAuth() {
           challenge: challengeData,
           roadmap: roadmapData,
           recommendations: recommendationsData,
-          sketches: sketchesData,
           continueItems: continueLearningData,
           achievements: achievementsData,
           insights: getLearningInsightsPlaceholder(),
@@ -247,7 +249,6 @@ export function DashboardAuth() {
           eloWeekGain: eloQuickStats.weekGain,
           eloHistory: eloHistoryData,
           lastProject: lastProjectData,
-          streakDays: streakDaysData,
           dashboardLearningPaths: learningPathsData.chapters,
           dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
@@ -293,27 +294,23 @@ export function DashboardAuth() {
           challengeData,
           roadmapData,
           recommendationsData,
-          sketchesData,
           achievementsData,
           tasksData,
           updatesData,
           eloQuickStats,
           eloHistoryData,
-          streakDaysData,
           learningPathsData,
         ] = await Promise.all([
-          fetchUserStats(userId, true), // Skip streak check in background fetch
+          fetchUserStats(userId),
           fetchRandomLessons(),
           fetchDailyChallenge(userId),
           fetchUserRoadmap(userId),
           fetchRecommendations(userId),
-          fetchRecentSketches(userId),
           fetchAchievements(userId),
           fetchUserTasks(userId),
           fetchDashboardUpdates(),
           fetchEloQuickStats(userId),
           fetchEloHistory(userId),
-          fetchLastFiveStreakDays(userId),
           fetchDashboardLearningPaths(userId, preferredMaterie),
         ])
 
@@ -326,7 +323,6 @@ export function DashboardAuth() {
           challenge: challengeData,
           roadmap: roadmapData,
           recommendations: recommendationsData,
-          sketches: sketchesData,
           continueItems: continueLearningData,
           achievements: achievementsData,
           insights: getLearningInsightsPlaceholder(),
@@ -336,7 +332,6 @@ export function DashboardAuth() {
           eloWeekGain: eloQuickStats.weekGain,
           eloHistory: eloHistoryData,
           lastProject: lastProjectData,
-          streakDays: streakDaysData,
           dashboardLearningPaths: learningPathsData.chapters,
           dashboardLessonsByChapter: learningPathsData.lessonsByChapter,
           dashboardStartHrefByChapter: learningPathsData.startHrefByChapterId,
@@ -396,11 +391,9 @@ export function DashboardAuth() {
           // Debounce realtime updates to prevent rapid flickering
           realtimeUpdateTimeoutRef.current = setTimeout(async () => {
             try {
-              // Skip streak check in realtime updates to prevent loops
-              const [updatedStats, eloQuickStats, streakDaysData] = await Promise.all([
-                fetchUserStats(user.id, true), // Skip streak check
+              const [updatedStats, eloQuickStats] = await Promise.all([
+                fetchUserStats(user.id),
                 fetchEloQuickStats(user.id),
-                fetchLastFiveStreakDays(user.id),
               ])
 
               const updatedEloHistory = await fetchEloHistory(user.id)
@@ -413,7 +406,6 @@ export function DashboardAuth() {
                   eloWeekGain: eloQuickStats.weekGain,
                   eloHistory: updatedEloHistory,
                   lastProject: prev.lastProject, // Preserve existing
-                  streakDays: streakDaysData,
                 }
               })
             } catch (error) {
@@ -660,12 +652,7 @@ export function DashboardAuth() {
                           />
                         </div>
                       ) : null}
-                      <DashboardStreakCard
-                        currentStreak={dashboardData.stats.current_streak}
-                        problemsToday={dashboardData.stats.problems_solved_today}
-                        streakDays={dashboardData.streakDays}
-                        streakImageSrc="/streak-icon.png"
-                      />
+                      <DashboardPregatireCard preferredMaterie={profile?.preferred_materie} />
 
                       {!isPaid ? (
                         <DashboardPremiumUpgradeCard onExploreClick={() => setPremiumUpgradeOpen(true)} />
@@ -762,34 +749,7 @@ function getCalendarDayDiff(from: Date, to: Date): number {
 }
 
 // Helper functions for client-side data fetching
-async function fetchUserStats(userId: string, skipStreakCheck: boolean = false): Promise<UserStats> {
-  // Check and reset streak if user skipped a day (only on initial load, not on realtime updates)
-  if (!skipStreakCheck) {
-    try {
-      const { error: streakError } = await supabase.rpc('check_and_reset_streak_if_needed', {
-        user_uuid: userId,
-      })
-      if (streakError) {
-        // Only log if error has meaningful information
-        if (streakError.message || streakError.code) {
-          console.warn('Warning: Streak reset check failed:', {
-            message: streakError.message,
-            code: streakError.code,
-            details: streakError.details,
-          })
-        }
-        // Continue execution even if streak check fails
-      }
-    } catch (err) {
-      // Log error but don't throw - allow function to continue
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      if (errorMessage && errorMessage !== '{}') {
-        console.warn('Warning: Streak reset check encountered an error:', errorMessage)
-      }
-      // Continue execution even if streak check fails
-    }
-  }
-
+async function fetchUserStats(userId: string): Promise<UserStats> {
   const { data, error } = await supabase
     .from('user_stats')
     .select('*')
@@ -809,40 +769,7 @@ async function fetchUserStats(userId: string, skipStreakCheck: boolean = false):
     }
   }
 
-  const today = formatLocalDate(new Date())
-  const { data: todayActivity } = await supabase
-    .from('daily_activity')
-    .select('problems_solved, time_minutes')
-    .eq('user_id', userId)
-    .eq('activity_date', today)
-    .maybeSingle()
-
-  // Override problems_solved_today and total_time_minutes with actual values from daily_activity
-  const stats = data as UserStats
-
-  // If last_activity_date is different from today, reset problems_solved_today to 0
-  const lastActivityDate = stats.last_activity_date ? new Date(stats.last_activity_date).toISOString().split('T')[0] : null
-  if (lastActivityDate !== today) {
-    stats.problems_solved_today = 0
-    // Only update in database if needed and not already 0 to prevent infinite loops with realtime updates
-    if (data.problems_solved_today !== 0) {
-      supabase
-        .from('user_stats')
-        .update({ problems_solved_today: 0 })
-        .eq('user_id', userId)
-        .then(() => { }) // Fire and forget
-    }
-  } else {
-    stats.problems_solved_today = todayActivity?.problems_solved || 0
-  }
-
-  // Override total_time_minutes with today's time_minutes for display purposes
-  // Note: We keep the original total_time_minutes in the stats object, but we'll use today's time in the card
-  // Actually, let's create a computed property - but since we can't modify the interface easily,
-  // we'll use a workaround: store today's time in a way that the card can access it
-  // For now, we'll return the stats as-is and handle timeToday separately in the component
-
-  return stats
+  return data as UserStats
 }
 
 interface EloQuickStats {
@@ -1149,7 +1076,7 @@ async function fetchRecommendations(userId: string): Promise<Recommendation[]> {
         type: 'lesson',
         title: 'Lecția 10.2 – Legea gazelor',
         description: 'Continuă cu teoria gazelor perfecte',
-        target_url: '/cursuri',
+        target_url: '/invata/cursuri',
         reason: 'Bazat pe progresul tău recent',
         priority: 1,
       },
@@ -1157,42 +1084,6 @@ async function fetchRecommendations(userId: string): Promise<Recommendation[]> {
   }
 
   return data as Recommendation[]
-}
-
-async function fetchRecentSketches(userId: string): Promise<RecentSketch[]> {
-  try {
-    // Get access token
-    const { data: sessionData } = await supabase.auth.getSession()
-    const accessToken = sessionData.session?.access_token
-
-    if (!accessToken) {
-      return []
-    }
-
-    // Fetch boards from API endpoint
-    const response = await fetch('/api/sketch/boards', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    })
-
-    if (!response.ok) {
-      return []
-    }
-
-    const data = await response.json()
-    const boards = data.boards || []
-
-    // Map boards to RecentSketch format (title -> name) and limit to 3
-    return boards.slice(0, 3).map((board: { id: string; title: string; updated_at: string }) => ({
-      id: board.id,
-      name: board.title,
-      updated_at: board.updated_at,
-    }))
-  } catch (error) {
-    console.error('Failed to fetch recent sketches:', error)
-    return []
-  }
 }
 
 async function fetchAchievements(userId: string): Promise<Achievement[]> {
@@ -1311,7 +1202,7 @@ async function fetchContinueLearning(): Promise<ContinueLearningItem[]> {
             type: 'lesson' as const,
             title: lesson.title,
             description: `${grade.name} - ${chapter.title}`,
-            url: `/cursuri/${slug}`,
+            url: `/invata/cursuri/${grade.subject || 'fizica'}/${slug}`,
           })
         }
 
@@ -1495,58 +1386,13 @@ function formatLocalDate(d: Date): string {
   return `${year}-${month}-${day}`
 }
 
-function getWeekdayLabel(date: Date): string {
-  const labels = ["D", "L", "Ma", "Mi", "J", "V", "S"]
-  return labels[date.getDay()] || "?"
-}
-
-async function fetchLastFiveStreakDays(userId: string): Promise<DashboardStreakDay[]> {
-  const endDate = new Date()
-  endDate.setHours(0, 0, 0, 0)
-  const startDate = new Date(endDate)
-  startDate.setDate(endDate.getDate() - 4)
-
-  const startIso = formatLocalDate(startDate)
-  const endIso = formatLocalDate(endDate)
-
-  const { data } = await supabase
-    .from("daily_activity")
-    .select("activity_date, problems_solved")
-    .eq("user_id", userId)
-    .gte("activity_date", startIso)
-    .lte("activity_date", endIso)
-
-  const activeDays = new Set(
-    (data || [])
-      .filter((item: any) => (item.problems_solved || 0) > 0)
-      .map((item: any) => {
-        if (typeof item.activity_date === "string") return item.activity_date
-        return formatLocalDate(new Date(item.activity_date))
-      })
-  )
-
-  const streakDays: DashboardStreakDay[] = []
-  for (let index = 0; index < 5; index++) {
-    const date = new Date(startDate)
-    date.setDate(startDate.getDate() + index)
-    const localDate = formatLocalDate(date)
-    streakDays.push({
-      date: localDate,
-      label: getWeekdayLabel(date),
-      active: activeDays.has(localDate),
-    })
-  }
-
-  return streakDays
-}
-
 function getContinueLearningPlaceholder(): ContinueLearningItem[] {
   return [
     {
       type: 'lesson',
       title: 'Vezi toate lecțiile',
       description: 'Explorează cursurile disponibile',
-      url: '/cursuri',
+      url: '/invata/cursuri',
     },
   ]
 }

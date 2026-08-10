@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, List, CheckCircle2, X, Play, ChevronRight, Loader2 } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, ChevronRight, Loader2 } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -24,8 +24,6 @@ import ProblemOrbButton from "@/components/problem-orb-button"
 const ProblemsSidebar = lazy(() => import("@/components/problems-sidebar").then(m => ({ default: m.ProblemsSidebar })))
 const InsightChatSidebar = lazy(() => import("@/components/insight-chat-sidebar"))
 import { cn } from "@/lib/utils"
-import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { PlanckPlusTrialModal } from "@/components/planck-plus-trial-modal"
 import { ProblemAnswerCard } from "@/components/problems/problem-answer-card"
 import {
@@ -44,8 +42,7 @@ import {
 } from "@/lib/problem-detail-subject"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
-// Lazy load video player component
-const VideoPlayer = lazy(() => import("@/components/video-player").then(module => ({ default: module.VideoPlayer })))
+import { extractYouTubeVideoId, LazyYouTubePlayer } from "@/components/lazy-youtube-player"
 
 // Array cu 10 iconițe variate pentru probleme (același sistem ca în problem-card)
 const problemIcons = [
@@ -122,30 +119,6 @@ function normalizeProblemTags(tags: Problem["tags"] | string[] | null | undefine
   return []
 }
 
-// Loading skeleton for video content
-function VideoSkeleton() {
-  return (
-    <div className="aspect-video w-full rounded-xl overflow-hidden bg-white/5 flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <Skeleton className="w-14 h-14 rounded-full mx-auto bg-white/20" />
-        <Skeleton className="w-24 h-4 rounded mx-auto bg-white/10" />
-      </div>
-    </div>
-  )
-}
-
-function MissingVideoCard() {
-  return (
-    <div className="aspect-video w-full rounded-xl border border-dashed border-white/15 bg-white/5 flex flex-col items-center justify-center text-center px-6">
-      <div className="text-5xl mb-4">🛠️</div>
-      <p className="text-2xl font-semibold text-white">Ups, ne-ai prins de data asta..</p>
-      <p className="mt-3 text-sm sm:text-base text-white/70 max-w-md">
-        Lucrăm la rezolvarea video pentru această problemă. Revino curând sau explorează soluția în enunțul detaliat.
-      </p>
-    </div>
-  )
-}
-
 function NoAnswerCard() {
   return (
     <div className="flex flex-col gap-4 rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-6 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)] text-center">
@@ -196,7 +169,7 @@ export default function ProblemDetailClient({
   const [imageLoaded, setImageLoaded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [insightSidebarOpen, setInsightSidebarOpen] = useState(false)
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+  const [insightChatMounted, setInsightChatMounted] = useState(false)
   const { user } = useAuth();
   const { isFree } = useSubscriptionPlan()
   const problemIcon = getProblemIcon(problem.id);
@@ -214,7 +187,12 @@ export default function ProblemDetailClient({
   const [catalogBackLoading, setCatalogBackLoading] = useState(false)
   const [wrongAnswerPenalty, setWrongAnswerPenalty] = useState<ProblemWrongAnswerPenalty | null>(null)
   const [wrongPageShake, setWrongPageShake] = useState(false)
+  const [mobileAnswerMaximised, setMobileAnswerMaximised] = useState(false)
   useSocialProofTrigger({ enabled: Boolean(user?.id) && !isClassroomEmbed, problemId: problem.id })
+
+  useEffect(() => {
+    if (insightSidebarOpen) setInsightChatMounted(true)
+  }, [insightSidebarOpen])
 
   useEffect(() => {
     if (!wrongAnswerPenalty) return
@@ -227,9 +205,11 @@ export default function ProblemDetailClient({
     setWrongAnswerPenalty(penalty)
   }, [])
 
-  const hasVideo = useMemo(() => {
-    return typeof problem.youtube_url === 'string' && problem.youtube_url.trim() !== ''
+  const youtubeVideoId = useMemo(() => {
+    if (typeof problem.youtube_url !== "string" || problem.youtube_url.trim() === "") return null
+    return extractYouTubeVideoId(problem.youtube_url)
   }, [problem.youtube_url])
+  const hasVideo = Boolean(youtubeVideoId)
   const hasAnswerCard = problem.answer_type === "value" || problem.answer_type === "grila"
   const hasProblemImage = typeof problem.image_url === "string" && problem.image_url.trim() !== ""
 
@@ -481,7 +461,7 @@ export default function ProblemDetailClient({
           className={cn(
             "px-4 sm:px-6 lg:px-12 pb-16",
             isClassroomEmbed ? "pt-4" : "pt-4 lg:pt-8",
-            !isClassroomEmbed && MOBILE_BOTTOM_NAV_PADDING_CLASS,
+            hasAnswerCard && "max-lg:pb-40",
           )}
         >
           <div className="mx-auto max-w-[1600px] space-y-10">
@@ -509,7 +489,10 @@ export default function ProblemDetailClient({
                     onClick={handleBackToCatalog}
                     disabled={catalogBackLoading}
                     aria-busy={catalogBackLoading}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10] disabled:pointer-events-none disabled:opacity-60"
+                    className={cn(
+                      "items-center gap-2 text-sm font-medium text-[#2C2F33]/70 transition hover:text-[#0b0d10] disabled:pointer-events-none disabled:opacity-60",
+                      user ? "hidden burger:inline-flex" : "inline-flex",
+                    )}
                   >
                     {catalogBackLoading ? (
                       <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
@@ -570,104 +553,163 @@ export default function ProblemDetailClient({
                     </div>
                   )}
                   <div className="space-y-6">
-                    <div className="rounded-2xl border border-[#0b0d10]/10 bg-white/95 p-6 shadow-[0_12px_30px_-24px_rgba(11,13,16,0.45)]">
+                    <div className="rounded-2xl border border-[#0b0d10]/10 bg-white/95 p-6 shadow-[0_12px_30px_-24px_rgba(11,13,16,0.45)] lg:mb-8">
                       <div className="whitespace-pre-wrap text-base font-semibold leading-relaxed text-[#2C2F33]">
                         {renderInlineMath(problem.statement)}
                       </div>
                     </div>
-                    {hasAnswerCard && (
-                      <div className="lg:hidden">
-                        <ProblemAnswerCard
-                          problem={problem}
-                          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-                          onSolvedCorrectly={handleMarkSolved}
-                          isSolved={isSolved}
-                          userId={user?.id ?? null}
-                          onWrongAnswerPenalty={handleWrongAnswerPenalty}
-                          showHintButton={!isClassroomEmbed}
-                          onHintClick={
-                            !isClassroomEmbed
-                              ? () => {
-                                  setOpenedInsightFromCard(true)
-                                  setInsightSidebarOpen(true)
-                                  setInitialHintMessage("Am nevoie de un hint")
-                                }
-                              : undefined
-                          }
-                        />
-                      </div>
-                    )}
-                    {hasProblemImage && (
-                      <div className="flex justify-center lg:hidden">
-                        {!imageLoaded && <ImageSkeleton />}
-                        <img
-                          src={problem.image_url!.replace(/^@/, '')}
-                          alt="Ilustrație problemă"
-                          className={cn(
-                            "w-full h-auto max-w-full rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
-                            !imageLoaded && 'hidden'
-                          )}
-                          onLoad={() => setImageLoaded(true)}
-                          onError={(e) => {
-                            console.error('Image failed to load:', problem.image_url, e)
-                            setImageLoaded(true)
-                          }}
-                        />
-                      </div>
-                    )}
-                    {hasProblemImage && (
-                      <div className="hidden lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.72fr)] items-start gap-6 xl:gap-8">
-                        <div className="flex justify-start">
-                          {!imageLoaded && <Skeleton className="h-72 w-full max-w-[620px] rounded-xl bg-[#dfdcd8]" />}
-                          <img
-                            src={problem.image_url!.replace(/^@/, '')}
-                            alt="Ilustrație problemă"
-                            className={cn(
-                              "h-auto w-full max-w-[620px] rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
-                              !imageLoaded && "hidden"
+
+                    {hasVideo && youtubeVideoId ? (
+                      <>
+                        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 xl:gap-8">
+                          <div className="space-y-6">
+                            {hasProblemImage && (
+                              <div className="flex justify-center lg:justify-start">
+                                {!imageLoaded && (
+                                  <Skeleton className="h-72 w-full max-w-[620px] rounded-xl bg-[#dfdcd8]" />
+                                )}
+                                <img
+                                  src={problem.image_url!.replace(/^@/, "")}
+                                  alt="Ilustrație problemă"
+                                  className={cn(
+                                    "h-auto w-full max-w-[620px] rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
+                                    !imageLoaded && "hidden"
+                                  )}
+                                  onLoad={() => setImageLoaded(true)}
+                                  onError={(e) => {
+                                    console.error("Image failed to load:", problem.image_url, e)
+                                    setImageLoaded(true)
+                                  }}
+                                />
+                              </div>
                             )}
-                            onLoad={() => setImageLoaded(true)}
-                            onError={(e) => {
-                              console.error('Image failed to load:', problem.image_url, e)
-                              setImageLoaded(true)
-                            }}
-                          />
+                            <div className="overflow-hidden rounded-2xl border border-[#0b0d10]/10 bg-white shadow-[0_12px_30px_-24px_rgba(11,13,16,0.45)]">
+                              <LazyYouTubePlayer
+                                videoId={youtubeVideoId}
+                                title="Rezolvare video"
+                                className="rounded-none shadow-none"
+                                locked={isFree}
+                                lockedLabel="Disponibil cu Planck Plus+"
+                                onLockedClick={() => setShowMobileUpgradeModal(true)}
+                              />
+                            </div>
+                          </div>
+                          <div className="hidden space-y-6 lg:block">
+                            {hasAnswerCard ? (
+                              <ProblemAnswerCard
+                                problem={problem}
+                                onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                                onSolvedCorrectly={handleMarkSolved}
+                                isSolved={isSolved}
+                                userId={user?.id ?? null}
+                                onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                                showHintButton={!isClassroomEmbed}
+                                onHintClick={
+                                  !isClassroomEmbed
+                                    ? () => {
+                                        setOpenedInsightFromCard(true)
+                                        setInsightSidebarOpen(true)
+                                        setInitialHintMessage("Am nevoie de un hint")
+                                      }
+                                    : undefined
+                                }
+                              />
+                            ) : null}
+                            <RecommendedProblemCard currentProblem={problem} subject={subject} />
+                          </div>
+                          <div className="lg:hidden">
+                            <RecommendedProblemCard currentProblem={problem} subject={subject} />
+                          </div>
                         </div>
-                        <div className="space-y-3">
-                          {hasAnswerCard ? (
-                            <ProblemAnswerCard
-                              problem={problem}
-                              onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-                              onSolvedCorrectly={handleMarkSolved}
-                              isSolved={isSolved}
-                              userId={user?.id ?? null}
-                              onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                        {renderProblemMetaBadges("hidden lg:flex")}
+                      </>
+                    ) : (
+                      <>
+                        {hasProblemImage && (
+                          <div className="flex justify-center lg:hidden">
+                            {!imageLoaded && <ImageSkeleton />}
+                            <img
+                              src={problem.image_url!.replace(/^@/, "")}
+                              alt="Ilustrație problemă"
+                              className={cn(
+                                "w-full h-auto max-w-full rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
+                                !imageLoaded && "hidden"
+                              )}
+                              onLoad={() => setImageLoaded(true)}
+                              onError={(e) => {
+                                console.error("Image failed to load:", problem.image_url, e)
+                                setImageLoaded(true)
+                              }}
                             />
-                          ) : (
-                            <NoAnswerCard />
+                          </div>
+                        )}
+                        {hasProblemImage && (
+                          <div className="hidden lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.72fr)] items-start gap-6 xl:gap-8">
+                            <div className="flex justify-start">
+                              {!imageLoaded && (
+                                <Skeleton className="h-72 w-full max-w-[620px] rounded-xl bg-[#dfdcd8]" />
+                              )}
+                              <img
+                                src={problem.image_url!.replace(/^@/, "")}
+                                alt="Ilustrație problemă"
+                                className={cn(
+                                  "h-auto w-full max-w-[620px] rounded-xl border border-[#0b0d10]/10 bg-white object-contain shadow-sm",
+                                  !imageLoaded && "hidden"
+                                )}
+                                onLoad={() => setImageLoaded(true)}
+                                onError={(e) => {
+                                  console.error("Image failed to load:", problem.image_url, e)
+                                  setImageLoaded(true)
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-3">
+                              {hasAnswerCard ? (
+                                <ProblemAnswerCard
+                                  problem={problem}
+                                  onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                                  onSolvedCorrectly={handleMarkSolved}
+                                  isSolved={isSolved}
+                                  userId={user?.id ?? null}
+                                  onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                                />
+                              ) : (
+                                <NoAnswerCard />
+                              )}
+                              {renderProblemMetaBadges("hidden lg:flex")}
+                            </div>
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            "hidden items-start gap-6 lg:grid xl:gap-8",
+                            hasProblemImage ? "grid-cols-1" : "grid-cols-2"
                           )}
-                          {renderProblemMetaBadges("hidden lg:flex")}
+                        >
+                          {!hasProblemImage && (
+                            <div className="space-y-3">
+                              {hasAnswerCard ? (
+                                <ProblemAnswerCard
+                                  problem={problem}
+                                  onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+                                  onSolvedCorrectly={handleMarkSolved}
+                                  isSolved={isSolved}
+                                  userId={user?.id ?? null}
+                                  onWrongAnswerPenalty={handleWrongAnswerPenalty}
+                                />
+                              ) : (
+                                <NoAnswerCard />
+                              )}
+                              {renderProblemMetaBadges()}
+                            </div>
+                          )}
+                          <RecommendedProblemCard currentProblem={problem} subject={subject} />
                         </div>
-                      </div>
+                      </>
                     )}
-                    <div className="pt-1 space-y-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          if (isFree) {
-                            setShowMobileUpgradeModal(true)
-                            return
-                          }
-                          if (hasVideo) setIsVideoModalOpen(true)
-                        }}
-                        disabled={!hasVideo && !isFree}
-                        className="rounded-full border-[#0b0d10]/20 bg-white/70 px-5 py-2.5 text-sm font-medium text-[#2C2F33] hover:bg-white disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        <Play className="mr-2 h-4 w-4" />
-                        {hasVideo || isFree ? "Rezolvare video" : "Video în curând"}
-                      </Button>
-                      {!isClassroomEmbed && (
+
+                    {!isClassroomEmbed && (
+                      <div className="pt-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -700,37 +742,19 @@ export default function ProblemDetailClient({
                             aria-hidden
                           />
                         </button>
-                      )}
-                    </div>
-                    <div className={cn("hidden items-start gap-6 lg:grid xl:gap-8", hasProblemImage ? "grid-cols-1" : "grid-cols-2")}>
-                      {!hasProblemImage && (
-                        <div className="space-y-3">
-                          {hasAnswerCard ? (
-                            <ProblemAnswerCard
-                              problem={problem}
-                              onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-                              onSolvedCorrectly={handleMarkSolved}
-                              isSolved={isSolved}
-                              userId={user?.id ?? null}
-                              onWrongAnswerPenalty={handleWrongAnswerPenalty}
-                            />
-                          ) : (
-                            <NoAnswerCard />
-                          )}
-                          {renderProblemMetaBadges()}
-                        </div>
-                      )}
-                      <RecommendedProblemCard currentProblem={problem} subject={subject} />
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {renderProblemMetaBadges("lg:hidden")}
               </section>
 
               {/* Pe mobil: card problema recomandată sub datele problemei, înainte de footer */}
-              <div className="lg:hidden w-full">
-                <RecommendedProblemCard currentProblem={problem} subject={subject} />
-              </div>
+              {!hasVideo && (
+                <div className="lg:hidden w-full">
+                  <RecommendedProblemCard currentProblem={problem} subject={subject} />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -796,6 +820,19 @@ export default function ProblemDetailClient({
 
       {!isClassroomEmbed && (
         <ProblemOrbButton
+          style={
+            hasAnswerCard && !insightSidebarOpen
+              ? {
+                  // Keep base clearance for the minimised bar; lift extra with GPU transform when maximised.
+                  bottom: "calc(4.75rem + env(safe-area-inset-bottom, 0px))",
+                  transform: mobileAnswerMaximised
+                    ? problem.answer_type === "grila"
+                      ? "translate3d(0, -13.5rem, 0)"
+                      : "translate3d(0, -4.25rem, 0)"
+                    : "translate3d(0, 0, 0)",
+                }
+              : undefined
+          }
           onOpenSidebar={() => {
             setOpenedInsightFromCard(false)
             setInsightSidebarOpen(true)
@@ -803,7 +840,32 @@ export default function ProblemDetailClient({
         />
       )}
 
-      {!isClassroomEmbed && (
+      {hasAnswerCard ? (
+        <div className={cn(insightSidebarOpen && "invisible pointer-events-none")}>
+          <ProblemAnswerCard
+            layout="bottomBar"
+            problem={problem}
+            onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+            onSolvedCorrectly={handleMarkSolved}
+            isSolved={isSolved}
+            userId={user?.id ?? null}
+            onWrongAnswerPenalty={handleWrongAnswerPenalty}
+            onMobileMaximisedChange={setMobileAnswerMaximised}
+            showHintButton={!isClassroomEmbed}
+            onHintClick={
+              !isClassroomEmbed
+                ? () => {
+                    setOpenedInsightFromCard(true)
+                    setInsightSidebarOpen(true)
+                    setInitialHintMessage("Am nevoie de un hint")
+                  }
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
+
+      {!isClassroomEmbed && insightChatMounted && (
         <Suspense fallback={null}>
           <InsightChatSidebar
             isOpen={insightSidebarOpen}
@@ -817,7 +879,10 @@ export default function ProblemDetailClient({
             }}
             problemId={problem.id}
             problemStatement={problem.statement || ''}
+            problemImageUrl={hasProblemImage ? problem.image_url!.replace(/^@/, '') : null}
             persona="problem_tutor"
+            enableInteractiveTutor={subject === 'physics' || subject === 'math'}
+            problemSubject={subject === 'math' ? 'math' : 'physics'}
             onMobileUpgradePrompt={() => setShowMobileUpgradeModal(true)}
             initialUserMessage={initialHintMessage}
             initialUserMessageDisplay={initialInsightDisplayOverride ?? initialHintMessage}
@@ -828,42 +893,6 @@ export default function ProblemDetailClient({
           />
         </Suspense>
       )}
-
-      <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
-        <DialogContent
-          hideClose
-          overlayClassName="z-[590]"
-          className="z-[600] max-w-4xl border border-[#0b0d10]/10 bg-[#f6f5f4] text-[#0b0d10] top-[calc(50%+32px)] sm:top-[calc(50%+36px)] md:top-[calc(50%+40px)]"
-        >
-          <DialogTitle className="sr-only">Rezolvare video</DialogTitle>
-          <DialogDescription className="sr-only">
-            Modal cu rezolvarea video pentru problema curentă.
-          </DialogDescription>
-          <div className="flex items-center justify-between pb-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-[#2C2F33]/45">Video</p>
-              <p className="text-sm font-medium text-[#2C2F33]/70">Rezolvare pentru această problemă</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsVideoModalOpen(false)}
-              className="rounded-full border border-[#0b0d10]/10 bg-white text-[#0b0d10] transition hover:bg-[#ebe9e6]"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="rounded-3xl border border-[#0b0d10]/10 bg-white p-3 shadow-[0_18px_50px_-42px_rgba(11,13,16,0.7)] sm:p-4">
-            {hasVideo ? (
-              <Suspense fallback={<VideoSkeleton />}>
-                <VideoPlayer videoUrl={problem.youtube_url!} title="Rezolvare video" />
-              </Suspense>
-            ) : (
-              <MissingVideoCard />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Plus+ trial modal when free user opens video resolution */}
       {showMobileUpgradeModal && (

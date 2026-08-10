@@ -28,6 +28,7 @@ create table if not exists public.coding_problems (
   sample_input text,
   sample_output text,
   explanation_markdown text,
+  display_id text,
   boilerplate_cpp text,
   language text not null default 'cpp',
   boilerplate_python text,

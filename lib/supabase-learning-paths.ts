@@ -75,6 +75,7 @@ export type LearningPathHubChapter = Pick<
   | "nav_title"
   | "description"
   | "icon_url"
+  | "accent_color"
   | "order_index"
   | "is_personalized"
   | "generation_status"
@@ -278,7 +279,7 @@ export async function getUserPersonalizedLearningPathHubChapters(
   const { data, error } = await client
     .from("learning_path_chapters")
     .select(
-      "id, slug, title, nav_title, description, icon_url, order_index, is_personalized, generation_status, created_at"
+      "id, slug, title, nav_title, description, icon_url, accent_color, order_index, is_personalized, generation_status, created_at"
     )
     .eq("generated_by_user_id", userId)
     .eq("is_personalized", true)

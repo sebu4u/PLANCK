@@ -1,6 +1,7 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 
 interface DashboardDetailOverlayProps {
@@ -12,13 +13,36 @@ interface DashboardDetailOverlayProps {
 
 /**
  * Full-viewport overlay used by the free-plan mobile dashboard to show the
- * "detailed" view of the traseu / leaderboard cards. The dashboard behind it
- * stays visible but blurred/dimmed to keep the opened card in focus.
+ * "detailed" view of the traseu / leaderboard cards. Portaled to document.body
+ * so it covers (and blurs) the mobile top/bottom bars along with the dashboard.
  */
 export function DashboardDetailOverlay({ open, onClose, title, children }: DashboardDetailOverlayProps) {
-  if (!open) return null
+  const [mounted, setMounted] = useState(false)
 
-  return (
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKey)
+
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [open, onClose])
+
+  if (!open || !mounted) return null
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50 p-4 backdrop-blur-md animate-in fade-in duration-200"
       role="dialog"
@@ -54,6 +78,7 @@ export function DashboardDetailOverlay({ open, onClose, title, children }: Dashb
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

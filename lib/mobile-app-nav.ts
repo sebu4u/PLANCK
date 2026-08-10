@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import { BookOpen, Calculator, Home, KeyRound, Library, NotebookPen, User, Users } from "lucide-react"
+import { isInformaticaProblemDetailRoute } from "@/lib/planckcode-shell-routes"
 
 export const MOBILE_BOTTOM_NAV_HEIGHT = "4.5rem"
 
@@ -8,6 +9,7 @@ export const MOBILE_BOTTOM_NAV_PADDING_CLASS = "mobile-bottom-nav-pad"
 export const MOBILE_BOTTOM_NAV_UPGRADE_BANNER_PADDING_CLASS = "mobile-bottom-nav-upgrade-banner-pad"
 export const MOBILE_BOTTOM_NAV_OFFSET_CLASS = "mobile-bottom-nav-offset"
 export const MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS = "mobile-bottom-nav-fab-offset"
+export const MOBILE_CURSURI_VIEWPORT_CLASS = "mobile-cursuri-viewport"
 export const MOBILE_BOTTOM_NAV_QUIZ_PADDING_CLASS = "mobile-bottom-nav-quiz-pad"
 export const MOBILE_BOTTOM_NAV_FAB_ABOVE_QUIZ_CLASS = "mobile-bottom-nav-fab-above-quiz"
 export const MOBILE_BOTTOM_NAV_DRAFT_PADDING_CLASS = "mobile-bottom-nav-draft-pad"
@@ -40,6 +42,11 @@ export function isInvataHubRoute(pathname: string | null | undefined): boolean {
 }
 
 /** Hub /exerseaza and destinations opened from it (catalogs, grile, flashcards). */
+export function isFlashcardRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/invata/flashcard-uri" || pathname.startsWith("/invata/flashcard-uri/")
+}
+
 export function isExerseazaRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return (
@@ -50,8 +57,9 @@ export function isExerseazaRoute(pathname: string | null | undefined): boolean {
     pathname.startsWith("/informatica/probleme") ||
     pathname === "/grile" ||
     pathname.startsWith("/grile/") ||
-    pathname === "/invata/flashcard-uri" ||
-    pathname.startsWith("/invata/flashcard-uri/")
+    pathname === "/teste" ||
+    pathname.startsWith("/teste/") ||
+    isFlashcardRoute(pathname)
   )
 }
 
@@ -63,6 +71,11 @@ export function isPregatireRoute(pathname: string | null | undefined): boolean {
 export function isGrileRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return pathname === "/grile" || pathname.startsWith("/grile/")
+}
+
+export function isTesteRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/teste" || pathname.startsWith("/teste/")
 }
 
 export function isMatematicaProblemsCatalogRoute(pathname: string | null | undefined): boolean {
@@ -81,6 +94,34 @@ export function isSubjectPracticeCatalogRoute(pathname: string | null | undefine
 export function isSubjectPracticeRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return pathname.startsWith("/matematica/probleme") || pathname.startsWith("/informatica/probleme")
+}
+
+/** Physics problem statement page (`/probleme/[id]`, not catalog pagination). */
+export function isPhysicsProblemDetailRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return /^\/probleme\/[^/]+$/.test(pathname) && !pathname.startsWith("/probleme/pagina")
+}
+
+/** Math problem statement page (`/matematica/probleme/[id]`). */
+export function isMatematicaProblemDetailRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return /^\/matematica\/probleme\/[^/]+$/.test(pathname)
+}
+
+/** Any practice problem statement page (physics / math / informatics). */
+export function isPracticeProblemDetailRoute(pathname: string | null | undefined): boolean {
+  return (
+    isPhysicsProblemDetailRoute(pathname) ||
+    isMatematicaProblemDetailRoute(pathname) ||
+    isInformaticaProblemDetailRoute(pathname)
+  )
+}
+
+/** Catalog hub for the current problem-detail subject. */
+export function getPracticeProblemCatalogHref(pathname: string | null | undefined): string {
+  if (isInformaticaProblemDetailRoute(pathname)) return "/informatica/probleme"
+  if (isMatematicaProblemDetailRoute(pathname)) return "/matematica/probleme"
+  return "/probleme"
 }
 
 export function isProfesorTemeRoute(pathname: string | null | undefined): boolean {
@@ -148,17 +189,22 @@ export function isMobileAppShellRoute(
     isClassroomsRoute(pathname) ||
     isProfesorRoute(pathname) ||
     isGrileRoute(pathname) ||
+    isTesteRoute(pathname) ||
     pathname === "/blog" ||
     pathname.startsWith("/blog/")
   )
 }
 
-/** Grile uses a full-screen quiz layout without the global bottom tab bar. */
+/** Grile + problem statements use a focused layout without the global bottom tab bar. */
 export function shouldShowMobileBottomNav(
   pathname: string | null | undefined,
   isAuthenticated: boolean,
 ): boolean {
-  return isMobileAppShellRoute(pathname, isAuthenticated) && !isGrileRoute(pathname)
+  return (
+    isMobileAppShellRoute(pathname, isAuthenticated) &&
+    !isGrileRoute(pathname) &&
+    !isPracticeProblemDetailRoute(pathname)
+  )
 }
 
 function formatMobileTopBarDate(): string {
@@ -207,6 +253,10 @@ export function getMobileTopBarContent(
     return { primary: "Informatica" }
   }
 
+  if (pathname === "/invata/cursuri" || pathname?.startsWith("/invata/cursuri/")) {
+    return { primary: "Cursuri" }
+  }
+
   if (pathname?.startsWith("/invata")) {
     return { primary: "Invata" }
   }
@@ -233,6 +283,10 @@ export function getMobileTopBarContent(
 
   if (pathname === "/grile") {
     return { primary: "Grile" }
+  }
+
+  if (pathname === "/teste" || pathname?.startsWith("/teste/")) {
+    return { primary: "Teste" }
   }
 
   if (pathname === "/blog" || pathname?.startsWith("/blog/")) {

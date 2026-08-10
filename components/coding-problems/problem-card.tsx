@@ -62,7 +62,7 @@ export function CodingProblemCard({ problem, onSelect, isLocked = false, showDev
     }
   }
 
-  const lockedIdentifier = problem.numeric_id ?? problem.id
+  const lockedIdentifier = problem.display_id?.trim() || problem.slug
 
   return (
     <Card className="relative flex h-full flex-col gap-4 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] p-5 text-white shadow-[0px_24px_60px_-40px_rgba(0,0,0,1)] transition hover:border-white/20 hover:bg-white/[0.08]">
@@ -115,9 +115,9 @@ export function CodingProblemCard({ problem, onSelect, isLocked = false, showDev
         </div>
 
         <div className="flex items-baseline gap-2">
-          {typeof problem.numeric_id === "number" && (
+          {problem.display_id?.trim() && (
             <span className="font-mono text-xs uppercase tracking-[0.35em] text-white/50">
-              #{problem.numeric_id}
+              {problem.display_id.trim()}
             </span>
           )}
           <h3 className="text-xl font-semibold text-white">{problem.title}</h3>

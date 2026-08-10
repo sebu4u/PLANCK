@@ -21,6 +21,7 @@ import { InformaticsProblemLivePreview } from "@/components/dashboard/informatic
 import { ArrowLeft, Loader2 } from "lucide-react"
 
 type InformaticsFormState = {
+  display_id: string
   slug: string
   title: string
   statement_markdown: string
@@ -56,6 +57,7 @@ function problemToForm(problem: Record<string, unknown>, tests: Array<Record<str
       : ""
 
   return {
+    display_id: typeof problem.display_id === "string" ? problem.display_id : "",
     slug: typeof problem.slug === "string" ? problem.slug : "",
     title: typeof problem.title === "string" ? problem.title : "",
     statement_markdown: typeof problem.statement_markdown === "string" ? problem.statement_markdown : "",
@@ -158,6 +160,7 @@ export function InformaticsProblemEditorClient({ slug }: { slug: string }) {
         method: "PATCH",
         headers,
         body: JSON.stringify({
+          display_id: form.display_id.trim(),
           slug: form.slug.trim().toLowerCase(),
           title: form.title.trim(),
           statement_markdown: form.statement_markdown.trim(),
@@ -264,6 +267,15 @@ export function InformaticsProblemEditorClient({ slug }: { slug: string }) {
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Identitate</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
+                <Label htmlFor="edit-display-id">ID catalog</Label>
+                <Input
+                  id="edit-display-id"
+                  placeholder="ex: I001"
+                  value={form.display_id}
+                  onChange={(e) => setForm({ ...form, display_id: e.target.value.toUpperCase() })}
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="edit-slug">Slug URL</Label>
                 <Input
                   id="edit-slug"
@@ -271,7 +283,7 @@ export function InformaticsProblemEditorClient({ slug }: { slug: string }) {
                   onChange={(e) => setForm({ ...form, slug: e.target.value })}
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="edit-title">Titlu</Label>
                 <Input
                   id="edit-title"

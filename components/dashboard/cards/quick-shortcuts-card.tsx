@@ -29,7 +29,7 @@ export function QuickShortcutsCard() {
     {
       icon: <BookOpen className="w-5 h-5" />,
       label: "Lessons",
-      url: "/cursuri",
+      url: "/invata/cursuri",
       color: "text-orange-400",
       bgColor: "bg-orange-500/10 hover:bg-orange-500/20 border-orange-500/20",
     },

@@ -12,6 +12,12 @@ import Image from "next/image"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { AnonLimitLockedContent } from "@/components/anon-limit-locked-content"
 import {
+  ChatMessageLimitHint,
+  ChatMessageLimitLockButton,
+  CHAT_MESSAGE_LIMIT_PLACEHOLDER,
+} from "@/components/chat-message-limit-lock"
+import { InsightProblemChatHistory } from "@/components/insight/insight-problem-chat-history"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -70,6 +76,8 @@ interface InsightIdeChatProps {
   sessionTitle?: string
   emptyStateTitle?: string
   emptyStateDescription?: string
+  /** When set (coding problem page), chats are persisted and history UI is shown. */
+  problemId?: string
 }
 
 const INSIGHT_SESSION_TITLE = "PlanckCode IDE"
@@ -443,23 +451,28 @@ export function InsightIdeChat({
   sessionTitle = INSIGHT_SESSION_TITLE,
   emptyStateTitle = "Salut, sunt Planck Agent!",
   emptyStateDescription = "Pune o întrebare despre C++ sau Python, sau lasă-mă să scriu și să corectez codul pentru tine.",
+  problemId,
 }: InsightIdeChatProps) {
   const isEmbeddedPanel = layout === "embedded-panel"
   const { user, loginWithGoogle, loginWithGitHub, subscriptionPlan } = useAuth()
   const { toast } = useToast()
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const defaultSystemMessage = useCallback(
+    (): ChatMessage => ({
       role: "system",
       content:
         "Ești Planck Agent, profesorul de informatică din PlanckCode IDE. Ajuți elevii de liceu cu C++ și Python.",
-    },
-  ])
-  const [input, setInput] = useState("")
+    }),
+    [],
+  )
+  const [messages, setMessages] = useState<ChatMessage[]>([defaultSystemMessage()])
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [loadingSession, setLoadingSession] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
+  const [messageLimitReached, setMessageLimitReached] = useState(false)
   const [loginLoading, setLoginLoading] = useState<"google" | "github" | null>(null)
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -471,6 +484,93 @@ export function InsightIdeChat({
   const [hasPendingCodeChange, setHasPendingCodeChange] = useState(false)
   const codeGeneratedRef = useRef(false)
   const didApplyFreeDefaultModelRef = useRef(false)
+
+  const handleHistoryNewChat = useCallback(() => {
+    stopStreamingSafe()
+    setSessionId(null)
+    setMessages([defaultSystemMessage()])
+    setInput("")
+    setError(null)
+    setHasPendingCodeChange(false)
+    setIsGenerating(false)
+  }, [defaultSystemMessage])
+
+  const loadSessionMessages = useCallback(
+    async (sessionIdToLoad: string, accessToken: string) => {
+      const res = await fetch(`/api/insight/messages?sessionId=${sessionIdToLoad}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!res.ok) {
+        throw new Error("Nu am putut încărca mesajele.")
+      }
+      const data = await res.json()
+      const loaded: ChatMessage[] = (data.messages || [])
+        .map((m: { role?: string; content?: string }) => ({
+          role: m.role as ChatRole,
+          content: String(m.content ?? ""),
+        }))
+        .filter(
+          (m: ChatMessage) =>
+            (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0,
+        )
+      setMessages([defaultSystemMessage(), ...loaded])
+    },
+    [defaultSystemMessage],
+  )
+
+  const handleHistorySelectSession = useCallback(
+    async (sessionIdToLoad: string) => {
+      try {
+        stopStreamingSafe()
+        setLoadingSession(true)
+        const { data } = await supabase.auth.getSession()
+        const accessToken = data.session?.access_token
+        if (!accessToken) {
+          toast({
+            title: "Eroare",
+            description: "Necesită autentificare.",
+            variant: "destructive",
+          })
+          return
+        }
+        setSessionId(sessionIdToLoad)
+        setInput("")
+        setError(null)
+        setHasPendingCodeChange(false)
+        setIsGenerating(false)
+        await loadSessionMessages(sessionIdToLoad, accessToken)
+      } catch (err) {
+        console.error("Failed to load IDE history session:", err)
+        toast({
+          title: "Eroare",
+          description: "Nu am putut încărca chat-ul selectat.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingSession(false)
+      }
+    },
+    [loadSessionMessages, toast],
+  )
+
+  function stopStreamingSafe() {
+    try {
+      abortControllerRef.current?.abort()
+    } catch {
+      // ignore
+    }
+    abortControllerRef.current = null
+    setBusy(false)
+    setIsStreaming(false)
+  }
+
+  useEffect(() => {
+    if (!problemId) return
+    setSessionId(null)
+    setMessages([defaultSystemMessage()])
+    setInput("")
+    setError(null)
+  }, [problemId, defaultSystemMessage])
 
   const handleAcceptChanges = useCallback(() => {
     setHasPendingCodeChange(false)
@@ -588,7 +688,7 @@ export function InsightIdeChat({
   }, [isStreaming])
 
   const sendMessage = useCallback(async () => {
-    if (!input.trim() || busy) return
+    if (!input.trim() || busy || messageLimitReached) return
 
     setBusy(true)
     setIsStreaming(true)
@@ -638,7 +738,10 @@ export function InsightIdeChat({
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ title: sessionTitle }),
+          body: JSON.stringify({
+            title: newUserMessage.content.slice(0, 60) || sessionTitle,
+            ...(problemId ? { problemId } : {}),
+          }),
         })
 
         if (!createRes.ok) {
@@ -700,6 +803,7 @@ export function InsightIdeChat({
           mode,
           model: selectedModel,
           contextMessages,
+          ...(problemId ? { problemId } : {}),
         }),
         signal: controller.signal,
       })
@@ -708,8 +812,14 @@ export function InsightIdeChat({
         const data = await response.json()
         const limitMessage = data.error || "Limită zilnică atinsă pentru Planck Agent."
         const isDailyLimit = Boolean(data.resetTime) || /zilnic/i.test(limitMessage)
+        const isFreeOrGuest = !user || subscriptionPlan === "free"
 
-        if (isDailyLimit) {
+        if (isFreeOrGuest) {
+          setMessageLimitReached(true)
+          setInput("")
+          setPremiumUpgradeOpen(true)
+          setMessages((prev) => prev.slice(0, -1))
+        } else if (isDailyLimit) {
           setPremiumUpgradeOpen(true)
           setMessages((prev) => prev.slice(0, -1))
         } else {
@@ -852,6 +962,8 @@ export function InsightIdeChat({
             } else if (data.type === "done") {
               if (data.anonLimitReached) {
                 anonLimitFakeStream = true
+                setMessageLimitReached(true)
+                setInput("")
                 setMessages((prev) => {
                   const updated = [...prev]
                   for (let i = updated.length - 1; i >= 0; i--) {
@@ -1104,6 +1216,8 @@ export function InsightIdeChat({
     user,
     input,
     busy,
+    messageLimitReached,
+    subscriptionPlan,
     sessionId,
     messages,
     toast,
@@ -1119,6 +1233,7 @@ export function InsightIdeChat({
     onMessageSent,
     additionalContextMessages,
     sessionTitle,
+    problemId,
   ])
 
   const handleGoogleLogin = useCallback(async () => {
@@ -1312,22 +1427,39 @@ export function InsightIdeChat({
           </div>
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            stopStreaming()
-            onClose()
-          }}
-          className="text-gray-400 hover:text-white hover:bg-white/10 shrink-0"
-        >
-          <X className="w-4 h-4" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {problemId && user ? (
+            <InsightProblemChatHistory
+              problemId={problemId}
+              currentSessionId={sessionId}
+              onSelectSession={handleHistorySelectSession}
+              onNewChat={handleHistoryNewChat}
+              refreshKey={sessionId}
+              lightTheme={false}
+            />
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              stopStreaming()
+              onClose()
+            }}
+            className="text-gray-400 hover:text-white hover:bg-white/10 shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </header>
 
         <>
           <div className={`flex-1 overflow-y-auto space-y-5 ${isEmbeddedPanel ? "px-3 py-3" : "px-4 py-5"}`}>
-            {visibleMessages.length === 0 ? (
+            {loadingSession ? (
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-white/50">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Se încarcă istoricul...
+              </div>
+            ) : visibleMessages.length === 0 ? (
               <div className={`text-center text-gray-400 text-sm space-y-2 ${isEmbeddedPanel ? "mt-8" : "mt-20"}`}>
                 <p className={`text-white ${isEmbeddedPanel ? "text-base" : "text-lg"}`}>{emptyStateTitle}</p>
                 <p className={isEmbeddedPanel ? "text-xs leading-relaxed px-2" : ""}>{emptyStateDescription}</p>
@@ -1379,6 +1511,12 @@ export function InsightIdeChat({
           </div>
 
           <div className={`space-y-3 ${isEmbeddedPanel ? "p-3" : "p-4"}`}>
+            {messageLimitReached ? (
+              <ChatMessageLimitHint
+                tone="dark"
+                onUpgradeClick={() => setPremiumUpgradeOpen(true)}
+              />
+            ) : null}
             <div className="rounded-2xl border border-[#3b3b3b] bg-[#242424] px-3 py-1.5 space-y-1">
               <textarea
                 ref={inputRef}
@@ -1387,16 +1525,23 @@ export function InsightIdeChat({
                   setInput(event.target.value)
                   adjustInputHeight()
                 }}
-                placeholder="Cu ce te pot ajuta?"
+                placeholder={
+                  messageLimitReached ? CHAT_MESSAGE_LIMIT_PLACEHOLDER : "Cu ce te pot ajuta?"
+                }
                 rows={1}
                 onKeyDown={(event) => {
+                  if (messageLimitReached) {
+                    event.preventDefault()
+                    return
+                  }
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault()
                     sendMessage()
                   }
                 }}
                 className="w-full min-h-8 max-h-[120px] resize-none overflow-y-auto bg-transparent border-0 text-[13px] leading-relaxed text-gray-100 placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-0 px-0 rounded-xl whitespace-pre-wrap break-words"
-                disabled={busy}
+                disabled={busy || messageLimitReached}
+                readOnly={messageLimitReached}
               />
               <div className="flex items-center justify-between gap-2 pt-0.5">
                 <div className="relative flex items-center h-6 w-[114px] text-[10px] font-medium rounded-xl border border-[#3b3b3b] bg-[#1c1c1c] overflow-hidden">
@@ -1412,6 +1557,7 @@ export function InsightIdeChat({
                     type="button"
                     variant="ghost"
                     onClick={() => setMode("agent")}
+                    disabled={messageLimitReached}
                     className={`relative z-10 flex-1 h-full px-0 rounded-none border border-transparent transition-colors focus-visible:ring-0 ${mode === "agent"
                       ? "text-white text-[10px] hover:text-white hover:bg-transparent"
                       : "text-gray-400 text-[10px] hover:text-gray-400 hover:bg-transparent"
@@ -1423,6 +1569,7 @@ export function InsightIdeChat({
                     type="button"
                     variant="ghost"
                     onClick={() => setMode("ask")}
+                    disabled={messageLimitReached}
                     className={`relative z-10 flex-1 h-full px-0 rounded-none border border-transparent transition-colors focus-visible:ring-0 ${mode === "ask"
                       ? "text-white text-[10px] hover:text-white hover:bg-transparent"
                       : "text-gray-400 text-[10px] hover:text-gray-400 hover:bg-transparent"
@@ -1437,6 +1584,7 @@ export function InsightIdeChat({
                       <Button
                         type="button"
                         variant="ghost"
+                        disabled={messageLimitReached}
                         className="h-7 px-3 text-[11px] font-medium text-gray-300 hover:text-white bg-transparent hover:bg-transparent flex items-center gap-1"
                       >
                         {MODEL_OPTIONS.find((m) => m.id === selectedModel)?.label || selectedModel}
@@ -1467,15 +1615,24 @@ export function InsightIdeChat({
                       })}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button
-                    type="button"
-                    onClick={isStreaming ? stopStreaming : sendMessage}
-                    disabled={!input.trim() && !isStreaming}
-                    className={`h-7 w-7 p-0 bg-transparent ${input.trim() || isStreaming ? "text-white hover:text-gray-200" : "text-gray-500"
-                      }`}
-                  >
-                    {isStreaming ? <X className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                  </Button>
+                  {messageLimitReached ? (
+                    <ChatMessageLimitLockButton
+                      onClick={() => setPremiumUpgradeOpen(true)}
+                      tone="dark"
+                      iconSize={14}
+                      className="h-7 w-7"
+                    />
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={isStreaming ? stopStreaming : sendMessage}
+                      disabled={!input.trim() && !isStreaming}
+                      className={`h-7 w-7 p-0 bg-transparent ${input.trim() || isStreaming ? "text-white hover:text-gray-200" : "text-gray-500"
+                        }`}
+                    >
+                      {isStreaming ? <X className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

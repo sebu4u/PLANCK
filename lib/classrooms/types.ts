@@ -49,6 +49,11 @@ export interface ClassroomAssignmentListItem {
   author_name: string
 }
 
+/** Assignment row for cross-classroom student lists (e.g. Exersează → Teme). */
+export interface UserAssignmentListItem extends ClassroomAssignmentListItem {
+  classroom_name: string
+}
+
 export interface ClassroomMemberOverview {
   member_id: string
   user_id: string

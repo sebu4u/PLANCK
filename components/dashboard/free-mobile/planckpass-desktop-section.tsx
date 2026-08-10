@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { usePlanckPass } from "@/hooks/use-planckpass"
+import type { PlanckPassTier } from "@/lib/planckpass/types"
 import { PlanckPassBgPattern } from "./planckpass-bg-pattern"
 import { PlanckPassClaimReveal } from "./planckpass-claim-reveal"
+import { PlanckPassLockedPreview } from "./planckpass-locked-preview"
 import {
   PLANCKPASS_DESKTOP_CARD_GAP,
   PLANCKPASS_DESKTOP_CARD_HEIGHT,
@@ -22,6 +24,7 @@ interface PlanckPassDesktopSectionProps {
 export function PlanckPassDesktopSection({ className }: PlanckPassDesktopSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { state, loading, claiming, reveal, claim, dismissReveal, error } = usePlanckPass()
+  const [previewTier, setPreviewTier] = useState<PlanckPassTier | null>(null)
   const { season, currentTier, xpCurrent, xpMax, tiers } = state
   const seasonTitle = season?.title ?? "PLANCKPASS"
   const xpPct = xpMax > 0 ? Math.min(100, Math.round((xpCurrent / xpMax) * 100)) : 0
@@ -139,6 +142,7 @@ export function PlanckPassDesktopSection({ className }: PlanckPassDesktopSection
                           onClaim={(t) => {
                             void claim(t.tier).catch(() => {})
                           }}
+                          onPreview={setPreviewTier}
                         />
                       ) : null}
                     </div>
@@ -153,6 +157,7 @@ export function PlanckPassDesktopSection({ className }: PlanckPassDesktopSection
                           onClaim={(t) => {
                             void claim(t.tier).catch(() => {})
                           }}
+                          onPreview={setPreviewTier}
                         />
                       ) : null}
                     </div>
@@ -165,6 +170,9 @@ export function PlanckPassDesktopSection({ className }: PlanckPassDesktopSection
       </div>
 
       {reveal ? <PlanckPassClaimReveal reward={reveal} onClose={dismissReveal} /> : null}
+      {previewTier && !reveal ? (
+        <PlanckPassLockedPreview tier={previewTier} onClose={() => setPreviewTier(null)} />
+      ) : null}
     </section>
   )
 }

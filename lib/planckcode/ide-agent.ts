@@ -4,8 +4,14 @@ import OpenAI from "openai"
 import type { InsightModel } from "@/lib/insight-limits"
 
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-const DEFAULT_FLASH_MODEL = "deepseek-v4-flash"
+/** Default DeepSeek flash model for IDE agent, main chat, and problem_tutor. */
+export const DEFAULT_FLASH_MODEL = "deepseek-v4-flash"
 const REASONER_MODEL = "deepseek-reasoner"
+
+/** Always returns the flash model (never reasoner). Used by problem_tutor. */
+export function getIdeAgentFlashModel(): string {
+  return DEFAULT_FLASH_MODEL
+}
 
 export function getIdeAgentProviderConfig() {
   const overrideKey = process.env.PERSONALIZED_COURSE_API_KEY?.trim()
@@ -36,6 +42,29 @@ export function getIdeAgentClient() {
 
 export function isIdeDeepThinkingModel(model: InsightModel) {
   return model === "deep-thinking"
+}
+
+/**
+ * DeepSeek V4 enables thinking (high effort) by default. Flash / problem_tutor must
+ * opt out or the UI waits on reasoning_content before any visible content tokens.
+ * Pass the returned object into chat.completions.create (extra body fields).
+ */
+export function deepseekThinkingExtra(opts: { enabled: boolean }) {
+  return { thinking: { type: opts.enabled ? ("enabled" as const) : ("disabled" as const) } }
+}
+
+/**
+ * Whether DeepSeek thinking should stay on for this Insight/IDE request.
+ * problem_tutor and flash paths stay off for low TTFT; deep-thinking keeps it on.
+ */
+export function shouldEnableDeepseekThinking(opts: {
+  useDeepSeekClient: boolean
+  isProblemTutor?: boolean
+  model: InsightModel
+}): boolean {
+  if (!opts.useDeepSeekClient) return false
+  if (opts.isProblemTutor) return false
+  return isIdeDeepThinkingModel(opts.model)
 }
 
 /**

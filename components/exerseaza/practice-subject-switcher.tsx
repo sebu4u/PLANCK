@@ -24,7 +24,10 @@ export function PracticeSubjectSwitcher({
   const { selectSubject, isSaving } = usePracticeSubjectSwitcher(currentSubject, { navigateOnChange })
 
   return (
-    <div className={cn(isSaving && "pointer-events-none opacity-60", className)}>
+    <div
+      data-guide-anchor="subject-switcher"
+      className={cn(isSaving && "pointer-events-none opacity-60", className)}
+    >
       <ExerseazaSubjectSelector
         selectedId={currentSubject}
         onSelect={selectSubject}

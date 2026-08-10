@@ -5,6 +5,7 @@ import { Search, SlidersHorizontal, ChevronDown, ChevronRight, X } from "lucide-
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { CatalogLanguageFilter as CatalogLanguageFilterControl } from "@/components/catalog/catalog-language-filter"
 import {
   CATALOG_CHAPTER_OPTIONS,
   CATALOG_CLASS_OPTIONS,
@@ -19,7 +20,10 @@ export interface FilterState {
   progress: "Toate" | "Nerezolvate" | "Rezolvate"
   class: string
   chapter: string
+  language?: CatalogLanguageFilter
 }
+
+export type CatalogLanguageFilter = "Toate" | "cpp" | "python"
 
 export interface SidebarProgress {
   total: number
@@ -35,6 +39,7 @@ export interface CatalogSidebarConfig {
   chapterOptions: Record<string, string[]>
   difficultyOptions: readonly string[]
   showProgress?: boolean
+  showLanguageFilter?: boolean
 }
 
 interface ProblemsCatalogSidebarProps {
@@ -61,6 +66,7 @@ const hasActiveFilters = (filters: FilterState, defaultClass: string | null) =>
   Boolean(filters.search) ||
   filters.difficulty !== "Toate" ||
   filters.progress !== "Toate" ||
+  (filters.language != null && filters.language !== "Toate") ||
   (defaultClass != null && filters.class !== defaultClass) ||
   filters.chapter !== "Toate"
 
@@ -79,9 +85,11 @@ export function ProblemsCatalogSidebar({
   config,
 }: ProblemsCatalogSidebarProps) {
   const classOptions = config?.classOptions ?? CATALOG_CLASS_OPTIONS
-  const chapterOptions = config?.chapterOptions ?? CATALOG_CHAPTER_OPTIONS
+  const chapterOptionsMap = (config?.chapterOptions ?? CATALOG_CHAPTER_OPTIONS) as Record<string, string[]>
   const difficultyOptions = config?.difficultyOptions ?? DEFAULT_DIFFICULTY_OPTIONS
   const showProgress = config?.showProgress ?? true
+  const showLanguageFilter = config?.showLanguageFilter ?? false
+  const languageValue = filters.language ?? "Toate"
 
   const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(classOptions.map((cls) => [cls, false])),
@@ -108,6 +116,7 @@ export function ProblemsCatalogSidebar({
       progress: "Toate",
       class: lockedClass ?? "Toate",
       chapter: "Toate",
+      language: "Toate",
     })
   }
 
@@ -184,10 +193,20 @@ export function ProblemsCatalogSidebar({
           </div>
         )}
 
+        {showLanguageFilter && (
+          <div className="lg:hidden">
+            <CatalogLanguageFilterControl
+              variant="sidebar"
+              value={languageValue}
+              onChange={(language) => updateFilters({ language })}
+            />
+          </div>
+        )}
+
         <div className="space-y-2 border-t border-[#0b0c0f]/10 pt-4">
           {classOptions.map((cls) => {
             const classProgress = progressByClass[cls]
-            const chapters = chapterOptions[cls] ?? []
+            const chapters = chapterOptionsMap[cls] ?? []
             const isActiveClass = filters.class === cls
             const isOpen = expandedClasses[cls]
             return (
@@ -211,7 +230,7 @@ export function ProblemsCatalogSidebar({
 
                 {isOpen && chapters.length > 0 && (
                   <div className="max-h-[320px] space-y-1 overflow-y-auto border-t border-[#0b0c0f]/10 px-2 py-2">
-                    {chapters.map((chapter) => {
+                    {chapters.map((chapter: string) => {
                       const chapterProgress = classProgress?.chapters?.[chapter]
                       const isActiveChapter = isActiveClass && filters.chapter === chapter
                       return (

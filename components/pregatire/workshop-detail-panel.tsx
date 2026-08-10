@@ -37,7 +37,7 @@ export function WorkshopDetailPanel({
 }: {
   workshop: WorkshopDetail
   isLoggedIn: boolean
-  onBalanceChange?: (balance: number) => void
+  onBalanceChange?: (next: { balance: number; carryoverBalance: number }) => void
   onUnlocked?: (workshop: WorkshopDetail) => void
   showBack?: boolean
   compact?: boolean
@@ -100,7 +100,12 @@ export function WorkshopDetailPanel({
       }
       setWorkshop(next)
       onUnlocked?.(next)
-      if (typeof payload.balance === "number") onBalanceChange?.(payload.balance)
+      if (typeof payload.balance === "number") {
+        onBalanceChange?.({
+          balance: payload.balance,
+          carryoverBalance: typeof payload.carryoverBalance === "number" ? payload.carryoverBalance : 0,
+        })
+      }
       toast({
         title: payload.already_unlocked ? "Deja deblocat" : "Pregătire deblocată",
         description: past

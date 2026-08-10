@@ -20,6 +20,7 @@ import { LockedLevelStickyCard } from "@/components/invata/locked-level-sticky-c
 import { LearningPathTrail } from "@/components/invata/learning-path-trail"
 import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
+import { FizicaLessonIrisTransition } from "@/components/invata/fizica-lesson-iris-transition"
 import { LearningPathUpNextSection } from "@/components/invata/learning-path-up-next-section"
 import { cn } from "@/lib/utils"
 
@@ -129,6 +130,7 @@ export function LearningPathLessonPage({
   const router = useRouter()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialSelectedItemId ?? items[0]?.id ?? null)
   const [isOpeningItem, setIsOpeningItem] = useState(false)
+  const [isIrisActive, setIsIrisActive] = useState(false)
   const [premiumComparisonOpen, setPremiumComparisonOpen] = useState(false)
   const [isOpeningNextLesson, setIsOpeningNextLesson] = useState(false)
   const [isSelectedItemInViewport, setIsSelectedItemInViewport] = useState(false)
@@ -136,6 +138,7 @@ export function LearningPathLessonPage({
   const [progressButtonMounted, setProgressButtonMounted] = useState(false)
   const [progressButtonExiting, setProgressButtonExiting] = useState(false)
   const progressButtonMountedRef = useRef(false)
+  const pendingItemHrefRef = useRef<string | null>(null)
   const completedItemIdSet = useMemo(() => new Set(completedItemIds), [completedItemIds])
   const showContinueCard = isSelectedItemInViewport
 
@@ -164,12 +167,19 @@ export function LearningPathLessonPage({
     nextLesson?.description?.trim() || "Continuă parcursul cu următoarea lecție."
 
   const handleOpenItem = () => {
-    if (!selectedItemHref || isOpeningItem) return
+    if (!selectedItemHref || isOpeningItem || isIrisActive) return
 
     setIsOpeningItem(true)
+    pendingItemHrefRef.current = selectedItemHref
     router.prefetch(selectedItemHref)
-    router.push(selectedItemHref)
+    setIsIrisActive(true)
   }
+
+  const handleIrisComplete = useCallback(() => {
+    const href = pendingItemHrefRef.current
+    if (!href) return
+    router.push(href)
+  }, [router])
 
   const handleSelectItem = (itemId: string) => {
     setSelectedItemId(itemId)
@@ -304,10 +314,10 @@ export function LearningPathLessonPage({
   }, [initialSelectedItemId, items])
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 pt-16 pb-6 sm:px-8 lg:px-12 lg:pt-28 lg:pb-10">
-      <div className="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3 lg:sticky lg:top-28 lg:self-start">
-          <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden lg:rounded-[24px] lg:border lg:border-[#e8e2ee] lg:bg-white lg:p-5 lg:shadow-[0_12px_32px_rgba(82,44,111,0.08)]">
+    <div className="mx-auto w-full max-w-7xl px-5 pt-16 pb-6 sm:px-8 lg:px-12 lg:pt-32 lg:pb-10">
+      <div className="grid items-start gap-8 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
+        <div className="flex w-full flex-col gap-3 lg:sticky lg:top-28 lg:z-20 lg:ml-16 lg:w-[360px] lg:max-w-[360px] lg:self-start xl:ml-28 xl:w-[400px] xl:max-w-[400px]">
+          <aside className="border-0 bg-transparent p-0 shadow-none lg:max-h-[calc(100vh-8rem)] lg:w-full lg:overflow-hidden lg:rounded-[24px] lg:border-[3px] lg:border-[#e5e5e5] lg:bg-white lg:p-5">
             <div className="flex w-full justify-center bg-transparent lg:justify-start">
               {lesson.image_url ? (
                 <img
@@ -323,7 +333,9 @@ export function LearningPathLessonPage({
               )}
             </div>
             <div className="mt-5 w-full text-center lg:mt-4 lg:text-left">
-              <p className="mb-0 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6fac] sm:text-xs lg:mb-2 lg:block">Level 1</p>
+              <p className="mb-0 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6fac] sm:text-xs lg:mb-2 lg:block">
+                {chapter.title}
+              </p>
               <h1 className="text-xl font-bold leading-tight text-[#111111] sm:text-2xl lg:mt-1">{lesson.title}</h1>
               <p className="mt-3 text-sm leading-snug text-[#6f657b] lg:mt-3 lg:text-sm">
                 {lesson.description || "Construiește pas cu pas această lecție."}
@@ -342,7 +354,7 @@ export function LearningPathLessonPage({
           </Link>
         </div>
 
-        <section className="relative flex min-w-0 flex-col items-center">
+        <section className="relative min-w-0 w-full">
           {items.length ? (
             <>
               <LearningPathTrail
@@ -368,6 +380,7 @@ export function LearningPathLessonPage({
                       labelColorClass={theme.label}
                       isLocked={false}
                       isColored={isLevelColored}
+                      className={levelNumber === 1 ? "lg:mb-12" : undefined}
                     />
 
                     <div className="relative flex w-full flex-col items-center">
@@ -385,7 +398,7 @@ export function LearningPathLessonPage({
                           <div
                             key={item.id}
                             id={`learning-path-item-node-${item.id}`}
-                            className={`relative mb-20 w-fit max-w-full sm:mb-10 ${offsetClass} ${isTest ? "mx-auto" : ""}`}
+                            className={`relative mb-20 w-fit max-w-full sm:mb-10 lg:mb-16 ${offsetClass} ${isTest ? "mx-auto" : ""}`}
                           >
                             <button
                               type="button"
@@ -582,13 +595,16 @@ export function LearningPathLessonPage({
                     )}
                     aria-hidden="true"
                   />
-                  <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-2 lg:bottom-6 lg:left-[calc(360px+2rem)] lg:right-8 xl:left-[calc(400px+2rem)]">
-                    <div
-                      className={cn(
-                        "relative w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,28rem)] lg:w-[min(100%,320px)]",
-                        progressButtonMounted && "min-h-9",
-                      )}
-                    >
+                  <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-2 lg:bottom-6">
+                    <div className="mx-auto grid w-full max-w-7xl px-4 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-8 lg:px-12 xl:grid-cols-[400px_minmax(0,1fr)]">
+                      <div className="hidden lg:block" aria-hidden="true" />
+                      <div className="pointer-events-auto flex w-full justify-center">
+                        <div
+                          className={cn(
+                            "relative w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,28rem)]",
+                            progressButtonMounted && "min-h-9",
+                          )}
+                        >
                       {progressButtonMounted ? (
                         <button
                           type="button"
@@ -614,7 +630,7 @@ export function LearningPathLessonPage({
                           className={cn(
                             "transition-[transform,opacity] duration-300",
                             showContinueCard
-                              ? "relative translate-y-0 opacity-100"
+                              ? "pointer-events-auto relative translate-y-0 opacity-100"
                               : "pointer-events-none absolute inset-x-0 bottom-0 translate-y-8 opacity-0",
                           )}
                         >
@@ -632,7 +648,7 @@ export function LearningPathLessonPage({
                           <div className="relative z-10 -mt-[min(200px,35vh)] w-full">
                             <div
                               key={selectedItem.id}
-                              className="animate-learning-path-card-pop w-full rounded-[20px] border border-[#e9e0f0] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)]"
+                              className="animate-learning-path-card-pop w-full rounded-[28px] border-[2px] border-[#e5e5e5] bg-white px-5 py-4 shadow-[0_12px_28px_rgba(82,44,111,0.08)]"
                             >
                       {freeAccess ? (
                         <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7c3aed]">
@@ -659,7 +675,7 @@ export function LearningPathLessonPage({
                             <button
                               type="button"
                               onClick={() => setPremiumComparisonOpen(true)}
-                              className="mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-[#1e293b] transition-[transform,box-shadow] hover:translate-y-0.5 active:translate-y-0.5"
+                              className="mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-3.5 text-sm font-semibold text-[#1e293b] transition-[transform,box-shadow] hover:translate-y-0.5 active:translate-y-0.5"
                               style={PREMIUM_CONTINUE_BUTTON_STYLE}
                             >
                               {buttonLabel}
@@ -673,7 +689,7 @@ export function LearningPathLessonPage({
                             onClick={handleOpenItem}
                             disabled={isOpeningItem}
                             aria-busy={isOpeningItem}
-                            className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] hover:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-3 py-3.5 text-sm font-semibold text-white transition-[transform,box-shadow] hover:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
                             style={{
                               "--start-glow-tint": selectedTheme.glow,
                               backgroundImage: `linear-gradient(to right, ${selectedTheme.from}, ${selectedTheme.to})`,
@@ -695,6 +711,8 @@ export function LearningPathLessonPage({
                           </div>
                         </div>
                       ) : null}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </>
@@ -710,6 +728,7 @@ export function LearningPathLessonPage({
       {premiumComparisonOpen ? (
         <FreePlanComparisonOverlay onClose={() => setPremiumComparisonOpen(false)} />
       ) : null}
+      <FizicaLessonIrisTransition active={isIrisActive} onComplete={handleIrisComplete} />
     </div>
   )
 }

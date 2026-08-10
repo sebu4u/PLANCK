@@ -1,6 +1,8 @@
 import type { Problem } from "@/data/problems"
+import type { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import type { QuizQuestion, AnswerKey } from "@/lib/types/quiz-questions"
 import { getCorrectAnswerKeys } from "@/lib/quiz-question-utils"
+import { buildCodingProblemAgentContext } from "@/lib/coding-problem-agent-context"
 
 /** First user message sent when learner taps „De ce?” (full text goes to the model). */
 export const LEARNING_PATH_EXPLAIN_INITIAL_PROMPT =
@@ -203,6 +205,102 @@ export function formatFillSlotLearningPathContext(params: {
     resultLine,
   )
   return parts.join("\n")
+}
+
+export function formatCodingProblemLearningPathContext(params: {
+  problem: CodingProblem
+  examples: CodingProblemExample[]
+  activeFileName?: string
+  activeFileLanguage?: string
+  activeFileContent?: string
+}): string {
+  const parts: string[] = [
+    "Tip exercițiu: problemă de informatică cu rulare cod (learning path).",
+    "",
+    buildCodingProblemAgentContext(params.problem, params.examples),
+  ]
+
+  const code = params.activeFileContent?.trim()
+  if (code) {
+    const lang =
+      params.activeFileLanguage?.trim() ||
+      (params.problem.language === "python" ? "python" : "cpp")
+    parts.push(
+      "",
+      "Cod curent în editor (fișierul activ al elevului):",
+      params.activeFileName?.trim() ? `Fișier: ${params.activeFileName.trim()}` : "",
+      `Limbaj: ${lang}`,
+      "",
+      "```" + lang,
+      code,
+      "```",
+    )
+  } else {
+    parts.push("", "Cod în editor: elevul nu a editat încă sau fișierul activ este gol.")
+  }
+
+  return parts.filter((line) => line !== "").join("\n")
+}
+
+export function formatCodeTraceLearningPathContext(params: {
+  language?: string
+  lines: string[]
+  stepIndex: number
+  totalSteps: number
+  highlightedLineIndex?: number
+  prompt?: string
+  inputMode?: "choice" | "text"
+  options?: string[]
+  userTextAnswer?: string
+  userChoice?: string | null
+  completed: boolean
+}): string {
+  const numberedCode = params.lines
+    .map((line, i) => {
+      const marker =
+        params.highlightedLineIndex === i && !params.completed ? "  <-- linie evidențiată" : ""
+      return `${String(i + 1).padStart(2, " ")} | ${line}${marker}`
+    })
+    .join("\n")
+
+  const parts: string[] = [
+    "Tip exercițiu: urmărire execuție cod (code_trace — learning path).",
+    params.language?.trim() ? `Limbaj: ${params.language.trim()}.` : "",
+    "",
+    "Cod afișat:",
+    numberedCode || "(gol)",
+  ]
+
+  if (params.completed) {
+    parts.push(
+      "",
+      `Elevul a parcurs toți cei ${params.totalSteps} pași cu întrebări.`,
+    )
+    return parts.filter((line) => line !== "").join("\n")
+  }
+
+  parts.push(
+    "",
+    `Pas curent cu întrebare: ${params.stepIndex} din ${params.totalSteps}.`,
+  )
+
+  if (params.prompt?.trim()) {
+    parts.push("", "Întrebarea afișată la acest pas:", params.prompt.trim())
+  }
+
+  if (params.inputMode === "choice" && params.options?.length) {
+    parts.push(
+      "",
+      "Opțiuni disponibile:",
+      params.options.map((o, i) => `${i + 1}) ${o}`).join("\n"),
+      "",
+      `Opțiunea aleasă de elev: ${params.userChoice ?? "(niciuna)"}.`,
+    )
+  } else {
+    parts.push("", `Răspuns text introdus de elev: ${params.userTextAnswer?.trim() || "(gol)"}.`)
+  }
+
+  return parts.filter((line) => line !== "").join("\n")
 }
 
 /** First user message when learner taps „De ce?” on reveal-steps quiz cards. */

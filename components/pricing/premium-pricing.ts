@@ -1,3 +1,6 @@
+import type { LucideIcon } from "lucide-react"
+import { Ban, Route, Sparkles, Users } from "lucide-react"
+
 export type PremiumBillingInterval = "week" | "month" | "year"
 
 export const PREMIUM_WEEKLY_RON = 79
@@ -17,6 +20,25 @@ export const PREMIUM_FEATURE_BULLETS = [
   "2-3 workshop-uri incluse în fiecare săptămână",
   "Acces complet la PlanckPass",
   "Fizică, Matematică, Informatică, Biologie — tot ce ai nevoie pentru BAC",
+] as const
+
+/** Short marketing bullets (icon + 3-4 words) for the desktop left panel. */
+export const PREMIUM_LEFT_BENEFITS: ReadonlyArray<{
+  icon: LucideIcon
+  label: string
+}> = [
+  { icon: Route, label: "Trasee complete de învățare" },
+  { icon: Sparkles, label: "Insight 2.5 nelimitat" },
+  { icon: Users, label: "Workshop-uri săptămânale" },
+  { icon: Ban, label: "Fără reclame, fără limite" },
+]
+
+/** Condensed bullet list shown directly on the pricing card. */
+export const PREMIUM_CARD_BULLETS = [
+  "Toate traseele de învățare, la orice materie",
+  "Tutorul AI Insight 2.5, fără limite",
+  "2-3 workshop-uri incluse în fiecare săptămână",
+  "Acces complet la PlanckPass",
 ] as const
 
 export const PREMIUM_PRICING_FAQ = [

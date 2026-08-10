@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabaseClient'
 import { slugify } from '@/lib/slug'
+import {
+  DEFAULT_CURSURI_SUBJECT,
+  type CursuriSubjectId,
+} from '@/lib/cursuri-subjects'
 
 // Tipuri pentru baza de date
 export interface Grade {
@@ -9,6 +13,7 @@ export interface Grade {
   description: string | null
   order_index: number
   is_active: boolean
+  subject: CursuriSubjectId
   created_at: string
   updated_at: string
 }
@@ -51,11 +56,14 @@ export interface LessonSummary {
 
 // Funcții pentru a obține datele din Supabase
 
-export async function getAllGrades(): Promise<Grade[]> {
+export async function getAllGrades(
+  subject: CursuriSubjectId = DEFAULT_CURSURI_SUBJECT
+): Promise<Grade[]> {
   const { data, error } = await supabase
     .from('grades')
     .select('*')
     .eq('is_active', true)
+    .eq('subject', subject)
     .order('order_index')
 
   if (error) {
@@ -63,7 +71,7 @@ export async function getAllGrades(): Promise<Grade[]> {
     return []
   }
 
-  return data || []
+  return (data || []) as Grade[]
 }
 
 export async function getGradeById(id: string): Promise<Grade | null> {
@@ -82,11 +90,15 @@ export async function getGradeById(id: string): Promise<Grade | null> {
   return data
 }
 
-export async function getGradeByNumber(gradeNumber: number): Promise<Grade | null> {
+export async function getGradeByNumber(
+  gradeNumber: number,
+  subject: CursuriSubjectId = DEFAULT_CURSURI_SUBJECT
+): Promise<Grade | null> {
   const { data, error } = await supabase
     .from('grades')
     .select('*')
     .eq('grade_number', gradeNumber)
+    .eq('subject', subject)
     .eq('is_active', true)
     .single()
 
@@ -95,7 +107,7 @@ export async function getGradeByNumber(gradeNumber: number): Promise<Grade | nul
     return null
   }
 
-  return data
+  return data as Grade | null
 }
 
 export async function getChaptersByGradeId(gradeId: string): Promise<Chapter[]> {
@@ -221,21 +233,37 @@ export async function getLessonById(id: string): Promise<Lesson | null> {
   return data
 }
 
-export async function getLessonBySlug(slug: string): Promise<Lesson | null> {
+export async function getLessonBySlug(
+  slug: string,
+  subject?: CursuriSubjectId
+): Promise<Lesson | null> {
   const normalizedSlug = slug.trim()
   if (!normalizedSlug) return null
 
-  const grades = await getAllGrades()
+  const subjects: CursuriSubjectId[] = subject
+    ? [subject]
+    : [
+        'fizica',
+        'mate',
+        'info-cpp',
+        'info-py',
+        'chimie',
+        'biologie',
+      ]
 
-  for (const grade of grades) {
-    const chapters = await getChaptersByGradeId(grade.id)
+  for (const subjectId of subjects) {
+    const grades = await getAllGrades(subjectId)
 
-    for (const chapter of chapters) {
-      const summaries = await getLessonSummariesByChapterId(chapter.id)
-      const matchedLesson = summaries.find((lesson) => slugify(lesson.title) === normalizedSlug)
+    for (const grade of grades) {
+      const chapters = await getChaptersByGradeId(grade.id)
 
-      if (matchedLesson) {
-        return getLessonById(matchedLesson.id)
+      for (const chapter of chapters) {
+        const summaries = await getLessonSummariesByChapterId(chapter.id)
+        const matchedLesson = summaries.find((lesson) => slugify(lesson.title) === normalizedSlug)
+
+        if (matchedLesson) {
+          return getLessonById(matchedLesson.id)
+        }
       }
     }
   }
@@ -358,6 +386,7 @@ export async function getRandomLessonsForDashboard(count: number = 3): Promise<{
   chapter_title: string
   grade_number: number
   estimated_duration: number | null
+  subject: CursuriSubjectId
 }[]> {
   // Fetch all lessons with chapter and grade info
   const { data: lessons, error } = await supabase
@@ -371,7 +400,8 @@ export async function getRandomLessonsForDashboard(count: number = 3): Promise<{
         title,
         grade_id,
         grades!inner (
-          grade_number
+          grade_number,
+          subject
         )
       )
     `)
@@ -392,5 +422,6 @@ export async function getRandomLessonsForDashboard(count: number = 3): Promise<{
     chapter_title: lesson.chapters?.title || 'Capitol',
     grade_number: lesson.chapters?.grades?.grade_number || 9,
     estimated_duration: lesson.estimated_duration,
+    subject: (lesson.chapters?.grades?.subject || DEFAULT_CURSURI_SUBJECT) as CursuriSubjectId,
   }))
 }

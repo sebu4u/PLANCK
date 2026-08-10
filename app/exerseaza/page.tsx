@@ -3,6 +3,7 @@ import { Navigation } from "@/components/navigation"
 import { ExerseazaHub } from "@/components/exerseaza/exerseaza-hub"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
+import { getAssignmentsForUser } from "@/lib/classrooms/server"
 import { fetchExerseazaCounts } from "@/lib/exerseaza-counts"
 import { generateMetadata } from "@/lib/metadata"
 import { resolveExerseazaRedirect } from "@/lib/practice-subject"
@@ -29,14 +30,17 @@ export default async function ExerseazaPage() {
     if (redirectPath) redirect(redirectPath)
   }
 
-  const counts = await fetchExerseazaCounts()
+  const [counts, assignments] = await Promise.all([
+    fetchExerseazaCounts(),
+    user ? getAssignmentsForUser(user.id) : Promise.resolve([]),
+  ])
 
   return (
     <CatalogThemeProvider catalogType="physics">
       <CatalogThemeBackground defaultBackgroundClass="bg-[#ffffff]">
         <Navigation />
         <div className="relative h-[100dvh] overflow-hidden bg-[#ffffff] pt-14 burger:pt-16">
-          <ExerseazaHub counts={counts} />
+          <ExerseazaHub counts={counts} assignments={assignments} />
         </div>
       </CatalogThemeBackground>
     </CatalogThemeProvider>

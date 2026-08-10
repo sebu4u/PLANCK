@@ -3,9 +3,13 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  classroomAnnouncementNotificationCopy,
+  notifyClassroomStudents,
+} from "@/lib/classrooms/in-app-notifications"
+import { classroomCoverPublicPath, listClassroomCoverFilenames } from "@/lib/classrooms/cover-images"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
-import { classroomCoverPublicPath, listClassroomCoverFilenames } from "@/lib/classrooms/cover-images"
 
 const JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -352,15 +356,42 @@ export async function createAnnouncementAction(formData: FormData) {
     lesson_slug: normalizedType === "lesson" ? lessonSlug : null,
   }
 
-  const { error } = await supabase.from("announcements").insert(payload)
-  if (error) {
+  const { data: announcement, error } = await supabase
+    .from("announcements")
+    .insert(payload)
+    .select("id")
+    .single()
+  if (error || !announcement) {
     console.error("createAnnouncementAction insert error:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
     })
     redirect(`/classrooms/${classroomId}?error=announcement_failed`)
+  }
+
+  const { data: classroom } = await supabase
+    .from("classrooms")
+    .select("name")
+    .eq("id", classroomId)
+    .maybeSingle()
+  const copy = classroomAnnouncementNotificationCopy({
+    type: normalizedType,
+    content: payload.content,
+    classroomName: classroom?.name ?? "",
+  })
+  try {
+    await notifyClassroomStudents({
+      classroomId,
+      type: "classroom_announcement",
+      title: copy.title,
+      body: copy.body,
+      href: `/classrooms/${classroomId}`,
+      announcementId: announcement.id,
+    })
+  } catch (notifyError) {
+    console.error("createAnnouncementAction notify error:", notifyError)
   }
 
   revalidatePath(`/classrooms/${classroomId}`)
@@ -421,6 +452,25 @@ export async function createAssignmentAction(formData: FormData) {
     redirect(
       `/classrooms/${classroomId}/assignments?error=assignment_problem_link_failed&reason=${encodeURIComponent(linkError.code + ": " + linkError.message)}`
     )
+  }
+
+  const { data: classroom } = await supabase
+    .from("classrooms")
+    .select("name")
+    .eq("id", classroomId)
+    .maybeSingle()
+  const classroomName = classroom?.name?.trim() || "clasă"
+  try {
+    await notifyClassroomStudents({
+      classroomId,
+      type: "classroom_assignment",
+      title: "Temă nouă",
+      body: `${title} · ${classroomName}`,
+      href: `/classrooms/${classroomId}/assignments/${assignment.id}`,
+      assignmentId: assignment.id,
+    })
+  } catch (notifyError) {
+    console.error("createAssignmentAction notify error:", notifyError)
   }
 
   revalidatePath(`/classrooms/${classroomId}`)

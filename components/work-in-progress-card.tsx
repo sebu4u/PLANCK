@@ -23,28 +23,22 @@ export function WorkInProgressCard() {
 
     return (
         <div className="mx-4 lg:mx-6 mt-4 lg:mt-6 mb-0">
-            <div
-                className="relative overflow-hidden rounded-r-lg border-l-4 border-amber-500 py-2 px-4 shadow-lg backdrop-blur-sm"
-                style={{
-                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.25) 100%)',
-                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
-                }}
-            >
+            <div className="relative overflow-hidden rounded-r-lg border border-amber-200 border-l-4 border-l-amber-500 bg-amber-50 py-2 px-4 shadow-sm">
                 <div className="flex items-start gap-3">
                     <button
                         onClick={handleClose}
-                        className="flex-shrink-0 text-amber-200/80 hover:text-white transition-colors duration-200 mt-0.5 p-0.5 hover:bg-white/10 rounded-full"
+                        className="flex-shrink-0 text-amber-700/70 hover:text-amber-900 transition-colors duration-200 mt-0.5 p-0.5 hover:bg-amber-100 rounded-full"
                         aria-label="Închide avertismentul"
                     >
                         <X className="w-4 h-4" />
                     </button>
 
-                    <div className="flex-1 text-white">
-                        <h3 className="text-sm font-bold text-amber-100 mb-0.5 flex items-center gap-2">
+                    <div className="flex-1 text-amber-950">
+                        <h3 className="text-sm font-bold text-amber-900 mb-0.5 flex items-center gap-2">
                             <AlertTriangle className="w-3.5 h-3.5" />
                             Conținut în lucru
                         </h3>
-                        <p className="text-xs lg:text-sm leading-snug text-white/90">
+                        <p className="text-xs lg:text-sm leading-snug text-amber-900/80">
                             Momentan lucrăm intens la dezvoltarea acestor cursuri și conținutul nu este încă finalizat. Vă mulțumim pentru răbdare și înțelegere în timp ce pregătim materiale de cea mai bună calitate!
                         </p>
                     </div>

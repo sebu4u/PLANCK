@@ -75,6 +75,7 @@ function initialInformaticsForm() {
     INFORMATICA_CATALOG_CHAPTER_OPTIONS[9][0] ?? "Capitol neclasificat"
 
   return {
+    display_id: "",
     slug: "",
     title: "",
     statement_markdown: "",
@@ -254,6 +255,7 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: DevSubjectKey }) {
         headers,
         body: JSON.stringify({
           catalog: "informatics",
+          display_id: infoForm.display_id.trim(),
           slug: infoForm.slug.trim().toLowerCase(),
           title: infoForm.title.trim(),
           statement_markdown: infoForm.statement_markdown.trim(),
@@ -653,12 +655,21 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: DevSubjectKey }) {
             <div className="grid gap-8 xl:grid-cols-2 xl:items-start">
               <div className="space-y-8">
               <p className="text-xs text-gray-500">
-                Completează câmpurile obligatorii (slug, titlu, enunț) și cel puțin un test judge. Restul sunt opționale.
+                Completează câmpurile obligatorii (ID catalog, slug, titlu, enunț) și cel puțin un test judge. Restul sunt opționale.
               </p>
 
               <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Identitate</p>
                 <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="info-display-id">ID catalog</Label>
+                    <Input
+                      id="info-display-id"
+                      placeholder="ex: I001"
+                      value={infoForm.display_id}
+                      onChange={(e) => setInfoForm({ ...infoForm, display_id: e.target.value.toUpperCase() })}
+                    />
+                  </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="info-slug">Slug URL</Label>
                     <Input
@@ -1134,10 +1145,10 @@ export function DevCatalogTools({ subjectKey }: { subjectKey: DevSubjectKey }) {
             <h3 className="text-sm font-semibold text-gray-800">Ultimele înregistrări ({problems.length})</h3>
             <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs text-gray-600">
               {problems.slice(0, 40).map((p) => {
-                const row = p as { id?: string; slug?: string; title?: string }
+                const row = p as { id?: string; display_id?: string; slug?: string; title?: string }
                 return (
                   <li key={row.slug ?? row.id}>
-                    <span className="font-mono text-gray-800">{row.slug ?? row.id}</span>
+                    <span className="font-mono text-gray-800">{row.display_id ?? row.slug ?? row.id}</span>
                     {" — "}
                     {row.title}
                   </li>

@@ -202,15 +202,10 @@ async function loadItemContent(item: LearningPathLessonItem) {
       .eq("is_active", true)
       .maybeSingle()
     if (codingRow) {
-      const serverSupabase = await createClient()
-      const canAccessPremiumHints = await resolveCanAccessPremiumHintsFromSession(serverSupabase)
-      sourceCodingProblem = applyCodingProblemPremiumGating(
-        {
-          ...(codingRow as CodingProblem),
-          tags: Array.isArray(codingRow.tags) ? codingRow.tags : [],
-        },
-        canAccessPremiumHints
-      )
+      sourceCodingProblem = {
+        ...(codingRow as CodingProblem),
+        tags: Array.isArray(codingRow.tags) ? codingRow.tags : [],
+      }
       const { data: examples } = await supabase
         .from("coding_problem_examples")
         .select("*")
@@ -226,6 +221,23 @@ async function loadItemContent(item: LearningPathLessonItem) {
       : null
 
   return { sourceLesson, sourceProblem, sourceCodingProblem, sourceCodingExamples, sourceQuizQuestion }
+}
+
+async function applySessionCodingProblemGating(
+  payload: StaticLearningPathItemPayload,
+): Promise<StaticLearningPathItemPayload> {
+  if (!payload.sourceCodingProblem) return payload
+
+  const serverSupabase = await createClient()
+  const canAccessPremiumHints = await resolveCanAccessPremiumHintsFromSession(serverSupabase)
+
+  return {
+    ...payload,
+    sourceCodingProblem: applyCodingProblemPremiumGating(
+      payload.sourceCodingProblem,
+      canAccessPremiumHints,
+    ),
+  }
 }
 
 async function getProgressState(
@@ -521,7 +533,7 @@ export async function loadLearningPathItemPayload(
     return staticResult
   }
 
-  const staticPayload = staticResult.payload
+  const staticPayload = await applySessionCodingProblemGating(staticResult.payload)
   const access = await getLearningPathAccess(staticPayload.chapter)
   if (access.mode === "locked") {
     return {

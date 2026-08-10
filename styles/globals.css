@@ -90,11 +90,10 @@ body {
   }
   body {
     @apply bg-background text-foreground;
-    /* Set dark background by default to prevent white flash during navigation */
-    background-color: #121212;
+    /* Default white shell — dark pages set their own background locally */
+    background-color: #ffffff;
   }
-  /* Homepage will override this with white background */
   html {
-    background-color: #121212;
+    background-color: #ffffff;
   }
 }

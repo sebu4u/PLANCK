@@ -44,14 +44,24 @@ import {
 import {
   enrichInsightAttachmentsWithOcr,
   enrichInsightAttachmentsWithOcrAndUsage,
+  extractInsightImageTexts,
+  shouldSkipProblemFigureOcr,
   type OcrUsageMetrics,
 } from '@/lib/insight-image-ocr';
 import {
   buildIdeAgentSystemPrompt,
+  deepseekThinkingExtra,
   getIdeAgentClient,
+  getIdeAgentFlashModel,
   normalizeIdeConversation,
   resolveIdeAgentModel,
+  shouldEnableDeepseekThinking,
 } from '@/lib/planckcode/ide-agent';
+import {
+  buildLessonTutorSystemPrompt,
+  buildProblemTutorSystemPrompt,
+  resolveProblemTutorSubject,
+} from '@/lib/insight-problem-tutor-prompt';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -140,6 +150,25 @@ async function insightHistoryToOpenAIMessages(
 
 function threadHasVisionAttachments(rows: InsightHistoryRow[]): boolean {
   return rows.some((r) => r.role === 'user' && Array.isArray(r.attachments) && r.attachments.length > 0);
+}
+
+/** Public problem/figure URLs allowed for one-shot OCR into the DeepSeek text pipeline. */
+function isSafePublicProblemImageUrl(url: string): boolean {
+  if (!url || url.length > 2048) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function appendProblemFigureOcr(baseText: string, ocrText: string): string {
+  const base = baseText.trim();
+  const ocr = ocrText.trim();
+  if (!ocr) return base;
+  const block = `--- CONȚINUT EXTRAS DIN IMAGINEA ENUNȚULUI ---\n${ocr}`;
+  return base ? `${base}\n\n${block}` : block;
 }
 
 async function insightHistoryToTextMessages(
@@ -255,11 +284,39 @@ export async function POST(req: NextRequest) {
           .filter(Boolean)
       : [];
 
-    // Check if this is from IDE - IDE messages should not be saved to chat history
+    const rawProblemImageUrl =
+      typeof (body as Record<string, unknown>).problemImageUrl === 'string'
+        ? String((body as Record<string, unknown>).problemImageUrl).trim().replace(/^@/, '')
+        : '';
+    const problemImageUrl = isSafePublicProblemImageUrl(rawProblemImageUrl)
+      ? rawProblemImageUrl
+      : '';
+
+    const interactiveTutor = Boolean((body as Record<string, unknown>).interactiveTutor)
+    const problemSubject = resolveProblemTutorSubject(
+      (body as Record<string, unknown>).problemSubject
+    )
+
+    // IDE without a problem stays ephemeral; problem-page IDE persists when problemId is set.
     const isIdeRequest = persona === 'ide';
-    const isMainChatDeepSeek = requestSource === 'main_chat' && !isIdeRequest;
     const personaKey = typeof persona === 'string' ? persona : null;
-    const isFocusedTutorPersona = personaKey === 'problem_tutor' || personaKey === 'lesson_tutor';
+    const isProblemTutor = personaKey === 'problem_tutor';
+    // Main chat + problem_tutor: DeepSeek text pipeline (OCR for images, not multimodal vision).
+    const useDeepSeekTextPipeline =
+      (requestSource === 'main_chat' || isProblemTutor) && !isIdeRequest;
+    const isFocusedTutorPersona = isProblemTutor || personaKey === 'lesson_tutor';
+
+    const rawProblemId =
+      typeof (body as Record<string, unknown>).problemId === 'string'
+        ? String((body as Record<string, unknown>).problemId).trim()
+        : '';
+    const problemIdForSession = rawProblemId ? rawProblemId.slice(0, 128) : null;
+    const rawLessonId =
+      typeof (body as Record<string, unknown>).lessonId === 'string'
+        ? String((body as Record<string, unknown>).lessonId).trim()
+        : '';
+    const lessonIdForSession = rawLessonId ? rawLessonId.slice(0, 128) : null;
+    const shouldPersistChat = !isIdeRequest || Boolean(problemIdForSession);
 
     if (isIdeRequest && rawAttachmentPaths.length > 0) {
       return NextResponse.json(
@@ -299,6 +356,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mesajul utilizatorului este necesar.' }, { status: 400 });
     }
 
+    // Full model-facing text (may include hidden problem statement). Keep separate from
+    // visibleUserInput so UI/DB stay clean while DeepSeek still sees the enunț.
+    // Do not bake user-attachment OCR into this string — history helper adds that from attachments.
+    let modelFacingUserText = userInput;
+
     // Model selection: deep-thinking uses gpt-4o with extra instructions; gpt-4o-mini is IDE "Raptor1 fast" (distinct free-tier bucket from gpt-4o).
     const modelToUseParam = resolveInsightModel(body?.model);
     const isIdeFastModel = isInsightIdeFastModel(modelToUseParam);
@@ -313,19 +375,31 @@ export async function POST(req: NextRequest) {
 
     let ocrUsage: OcrUsageMetrics | null = null;
 
-    // Handle session: create if needed, validate ownership if exists
-    // Skip session handling for IDE requests as they don't need persistent history
-    if (!isIdeRequest) {
+    // Handle session: create if needed, validate ownership if exists.
+    // Skip only for ephemeral IDE (no problemId).
+    if (shouldPersistChat) {
       if (!resolvedSessionId) {
         // Create new session with auto-generated title from first message
         const autoTitle =
           visibleUserInput.slice(0, 60) || (rawAttachmentPaths.length ? 'Insight — imagini' : 'Insight');
+        const insertPayload: {
+          user_id: string;
+          title: string;
+          problem_id?: string;
+          lesson_id?: string;
+        } = {
+          user_id: user.id,
+          title: autoTitle,
+        };
+        if (problemIdForSession) {
+          insertPayload.problem_id = problemIdForSession;
+        }
+        if (lessonIdForSession) {
+          insertPayload.lesson_id = lessonIdForSession;
+        }
         const { data: newSession, error: sessErr } = await supabase
           .from('insight_chat_sessions')
-          .insert({
-            user_id: user.id,
-            title: autoTitle,
-          })
+          .insert(insertPayload)
           .select('id')
           .single();
 
@@ -349,7 +423,7 @@ export async function POST(req: NextRequest) {
       }
 
       let attachmentsPayload: InsightMessageAttachment[] | null = null;
-      if (rawAttachmentPaths.length > 0) {
+      if (!isIdeRequest && rawAttachmentPaths.length > 0) {
         const sid = resolvedSessionId;
         if (!sid) {
           return NextResponse.json({ error: 'Sesiune invalidă pentru atașamente.' }, { status: 500 });
@@ -365,7 +439,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Atașamentele nu au putut fi validate.' }, { status: 400 });
         }
 
-        if (isMainChatDeepSeek) {
+        if (useDeepSeekTextPipeline) {
           try {
             const ocrResult = await enrichInsightAttachmentsWithOcrAndUsage(
               supabase,
@@ -373,9 +447,10 @@ export async function POST(req: NextRequest) {
             );
             attachmentsPayload = ocrResult.attachments;
             ocrUsage = ocrResult.ocrUsage;
-            userInput = buildInsightUserTextContent(visibleUserInput, attachmentsPayload);
+            // Preserve hidden problem statement (input), not just visibleInput.
+            userInput = buildInsightUserTextContent(modelFacingUserText, attachmentsPayload);
           } catch (ocrErr: unknown) {
-            logger.error('Insight main chat OCR error:', ocrErr);
+            logger.error('Insight DeepSeek text pipeline OCR error:', ocrErr);
             return NextResponse.json(
               {
                 error:
@@ -392,7 +467,6 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Save user message to database (only for non-IDE requests)
       const { error: insUserMsgErr } = await supabase.from('insight_chat_messages').insert({
         session_id: resolvedSessionId,
         user_id: user.id,
@@ -404,6 +478,20 @@ export async function POST(req: NextRequest) {
       if (insUserMsgErr) {
         logger.error('Failed to save user message:', insUserMsgErr);
         return NextResponse.json({ error: 'Nu am putut salva mesajul.' }, { status: 500 });
+      }
+    }
+
+    // OCR the problem's figure only when the text statement is too short to stand alone.
+    if (useDeepSeekTextPipeline && problemImageUrl && !shouldSkipProblemFigureOcr(modelFacingUserText)) {
+      try {
+        const [figureOcr] = await extractInsightImageTexts([problemImageUrl], { detail: 'low' });
+        if (figureOcr?.trim()) {
+          modelFacingUserText = appendProblemFigureOcr(modelFacingUserText, figureOcr);
+          userInput = appendProblemFigureOcr(userInput, figureOcr);
+        }
+      } catch (figureOcrErr: unknown) {
+        // Soft-fail: still answer from the text statement if figure OCR fails.
+        logger.error('Insight problem figure OCR error:', figureOcrErr);
       }
     }
 
@@ -441,10 +529,13 @@ export async function POST(req: NextRequest) {
     const insightAgentIntent = resolveInsightAgentIntent(intentSource);
     const shouldUseAgentCatalog =
       !isFocusedTutorPersona || userExplicitlyRequestsPlanckResources(visibleUserInput);
-    if (!isIdeRequest) {
+    if (!isIdeRequest && !isFocusedTutorPersona) {
       await ensureInsightAgentProfile(supabase, user.id);
     }
-    const insightAgentProfile = !isIdeRequest ? await loadInsightAgentProfile(supabase, user.id) : {};
+    const insightAgentProfile =
+      !isIdeRequest && !isFocusedTutorPersona
+        ? await loadInsightAgentProfile(supabase, user.id)
+        : {};
     const catalogPolicy = shouldUseAgentCatalog
       ? getPlanckCatalogRequestPolicy({
           intent: insightAgentIntent,
@@ -567,101 +658,18 @@ export async function POST(req: NextRequest) {
     };
 
     if (personaKey === 'problem_tutor') {
-      const problemTutorContent = `Ești Insight, un profesor de fizică răbdător, clar și conversațional. Comportă-te ca un profesor util cu care elevul poate vorbi natural, nu ca un bot rigid. Poți fi cald, încurajator și scurt atunci când contextul cere asta.
+      systemMessage.content = buildProblemTutorSystemPrompt({
+        subject: problemSubject,
+        interactiveTutor: interactiveTutor && !isLearningPathItemRequest,
+        learningPathItem: isLearningPathItemRequest,
+        visionAppendix: threadHasVisionAttachments(history)
+          ? PROBLEM_TUTOR_VISION_APPENDIX
+          : undefined,
+      });
+    }
 
-CONTEXT ACADEMIC:
-- Răspunde conform programei de fizică din învățământul preuniversitar românesc (cls. 9-12).
-- Folosește terminologia din manualele românești (ex: "tensiune electromotoare", nu "EMF").
-- Unitățile de măsură se scriu în română: "metri pe secundă", nu "m/s" în text liber.
-- Când o problemă are mai mulți pași, verifică întotdeauna consistența fizică înainte să răspunzi.
-
-REGULĂ GENERALĂ DE STIL:
-- Adaptează răspunsul la intenția reală a utilizatorului. Nu forța mereu același flow.
-- OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu.
-- Dacă este natural, poți adăuga o scurtă notă de încurajare, dar fără să devii repetitiv sau robotic.
-
-REGULĂ PAGINĂ PROBLEMĂ:
-- Utilizatorul lucrează deja la o problemă specifică din Planck. Concentrează-te exclusiv pe această problemă.
-- NU recomanda alte exerciții, probleme, lecții, cursuri sau resurse Planck decât dacă utilizatorul cere explicit asta.
-- NU încheia răspunsul cu sugestii de tip „poți exersa și cu...”, „îți recomand și...” sau linkuri către alte resurse.
-- Explică, ghidează sau verifică doar în contextul problemei curente.
-
-ALEGE MODUL DE RĂSPUNS ÎN FUNCȚIE DE MESAJ:
-
-1. MOD GHIDARE SOCRATICĂ:
-Folosește acest mod doar când utilizatorul cere clar ajutor pentru a rezolva problema sau este blocat, de tipul:
-- "rezolvă problema"
-- "cum fac?"
-- "nu înțeleg"
-- "care e următorul pas?"
-- "dă-mi un indiciu"
-
-În acest mod:
-- NU rezolva problema numeric din prima, decât dacă utilizatorul cere explicit soluția completă.
-- Explică pe scurt ideea fizică relevantă.
-- Ghidează elevul pas cu pas.
-- Înainte să oferi o formulă, verifică dacă se aplică exact în contextul problemei (ex: bobină ideală vs. bobină cu rezistență internă).
-- Dacă elevul se blochează, dă un indiciu mic sau verifică direcția, nu oferi imediat toată rezolvarea.
-- Poți pune întrebări de ghidaj în răspuns dacă ajută conversația.
-
-2. MOD VERIFICARE RAPIDĂ:
-Folosește acest mod când utilizatorul vrea doar să verifice un rezultat, un pas sau o sub-concluzie, de tipul:
-- "am obținut $12\\,N$, e corect?"
-- "la a) mi-a dat $v = 3\\,m/s$, e bine?"
-- "formula asta e bună?"
-- "semnul minus aici e corect?"
-
-În acest mod:
-- Răspunde direct, scurt și clar.
-- Confirmă dacă este corect sau corectează punctual.
-- Dacă este util, spune într-o propoziție de ce.
-- NU forța flow-ul socratic.
-
-3. MOD RĂSPUNS LIBER / ÎNTREBARE LATERALĂ:
-Folosește acest mod când utilizatorul pune o întrebare care nu cere ghidare pas cu pas pe problema curentă, de exemplu:
-- cere explicația unui concept sau a unei formule
-- întreabă ceva legat de fizică, matematică sau informatică, chiar dacă nu este direct despre problema curentă
-- pune o întrebare scurtă auxiliară sau un "off-topic" util pentru învățare
-
-În acest mod:
-- Răspunde natural, util și conversațional.
-- Dacă întrebarea este despre un concept, oferă o explicație clară și suficientă, fără să o lungești artificial.
-- Dacă este relevant, poți menționa la final, într-o singură propoziție naturală, că poți reveni și la problema curentă.
-- NU forța întoarcerea la problemă.
-
-EXCEPTIE - SOLUȚIA COMPLETĂ:
-Dacă utilizatorul cere explicit "Vreau să văd soluția completă", "Arată-mi rezolvarea completă" sau ceva similar:
-1. Oferă rezolvarea completă, pas cu pas, cu calcule numerice.
-2. NU mai genera întrebări de ghidaj.
-3. NU mai genera blocul ---SUGGESTIONS--- la final.
-
-GENERARE ÎNTREBĂRI SUGERATE:
-După fiecare răspuns, generează la final blocul ---SUGGESTIONS--- cu exact 2 întrebări scurte despre problema curentă.
-Excepție: NU genera acest bloc doar când oferi soluția completă (EXCEPTIE - SOLUȚIA COMPLETĂ).
-Întrebările trebuie să fie pertinente pentru stadiul curent al discuției și să ajute elevul să avanseze pe problema curentă.
-IMPORTANT: Dacă generezi acest bloc, nu pune întrebări în zona de sugestii în alt format și nu adăuga text după el.
-
-Formatul TREBUIE să fie exact acesta la finalul mesajului, PRECEDAT DOAR DE LINII GOALE (fără alte texte înainte sau după acest bloc în zona de sugestii) și FĂRĂ markdown (nu pune în \`\`\`json ... \`\`\`):
-
----SUGGESTIONS---
-["Întrebare scurtă 1?", "Întrebare scurtă 2?"]
-
-Exemplu de întrebări: "Cum calculez forța?", "Ce formulă folosesc?", "E corect raționamentul?", "Care e următorul pas?".
-Asigură-te că JSON-ul este valid.`;
-
-      // Override system message
-      systemMessage.content = problemTutorContent;
-      if (isLearningPathItemRequest) {
-        systemMessage.content += `
-
-REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
-- Răspunde cu un singur paragraf scurt, direct și explicativ (maximum 4 propoziții).
-- Începe direct cu explicația; nu adăuga salut, introducere, concluzie, încurajări sau informații care nu ajută la întrebarea curentă.
-- Nu folosi titluri, liste, pași numerotați sau blocul ---SUGGESTIONS---.`;
-      }
-      if (threadHasVisionAttachments(history)) {
-        systemMessage.content += PROBLEM_TUTOR_VISION_APPENDIX;
-      }
+    if (personaKey === 'lesson_tutor') {
+      systemMessage.content = buildLessonTutorSystemPrompt();
     }
 
     if (!isFocusedTutorPersona) {
@@ -681,8 +689,11 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
     const hasAnyImagesInContext =
       threadHasVisionAttachments(history) || rawAttachmentPaths.length > 0;
 
-    if (isMainChatDeepSeek && hasAnyImagesInContext) {
-      systemMessage.content += MAIN_CHAT_VISION_APPENDIX;
+    if (useDeepSeekTextPipeline && hasAnyImagesInContext) {
+      // problem_tutor keeps its own vision appendix; main chat uses the generic one.
+      if (!isProblemTutor) {
+        systemMessage.content += MAIN_CHAT_VISION_APPENDIX;
+      }
     }
 
     const sanitizedContextMessages = Array.isArray(contextMessages)
@@ -707,13 +718,15 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
 
     let finalMessages: ChatCompletionMessageParam[] = [];
 
-    if (isMainChatDeepSeek) {
+    if (useDeepSeekTextPipeline) {
+      // Use full input (hidden statement + user text [+ figure OCR]), not visibleInput.
+      // Attachment OCR is re-applied from stored attachments in insightHistoryToTextMessages.
       const historyForText = isLastMessageCurrentUser
         ? history.map((row, index) =>
             index === history.length - 1
               ? {
                   ...row,
-                  content: visibleUserInput,
+                  content: modelFacingUserText,
                 }
               : row
           )
@@ -732,7 +745,7 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
           ];
         }
       } catch (textErr: unknown) {
-        logger.error('Insight main chat text/OCR history error:', textErr);
+        logger.error('Insight DeepSeek text/OCR history error:', textErr);
         return NextResponse.json(
           { error: 'Nu am putut pregăti mesajele pentru chat. Încearcă din nou.' },
           { status: 502 }
@@ -804,17 +817,19 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
 
     let activeModel = isIdeRequest
       ? resolveIdeAgentModel(modelToUseParam)
-      : isMainChatDeepSeek
-        ? resolveIdeAgentModel(modelToUseParam)
+      : useDeepSeekTextPipeline
+        ? isProblemTutor
+          ? getIdeAgentFlashModel()
+          : resolveIdeAgentModel(modelToUseParam)
         : modelToUseParam === 'deep-thinking'
           ? 'gpt-4o'
           : modelToUseParam;
-    if (hasAnyImagesInContext && !isIdeRequest && !isMainChatDeepSeek) {
+    if (hasAnyImagesInContext && !isIdeRequest && !useDeepSeekTextPipeline) {
       activeModel = 'gpt-4o';
     }
 
-    // For "deep-thinking" mode on non-IDE, non-main-chat personas, inject Chain of Thought instructions
-    if (!isIdeRequest && !isMainChatDeepSeek && modelToUseParam === 'deep-thinking') {
+    // For "deep-thinking" mode on non-IDE, non-DeepSeek-text personas, inject Chain of Thought instructions
+    if (!isIdeRequest && !useDeepSeekTextPipeline && modelToUseParam === 'deep-thinking') {
       const deepBlock =
         '\n\nMOD "DEEP THINKING" ACTIVAT:\nTe rog să gândești pas cu pas înainte de a răspunde. Analizează problema în profunzime, verifică ipotezele și planifică rezolvarea înainte de a genera codul final. Explică raționamentul tău logic.';
       systemMessage.content += deepBlock;
@@ -841,8 +856,9 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
     let stream: any;
     try {
       const openai =
-        isIdeRequest || isMainChatDeepSeek ? getIdeAgentClient() : getOpenAIClient();
+        isIdeRequest || useDeepSeekTextPipeline ? getIdeAgentClient() : getOpenAIClient();
 
+      const useDeepSeekClient = isIdeRequest || useDeepSeekTextPipeline;
       const completionParams: any = {
         model: activeModel,
         messages: finalMessages,
@@ -850,6 +866,15 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
         ...maxTokensParam,
         ...(personaKey === 'problem_tutor'
           ? { temperature: INSIGHT_PROBLEM_TUTOR_TEMPERATURE }
+          : {}),
+        ...(useDeepSeekClient
+          ? deepseekThinkingExtra({
+              enabled: shouldEnableDeepseekThinking({
+                useDeepSeekClient: true,
+                isProblemTutor,
+                model: modelToUseParam,
+              }),
+            })
           : {}),
       };
 
@@ -971,21 +996,28 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
             }
           }
 
-          // Save assistant message to database (only for non-IDE requests)
-          if (!isIdeRequest && resolvedSessionId) {
+          // Save assistant message (Insight + problem-scoped IDE)
+          if (shouldPersistChat && resolvedSessionId) {
+            const assistantPayload: Record<string, unknown> = {
+              session_id: resolvedSessionId,
+              user_id: user.id,
+              role: 'assistant',
+              content: fullText || 'Nu am primit răspuns.',
+              input_tokens: inputTokens || null,
+              output_tokens: outputTokens || null,
+            };
+            if (!isIdeRequest) {
+              assistantPayload.agent_artifacts = agentPersistenceResult?.messageArtifacts ?? [];
+            }
+
             let { error: insAsstMsgErr } = await supabase
               .from('insight_chat_messages')
-              .insert({
-                session_id: resolvedSessionId,
-                user_id: user.id,
-                role: 'assistant',
-                content: fullText || 'Nu am primit răspuns.',
-                input_tokens: inputTokens || null,
-                output_tokens: outputTokens || null,
-                agent_artifacts: agentPersistenceResult?.messageArtifacts ?? [],
-              });
+              .insert(assistantPayload);
 
-            if (insAsstMsgErr && (insAsstMsgErr.code === '42703' || /agent_artifacts/i.test(insAsstMsgErr.message ?? ''))) {
+            if (
+              insAsstMsgErr &&
+              (insAsstMsgErr.code === '42703' || /agent_artifacts/i.test(insAsstMsgErr.message ?? ''))
+            ) {
               const fallback = await supabase
                 .from('insight_chat_messages')
                 .insert({
@@ -1022,8 +1054,8 @@ REGULĂ PENTRU CHATUL DIN ITEMUL LEARNING PATH:
           }
           const costUSD =
             estimateCostUSD(inputTokens, outputTokens, {
-              insightVisionImagesApprox: isMainChatDeepSeek ? 0 : imagesInThread,
-              ideAgent: isIdeRequest || isMainChatDeepSeek,
+              insightVisionImagesApprox: useDeepSeekTextPipeline ? 0 : imagesInThread,
+              ideAgent: isIdeRequest || useDeepSeekTextPipeline,
             }) +
             (ocrUsage
               ? estimateCostUSD(ocrUsage.inputTokens, ocrUsage.outputTokens, {

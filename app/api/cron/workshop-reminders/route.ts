@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sendWorkshopReminderEmail } from "@/lib/pregatire/email"
+import { createWorkshopInAppReminder } from "@/lib/pregatire/in-app-notification"
 import { sendWorkshopPushToUser } from "@/lib/pregatire/push"
 import { formatWorkshopDateTime } from "@/lib/pregatire/dates"
 import { logger } from "@/lib/logger"
@@ -9,6 +10,7 @@ export const runtime = "nodejs"
 export const maxDuration = 300
 
 type ReminderKind = "24h" | "30m"
+type ReminderChannel = "email" | "push" | "in_app"
 
 function isAuthorized(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET
@@ -31,7 +33,7 @@ async function alreadySent(
   workshopId: string,
   userId: string,
   kind: ReminderKind,
-  channel: "email" | "push",
+  channel: ReminderChannel,
 ): Promise<boolean> {
   const supabase = getServiceRoleSupabase()
   const { data } = await supabase
@@ -50,7 +52,7 @@ async function logSend(input: {
   workshopId: string
   userId: string
   kind: ReminderKind
-  channel: "email" | "push"
+  channel: ReminderChannel
   status: "sent" | "failed" | "skipped"
   error?: string
 }) {
@@ -81,6 +83,7 @@ export async function GET(request: NextRequest) {
     scanned: 0,
     emailSent: 0,
     pushSent: 0,
+    inAppSent: 0,
     skipped: 0,
     failed: 0,
   }
@@ -192,6 +195,37 @@ export async function GET(request: NextRequest) {
                 error: "no_subscription",
               })
               summary.skipped += 1
+            }
+          }
+
+          // In-app (navbar)
+          if (!(await alreadySent(workshop.id, userId, kind, "in_app"))) {
+            const inAppResult = await createWorkshopInAppReminder({
+              userId,
+              workshopId: workshop.id,
+              workshopTitle: workshop.title,
+              startsAtLabel: when,
+              reminderKind: kind,
+            })
+            if (inAppResult.ok) {
+              await logSend({
+                workshopId: workshop.id,
+                userId,
+                kind,
+                channel: "in_app",
+                status: "sent",
+              })
+              summary.inAppSent += 1
+            } else {
+              await logSend({
+                workshopId: workshop.id,
+                userId,
+                kind,
+                channel: "in_app",
+                status: "failed",
+                error: inAppResult.message,
+              })
+              summary.failed += 1
             }
           }
         }

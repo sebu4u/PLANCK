@@ -51,6 +51,7 @@ export function PregatirePageClient() {
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
   const [loading, setLoading] = useState(true)
   const [energy, setEnergy] = useState<number | null>(null)
+  const [carryoverEnergy, setCarryoverEnergy] = useState(0)
   const [energyLoading, setEnergyLoading] = useState(false)
   const [sheetWorkshop, setSheetWorkshop] = useState<WorkshopDetail | null>(null)
   const [openingKey, setOpeningKey] = useState<string | null>(null)
@@ -65,6 +66,7 @@ export function PregatirePageClient() {
   const refreshEnergy = useCallback(async () => {
     if (!user) {
       setEnergy(null)
+      setCarryoverEnergy(0)
       return
     }
     setEnergyLoading(true)
@@ -74,6 +76,7 @@ export function PregatirePageClient() {
       if (response.ok) {
         const data = await response.json()
         setEnergy(data.balance ?? 0)
+        setCarryoverEnergy(data.carryoverBalance ?? 0)
       }
     } finally {
       setEnergyLoading(false)
@@ -172,7 +175,9 @@ export function PregatirePageClient() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {user ? <EnergyBadge balance={energy} loading={energyLoading} /> : null}
+            {user ? (
+              <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} loading={energyLoading} />
+            ) : null}
             <PushPrompt isLoggedIn={Boolean(user)} />
           </div>
         </header>
@@ -322,7 +327,10 @@ export function PregatirePageClient() {
                 isLoggedIn={Boolean(user)}
                 showBack={false}
                 compact
-                onBalanceChange={setEnergy}
+                onBalanceChange={(next) => {
+                  setEnergy(next.balance)
+                  setCarryoverEnergy(next.carryoverBalance)
+                }}
                 onUnlocked={(next) => {
                   setSheetWorkshop(next)
                   setWorkshops((list) =>

@@ -5,7 +5,7 @@ import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabaseClient'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { X, Paperclip, Send, Chrome, Github, Loader2, Camera } from 'lucide-react'
+import { X, Paperclip, Send, Chrome, Github, Loader2, Camera, ChevronDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -14,6 +14,11 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content'
+import {
+  ChatMessageLimitHint,
+  ChatMessageLimitLockButton,
+  CHAT_MESSAGE_LIMIT_PLACEHOLDER,
+} from '@/components/chat-message-limit-lock'
 import { cn } from '@/lib/utils'
 import InsightMessageArtifacts from '@/components/insight-message-artifacts'
 import type { InsightMessageArtifact } from '@/lib/insight/agent/types'
@@ -25,6 +30,15 @@ import {
   MAX_INSIGHT_ATTACHMENT_BYTES,
   prepareInsightImageForUpload,
 } from '@/lib/insight-client-image'
+import { InvataAskThinkingDots } from '@/components/invata/invata-ask-thinking'
+import { InsightInteractiveWidget } from '@/components/insight/insight-interactive-widget'
+import { InsightProblemChatHistory } from '@/components/insight/insight-problem-chat-history'
+import {
+  parseAssistantInteractive,
+  stripInteractiveMarkerForDisplay,
+  type InsightInteractivePayload,
+  type InsightInteractiveResult,
+} from '@/lib/insight-interactive'
 
 type InsightChatImageRef = {
   storagePath: string
@@ -41,6 +55,8 @@ type ChatMessage = {
   agentArtifacts?: InsightMessageArtifact[]
   /** Sugestii de follow-up afișate sub răspuns (problem_tutor). */
   suggestions?: string[]
+  interactive?: InsightInteractivePayload
+  interactiveResult?: InsightInteractiveResult
 }
 
 type PendingInsightImage = {
@@ -55,6 +71,8 @@ interface InsightChatSidebarProps {
   onClose: () => void
   problemId: string
   problemStatement: string
+  /** Public URL of the problem figure (OCR'd into model context on first send with context). */
+  problemImageUrl?: string | null
   persona?: string
   embedOnDesktop?: boolean
   problemLightTheme?: boolean
@@ -93,6 +111,10 @@ interface InsightChatSidebarProps {
   contextPreviewLabel?: string
   /** Keep page context attached to each message instead of consuming it once. */
   keepContextAfterSend?: boolean
+  /** Math/physics problem pages: enable interactive check widgets from the model. */
+  enableInteractiveTutor?: boolean
+  /** Subject for interactive tutor prompt wording. */
+  problemSubject?: 'physics' | 'math'
 }
 
 interface SuggestedQuestionsProps {
@@ -258,8 +280,39 @@ function conversationHasSolutionRequest(messages: ChatMessage[]): boolean {
 function finalizeProblemTutorAssistantMessage(
   message: ChatMessage,
   rawContent: string,
-  skipSuggestions: boolean
+  options: { skipSuggestions: boolean; enableInteractive: boolean }
 ): ChatMessage {
+  const { skipSuggestions, enableInteractive } = options
+
+  if (enableInteractive) {
+    const {
+      displayContent: afterInteractive,
+      interactive,
+      markerPresent,
+    } = parseAssistantInteractive(rawContent)
+    if (interactive) {
+      // Interactive present: strip SUGGESTIONS if any, do not show suggestion chips.
+      const { displayContent } = parseAssistantSuggestions(afterInteractive)
+      return {
+        ...message,
+        content: displayContent || message.content,
+        suggestions: undefined,
+        interactive,
+      }
+    }
+    // Marker existed but payload failed validation — still hide suggestion chips.
+    // No interactive block — fall through to suggestions (or none if solution requested).
+    const resolved = resolveProblemTutorSuggestions(afterInteractive, {
+      skipFallback: skipSuggestions || markerPresent,
+    })
+    return {
+      ...message,
+      content: resolved.displayContent || message.content,
+      suggestions: skipSuggestions || markerPresent ? undefined : resolved.suggestions,
+      interactive: undefined,
+    }
+  }
+
   const resolved = resolveProblemTutorSuggestions(rawContent, { skipFallback: skipSuggestions })
   return {
     ...message,
@@ -307,6 +360,7 @@ export default function InsightChatSidebar({
   onClose,
   problemId,
   problemStatement,
+  problemImageUrl,
   persona = 'problem_tutor',
   embedOnDesktop = false,
   problemLightTheme = false,
@@ -326,6 +380,8 @@ export default function InsightChatSidebar({
   panelSlideTransitionClass,
   contextPreviewLabel,
   keepContextAfterSend = false,
+  enableInteractiveTutor = false,
+  problemSubject = 'physics',
 }: InsightChatSidebarProps) {
   const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
   const { toast } = useToast()
@@ -355,6 +411,7 @@ export default function InsightChatSidebar({
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null)
   const [problemContext, setProblemContext] = useState<string | null>(null)
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
+  const [messageLimitReached, setMessageLimitReached] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [viewportModeResolved, setViewportModeResolved] = useState(false)
   const pendingStreamAnchorRef = useRef(false)
@@ -363,6 +420,16 @@ export default function InsightChatSidebar({
   const cameraAttachmentInputRef = useRef<HTMLInputElement>(null)
   const [pendingAttachments, setPendingAttachments] = useState<PendingInsightImage[]>([])
   const [uploadingAttachments, setUploadingAttachments] = useState(false)
+  const mobileDragRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const [mobileHeight, setMobileHeight] = useState<number | null>(null)
+  const [mobileDragging, setMobileDragging] = useState(false)
+  const [mobileDragOffset, setMobileDragOffset] = useState(0)
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0)
+  const [keyboardMaxHeight, setKeyboardMaxHeight] = useState<number | null>(null)
+  /** Avoid mount/hydration flash: only animate when user opens/closes, not when mode flips. */
+  const [mobileSheetTransitionOn, setMobileSheetTransitionOn] = useState(false)
+  /** Separate from isOpen so we can paint off-screen first, then animate in. */
+  const [mobileSheetEntered, setMobileSheetEntered] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
@@ -373,9 +440,126 @@ export default function InsightChatSidebar({
   }, [])
 
   const isDesktopEmbedded = embedOnDesktop && viewportModeResolved && !isMobile
+  const isMobileBottomSheet = isMobile && !isDesktopEmbedded
   const effectiveOpen = isOpen || isDesktopEmbedded
+
+  useEffect(() => {
+    if (!isMobileBottomSheet) {
+      setMobileSheetTransitionOn(false)
+      setMobileSheetEntered(false)
+      return
+    }
+    if (isOpen) {
+      setMobileSheetTransitionOn(true)
+      let cancelled = false
+      const id = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (!cancelled) setMobileSheetEntered(true)
+        })
+      })
+      return () => {
+        cancelled = true
+        window.cancelAnimationFrame(id)
+      }
+    }
+    setMobileSheetEntered(false)
+    const t = window.setTimeout(() => setMobileSheetTransitionOn(false), 350)
+    return () => window.clearTimeout(t)
+  }, [isMobileBottomSheet, isOpen])
   const isProblemLightTheme = Boolean(
-    problemLightTheme && (isDesktopEmbedded || (lightChromeWhenSlideOver && !isMobile))
+    problemLightTheme && (isDesktopEmbedded || isMobile || lightChromeWhenSlideOver)
+  )
+
+  const getMobileDefaultHeight = useCallback(
+    () => Math.round(window.innerHeight * 0.8),
+    [],
+  )
+  const getMobileMinHeight = useCallback(
+    () => Math.round(window.innerHeight * 0.4),
+    [],
+  )
+  const getMobileMaxHeight = useCallback(
+    () => Math.round(window.innerHeight * 0.95),
+    [],
+  )
+
+  useEffect(() => {
+    if (!isMobileBottomSheet || !isOpen) {
+      setMobileHeight(null)
+      setMobileDragging(false)
+      setMobileDragOffset(0)
+      mobileDragRef.current = null
+      return
+    }
+    const resetHeight = () => {
+      setMobileHeight(getMobileDefaultHeight())
+      setMobileDragOffset(0)
+    }
+    resetHeight()
+    window.addEventListener('resize', resetHeight)
+    return () => window.removeEventListener('resize', resetHeight)
+  }, [getMobileDefaultHeight, isMobileBottomSheet, isOpen])
+
+  const handleMobilePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isMobileBottomSheet || !isOpen) return
+      event.currentTarget.setPointerCapture(event.pointerId)
+      mobileDragRef.current = {
+        startY: event.clientY,
+        startHeight: mobileHeight ?? getMobileDefaultHeight(),
+      }
+      setMobileDragging(true)
+    },
+    [getMobileDefaultHeight, isMobileBottomSheet, isOpen, mobileHeight],
+  )
+
+  const handleMobilePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = mobileDragRef.current
+      if (!isMobileBottomSheet || !drag) return
+      const requested = drag.startHeight - (event.clientY - drag.startY)
+      const maxHeight = getMobileMaxHeight()
+      const minHeight = getMobileMinHeight()
+      if (requested >= minHeight) {
+        // Normal resize: keep the sheet anchored and change height.
+        setMobileHeight(Math.min(maxHeight, requested))
+        setMobileDragOffset(0)
+        return
+      }
+      // Below the floor: keep height at min and slide the whole card down so content isn't clipped.
+      setMobileHeight(minHeight)
+      setMobileDragOffset(minHeight - requested)
+    },
+    [getMobileMaxHeight, getMobileMinHeight, isMobileBottomSheet],
+  )
+
+  const handleMobilePointerUp = useCallback(
+    (_event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = mobileDragRef.current
+      if (!isMobileBottomSheet || !drag) return
+      mobileDragRef.current = null
+      setMobileDragging(false)
+      if (mobileDragOffset > 72) {
+        setMobileDragOffset(0)
+        onClose()
+        return
+      }
+      setMobileDragOffset(0)
+      setMobileHeight((height) =>
+        Math.min(
+          getMobileMaxHeight(),
+          Math.max(getMobileMinHeight(), height ?? getMobileDefaultHeight()),
+        ),
+      )
+    },
+    [
+      getMobileDefaultHeight,
+      getMobileMaxHeight,
+      getMobileMinHeight,
+      isMobileBottomSheet,
+      mobileDragOffset,
+      onClose,
+    ],
   )
 
   const starterChipsToShow = useMemo(
@@ -383,7 +567,7 @@ export default function InsightChatSidebar({
     [starterQuestionChips]
   )
 
-  // Handle mobile keyboard resizing and prevent body scroll
+  // Keyboard: keep the bottom sheet above the soft keyboard on mobile
   const [viewportHeight, setViewportHeight] = useState<string | undefined>(undefined)
   const [viewportOffset, setViewportOffset] = useState<number>(0)
 
@@ -416,22 +600,26 @@ export default function InsightChatSidebar({
     if (!isMobile || !isOpen) {
       setViewportHeight(undefined)
       setViewportOffset(0)
+      setKeyboardBottomInset(0)
+      setKeyboardMaxHeight(null)
       return
     }
 
     const handleVisualViewportResize = () => {
-      if (window.visualViewport) {
-        // Set height to visual viewport height 
-        const height = window.visualViewport.height
-        setViewportHeight(`${height}px`)
-
-        // Calculate offset from top (when keyboard pushes content up)
-        const offset = window.visualViewport.offsetTop
-        setViewportOffset(offset)
+      if (!window.visualViewport) return
+      const vv = window.visualViewport
+      if (isMobileBottomSheet) {
+        const bottomInset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+        setKeyboardBottomInset(bottomInset)
+        setKeyboardMaxHeight(Math.round(vv.height))
+        setViewportHeight(undefined)
+        setViewportOffset(0)
+        return
       }
+      setViewportHeight(`${vv.height}px`)
+      setViewportOffset(vv.offsetTop)
     }
 
-    // Initial check
     if (window.visualViewport) {
       handleVisualViewportResize()
       window.visualViewport.addEventListener('resize', handleVisualViewportResize)
@@ -444,7 +632,7 @@ export default function InsightChatSidebar({
         window.visualViewport.removeEventListener('scroll', handleVisualViewportResize)
       }
     }
-  }, [isMobile, isOpen])
+  }, [isMobile, isMobileBottomSheet, isOpen])
 
   useEffect(() => {
     if (effectiveOpen) return
@@ -515,25 +703,85 @@ export default function InsightChatSidebar({
   // Load session for this problem
   // NOTE: For problem pages, we don't load existing sessions - each visit starts fresh
   // Sessions are still saved for history on the dedicated chat page (/insight/chat)
-  const loadProblemSession = async (accessToken: string) => {
+  const defaultSystemMessage = (): ChatMessage => ({
+    role: 'system',
+    content:
+      persona === 'problem_tutor'
+        ? 'Ești Insight, un profesor de fizică răbdător.'
+        : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
+  })
+
+  const loadProblemSession = async (_accessToken: string) => {
     try {
-      // Don't load existing session for problem pages
-      // Always start with a fresh chat on the problem page
-      // Sessions remain saved in database for history on /insight/chat page
+      // Fresh chat on open; history is available via the header history card
       setSessionId(null)
-      setMessages([
-        {
-          role: 'system',
-          content: persona === 'problem_tutor'
-            ? 'Ești Insight, un profesor de fizică răbdător.'
-            : 'Ești Insight, un asistent inteligent pentru fizică pe planck.academy. Ajută utilizatorii să înțeleagă concepte de fizică și să rezolve probleme.',
-        },
-      ])
+      setMessages([defaultSystemMessage()])
     } catch (e: any) {
       console.error('Failed to load problem session:', e)
       return null
     }
   }
+
+  const handleHistoryNewChat = useCallback(() => {
+    setSessionId(null)
+    setMessages([defaultSystemMessage()])
+    setInput('')
+    setError(null)
+    setPendingAttachments((prev) => {
+      for (const p of prev) {
+        if (p.preview.startsWith('blob:')) URL.revokeObjectURL(p.preview)
+      }
+      return []
+    })
+    if (problemStatement) {
+      setProblemContext(buildProblemContextFromStatement(problemStatement, problemContextPreamble))
+    } else {
+      setProblemContext(null)
+    }
+  }, [persona, problemStatement, problemContextPreamble])
+
+  const handleHistorySelectSession = useCallback(
+    async (sessionIdToLoad: string) => {
+      try {
+        setLoadingSession(true)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+        if (!accessToken) {
+          toast({
+            title: 'Eroare',
+            description: 'Necesită autentificare.',
+            variant: 'destructive',
+          })
+          return
+        }
+        setSessionId(sessionIdToLoad)
+        setInput('')
+        setError(null)
+        if (!keepContextAfterSend) {
+          setProblemContext(null)
+        } else if (problemStatement) {
+          setProblemContext(buildProblemContextFromStatement(problemStatement, problemContextPreamble))
+        }
+        await loadSessionMessages(sessionIdToLoad, accessToken)
+      } catch (e: any) {
+        console.error('Failed to load history session:', e)
+        toast({
+          title: 'Eroare',
+          description: 'Nu am putut încărca chat-ul selectat.',
+          variant: 'destructive',
+        })
+      } finally {
+        setLoadingSession(false)
+      }
+    },
+    [
+      toast,
+      keepContextAfterSend,
+      problemStatement,
+      problemContextPreamble,
+      persona,
+    ]
+  )
 
   // Load session messages
   const loadSessionMessages = async (sessionIdToLoad: string, accessToken: string) => {
@@ -588,7 +836,10 @@ export default function InsightChatSidebar({
               if (message.role !== 'assistant' || !(message.content || '').trim()) {
                 return message
               }
-              return finalizeProblemTutorAssistantMessage(message, message.content, skipSuggestions)
+              return finalizeProblemTutorAssistantMessage(message, message.content, {
+                skipSuggestions,
+                enableInteractive: enableInteractiveTutor && !skipSuggestions,
+              })
             })
           : loadedMessages
 
@@ -623,7 +874,10 @@ export default function InsightChatSidebar({
     !busy &&
     effectiveOpen &&
     !initialUserMessage?.trim() &&
-    starterChipsToShow.length > 0
+    starterChipsToShow.length > 0 &&
+    !messageLimitReached
+  const showProblemContextCard =
+    Boolean(problemContext) && !busy && !messageLimitReached && !isMobileBottomSheet
   const lastAssistantMessageIndex = useMemo(() => {
     for (let i = visibleMessages.length - 1; i >= 0; i--) {
       if (visibleMessages[i]?.role === 'assistant') return i
@@ -863,6 +1117,22 @@ export default function InsightChatSidebar({
     submitMessage(question)
   }
 
+  const handleInteractiveResolved = (
+    messageIndex: number,
+    result: InsightInteractiveResult
+  ) => {
+    setMessages((prev) => {
+      const next = [...prev]
+      if (next[messageIndex]?.role === 'assistant') {
+        next[messageIndex] = {
+          ...next[messageIndex],
+          interactiveResult: result,
+        }
+      }
+      return next
+    })
+  }
+
   const handleStarterCardSelect = (question: string) => {
     submitMessage(question, question)
   }
@@ -982,7 +1252,13 @@ export default function InsightChatSidebar({
   const submitMessage = async (textOverride?: string, displayContentOverride?: string) => {
     const textToSend = textOverride ?? input
     const attachmentsSnapshot = [...pendingAttachments]
-    if ((!textToSend.trim() && !problemContext && attachmentsSnapshot.length === 0) || busy) return
+    if (
+      (!textToSend.trim() && !problemContext && attachmentsSnapshot.length === 0) ||
+      busy ||
+      messageLimitReached
+    ) {
+      return
+    }
 
     if (!user && attachmentsSnapshot.length > 0) {
       toast({
@@ -1044,7 +1320,7 @@ export default function InsightChatSidebar({
 
       let currentSessionId = sessionId
       if (!isGuest && accessToken && !currentSessionId) {
-        const problemSessionTitle = `Problem: ${problemId}`
+        const draftTitle = textToSend.trim().slice(0, 60) || 'Chat nou'
         const sessRes = await fetch('/api/insight/sessions', {
           method: 'POST',
           headers: {
@@ -1052,7 +1328,8 @@ export default function InsightChatSidebar({
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            title: problemSessionTitle,
+            title: draftTitle,
+            problemId,
           }),
         })
 
@@ -1100,9 +1377,19 @@ export default function InsightChatSidebar({
 
       // Combine context and input if context exists (this is what we send to the API)
       let finalContent = textToSend.trim()
+      const attachedProblemContext = Boolean(problemContext)
       if (problemContext) {
         finalContent = finalContent ? `${problemContext}\n\n${finalContent}` : problemContext
       }
+
+      const normalizedProblemImageUrl =
+        attachedProblemContext && typeof problemImageUrl === 'string'
+          ? problemImageUrl.trim().replace(/^@/, '')
+          : ''
+      const problemImageUrlForApi =
+        normalizedProblemImageUrl && /^https?:\/\//i.test(normalizedProblemImageUrl)
+          ? normalizedProblemImageUrl
+          : ''
 
       const priorForApi = messages
         .filter((m) => m.role !== 'system')
@@ -1160,6 +1447,10 @@ export default function InsightChatSidebar({
             ? {
                 messages: [...priorForApi, { role: 'user', content: finalContent }],
                 persona,
+                ...(problemImageUrlForApi ? { problemImageUrl: problemImageUrlForApi } : {}),
+                ...(enableInteractiveTutor
+                  ? { interactiveTutor: true, problemSubject }
+                  : {}),
               }
             : {
                 sessionId: currentSessionId,
@@ -1167,6 +1458,10 @@ export default function InsightChatSidebar({
                 visibleInput: displayContent,
                 persona,
                 ...(uploadedPaths.length ? { attachmentPaths: uploadedPaths } : {}),
+                ...(problemImageUrlForApi ? { problemImageUrl: problemImageUrlForApi } : {}),
+                ...(enableInteractiveTutor
+                  ? { interactiveTutor: true, problemSubject }
+                  : {}),
               }
         ),
         signal: controller.signal,
@@ -1175,7 +1470,13 @@ export default function InsightChatSidebar({
       // Check for non-streaming errors (429, etc.)
       if (res.status === 429) {
         const data = await res.json()
-        if (data.resetTime) {
+        const isFreeOrGuest = !user || !profile?.plan || profile.plan === 'free'
+        if (isFreeOrGuest) {
+          setMessageLimitReached(true)
+          setInput('')
+          setPremiumUpgradeOpen(true)
+          setError(null)
+        } else if (data.resetTime) {
           setPremiumUpgradeOpen(true)
         } else {
           setError(data.error || 'Limită zilnică atinsă.')
@@ -1243,7 +1544,11 @@ export default function InsightChatSidebar({
                   setLoadingMessage(null)
                   fullAssistantContent += data.content
 
-                  const { displayContent } = parseAssistantSuggestions(fullAssistantContent)
+                  const { displayContent: withoutSuggestions } =
+                    parseAssistantSuggestions(fullAssistantContent)
+                  const displayContent = enableInteractiveTutor
+                    ? stripInteractiveMarkerForDisplay(withoutSuggestions)
+                    : withoutSuggestions
 
                   // Update assistant message incrementally
                   setMessages((prev) => {
@@ -1263,6 +1568,8 @@ export default function InsightChatSidebar({
                   })
                 } else if (data.type === 'done') {
                   if (data.anonLimitReached) {
+                    setMessageLimitReached(true)
+                    setInput('')
                     setMessages((prev) => {
                       const next = [...prev]
                       for (let i = next.length - 1; i >= 0; i--) {
@@ -1313,7 +1620,10 @@ export default function InsightChatSidebar({
                 newMessages[i] = finalizeProblemTutorAssistantMessage(
                   newMessages[i],
                   fullAssistantContent,
-                  skipSuggestions
+                  {
+                    skipSuggestions: skipSuggestions,
+                    enableInteractive: enableInteractiveTutor && !skipSuggestions,
+                  }
                 )
               } else {
                 const { displayContent } = parseAssistantSuggestions(fullAssistantContent)
@@ -1338,7 +1648,10 @@ export default function InsightChatSidebar({
             const skipSuggestions = conversationHasSolutionRequest(newMessages)
             if (persona === 'problem_tutor') {
               newMessages[lastIndex] = {
-                ...finalizeProblemTutorAssistantMessage(newMessages[lastIndex], rawOutput, skipSuggestions),
+                ...finalizeProblemTutorAssistantMessage(newMessages[lastIndex], rawOutput, {
+                  skipSuggestions,
+                  enableInteractive: enableInteractiveTutor && !skipSuggestions,
+                }),
                 agentArtifacts: Array.isArray(data.agentArtifacts)
                   ? (data.agentArtifacts as InsightMessageArtifact[])
                   : newMessages[lastIndex]?.agentArtifacts,
@@ -1398,6 +1711,10 @@ export default function InsightChatSidebar({
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (messageLimitReached) {
+      e.preventDefault()
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submitMessage()
@@ -1469,7 +1786,10 @@ export default function InsightChatSidebar({
   }, [isStreaming])
 
   const send = () => submitMessage()
-  const isInputDisabled = busy
+  const isInputDisabled = busy || messageLimitReached
+  const openMessageLimitUpgrade = useCallback(() => {
+    setPremiumUpgradeOpen(true)
+  }, [])
   const embeddedPanelSlideTransition =
     panelSlideTransitionClass ?? "transition-transform duration-300 ease-out"
   const slideOverPanelTransition =
@@ -1486,9 +1806,16 @@ export default function InsightChatSidebar({
     [isOpen, onExitAnimationComplete]
   )
 
+  const mobileSheetHeightPx = useMemo(() => {
+    if (!isMobileBottomSheet) return null
+    const desired = mobileHeight ?? Math.round((typeof window !== 'undefined' ? window.innerHeight : 800) * 0.8)
+    if (keyboardMaxHeight == null) return desired
+    return Math.min(desired, keyboardMaxHeight)
+  }, [isMobileBottomSheet, keyboardMaxHeight, mobileHeight])
+
   // Prevent page scroll when hovering over sidebar
   useEffect(() => {
-    if (!effectiveOpen || !sidebarRef.current || isDesktopEmbedded) return
+    if (!effectiveOpen || !sidebarRef.current || isDesktopEmbedded || isMobileBottomSheet) return
 
     const handleMouseEnter = () => {
       document.body.style.overflow = 'hidden'
@@ -1507,81 +1834,142 @@ export default function InsightChatSidebar({
       sidebarElement.removeEventListener('mouseleave', handleMouseLeave)
       document.body.style.overflow = ''
     }
-  }, [effectiveOpen, isDesktopEmbedded])
+  }, [effectiveOpen, isDesktopEmbedded, isMobileBottomSheet])
+
+  // Wait until we know mobile vs desktop so we don't flash the wrong panel chrome.
+  if (!viewportModeResolved) {
+    return null
+  }
 
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-[499] lg:hidden touch-none"
+          className="fixed inset-0 bg-black/40 z-[499] lg:hidden touch-none"
           onClick={onClose}
           onTouchMove={(e) => e.preventDefault()}
         />
       )}
 
-      {/* Sidebar: on desktop (lg) full height and above navbar (z-[500] > navbar z-[300]); on mobile unchanged */}
+      {/* Sidebar / mobile bottom sheet */}
       <div
         ref={sidebarRef}
         onTransitionEnd={handlePanelTransitionEnd}
-        className={`fixed right-0 ${
-          isProblemLightTheme
-            ? isDesktopEmbedded
-              ? "bg-white"
-              : "bg-white border-l border-[#0b0d10]/10"
-            : "bg-[#101010] border-l border-white/10"
-        } z-[500] flex flex-col overscroll-contain ${
+        aria-hidden={isMobileBottomSheet ? !isOpen : undefined}
+        className={cn(
+          "z-[500] flex flex-col overscroll-contain",
           isDesktopEmbedded
-            ? showCloseWhenDesktopEmbedded
+            ? cn(
+                isProblemLightTheme ? "bg-white" : "bg-[#101010] border-l border-white/10",
+                "fixed right-0",
+                showCloseWhenDesktopEmbedded
+                  ? cn(
+                      embedDesktopTopClass ?? "top-16",
+                      embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
+                      "bottom-0 w-[25vw] rounded-tl-xl rounded-bl-xl overflow-hidden",
+                      embeddedPanelSlideTransition,
+                      isOpen ? "translate-x-0" : "translate-x-full",
+                    )
+                  : cn(
+                      embedDesktopTopClass ?? "top-16",
+                      embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
+                      "bottom-0 w-[25vw] translate-x-0 transition-none rounded-tl-xl rounded-bl-xl overflow-hidden",
+                    ),
+              )
+            : isMobileBottomSheet
               ? cn(
-                  embedDesktopTopClass ?? "top-16",
-                  embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
-                  "bottom-0 w-[25vw] rounded-tl-xl rounded-bl-xl overflow-hidden",
-                  embeddedPanelSlideTransition,
-                  isOpen ? "translate-x-0" : "translate-x-full",
+                  "fixed inset-x-0 bottom-0 overflow-hidden rounded-t-[28px] border shadow-[0_-10px_30px_rgba(0,0,0,0.08)]",
+                  isProblemLightTheme
+                    ? "border-[#dedede] bg-white"
+                    : "border-white/10 bg-[#101010]",
+                  mobileSheetTransitionOn && !mobileDragging
+                    ? "transition-[height,transform] duration-300 ease-out will-change-transform"
+                    : "transition-none",
+                  !isOpen && "pointer-events-none",
+                  !isOpen && !mobileSheetTransitionOn && "invisible",
                 )
               : cn(
-                  embedDesktopTopClass ?? "top-16",
-                  embedDesktopHeightClass ?? "h-[calc(100dvh-4rem)]",
-                  "bottom-0 w-[25vw] translate-x-0 transition-none rounded-tl-xl rounded-bl-xl overflow-hidden",
-                )
-            : `top-0 h-dvh lg:h-dvh w-[90vw] lg:w-[25vw] ${slideOverPanelTransition} ${
-                isOpen ? 'translate-x-0' : 'translate-x-full'
-              }`
-        }`}
+                  "fixed right-0 top-0 h-dvh w-[90vw] lg:h-dvh lg:w-[25vw]",
+                  isProblemLightTheme
+                    ? "border-l border-[#0b0d10]/10 bg-white"
+                    : "border-l border-white/10 bg-[#101010]",
+                  slideOverPanelTransition,
+                  isOpen ? "translate-x-0" : "translate-x-full",
+                ),
+        )}
         style={
           isDesktopEmbedded
             ? undefined
-            : {
-                maxWidth: '90vw',
-                ...(isMobile && viewportHeight
-                  ? {
-                      height: viewportHeight,
-                      top: `${viewportOffset}px`,
-                    }
-                  : {}),
-              }
+            : isMobileBottomSheet
+              ? {
+                  height:
+                    mobileSheetHeightPx == null
+                      ? "80dvh"
+                      : `${mobileSheetHeightPx}px`,
+                  bottom: keyboardBottomInset,
+                  transform: mobileSheetEntered
+                    ? `translate3d(0, ${mobileDragOffset}px, 0)`
+                    : "translate3d(0, 100%, 0)",
+                }
+              : {
+                  maxWidth: "90vw",
+                  ...(isMobile && viewportHeight
+                    ? {
+                        height: viewportHeight,
+                        top: `${viewportOffset}px`,
+                      }
+                    : {}),
+                }
         }
       >
         {/* Header */}
         <div
           className={cn(
-            'flex items-center gap-3 p-4 border-b',
-            isProblemLightTheme ? 'border-[#0b0d10]/10' : 'border-white/10',
-            isDesktopEmbedded && !showCloseWhenDesktopEmbedded ? 'justify-start' : 'justify-between'
+            "relative flex shrink-0 items-center justify-between gap-3 border-b",
+            isProblemLightTheme ? "border-[#0b0d10]/10" : "border-white/10",
+            isMobileBottomSheet ? "h-12 px-3 pt-2" : "p-4",
           )}
         >
-          <div
-            className={cn(
-              'flex items-center gap-3',
-              !isDesktopEmbedded && 'min-w-0 flex-1',
-              isDesktopEmbedded && showCloseWhenDesktopEmbedded && 'min-w-0 flex-1'
-            )}
-          >
-            <h2 className={cn('shrink-0 font-semibold', isProblemLightTheme ? 'text-[#0b0d10]' : 'text-white')}>
+          {isMobileBottomSheet ? (
+            <div
+              className="absolute inset-x-0 top-0 z-[1] flex h-7 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+              onPointerDown={handleMobilePointerDown}
+              onPointerMove={handleMobilePointerMove}
+              onPointerUp={handleMobilePointerUp}
+              onPointerCancel={handleMobilePointerUp}
+              role="presentation"
+              aria-label="Redimensionează chat-ul"
+            >
+              <div
+                className={cn(
+                  "h-1 w-12 rounded-full",
+                  isProblemLightTheme ? "bg-[#bdbdbd]" : "bg-white/30",
+                )}
+              />
+            </div>
+          ) : null}
+          <div className={cn("flex min-w-0 flex-1 items-center gap-2", isMobileBottomSheet && "pt-2")}>
+            {isMobileBottomSheet ? (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden bg-transparent">
+                <img
+                  src={INSIGHT_CHAT_ILLUSTRATION_SRC}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  loading="lazy"
+                />
+              </div>
+            ) : null}
+            <h2
+              className={cn(
+                "shrink-0 font-semibold",
+                isProblemLightTheme ? "text-[#0b0d10]" : "text-white",
+                isMobileBottomSheet && "text-sm",
+              )}
+            >
               Insight Chat
             </h2>
-            {userMessagesCount > 0 && (
+            {!isMobileBottomSheet && userMessagesCount > 0 ? (
               <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden bg-transparent">
                 <img
                   src={INSIGHT_CHAT_ILLUSTRATION_SRC}
@@ -1590,37 +1978,52 @@ export default function InsightChatSidebar({
                   loading="lazy"
                 />
               </div>
+            ) : null}
+          </div>
+          <div className={cn("flex shrink-0 items-center gap-0.5", isMobileBottomSheet && "relative z-[2] pt-2")}>
+            {user ? (
+              <InsightProblemChatHistory
+                problemId={problemId}
+                currentSessionId={sessionId}
+                onSelectSession={handleHistorySelectSession}
+                onNewChat={handleHistoryNewChat}
+                refreshKey={sessionId}
+                lightTheme={isProblemLightTheme}
+              />
+            ) : null}
+            {(!isDesktopEmbedded || showCloseWhenDesktopEmbedded) && (
+              <button
+                type="button"
+                onClick={onClose}
+                className={cn(
+                  'group shrink-0 p-2 rounded transition-colors',
+                  isProblemLightTheme
+                    ? 'max-lg:active:bg-transparent lg:hover:bg-[#e5e7eb]'
+                    : 'max-lg:active:bg-transparent lg:hover:bg-white/10'
+                )}
+                aria-label="Închide chat-ul"
+              >
+                <X
+                  className={cn(
+                    'w-5 h-5 transition-colors duration-150',
+                    isProblemLightTheme
+                      ? 'text-[#6b7280] max-lg:group-active:text-[#d1d5db]'
+                      : 'text-gray-400 max-lg:group-active:text-gray-200'
+                  )}
+                />
+              </button>
             )}
           </div>
-          {(!isDesktopEmbedded || showCloseWhenDesktopEmbedded) && (
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn(
-                'group shrink-0 p-2 rounded transition-colors',
-                isProblemLightTheme
-                  ? 'max-lg:active:bg-transparent lg:hover:bg-[#e5e7eb]'
-                  : 'max-lg:active:bg-transparent lg:hover:bg-white/10'
-              )}
-              aria-label="Închide chat-ul"
-            >
-              <X
-                className={cn(
-                  'w-5 h-5 transition-colors duration-150',
-                  isProblemLightTheme
-                    ? 'text-[#6b7280] max-lg:group-active:text-[#d1d5db]'
-                    : 'text-gray-400 max-lg:group-active:text-gray-200'
-                )}
-              />
-            </button>
-          )}
         </div>
 
         {/* Messages Area */}
         <div
           ref={messagesContainerRef}
           onScroll={handleScroll}
-          className="insight-chat-scroll flex-1 overflow-y-auto px-3 py-5 pb-36 sm:px-4 sm:py-6 sm:pb-40 lg:px-5 overscroll-contain"
+          className={cn(
+            "insight-chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-5 sm:px-4 sm:py-6 lg:px-5",
+            isMobileBottomSheet ? "pb-32" : "pb-36 sm:pb-40",
+          )}
         >
           {loadingSession && !disableEntranceAnimations ? (
             <div className="flex h-full items-center justify-center">
@@ -1647,20 +2050,17 @@ export default function InsightChatSidebar({
                         ref={isStreamingAssistant ? (node) => {
                           streamingAssistantRef.current = node
                         } : undefined}
-                        className={cn(
-                          "w-full py-1.5",
-                          isProblemLightTheme && "rounded-2xl border border-[#0b0d10]/10 bg-white px-4 py-3.5 shadow-sm"
-                        )}
+                        className="w-full py-1.5"
                       >
                         <div className={cn("text-xs uppercase tracking-wide mb-2", isProblemLightTheme ? "text-[#6b7280]" : "text-gray-500")}>
                           {m.content === '' && loadingMessage ? (
-                            <span className="flex items-center gap-2">
-                              <span className="shimmer-text">{loadingMessage}</span>
-                              <span className="flex gap-1">
-                                <span className="animate-pulse">●</span>
-                                <span className="animate-pulse delay-75">●</span>
-                                <span className="animate-pulse delay-150">●</span>
-                              </span>
+                            <span
+                              className="flex items-center normal-case tracking-normal"
+                              role="status"
+                              aria-live="polite"
+                              aria-label={loadingMessage}
+                            >
+                              <InvataAskThinkingDots />
                             </span>
                           ) : (
                             'Insight'
@@ -1683,8 +2083,30 @@ export default function InsightChatSidebar({
                           light={isProblemLightTheme}
                           singleColumn
                         />
+                        {m.interactive && !(isStreamingAssistant && busy && !m.content) ? (
+                          <InsightInteractiveWidget
+                            payload={m.interactive}
+                            light={isProblemLightTheme}
+                            disabled={busy}
+                            initialResult={m.interactiveResult ?? null}
+                            onResolved={(result) => handleInteractiveResolved(i, result)}
+                          />
+                        ) : null}
                         {persona === 'problem_tutor' &&
                           !hasSolutionRequest &&
+                          m.interactive &&
+                          m.interactiveResult &&
+                          !(isStreamingAssistant && busy) && (
+                            <SuggestedQuestions
+                              questions={m.interactive.continueSuggestions}
+                              onSelect={handleSuggestionSelect}
+                              isLightTheme={isProblemLightTheme}
+                              disableEntranceAnimations={disableEntranceAnimations}
+                            />
+                          )}
+                        {persona === 'problem_tutor' &&
+                          !hasSolutionRequest &&
+                          !m.interactive &&
                           m.suggestions &&
                           m.suggestions.length > 0 &&
                           (m.content || '').trim() &&
@@ -1751,6 +2173,48 @@ export default function InsightChatSidebar({
               })}
               <div ref={endRef} />
             </div>
+          ) : isMobileBottomSheet ? (
+            <div className="flex h-full min-h-0 flex-col px-4 pt-5">
+              <div
+                className={cn(
+                  "flex flex-col items-center gap-4",
+                  !disableEntranceAnimations && "animate-in fade-in slide-in-from-bottom-2 duration-300",
+                )}
+              >
+                <div className="flex flex-col items-center gap-1.5 text-center">
+                  <span className="text-[2rem] leading-none" aria-hidden>
+                    👋
+                  </span>
+                  <p
+                    className={cn(
+                      "text-[17px] font-bold leading-snug",
+                      isProblemLightTheme ? "text-[#111827]" : "text-white",
+                    )}
+                  >
+                    Bună! Ce ai vrea să știi?
+                  </p>
+                </div>
+                {canShowStarterCards ? (
+                  <div className="flex w-full flex-col items-center gap-2">
+                    {starterChipsToShow.map((cardText) => (
+                      <button
+                        key={cardText}
+                        type="button"
+                        onClick={() => handleStarterCardSelect(cardText)}
+                        className={cn(
+                          "w-fit max-w-full rounded-full px-3.5 py-2 text-left text-[13px] leading-snug shadow-sm transition-all duration-200 active:scale-[0.98]",
+                          isProblemLightTheme
+                            ? "border border-[#0b0d10]/10 bg-[#f3f4f6] text-[#111827] hover:bg-[#ebecef]"
+                            : "border border-white/10 bg-white/5 text-white/90 hover:bg-white/10",
+                        )}
+                      >
+                        {cardText}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
           ) : (
             <div className="flex h-full min-h-0 flex-col px-4">
               {/* Spacer flex: content sits in the upper part of the free area (above composer), centered horizontally */}
@@ -1793,39 +2257,54 @@ export default function InsightChatSidebar({
         )}
 
         {/* Chatbox Area */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 isolate p-4">
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 bottom-0 z-30 isolate p-4",
+            isMobileBottomSheet && "pb-[max(1rem,env(safe-area-inset-bottom,0px))]",
+          )}
+        >
+          {messageLimitReached && isProblemLightTheme ? (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[min(55vh,28rem)] bg-[radial-gradient(ellipse_120%_90%_at_50%_100%,rgba(251,207,232,0.85)_0%,rgba(244,194,230,0.55)_30%,rgba(232,212,245,0.28)_55%,transparent_88%)] blur-[28px]"
+            />
+          ) : null}
           <div
             aria-hidden
             className={cn(
               "pointer-events-none absolute inset-x-0 bottom-0 z-0 h-44 sm:h-52",
               isProblemLightTheme
-                ? "bg-gradient-to-t from-white via-white/95 to-transparent"
+                ? messageLimitReached
+                  ? "bg-gradient-to-t from-white/70 via-white/40 to-transparent"
+                  : "bg-gradient-to-t from-white via-white/95 to-transparent"
                 : "bg-gradient-to-t from-black/90 via-black/50 to-transparent"
             )}
           />
           <div className="pointer-events-auto relative z-10 flex w-full flex-col">
               <>
                 {shouldShowJumpToLatest && (
-                  <div className="pointer-events-none absolute -top-12 right-0 z-20">
+                  <div className="pointer-events-none absolute -top-12 inset-x-0 z-20 flex justify-center">
                     <button
+                      type="button"
+                      aria-label="Vezi ultimele mesaje"
                       onClick={() => {
                         setShouldAutoScroll(true)
                         setFollowStreamToLatest(true)
                         scrollToLatest(isStreaming ? 'auto' : 'smooth')
                       }}
                       className={cn(
-                        "pointer-events-auto rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                        "pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full transition-colors shadow-sm",
                         isProblemLightTheme
                           ? "border border-[#0b0d10]/15 bg-white text-[#111827] hover:bg-[#f8fafc]"
                           : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
                       )}
                     >
-                      Vezi ultimele mesaje
+                      <ChevronDown className="h-4 w-4" />
                     </button>
                   </div>
                 )}
 
-                {canShowStarterCards && (
+                {canShowStarterCards && !isMobileBottomSheet ? (
                   <div
                     className={cn(
                       "mb-2 flex flex-col gap-2",
@@ -1837,7 +2316,7 @@ export default function InsightChatSidebar({
                         key={cardText}
                         onClick={() => handleStarterCardSelect(cardText)}
                         className={cn(
-                          "text-left text-sm rounded-xl px-3.5 py-3 transition-all duration-200 shadow-sm active:scale-[0.98]",
+                          "rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-200 shadow-sm active:scale-[0.98]",
                           isProblemLightTheme
                             ? "bg-white hover:bg-[#f8fafc] border border-[#0b0d10]/12 hover:border-[#0b0d10]/20 text-[#111827]"
                             : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/90"
@@ -1847,16 +2326,16 @@ export default function InsightChatSidebar({
                       </button>
                     ))}
                   </div>
-                )}
+                ) : null}
 
                 {/* Context Card */}
-                {problemContext && !busy && (
+                {showProblemContextCard && (
                   <div className={cn(
-                    "flex items-center justify-between border border-b-0 rounded-t-2xl p-3 text-sm",
+                    "flex items-center justify-between border border-b-0 p-3 text-sm",
                     !disableEntranceAnimations && "animate-in fade-in slide-in-from-bottom-2 duration-200",
                     isProblemLightTheme
-                      ? "bg-white border-[#0b0d10]/12 text-[#4b5563]"
-                      : "bg-[#1a1a1a] border-white/10 text-gray-300"
+                      ? "rounded-t-[1.75rem] bg-white border-[#0b0d10]/12 text-[#4b5563]"
+                      : "rounded-t-2xl bg-[#1a1a1a] border-white/10 text-gray-300"
                   )}>
                     <div className="flex items-center gap-2 overflow-hidden">
                       <span className={cn("text-xs font-medium uppercase flex-shrink-0", isProblemLightTheme ? "text-[#2563eb]" : "text-blue-400")}>Context:</span>
@@ -1878,7 +2357,7 @@ export default function InsightChatSidebar({
                 )}
 
                 {/* Pending image attachments */}
-                {pendingAttachments.length > 0 && !busy && (
+                {pendingAttachments.length > 0 && !busy && !messageLimitReached && (
                   <div className="mb-2 flex flex-wrap gap-2">
                     {pendingAttachments.map((p) => (
                       <div
@@ -1906,11 +2385,30 @@ export default function InsightChatSidebar({
                   </div>
                 )}
 
+                {messageLimitReached ? (
+                  <ChatMessageLimitHint
+                    className="mb-2"
+                    tone={isProblemLightTheme ? 'light' : 'dark'}
+                    onUpgradeClick={openMessageLimitUpgrade}
+                  />
+                ) : null}
+
                 {/* Input Area */}
-                <div className={`relative flex items-end gap-2 ${isProblemLightTheme ? "bg-white border border-[#0b0d10]/12" : "bg-[#212121] border border-white/10"} p-2.5 sm:p-3 shadow-lg transition-all duration-200 ${problemContext
-                  ? 'rounded-b-2xl rounded-t-none border-t-0'
-                  : 'rounded-2xl'
-                  }`}>
+                <div
+                  className={cn(
+                    'relative flex items-end gap-2 p-2.5 sm:p-3 shadow-lg transition-all duration-200',
+                    isProblemLightTheme
+                      ? 'border border-[#0b0d10]/12 bg-white'
+                      : 'border border-white/10 bg-[#212121]',
+                    showProblemContextCard
+                      ? isProblemLightTheme
+                        ? 'rounded-b-[1.75rem] rounded-t-none border-t-0'
+                        : 'rounded-b-2xl rounded-t-none border-t-0'
+                      : isProblemLightTheme
+                        ? 'rounded-[1.75rem]'
+                        : 'rounded-2xl',
+                  )}
+                >
                   <input
                     ref={attachmentInputRef}
                     type="file"
@@ -1934,15 +2432,17 @@ export default function InsightChatSidebar({
                       isProblemLightTheme
                         ? 'max-lg:active:bg-transparent lg:hover:bg-[#f3f4f6]'
                         : 'max-lg:active:bg-transparent lg:hover:bg-gray-700',
-                      (!user || busy || uploadingAttachments) && 'opacity-40 cursor-not-allowed'
+                      (!user || busy || uploadingAttachments || messageLimitReached) && 'opacity-40 cursor-not-allowed'
                     )}
-                    disabled={!user || busy || uploadingAttachments}
+                    disabled={!user || busy || uploadingAttachments || messageLimitReached}
                     title={
-                      user
-                        ? `Atașează imagini (max. ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE}, max ${Math.round(MAX_INSIGHT_ATTACHMENT_BYTES / (1024 * 1024))} MB/fișier, convertite la WebP sau JPEG)`
-                        : 'Autentifică-te pentru a atașa imagini'
+                      messageLimitReached
+                        ? CHAT_MESSAGE_LIMIT_PLACEHOLDER
+                        : user
+                          ? `Atașează imagini (max. ${MAX_INSIGHT_ATTACHMENTS_PER_MESSAGE}, max ${Math.round(MAX_INSIGHT_ATTACHMENT_BYTES / (1024 * 1024))} MB/fișier, convertite la WebP sau JPEG)`
+                          : 'Autentifică-te pentru a atașa imagini'
                     }
-                    onClick={() => user && !busy && !uploadingAttachments && attachmentInputRef.current?.click()}
+                    onClick={() => user && !busy && !uploadingAttachments && !messageLimitReached && attachmentInputRef.current?.click()}
                   >
                     <Paperclip
                       className={cn(
@@ -1958,18 +2458,21 @@ export default function InsightChatSidebar({
                       type="button"
                       className={cn(
                         'group h-10 w-10 rounded transition-colors flex items-center justify-center flex-shrink-0 self-end active:bg-transparent',
-                        (!user || busy || uploadingAttachments) && 'opacity-40 cursor-not-allowed'
+                        (!user || busy || uploadingAttachments || messageLimitReached) && 'opacity-40 cursor-not-allowed'
                       )}
-                      disabled={!user || busy || uploadingAttachments}
+                      disabled={!user || busy || uploadingAttachments || messageLimitReached}
                       title={
-                        user
-                          ? 'Fă o poză la caiet / problemă (cameră)'
-                          : 'Autentifică-te pentru a atașa imagini'
+                        messageLimitReached
+                          ? CHAT_MESSAGE_LIMIT_PLACEHOLDER
+                          : user
+                            ? 'Fă o poză la caiet / problemă (cameră)'
+                            : 'Autentifică-te pentru a atașa imagini'
                       }
                       onClick={() =>
                         user &&
                         !busy &&
                         !uploadingAttachments &&
+                        !messageLimitReached &&
                         cameraAttachmentInputRef.current?.click()
                       }
                     >
@@ -1985,7 +2488,15 @@ export default function InsightChatSidebar({
                   ) : null}
                   <Textarea
                     ref={textareaRef}
-                    placeholder={problemContext ? (isMobile ? "Scrie..." : "Adaugă detalii sau întreabă...") : "Scrie un mesaj..."}
+                    placeholder={
+                      messageLimitReached
+                        ? CHAT_MESSAGE_LIMIT_PLACEHOLDER
+                        : problemContext
+                          ? isMobile
+                            ? 'Scrie...'
+                            : 'Adaugă detalii sau întreabă...'
+                          : 'Scrie un mesaj...'
+                    }
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
@@ -1995,12 +2506,20 @@ export default function InsightChatSidebar({
                       isProblemLightTheme ? "text-[#111827] placeholder:text-[#6b7280]" : "text-white placeholder:text-gray-400"
                     )}
                     disabled={isInputDisabled}
+                    readOnly={messageLimitReached}
                     style={{
                       height: `${textareaHeight}px`,
                       overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
                     }}
                   />
-                  {busy && isStreaming ? (
+                  {messageLimitReached ? (
+                    <ChatMessageLimitLockButton
+                      onClick={openMessageLimitUpgrade}
+                      tone={isProblemLightTheme ? 'light' : 'dark'}
+                      iconSize={18}
+                      className="h-10 w-10 self-end"
+                    />
+                  ) : busy && isStreaming ? (
                     <button
                       onClick={stopGeneration}
                       aria-label="Oprește răspunsul"

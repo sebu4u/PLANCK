@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils"
 interface StudentGradeGoalCardProps {
   currentGrade: number
   targetGrade: number | null
+  /** Narrow layout for desktop sidebars (e.g. /exerseaza). */
+  compact?: boolean
+  className?: string
 }
 
 const CHART_WIDTH = 520
@@ -17,7 +20,12 @@ const PADDING = { top: 16, right: 16, bottom: 28, left: 32 }
  * Read-only variant of the parent dashboard's grade chart, adapted for the
  * student's own free-plan mobile dashboard (no edit affordance).
  */
-export function StudentGradeGoalCard({ currentGrade, targetGrade }: StudentGradeGoalCardProps) {
+export function StudentGradeGoalCard({
+  currentGrade,
+  targetGrade,
+  compact = false,
+  className,
+}: StudentGradeGoalCardProps) {
   const resolvedTarget = targetGrade ?? Math.min(MAX_GRADE, currentGrade + 1)
 
   const projection = useMemo(
@@ -57,42 +65,72 @@ export function StudentGradeGoalCard({ currentGrade, targetGrade }: StudentGrade
   }, [projection, resolvedTarget])
 
   return (
-    <section className="px-1">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className={cn(compact ? "px-0" : "px-1", className)}>
+      <div className={cn("flex flex-wrap items-start justify-between", compact ? "gap-2" : "gap-4")}>
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#6b6b6b]">
+          <p
+            className={cn(
+              "font-medium uppercase tracking-[0.12em] text-[#6b6b6b]",
+              compact ? "text-[10px]" : "text-[11px]",
+            )}
+          >
             Nota ta estimată
           </p>
-          <p className="mt-1 text-4xl font-bold leading-none tabular-nums text-[#121212]">
+          <p
+            className={cn(
+              "mt-1 font-bold leading-none tabular-nums text-[#121212]",
+              compact ? "text-2xl" : "text-4xl",
+            )}
+          >
             {formatGrade(currentGrade)}
           </p>
         </div>
 
         <div className="text-right">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#6b6b6b]">
+          <p
+            className={cn(
+              "font-medium uppercase tracking-[0.12em] text-[#6b6b6b]",
+              compact ? "text-[10px]" : "text-[11px]",
+            )}
+          >
             Nota dorită
           </p>
-          <p className="mt-1 text-4xl font-bold leading-none tabular-nums text-[#121212]">
+          <p
+            className={cn(
+              "mt-1 font-bold leading-none tabular-nums text-[#121212]",
+              compact ? "text-2xl" : "text-4xl",
+            )}
+          >
             {formatGrade(resolvedTarget)}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0ebff] px-3 py-1 text-xs font-semibold text-[#6e4ef2]">
+      <div className={cn("mt-3 flex flex-wrap", compact ? "gap-1.5" : "gap-2")}>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full bg-[#f0ebff] font-semibold text-[#6e4ef2]",
+            compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs",
+          )}
+        >
           <span className="h-2 w-2 rounded-full bg-[#6e4ef2]" />
           Nota ta
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fff9e8] px-3 py-1 text-xs font-semibold text-[#b45309]">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full bg-[#fff9e8] font-semibold text-[#b45309]",
+            compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs",
+          )}
+        >
           <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
           Țintă
         </span>
       </div>
 
-      <div className="mt-3 overflow-x-auto">
+      <div className={cn("mt-3", compact ? "overflow-hidden" : "overflow-x-auto")}>
         <svg
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          className="h-[150px] w-full min-w-[300px]"
+          className={cn("w-full", compact ? "h-[170px]" : "h-[150px] min-w-[300px]")}
           role="img"
           aria-label="Proiecție notă estimată pe 12 luni"
         >

@@ -40,6 +40,7 @@ export async function POST(
       meet_url?: string
       recording_url?: string | null
       balance?: number
+      carryover_balance?: number
       energy_cost?: number
     }
 
@@ -51,6 +52,7 @@ export async function POST(
             error: "Nu ai suficientă energie.",
             code,
             balance: result.balance,
+            carryoverBalance: result.carryover_balance ?? 0,
             energy_cost: result.energy_cost,
           },
           { status: 402 },
@@ -74,6 +76,7 @@ export async function POST(
       meet_url: result.meet_url ?? null,
       recording_url: result.recording_url ?? null,
       balance: result.balance ?? 0,
+      carryoverBalance: result.carryover_balance ?? 0,
     })
   } catch (err) {
     logger.error("[pregatire/unlock] error:", err)

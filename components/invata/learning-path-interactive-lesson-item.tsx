@@ -34,6 +34,7 @@ import { useLearningPathExplainChat } from "@/components/invata/learning-path-ex
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import {
   formatCardSortLearningPathContext,
+  formatCodeTraceLearningPathContext,
   formatFillSlotLearningPathContext,
   formatRevealStepsQuizLearningPathContext,
   LEARNING_PATH_CARD_SORT_EXPLAIN_INITIAL_PROMPT,
@@ -1355,6 +1356,36 @@ function CodeTraceView({
 
   const canVerifyStep =
     !!cur && (usesChoiceInput ? choice !== null : textVal.trim().length > 0)
+
+  useRegisterLearningPathAiContext(
+    () =>
+      formatCodeTraceLearningPathContext({
+        language: data.language,
+        lines: data.lines,
+        stepIndex: done ? data.steps.length : step + 1,
+        totalSteps: data.steps.length,
+        highlightedLineIndex: cur?.lineIndex,
+        prompt: cur?.prompt,
+        inputMode: cur?.inputMode,
+        options: cur?.options,
+        userTextAnswer: textVal,
+        userChoice: choice,
+        completed: done,
+      }),
+    [
+      data.language,
+      data.lines,
+      data.steps.length,
+      done,
+      step,
+      cur?.lineIndex,
+      cur?.prompt,
+      cur?.inputMode,
+      cur?.options,
+      textVal,
+      choice,
+    ],
+  )
 
   return (
     <>

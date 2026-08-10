@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
 
     const { data: rows, error } = await service
       .from("coding_problems")
-      .select("id, slug, title, difficulty, class, chapter, is_active, created_at")
+      .select("id, display_id, slug, title, difficulty, class, chapter, is_active, created_at")
       .order("created_at", { ascending: false })
       .limit(300)
 
@@ -338,7 +338,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await service
       .from("coding_problems")
       .insert(parsed.row)
-      .select("id, slug, title")
+      .select("id, display_id, slug, title")
       .single()
     if (error) {
       logger.error("[dev/problems] coding insert:", error)

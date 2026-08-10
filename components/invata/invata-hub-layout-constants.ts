@@ -12,9 +12,14 @@ export const INVATA_HUB_MOBILE_SHEET_SHADOW =
 export const INVATA_ASK_CARD_Z = 295
 
 /**
- * Stacking on mobile /invata hub (navbar wrapper stays z-[300]):
- * chapter image (2) < glow (280) < lesson cards / titles (290) < ask advisor dropdown anchor (295) < top & bottom bar (300)
+ * Stacking on mobile /invata hub:
+ * top bar (0) < header character (2) < white sheet (10) < …
+ * Within the sheet: chapter image (2) < glow (280) < lesson cards (290) < ask advisor (295)
+ * Bottom bar stays at 300 (fixed, outside the sheet). Desktop top bar stays at 300.
  */
+export const INVATA_HUB_MOBILE_NAV_Z = 0
+export const INVATA_HUB_MOBILE_HEADER_Z = 2
+export const INVATA_HUB_MOBILE_SHEET_Z = 10
 export const INVATA_HUB_TOP_GLOW_Z = 280
 export const INVATA_HUB_CHAPTER_IMAGE_Z = 2
 export const INVATA_HUB_LESSON_CARDS_Z = 290

@@ -1,13 +1,14 @@
 "use client"
 
-import { Check, Coins, Frame, Lock, Snowflake, Sparkles, Trophy, Zap } from "lucide-react"
+import { Check, Coins, Frame, Gift, Lock, Snowflake, Sparkles, Trophy, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   formatMilestoneAmount,
   getRewardKindLabel,
+  toDisplayKind,
   type TrophyRoadMilestone,
   type TrophyRoadNodeState,
-} from "@/lib/trophy-road/milestones"
+} from "@/lib/trophy-road/types"
 
 function RewardIcon({
   kind,
@@ -16,217 +17,185 @@ function RewardIcon({
   kind: TrophyRoadMilestone["kind"]
   className?: string
 }) {
-  const shared = cn(className)
-  switch (kind) {
+  switch (toDisplayKind(kind)) {
     case "coins":
-      return <Coins className={cn(shared, "text-amber-300")} strokeWidth={2.5} />
+      return <Coins className={cn(className, "text-amber-500")} strokeWidth={2.4} />
     case "elo_boost":
-      return <Zap className={cn(shared, "text-yellow-300")} strokeWidth={2.5} />
+      return <Zap className={cn(className, "text-sky-500")} strokeWidth={2.4} />
     case "freeze":
-      return <Snowflake className={cn(shared, "text-sky-300")} strokeWidth={2.5} />
+      return <Snowflake className={cn(className, "text-cyan-500")} strokeWidth={2.4} />
     case "cosmetic":
-      return <Frame className={cn(shared, "text-fuchsia-200")} strokeWidth={2.5} />
+      return <Frame className={cn(className, "text-rose-500")} strokeWidth={2.4} />
     case "special":
-      return <Sparkles className={cn(shared, "text-violet-200")} strokeWidth={2.5} />
+      return <Sparkles className={cn(className, "text-orange-500")} strokeWidth={2.4} />
   }
 }
 
-function nodeColors(state: TrophyRoadNodeState) {
+function nodeFaceClasses(state: TrophyRoadNodeState) {
   if (state === "claimed") {
-    return {
-      face: "bg-emerald-500 text-white",
-      depth: "bg-emerald-700",
-    }
+    return "border-[#1a9f6e] bg-[#34d399] text-white shadow-[0_4px_0_#1a9f6e]"
+  }
+  if (state === "claimable") {
+    return "border-[#d4a012] bg-[#ffd84d] text-[#4a3200] shadow-[0_4px_0_#c48900] trophy-road-node-pulse"
   }
   if (state === "current") {
-    return {
-      face: "bg-[#ffc800] text-[#3d2800]",
-      depth: "bg-[#9a6800]",
-    }
+    return "border-[#d4a012] bg-[#ffd84d] text-[#4a3200] shadow-[0_4px_0_#c48900] trophy-road-node-pulse"
   }
-  return {
-    face: "bg-[#5020F0] text-white",
-    depth: "bg-[#1a0a4a]",
+  if (state === "soon") {
+    return "border-[#c5d4e8] bg-[#eef3f9] text-[#7a8aa0] shadow-[0_4px_0_#b8c8dc]"
   }
+  return "border-[#c5d4e8] bg-white text-[#7a8aa0] shadow-[0_4px_0_#b8c8dc]"
 }
 
 export function TrophyRoadCircleNode({
   milestone,
   state,
-  size = "md",
 }: {
   milestone: TrophyRoadMilestone
   state: TrophyRoadNodeState
-  size?: "md" | "lg"
 }) {
-  const colors = nodeColors(state)
-  const isSpecial = milestone.kind === "special"
-  const isLg = size === "lg"
+  const showGift = state === "claimable"
 
   return (
     <div
       data-map-node={milestone.id}
       className={cn(
-        "relative shrink-0",
-        isLg ? "h-[104px] w-[104px]" : "h-[72px] w-[72px]",
-        state === "current" && "fizica-map-node-glow",
+        "relative z-[3] flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full border-[3px] burger:h-[72px] burger:w-[72px]",
+        nodeFaceClasses(state),
       )}
       aria-hidden
     >
-      <div
-        className={cn(
-          "absolute inset-x-0 bottom-0 rounded-full",
-          isLg ? "h-[96px]" : "h-[66px]",
-          colors.depth,
-        )}
-      />
-      <div
-        className={cn(
-          "absolute inset-x-0 top-0 flex items-center justify-center rounded-full shadow-[inset_0_2px_0_rgba(255,255,255,0.22)]",
-          isLg ? "h-[96px]" : "h-[66px]",
-          colors.face,
-          isSpecial && state === "locked" && "bg-[#3a12c4]",
-        )}
-      >
-        {state === "claimed" ? (
-          <Check className={isLg ? "h-10 w-10" : "h-7 w-7"} strokeWidth={3} />
-        ) : state === "locked" ? (
-          <Lock className={isLg ? "h-9 w-9 opacity-90" : "h-6 w-6 opacity-90"} strokeWidth={2.5} />
-        ) : (
-          <Trophy className={isLg ? "h-10 w-10" : "h-7 w-7"} strokeWidth={2.5} />
-        )}
-      </div>
+      {state === "claimed" ? (
+        <Check className="h-6 w-6 burger:h-7 burger:w-7" strokeWidth={3} />
+      ) : showGift ? (
+        <Gift className="h-6 w-6 !text-[#4a3200] burger:h-7 burger:w-7" strokeWidth={2.4} />
+      ) : state === "locked" || state === "soon" ? (
+        <div className="relative flex items-center justify-center">
+          <RewardIcon kind={milestone.kind} className="h-6 w-6 opacity-45 burger:h-7 burger:w-7" />
+          <Lock
+            className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-white text-[#7a8aa0] burger:h-4 burger:w-4"
+            strokeWidth={2.5}
+          />
+        </div>
+      ) : (
+        <RewardIcon kind={milestone.kind} className="h-6 w-6 !text-[#4a3200] burger:h-7 burger:w-7" />
+      )}
     </div>
   )
 }
 
-export function TrophyRoadRewardCard({
+export function TrophyRoadRewardChip({
   milestone,
   state,
   trophiesNeeded,
-  compact = false,
-  size = "md",
+  side,
+  claiming,
+  onClaim,
 }: {
   milestone: TrophyRoadMilestone
   state: TrophyRoadNodeState
   trophiesNeeded?: number
-  compact?: boolean
-  size?: "md" | "lg"
+  side: "left" | "right"
+  claiming?: boolean
+  onClaim?: (milestoneId: string) => void
 }) {
   const isClaimed = state === "claimed"
+  const isClaimable = state === "claimable"
   const isCurrent = state === "current"
   const isLocked = state === "locked"
-  const isSpecial = milestone.kind === "special"
-  const amountLabel = formatMilestoneAmount(milestone)
-  const isLg = size === "lg" && !compact
+  const isSoon = state === "soon"
+  const amountLabel = formatMilestoneAmount({
+    kind: milestone.kind,
+    coinsAmount: milestone.coinsAmount,
+    eloAmount: milestone.eloAmount,
+    eloMultiplierMinutes: milestone.eloMultiplierMinutes,
+    streakFreezeHours: milestone.streakFreezeHours,
+    label: milestone.label,
+  })
+  const showAmount =
+    milestone.configured &&
+    (milestone.kind === "coins" ||
+      milestone.kind === "elo" ||
+      milestone.kind === "elo_2x" ||
+      milestone.kind === "streak_freeze")
 
   return (
     <article
       data-map-card={milestone.id}
       className={cn(
-        "relative z-[3] flex flex-col rounded-2xl border-[3px] border-b-[6px]",
-        compact
-          ? "h-[100px] max-w-none px-4 py-2.5"
-          : isLg
-            ? "h-[176px] w-[min(100%,340px)] px-5 py-4"
-            : "h-[132px] w-[min(100%,280px)] px-4 py-3",
-        isCurrent
-          ? "border-[#ffc800] border-b-[#c68a00] bg-[#ffc800] text-[#2a1f00]"
+        "relative z-[3] flex min-w-0 flex-col gap-1.5 rounded-2xl border-2 bg-white/90 px-3 py-2.5 backdrop-blur-sm burger:gap-2 burger:px-4 burger:py-3",
+        isClaimable || isCurrent
+          ? "border-[#ffd84d] shadow-[0_6px_0_rgba(196,137,0,0.35)]"
           : isClaimed
-            ? "border-[#34d399] border-b-[#059669] bg-[#ecfdf5] text-[#065f46]"
-            : isSpecial
-              ? "border-[#6a2cff] border-b-[#1a0a4a] bg-[#5020F0] text-[#f3e8ff]"
-              : "border-[#2b5797] border-b-[#143660] bg-[#234a7a] text-[#d8e8ff]",
-        isLocked && !isSpecial && "opacity-70",
+            ? "border-[#a7f3d0] shadow-[0_4px_0_rgba(26,159,110,0.2)]"
+            : "border-[#e2ebf5] shadow-[0_4px_0_rgba(148,163,184,0.18)]",
+        (isLocked || isSoon) && "opacity-75",
+        side === "left" ? "text-right" : "text-left",
       )}
     >
-      <div className={cn("flex items-start", isLg ? "gap-4" : "gap-3")}>
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-xl border-2",
-            isLg ? "h-14 w-14 rounded-2xl" : "h-11 w-11",
-            isCurrent
-              ? "border-[#9a6800] bg-[#c68a00]"
-              : isClaimed
-                ? "border-emerald-600 bg-emerald-500"
-                : "border-black/20 bg-black/15",
-          )}
-        >
-          <RewardIcon
-            kind={milestone.kind}
-            className={cn(
-              isLg ? "h-8 w-8" : "h-6 w-6",
-              isCurrent && "!text-[#2a1f00]",
-              isClaimed && "!text-white",
-            )}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              "font-bold uppercase tracking-wide",
-              isLg ? "text-xs" : "text-[10px]",
-              isCurrent ? "text-[#6b4a00]" : isClaimed ? "text-emerald-700" : "text-white/70",
-            )}
-          >
-            {getRewardKindLabel(milestone.kind)}
-          </p>
-          <h3
-            className={cn(
-              "line-clamp-2 font-bold leading-snug",
-              isLg ? "text-base" : "text-sm",
-              isCurrent ? "text-[#2a1f00]" : isClaimed ? "text-[#065f46]" : "text-white",
-            )}
-          >
-            {milestone.label}
-            {milestone.kind === "coins" || milestone.kind === "elo_boost" || milestone.kind === "freeze"
-              ? ` · ${amountLabel}`
-              : null}
-          </h3>
-        </div>
-      </div>
+      <p
+        className={cn(
+          "text-[10px] font-bold uppercase tracking-wide burger:text-[11px]",
+          isClaimable || isCurrent
+            ? "text-[#9a6800]"
+            : isClaimed
+              ? "text-[#1a9f6e]"
+              : "text-[#8a9bb0]",
+        )}
+      >
+        {milestone.configured ? getRewardKindLabel(milestone.kind) : "Recompensă"}
+      </p>
 
-      <div className={cn("mt-auto flex flex-wrap items-center gap-2", isLg ? "pt-3" : "pt-2")}>
+      <h3 className="text-sm font-black leading-snug text-[#1e2a3a] burger:text-base">
+        {milestone.label}
+        {showAmount ? ` · ${amountLabel}` : null}
+      </h3>
+
+      <div
+        className={cn(
+          "mt-0.5 flex flex-wrap items-center gap-1.5",
+          side === "left" ? "justify-end" : "justify-start",
+        )}
+      >
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-lg font-bold",
-            isLg ? "px-2.5 py-1 text-sm" : "px-2 py-0.5 text-xs",
-            isCurrent
-              ? "bg-[#c68a00] text-white"
+            "inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] font-bold burger:px-2 burger:text-xs",
+            isClaimable || isCurrent
+              ? "bg-[#ffd84d] text-[#4a3200]"
               : isClaimed
-                ? "bg-emerald-500 text-white"
-                : "bg-black/20 text-white/90",
+                ? "bg-[#d1fae5] text-[#065f46]"
+                : "bg-[#eef3f9] text-[#5b6b7f]",
           )}
         >
-          <Trophy className={isLg ? "h-3.5 w-3.5" : "h-3 w-3"} strokeWidth={2.5} />
+          <Trophy className="h-3 w-3 burger:h-3.5 burger:w-3.5" strokeWidth={2.5} />
           {milestone.threshold.toLocaleString("ro-RO")}
         </span>
+
         {isClaimed ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-lg bg-emerald-500 font-bold uppercase tracking-wide text-white",
-              isLg ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[10px]",
-            )}
-          >
+          <span className="inline-flex items-center gap-1 rounded-lg bg-[#34d399] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white burger:px-2 burger:text-[11px]">
             <Check className="h-3 w-3" strokeWidth={3} />
-            Deblocat
+            Colectat
+          </span>
+        ) : isClaimable ? (
+          <button
+            type="button"
+            disabled={claiming}
+            onClick={() => onClaim?.(milestone.id)}
+            className="inline-flex items-center gap-1 rounded-lg bg-[#1e2a3a] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white transition active:translate-y-px disabled:opacity-60 burger:px-2.5 burger:text-[11px]"
+          >
+            <Gift className="h-3 w-3" strokeWidth={2.5} />
+            {claiming ? "…" : "Colectează"}
+          </button>
+        ) : isSoon ? (
+          <span className="rounded-lg bg-[#eef3f9] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#8a9bb0] burger:px-2 burger:text-[11px]">
+            În curând
           </span>
         ) : isCurrent && trophiesNeeded != null && trophiesNeeded > 0 ? (
-          <span
-            className={cn(
-              "rounded-lg bg-[#c68a00] font-bold text-white",
-              isLg ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[10px]",
-            )}
-          >
+          <span className="rounded-lg bg-[#fff1b8] px-1.5 py-0.5 text-[10px] font-bold text-[#7a5200] burger:px-2 burger:text-[11px]">
             încă {trophiesNeeded.toLocaleString("ro-RO")}
           </span>
         ) : isLocked ? (
-          <span
-            className={cn(
-              "rounded-lg bg-black/20 font-bold uppercase tracking-wide text-white/80",
-              isLg ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[10px]",
-            )}
-          >
+          <span className="rounded-lg bg-[#eef3f9] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#8a9bb0] burger:px-2 burger:text-[11px]">
             Blocat
           </span>
         ) : null}

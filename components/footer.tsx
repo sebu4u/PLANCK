@@ -76,7 +76,7 @@ export function Footer({
                 </Link>
               </li>
               <li>
-                <Link href="/cursuri" className={linkClass}>
+                <Link href="/invata/cursuri" className={linkClass}>
                   Cursuri de Fizică
                 </Link>
               </li>

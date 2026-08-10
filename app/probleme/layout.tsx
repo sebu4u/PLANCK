@@ -8,5 +8,10 @@ export default function ProblemsLayout({
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return (
+    <>
+      <div className="fixed inset-0 -z-10 bg-[#ffffff]" />
+      <div className="relative min-h-screen bg-[#ffffff]">{children}</div>
+    </>
+  )
 }

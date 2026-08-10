@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 export interface ExerseazaCounts {
   exercises: number
   grile: number
+  teste: number
 }
 
 export async function fetchExerseazaCounts(): Promise<ExerseazaCounts> {
@@ -10,13 +11,13 @@ export async function fetchExerseazaCounts(): Promise<ExerseazaCounts> {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return { exercises: 0, grile: 0 }
+    return { exercises: 0, grile: 0, teste: 0 }
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   try {
-    const [physicsRes, mathRes, informaticaRes, grileRes] = await Promise.all([
+    const [physicsRes, mathRes, informaticaRes, grileRes, testeRes] = await Promise.all([
       supabase.from("problems").select("id", { count: "exact", head: true }),
       supabase
         .from("math_problems")
@@ -27,14 +28,19 @@ export async function fetchExerseazaCounts(): Promise<ExerseazaCounts> {
         .select("id", { count: "exact", head: true })
         .eq("is_active", true),
       supabase.from("quiz_questions").select("id", { count: "exact", head: true }),
+      supabase
+        .from("practice_tests")
+        .select("id", { count: "exact", head: true })
+        .eq("is_published", true),
     ])
 
     const exercises =
       (physicsRes.count ?? 0) + (mathRes.count ?? 0) + (informaticaRes.count ?? 0)
     const grile = grileRes.count ?? 0
+    const teste = testeRes.count ?? 0
 
-    return { exercises, grile }
+    return { exercises, grile, teste }
   } catch {
-    return { exercises: 0, grile: 0 }
+    return { exercises: 0, grile: 0, teste: 0 }
   }
 }

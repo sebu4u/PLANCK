@@ -38,7 +38,7 @@ export function ConcursNavbar() {
                         Regulament
                     </Link>
                     <Link
-                        href="/cursuri"
+                        href="/invata/cursuri"
                         className="text-gray-700 hover:text-gray-900 px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium transition-colors rounded-full hover:bg-gray-100 leading-none flex items-center"
                     >
                         Cursuri

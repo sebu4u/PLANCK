@@ -14,10 +14,21 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { FreePlanComparisonOverlay } from '@/components/invata/free-plan-comparison-overlay'
 import { AnonLimitLockedContent } from '@/components/anon-limit-locked-content'
+import {
+    ChatMessageLimitHint,
+    ChatMessageLimitLockButton,
+    CHAT_MESSAGE_LIMIT_PLACEHOLDER,
+} from '@/components/chat-message-limit-lock'
+import { InsightProblemChatHistory } from '@/components/insight/insight-problem-chat-history'
+import {
+    resolveLessonTutorSuggestions,
+    stripSuggestionsMarker,
+} from '@/lib/insight-suggestions'
 
 type ChatMessage = {
     role: 'user' | 'assistant' | 'system'
     content: string
+    suggestions?: string[]
     anonLimitLocked?: boolean
 }
 
@@ -25,7 +36,37 @@ interface PhysicsChatSidebarProps {
     isOpen: boolean
     onClose: () => void
     lessonContent: string
+    lessonId: string
+    lessonTitle?: string
     initialQuery?: string | null
+}
+
+function SuggestedQuestions({
+    questions,
+    onSelect,
+}: {
+    questions: string[]
+    onSelect: (question: string) => void
+}) {
+    if (!questions.length) return null
+
+    return (
+        <div className="mt-4 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <p className="mb-1 ml-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Sugestii de întrebări
+            </p>
+            {questions.map((q, i) => (
+                <button
+                    key={`${i}-${q}`}
+                    type="button"
+                    onClick={() => onSelect(q)}
+                    className="rounded-xl border border-gray-200 bg-white p-3 text-left text-sm text-gray-900 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-[#f8fafc] active:scale-[0.98]"
+                >
+                    {q}
+                </button>
+            ))}
+        </div>
+    )
 }
 
 // Loading messages shown while AI is thinking
@@ -46,6 +87,8 @@ export function PhysicsChatSidebar({
     isOpen,
     onClose,
     lessonContent,
+    lessonId,
+    lessonTitle,
     initialQuery,
 }: PhysicsChatSidebarProps) {
     const { user, profile, loginWithGoogle, loginWithGitHub } = useAuth()
@@ -79,33 +122,46 @@ export function PhysicsChatSidebar({
     // Context specifically from selection (initialQuery)
     const [selectionContext, setSelectionContext] = useState<string | null>(null)
     const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
+    const [messageLimitReached, setMessageLimitReached] = useState(false)
 
+    const buildSystemMessage = useCallback(
+        (): ChatMessage => ({
+            role: 'system',
+            content: `Ești un asistent educațional util pentru o lecție.
+            Folosește următorul conținut al lecției pentru a răspunde la întrebări.
+            Fii concis, clar și încurajator.
+            
+            Conținutul lecției:
+            ${lessonContent}`,
+        }),
+        [lessonContent],
+    )
 
     const markdownComponents = useMemo(
         () => ({
             p: ({ node, ...props }: any) => (
-                <p className="whitespace-pre-wrap break-words text-gray-200 leading-relaxed" {...props} />
+                <p className="whitespace-pre-wrap break-words text-gray-700 leading-relaxed" {...props} />
             ),
             strong: ({ node, ...props }: any) => (
-                <strong className="text-white" {...props} />
+                <strong className="text-gray-900" {...props} />
             ),
             em: ({ node, ...props }: any) => (
-                <em className="text-gray-300" {...props} />
+                <em className="text-gray-600" {...props} />
             ),
             h1: ({ node, ...props }: any) => (
-                <h1 className="text-xl font-semibold text-white" {...props} />
+                <h1 className="text-xl font-semibold text-gray-900" {...props} />
             ),
             h2: ({ node, ...props }: any) => (
-                <h2 className="text-lg font-semibold text-white" {...props} />
+                <h2 className="text-lg font-semibold text-gray-900" {...props} />
             ),
             h3: ({ node, ...props }: any) => (
-                <h3 className="text-base font-semibold text-white" {...props} />
+                <h3 className="text-base font-semibold text-gray-900" {...props} />
             ),
             ul: ({ node, ordered, ...props }: any) => (
-                <ul className="list-disc pl-5 space-y-1 text-gray-200" {...props} />
+                <ul className="list-disc pl-5 space-y-1 text-gray-700" {...props} />
             ),
             ol: ({ node, ordered, ...props }: any) => (
-                <ol className="list-decimal pl-5 space-y-1 text-gray-200" {...props} />
+                <ol className="list-decimal pl-5 space-y-1 text-gray-700" {...props} />
             ),
             li: ({ node, ...props }: any) => (
                 <li className="leading-relaxed" {...props} />
@@ -118,7 +174,7 @@ export function PhysicsChatSidebar({
                 ...props
             }: any) => (
                 <code
-                    className={`rounded bg-white/5 px-1.5 py-0.5 font-mono text-[13px] text-gray-100 ${className ?? ''}`}
+                    className={`rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[13px] text-gray-800 ${className ?? ''}`}
                     {...props}
                 >
                     {children}
@@ -130,117 +186,103 @@ export function PhysicsChatSidebar({
 
     const hasMessages = messages.filter((m) => m.role !== 'system').length > 0
 
-    // Initialize session when sidebar opens
-    useEffect(() => {
-        if (!isOpen) return
+    const handleHistoryNewChat = useCallback(() => {
+        setSessionId(null)
+        setMessages([buildSystemMessage()])
+        setInput('')
+        setError(null)
+        setSelectionContext(null)
+        setLoadingMessage(null)
+    }, [buildSystemMessage])
 
-        if (!user) {
-            const initGuest = async () => {
-                try {
-                    setLoadingSession(true)
-                    setSessionId(null)
-                    setMessages([
-                        {
-                            role: 'system',
-                            content: `Ești un asistent educațional util pentru o lecție de fizică.
-            Folosește următorul conținut al lecției pentru a răspunde la întrebări.
-            Fii concis, clar și încurajator.
-            
-            Conținutul lecției:
-            ${lessonContent}`
-                        },
-                    ])
-
-                    if (initialQuery) {
-                        setSelectionContext(initialQuery)
-                    }
-
-                    setTimeout(() => {
-                        if (window.innerWidth >= 1024) {
-                            textareaRef.current?.focus()
-                        }
-                    }, 100)
-                } catch (e: any) {
-                    console.error('Failed to initialize guest session:', e)
-                } finally {
-                    setLoadingSession(false)
-                }
+    const loadSessionMessages = useCallback(
+        async (sessionIdToLoad: string, accessToken: string) => {
+            const res = await fetch(`/api/insight/messages?sessionId=${sessionIdToLoad}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            })
+            if (!res.ok) {
+                throw new Error('Nu am putut încărca mesajele.')
             }
-            void initGuest()
-            return
-        }
 
-        if (hasMessages || sessionId) {
-            setTimeout(() => {
-                if (window.innerWidth >= 1024) {
-                    textareaRef.current?.focus()
-                }
-            }, 100)
-            return
-        }
+            const data = await res.json()
+            const loadedMessages: ChatMessage[] = (data.messages || []).map(
+                (m: Record<string, unknown>) => {
+                    const role = m.role as 'user' | 'assistant' | 'system'
+                    const content = String(m.content ?? '')
+                    if (role === 'assistant' && content.trim()) {
+                        const finalized = resolveLessonTutorSuggestions(content)
+                        return {
+                            role,
+                            content: finalized.displayContent || content,
+                            suggestions: finalized.suggestions,
+                        }
+                    }
+                    return { role, content }
+                },
+            )
 
-        const initializeSession = async () => {
+            setMessages([buildSystemMessage(), ...loadedMessages.filter((m) => m.role !== 'system')])
+        },
+        [buildSystemMessage],
+    )
+
+    const handleHistorySelectSession = useCallback(
+        async (sessionIdToLoad: string) => {
             try {
                 setLoadingSession(true)
                 const { data: sessionData } = await supabase.auth.getSession()
                 const accessToken = sessionData.session?.access_token
-
-                // We start fresh for lesson chat too
-                setSessionId(null)
-                setMessages([
-                    {
-                        role: 'system',
-                        content: `Ești un asistent educațional util pentru o lecție de fizică.
-            Folosește următorul conținut al lecției pentru a răspunde la întrebări.
-            Fii concis, clar și încurajator.
-            
-            Conținutul lecției:
-            ${lessonContent}`
-                    },
-                ])
-
-                if (initialQuery) {
-                    setSelectionContext(initialQuery)
+                if (!accessToken) {
+                    toast({
+                        title: 'Eroare',
+                        description: 'Necesită autentificare.',
+                        variant: 'destructive',
+                    })
+                    return
                 }
-
-                setTimeout(() => {
-                    if (window.innerWidth >= 1024) {
-                        textareaRef.current?.focus()
-                    }
-                }, 100)
+                setSessionId(sessionIdToLoad)
+                setInput('')
+                setError(null)
+                setSelectionContext(null)
+                await loadSessionMessages(sessionIdToLoad, accessToken)
             } catch (e: any) {
-                console.error('Failed to initialize session:', e)
+                console.error('Failed to load history session:', e)
+                toast({
+                    title: 'Eroare',
+                    description: 'Nu am putut încărca chat-ul selectat.',
+                    variant: 'destructive',
+                })
             } finally {
                 setLoadingSession(false)
             }
-        }
+        },
+        [loadSessionMessages, toast],
+    )
 
-        initializeSession()
-    }, [isOpen, user, lessonContent, initialQuery])
-
-    // Reset when lessonContent changes markedly (though usually it's stable per page load)
-    // For lesson viewer, if we navigate to next lesson, lessonContent changes.
+    // Start fresh when the sidebar opens or the lesson changes (history is loaded from the popover).
     useEffect(() => {
-        setMessages([
-            {
-                role: 'system',
-                content: `Ești un asistent educațional util pentru o lecție de fizică.
-            Folosește următorul conținut al lecției pentru a răspunde la întrebări.
-            Fii concis, clar și încurajator.
-            
-            Conținutul lecției:
-            ${lessonContent}`
-            },
-        ])
+        if (!isOpen) return
+
         setSessionId(null)
+        setMessages([buildSystemMessage()])
         setInput('')
         setError(null)
-        if (initialQuery) {
-            setSelectionContext(initialQuery)
-        } else {
-            setSelectionContext(null)
-        }
-    }, [lessonContent, initialQuery])
+        setLoadingMessage(null)
+        setSelectionContext(initialQuery || null)
+
+        setTimeout(() => {
+            if (window.innerWidth >= 1024) {
+                textareaRef.current?.focus()
+            }
+        }, 100)
+        // Omit buildSystemMessage / initialQuery so loading a history session isn't wiped by re-renders.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- only reopen / lesson switch
+    }, [isOpen, lessonId])
+
+    useEffect(() => {
+        if (!isOpen || !initialQuery) return
+        setSelectionContext(initialQuery)
+    }, [initialQuery, isOpen])
 
 
     // Check if user is at bottom of messages container
@@ -315,7 +357,7 @@ export function PhysicsChatSidebar({
         const textToSend = textOverride !== undefined ? textOverride : input
         const contextToUse = contextOverride !== undefined ? contextOverride : selectionContext
 
-        if ((!textToSend.trim() && !contextToUse) || busy) return
+        if ((!textToSend.trim() && !contextToUse) || busy || messageLimitReached) return
 
         setBusy(true)
         setError(null)
@@ -367,8 +409,8 @@ export function PhysicsChatSidebar({
 
             let currentSessionId = sessionId
             if (!isGuest && accessToken && !currentSessionId) {
-                // Create session
-                const sessionTitle = `Lesson Chat`
+                const sessionTitle =
+                    (finalContent.slice(0, 60) || lessonTitle || 'Chat lecție').trim() || 'Chat lecție'
                 const res = await fetch('/api/insight/sessions', {
                     method: 'POST',
                     headers: {
@@ -377,6 +419,7 @@ export function PhysicsChatSidebar({
                     },
                     body: JSON.stringify({
                         title: sessionTitle,
+                        lessonId,
                     }),
                 })
 
@@ -419,6 +462,7 @@ export function PhysicsChatSidebar({
                               sessionId: currentSessionId,
                               input: newUserMsg.content,
                               persona: 'lesson_tutor',
+                              lessonId,
                               contextMessages: [lessonContextMsg],
                           }
                 ),
@@ -427,7 +471,13 @@ export function PhysicsChatSidebar({
 
             if (res.status === 429) {
                 const data = await res.json()
-                if (data.resetTime) {
+                const isFreeOrGuest = !user || !profile?.plan || profile.plan === 'free'
+                if (isFreeOrGuest) {
+                    setMessageLimitReached(true)
+                    setInput('')
+                    setPremiumUpgradeOpen(true)
+                    setError(null)
+                } else if (data.resetTime) {
                     setPremiumUpgradeOpen(true)
                 } else {
                     setError(data.error || 'Limită zilnică atinsă.')
@@ -471,20 +521,17 @@ export function PhysicsChatSidebar({
                                     setLoadingMessage(null)
                                     fullAssistantContent += data.content
 
-                                    // Strip suggestions if any (Insight API might send them)
-                                    let displayContent = fullAssistantContent
-                                    const suggestionsMarker = '---SUGGESTIONS---'
-                                    if (fullAssistantContent.includes(suggestionsMarker)) {
-                                        displayContent = fullAssistantContent.split(suggestionsMarker)[0].trim()
-                                    }
+                                    const displayContent = stripSuggestionsMarker(fullAssistantContent)
 
                                     setMessages((prev) => {
                                         const newMessages = [...prev]
                                         for (let i = newMessages.length - 1; i >= 0; i--) {
                                             if (newMessages[i]?.role === 'assistant') {
                                                 newMessages[i] = {
+                                                    ...newMessages[i],
                                                     role: 'assistant',
                                                     content: displayContent,
+                                                    suggestions: undefined,
                                                 }
                                                 break
                                             }
@@ -493,17 +540,27 @@ export function PhysicsChatSidebar({
                                     })
                                 } else if (data.type === 'done') {
                                     if (data.anonLimitReached) {
-                                        setMessages((prev) => {
-                                            const next = [...prev]
-                                            for (let i = next.length - 1; i >= 0; i--) {
-                                                if (next[i].role === 'assistant') {
-                                                    next[i] = { ...next[i], anonLimitLocked: true }
-                                                    break
-                                                }
-                                            }
-                                            return next
-                                        })
+                                        setMessageLimitReached(true)
+                                        setInput('')
                                     }
+                                    const finalized = resolveLessonTutorSuggestions(fullAssistantContent)
+                                    setMessages((prev) => {
+                                        const next = [...prev]
+                                        for (let i = next.length - 1; i >= 0; i--) {
+                                            if (next[i].role === 'assistant') {
+                                                next[i] = {
+                                                    ...next[i],
+                                                    content: finalized.displayContent || next[i].content,
+                                                    suggestions: finalized.suggestions,
+                                                    anonLimitLocked: data.anonLimitReached
+                                                        ? true
+                                                        : next[i].anonLimitLocked,
+                                                }
+                                                break
+                                            }
+                                        }
+                                        return next
+                                    })
                                     if (data.sessionId) {
                                         setSessionId(data.sessionId)
                                     }
@@ -518,13 +575,16 @@ export function PhysicsChatSidebar({
                 }
             } else {
                 const data = await res.json()
+                const raw = data.output || 'Nu am primit răspuns.'
+                const finalized = resolveLessonTutorSuggestions(raw)
                 setMessages((prev) => {
                     const newMessages = [...prev]
                     const lastIndex = newMessages.length - 1
                     if (lastIndex >= 0 && newMessages[lastIndex]?.role === 'assistant') {
                         newMessages[lastIndex] = {
                             role: 'assistant',
-                            content: data.output || 'Nu am primit răspuns.',
+                            content: finalized.displayContent || raw,
+                            suggestions: finalized.suggestions,
                         }
                     }
                     return newMessages
@@ -549,6 +609,10 @@ export function PhysicsChatSidebar({
     }
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (messageLimitReached) {
+            e.preventDefault()
+            return
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             submitMessage()
@@ -594,6 +658,23 @@ export function PhysicsChatSidebar({
         } catch (err) {
             console.error('Failed to abort streaming response:', err)
         }
+        setMessages((prev) => {
+            const next = [...prev]
+            for (let i = next.length - 1; i >= 0; i--) {
+                if (next[i].role === 'assistant') {
+                    const content = (next[i].content || '').trim()
+                    if (!content) break
+                    const finalized = resolveLessonTutorSuggestions(content)
+                    next[i] = {
+                        ...next[i],
+                        content: finalized.displayContent || content,
+                        suggestions: finalized.suggestions,
+                    }
+                    break
+                }
+            }
+            return next
+        })
         setIsStreaming(false)
         setBusy(false)
         setLoadingMessage(null)
@@ -627,18 +708,33 @@ export function PhysicsChatSidebar({
 
             <div
                 ref={sidebarRef}
-                className={`fixed top-0 lg:top-[100px] right-0 h-dvh lg:h-[calc(100dvh-100px)] w-[90vw] lg:w-[450px] bg-[#101010] border-l border-white/10 z-[500] flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`fixed top-0 lg:top-16 right-0 h-dvh lg:h-[calc(100dvh-4rem)] w-[90vw] lg:w-[450px] bg-[#F8FAFD] border-l border-gray-200 z-[500] flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
                     }`}
                 style={{ maxWidth: '90vw' }}
             >
-                <div className="flex items-center justify-between p-4 border-b border-white/10">
-                    <h2 className="text-white font-semibold">Asistent Lecție</h2>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded hover:bg-white/10 transition-colors"
-                    >
-                        <X className="w-5 h-5 text-gray-400" />
-                    </button>
+                <div className="flex items-center justify-between gap-2 p-4 border-b border-gray-200">
+                    <h2 className="text-gray-900 font-semibold">Asistent Lecție</h2>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                        {user ? (
+                            <InsightProblemChatHistory
+                                lessonId={lessonId}
+                                currentSessionId={sessionId}
+                                onSelectSession={(id) => {
+                                    void handleHistorySelectSession(id)
+                                }}
+                                onNewChat={handleHistoryNewChat}
+                                refreshKey={sessionId}
+                                lightTheme
+                            />
+                        ) : null}
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded hover:bg-gray-200/70 transition-colors"
+                            aria-label="Închide"
+                        >
+                            <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                    </div>
                 </div>
 
                 <div
@@ -648,17 +744,20 @@ export function PhysicsChatSidebar({
                 >
                     {loadingSession ? (
                         <div className="flex h-full items-center justify-center">
-                            <div className="flex flex-col items-center gap-3 text-gray-400">
-                                <Loader2 className="h-8 w-8 animate-spin text-white" />
-                                <p className="text-sm">Se inițializează...</p>
+                            <div className="flex flex-col items-center gap-3 text-gray-500">
+                                <Loader2 className="h-8 w-8 animate-spin text-gray-700" />
+                                <p className="text-sm">Se încarcă...</p>
                             </div>
                         </div>
                     ) : hasMessages ? (
                         <div className="space-y-4">
                             {messages
                                 .filter((m) => m.role !== 'system')
-                                .map((m, i) => {
+                                .map((m, i, visible) => {
                                     const isAssistant = m.role === 'assistant'
+                                    const isLastVisible = i === visible.length - 1
+                                    const hideSuggestionsWhileStreaming =
+                                        busy && isStreaming && isLastVisible && isAssistant
                                     return (
                                         <div
                                             key={i}
@@ -686,23 +785,31 @@ export function PhysicsChatSidebar({
                                                                 remarkPlugins={[remarkGfm, remarkMath]}
                                                                 rehypePlugins={[rehypeKatex]}
                                                                 components={markdownComponents}
-                                                                className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
+                                                                className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-300"
                                                             >
                                                                 {m.content}
                                                             </ReactMarkdown>
                                                         </AnonLimitLockedContent>
                                                     )}
+                                                    {!hideSuggestionsWhileStreaming && m.suggestions?.length ? (
+                                                        <SuggestedQuestions
+                                                            questions={m.suggestions}
+                                                            onSelect={(question) => {
+                                                                void submitMessage(question)
+                                                            }}
+                                                        />
+                                                    ) : null}
                                                 </div>
                                             ) : (
-                                                <div className="max-w-[70%] rounded-2xl bg-[#212121] text-white px-4 py-3 shadow-sm">
-                                                    <div className="text-xs uppercase tracking-wide text-gray-400 mb-2 opacity-70">
+                                                <div className="max-w-[70%] rounded-2xl bg-white text-gray-900 px-4 py-3 shadow-sm border border-gray-200">
+                                                    <div className="text-xs uppercase tracking-wide text-gray-500 mb-2 opacity-70">
                                                         Tu
                                                     </div>
                                                     <ReactMarkdown
                                                         remarkPlugins={[remarkGfm, remarkMath]}
                                                         rehypePlugins={[rehypeKatex]}
                                                         components={markdownComponents}
-                                                        className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-700"
+                                                        className="space-y-3 [&_.katex-display]:my-3 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:scrollbar-thin [&_.katex-display]:scrollbar-track-transparent [&_.katex-display]:scrollbar-thumb-gray-300"
                                                     >
                                                         {m.content}
                                                     </ReactMarkdown>
@@ -727,7 +834,7 @@ export function PhysicsChatSidebar({
 
                 {error && (
                     <div className="px-4 pb-2">
-                        <div className="bg-red-900/20 border border-red-800 text-red-300 rounded p-2 text-sm">
+                        <div className="bg-red-50 border border-red-200 text-red-700 rounded p-2 text-sm">
                             {error}
                         </div>
                     </div>
@@ -738,19 +845,19 @@ export function PhysicsChatSidebar({
                         <div className="flex flex-row gap-1.5 mb-3 overflow-x-auto no-scrollbar pb-1 justify-between">
                             <button
                                 onClick={() => submitMessage('Fă-mi un rezumat')}
-                                className="whitespace-nowrap flex-1 rounded-full bg-[#1a1a1a] border border-white/10 px-1 py-1.5 text-[11px] text-white hover:bg-white/5 transition-colors text-center truncate"
+                                className="whitespace-nowrap flex-1 rounded-full bg-white border border-gray-200 px-1 py-1.5 text-[11px] text-gray-800 hover:bg-gray-50 transition-colors text-center truncate"
                             >
                                 Fă-mi un rezumat
                             </button>
                             <button
                                 onClick={() => submitMessage('Explică-mi mai simplu')}
-                                className="whitespace-nowrap flex-1 rounded-full bg-[#1a1a1a] border border-white/10 px-1 py-1.5 text-[11px] text-white hover:bg-white/5 transition-colors text-center truncate"
+                                className="whitespace-nowrap flex-1 rounded-full bg-white border border-gray-200 px-1 py-1.5 text-[11px] text-gray-800 hover:bg-gray-50 transition-colors text-center truncate"
                             >
                                 Explică-mi mai simplu
                             </button>
                             <button
                                 onClick={() => submitMessage('Vreau o problemă')}
-                                className="whitespace-nowrap flex-1 rounded-full bg-[#1a1a1a] border border-white/10 px-1 py-1.5 text-[11px] text-white hover:bg-white/5 transition-colors text-center truncate"
+                                className="whitespace-nowrap flex-1 rounded-full bg-white border border-gray-200 px-1 py-1.5 text-[11px] text-gray-800 hover:bg-gray-50 transition-colors text-center truncate"
                             >
                                 Vreau o problemă
                             </button>
@@ -759,58 +866,78 @@ export function PhysicsChatSidebar({
                     <div className="flex flex-col relative w-full">
                             <>
                                 {selectionContext && !busy && (
-                                    <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 border-b-0 rounded-t-2xl p-3 text-sm text-gray-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                    <div className="flex items-center justify-between bg-white border border-gray-200 border-b-0 rounded-t-2xl p-3 text-sm text-gray-600 animate-in fade-in slide-in-from-bottom-2 duration-200">
                                         <div className="flex items-center gap-2 overflow-hidden">
-                                            <span className="text-xs font-medium uppercase text-blue-400 flex-shrink-0">Selecție:</span>
+                                            <span className="text-xs font-medium uppercase text-blue-600 flex-shrink-0">Selecție:</span>
                                             <p className="truncate opacity-80 text-xs">
                                                 {selectionContext.slice(0, 50)}...
                                             </p>
                                         </div>
                                         <button
                                             onClick={() => setSelectionContext(null)}
-                                            className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0"
+                                            className="p-1 hover:bg-gray-100 rounded-full transition-colors ml-2 flex-shrink-0"
                                             title="Șterge selecția"
                                         >
-                                            <X className="w-3 h-3 text-white/50" />
+                                            <X className="w-3 h-3 text-gray-400" />
                                         </button>
                                     </div>
                                 )}
 
-                                <div className={`relative flex items-end gap-2 bg-[#212121] border border-white/10 p-3 shadow-lg transition-all duration-200 ${selectionContext
+                                {messageLimitReached ? (
+                                    <ChatMessageLimitHint
+                                        className="mb-2"
+                                        onUpgradeClick={() => setPremiumUpgradeOpen(true)}
+                                    />
+                                ) : null}
+
+                                <div className={`relative flex items-end gap-2 bg-white border border-gray-200 p-3 shadow-sm transition-all duration-200 ${selectionContext
                                     ? 'rounded-b-2xl rounded-t-none border-t-0'
                                     : 'rounded-2xl'
                                     }`}>
                                     <button
-                                        className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 self-end mb-0.5"
+                                        className="p-2 rounded hover:bg-gray-100 transition-colors flex-shrink-0 self-end mb-0.5"
                                         disabled
                                         title="Atașează fișier (în curând)"
                                     >
-                                        <Paperclip className="w-4 h-4 text-gray-400" />
+                                        <Paperclip className="w-4 h-4 text-gray-500" />
                                     </button>
                                     <Textarea
                                         ref={textareaRef}
-                                        placeholder={selectionContext ? "Întreabă despre selecție..." : "Scrie o întrebare..."}
+                                        placeholder={
+                                            messageLimitReached
+                                                ? CHAT_MESSAGE_LIMIT_PLACEHOLDER
+                                                : selectionContext
+                                                    ? 'Întreabă despre selecție...'
+                                                    : 'Scrie o întrebare...'
+                                        }
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyPress={handleKeyPress}
                                         rows={1}
-                                        className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-400 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                                        disabled={busy}
+                                        className="flex-1 bg-transparent border-0 text-gray-900 placeholder:text-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                        disabled={busy || messageLimitReached}
+                                        readOnly={messageLimitReached}
                                         style={{
                                             minHeight: '24px',
                                             height: `${textareaHeight}px`,
                                             overflowY: textareaHeight > 24 * 5 ? 'auto' : 'hidden',
                                         }}
                                     />
-                                    {busy && isStreaming ? (
+                                    {messageLimitReached ? (
+                                        <ChatMessageLimitLockButton
+                                            onClick={() => setPremiumUpgradeOpen(true)}
+                                            iconSize={16}
+                                            className="mb-0.5 h-8 w-8 self-end"
+                                        />
+                                    ) : busy && isStreaming ? (
                                         <button
                                             onClick={stopGeneration}
                                             className="p-2 rounded transition-colors flex-shrink-0 self-end mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Oprește răspunsul"
                                         >
                                             <span className="flex items-center justify-center w-5 h-5">
-                                                <span className="flex items-center justify-center w-4 h-4 bg-white rounded-full">
-                                                    <span className="w-2 h-2 bg-black" />
+                                                <span className="flex items-center justify-center w-4 h-4 bg-gray-900 rounded-full">
+                                                    <span className="w-2 h-2 bg-white" />
                                                 </span>
                                             </span>
                                         </button>
@@ -818,9 +945,9 @@ export function PhysicsChatSidebar({
                                         <button
                                             onClick={send}
                                             disabled={busy || (!input.trim() && !selectionContext)}
-                                            className="p-2 rounded hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
+                                            className="p-2 rounded hover:bg-gray-100 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-end mb-0.5"
                                         >
-                                            <Send className="w-4 h-4 text-gray-400" />
+                                            <Send className="w-4 h-4 text-gray-600" />
                                         </button>
                                     )}
                                 </div>

@@ -1,6 +1,7 @@
 export interface CodingProblem {
   id: string;
-  numeric_id?: number;
+  /** ID public afișat în catalog (ex: I001), ca M100 la fizică. */
+  display_id?: string | null;
   slug: string;
   title: string;
   statement_markdown: string;

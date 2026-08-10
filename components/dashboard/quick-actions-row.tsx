@@ -12,7 +12,7 @@ interface QuickActionsRowProps {
 
 export function QuickActionsRow({ lastLesson, userGrade, lastProject }: QuickActionsRowProps) {
     // Determine course link
-    const courseLink = lastLesson?.url || "/cursuri"
+    const courseLink = lastLesson?.url || "/invata/cursuri"
 
     // Determine quizzes link
     const quizLink = userGrade ? `/grile?grade=${userGrade}` : "/grile"

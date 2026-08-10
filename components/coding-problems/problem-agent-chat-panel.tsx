@@ -46,6 +46,7 @@ export function ProblemAgentChatPanel({
         isOpen={isOpen}
         onClose={onClose}
         layout="embedded-panel"
+        problemId={problem.id}
         sessionTitle={`Problema: ${problem.title}`}
         emptyStateTitle="Salut, sunt Planck Agent!"
         emptyStateDescription={`Te ajut cu „${problem.title}” — explicații, indicii sau cod direct în editor.`}

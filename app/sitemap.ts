@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { createClient } from '@supabase/supabase-js'
 import { PLATFORM_SITE_URL } from '@/lib/platform-marketing'
 import { getPublishedBlogCategories, getPublishedBlogPosts } from '@/lib/blog'
+import { CURSURI_SUBJECT_IDS } from '@/lib/cursuri-subjects'
 
 async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -82,26 +83,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Get all lessons for dynamic sitemap with updated_at
-  const grades = await getAllGrades()
-  const allLessons: Array<{ title: string; id: string; updated_at: string }> = []
+  const allLessons: Array<{ title: string; id: string; updated_at: string; subject: string }> = []
 
-  for (const grade of grades) {
-    const chapters = await getChaptersByGradeId(grade.id)
-    for (const chapter of chapters) {
-      // Fetch lessons with updated_at field directly from Supabase
-      const { data: lessons, error } = await supabase
-        .from('lessons')
-        .select('id, title, updated_at')
-        .eq('chapter_id', chapter.id)
-        .eq('is_active', true)
-        .order('order_index')
+  for (const subject of CURSURI_SUBJECT_IDS) {
+    const grades = await getAllGrades(subject)
+    for (const grade of grades) {
+      const chapters = await getChaptersByGradeId(grade.id)
+      for (const chapter of chapters) {
+        const { data: lessons, error } = await supabase
+          .from('lessons')
+          .select('id, title, updated_at')
+          .eq('chapter_id', chapter.id)
+          .eq('is_active', true)
+          .order('order_index')
 
-      if (!error && lessons) {
-        allLessons.push(...lessons.map(l => ({
-          title: l.title,
-          id: l.id,
-          updated_at: l.updated_at || new Date().toISOString()
-        })))
+        if (!error && lessons) {
+          allLessons.push(...lessons.map(l => ({
+            title: l.title,
+            id: l.id,
+            updated_at: l.updated_at || new Date().toISOString(),
+            subject,
+          })))
+        }
       }
     }
   }
@@ -127,11 +130,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7 as const,
     })),
     {
-      url: `${baseUrl}/cursuri`,
+      url: `${baseUrl}/invata/cursuri`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.9,
     },
+    ...CURSURI_SUBJECT_IDS.map((subject) => ({
+      url: `${baseUrl}/invata/cursuri/${subject}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.85 as const,
+    })),
     {
       url: `${baseUrl}/probleme`,
       lastModified: new Date(),
@@ -243,7 +252,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     // Dynamic course lesson URLs
     ...allLessons.map(lesson => ({
-      url: `${baseUrl}/cursuri/${slugify(lesson.title)}`,
+      url: `${baseUrl}/invata/cursuri/${lesson.subject}/${slugify(lesson.title)}`,
       lastModified: new Date(lesson.updated_at),
       changeFrequency: 'weekly' as const,
       priority: 0.8,

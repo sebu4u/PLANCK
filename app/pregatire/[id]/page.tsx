@@ -19,6 +19,7 @@ export default function PregatireDetailPage() {
   const [workshop, setWorkshop] = useState<WorkshopDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [energy, setEnergy] = useState<number | null>(null)
+  const [carryoverEnergy, setCarryoverEnergy] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -45,7 +46,10 @@ export default function PregatireDetailPage() {
           const energyRes = await fetch("/api/pregatire/energy", { headers })
           if (energyRes.ok) {
             const energyData = await energyRes.json()
-            if (!cancelled) setEnergy(energyData.balance ?? 0)
+            if (!cancelled) {
+              setEnergy(energyData.balance ?? 0)
+              setCarryoverEnergy(energyData.carryoverBalance ?? 0)
+            }
           }
         }
       } catch {
@@ -72,7 +76,7 @@ export default function PregatireDetailPage() {
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
           {user ? (
             <div className="mb-4 flex justify-end">
-              <EnergyBadge balance={energy} />
+              <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} />
             </div>
           ) : null}
 
@@ -95,7 +99,10 @@ export default function PregatireDetailPage() {
             <WorkshopDetailPanel
               workshop={workshop}
               isLoggedIn={Boolean(user)}
-              onBalanceChange={setEnergy}
+              onBalanceChange={(next) => {
+                setEnergy(next.balance)
+                setCarryoverEnergy(next.carryoverBalance)
+              }}
               onUnlocked={setWorkshop}
             />
           )}

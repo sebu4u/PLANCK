@@ -620,6 +620,7 @@ export function PersonalizedCourseGenerator({
   return (
     <div
       ref={containerRef}
+      data-guide-anchor="create-path"
       className={cn(
         "relative w-full",
         PILL_HEIGHT_CLASS,

@@ -14,10 +14,12 @@ import { HomePageScrollNavbar } from "@/components/homepage-scroll-navbar"
 import { AIDemoSection } from "@/components/ai-demo-section"
 import { AICodeAnalysisSection } from "@/components/ai-code-analysis-section"
 import { NewWayToLearnSection } from "@/components/new-way-to-learn-section"
-import { CoursesSectionHomepage } from "@/components/courses-section-homepage"
 import { HomePageReusiteSection } from "@/components/homepage-reusite-section"
+import { HomePagePlatformVideoSection } from "@/components/homepage-platform-video-section"
+import { HomePageVirtualTeacherSection } from "@/components/homepage-virtual-teacher-section"
+import { HomePageSubjectsSection } from "@/components/homepage-subjects-section"
 import { HomePagePlanckPassSection } from "@/components/homepage-planckpass-section"
-import { HomePageInteractiveSchoolSection } from "@/components/homepage-interactive-school-section"
+import { HomePageLearningPathPreviewSection } from "@/components/homepage-learning-path-preview-section"
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
 import { ReviewsSection } from "@/components/homepage-reviews"
@@ -36,11 +38,11 @@ const HowItWorksSection = dynamic(() => import("@/components/how-it-works-sectio
 const HOME_SECTION_IDS = [
   "home-hero",
   "home-reusite",
-  "home-planckpass",
-  "home-interactive-school",
-  "home-ai-demo",
-  "home-mai-eficient",
+  "home-platform",
+  "home-virtual-teacher",
+  "home-subjects",
   "home-courses",
+  "home-mai-eficient",
   "home-reviews",
   "home-faq",
 ]
@@ -178,21 +180,23 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
 
       <HomePageReusiteSection />
 
-      <HomePagePlanckPassSection />
+      <HomePagePlatformVideoSection />
 
-      <HomePageInteractiveSchoolSection />
+      <HomePageVirtualTeacherSection />
 
-      {/* AI Demo Section */}
-      <section id="home-ai-demo">
+      <HomePageSubjectsSection />
+
+      <div className="lg:hidden">
+        <HomePagePlanckPassSection />
+      </div>
+
+      <section id="home-ai-demo" className="lg:hidden">
         <AIDemoSection />
       </section>
 
-      <HomePageMaiEficientSection />
+      <HomePageLearningPathPreviewSection />
 
-      {/* Courses Section */}
-      <section id="home-courses">
-        <CoursesSectionHomepage />
-      </section>
+      <HomePageMaiEficientSection />
 
       {/* Reviews Section */}
       <section id="home-reviews">

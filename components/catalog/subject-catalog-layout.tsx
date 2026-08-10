@@ -16,10 +16,7 @@ import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/cat
 
 export interface SubjectCatalogLayoutProps {
   catalogReady: boolean
-  requiresClassSelection: boolean
-  selectedClassGate: string | null
   onSelectClass: (classValue: string) => void
-  onClearClassGate?: () => void
   classOptions: readonly string[]
   classCardCopy: Record<string, { title: string; subtitle: string }>
   title: string
@@ -43,10 +40,7 @@ export interface SubjectCatalogLayoutProps {
 
 export function SubjectCatalogLayout({
   catalogReady,
-  requiresClassSelection,
-  selectedClassGate,
   onSelectClass,
-  onClearClassGate,
   classOptions,
   classCardCopy,
   title,
@@ -71,6 +65,7 @@ export function SubjectCatalogLayout({
     Boolean(filters.search) ||
     filters.difficulty !== "Toate" ||
     filters.progress !== "Toate" ||
+    (filters.language != null && filters.language !== "Toate") ||
     filters.class !== effectiveUserClass ||
     filters.chapter !== "Toate"
 
@@ -162,7 +157,7 @@ export function SubjectCatalogLayout({
                           Alege clasa de la care vrei sa lucrezi probleme
                         </h2>
                         <p className="mt-2 text-sm text-[#2c2f33]/75 sm:text-base">
-                          Selecteaza una dintre cele 4 clase pentru a personaliza catalogul.
+                          Selecteaza una dintre cele {classOptions.length} clase pentru a personaliza catalogul.
                         </p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -189,7 +184,7 @@ export function SubjectCatalogLayout({
                       <p className="text-sm text-[#2c2f33]/75 sm:text-base">{subtitle}</p>
                     </div>
 
-                    <div className="flex items-center justify-between lg:hidden">
+                    <div className="lg:hidden">
                       <Button
                         type="button"
                         variant="outline"
@@ -199,16 +194,6 @@ export function SubjectCatalogLayout({
                         <SlidersHorizontal className="mr-2 h-4 w-4" />
                         Search si filtre
                       </Button>
-                      {requiresClassSelection && selectedClassGate && onClearClassGate && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={onClearClassGate}
-                          className="rounded-full text-xs font-semibold text-[#2c2f33]/70 hover:bg-transparent hover:text-[#0b0c0f]"
-                        >
-                          Schimba clasa
-                        </Button>
-                      )}
                     </div>
 
                     {hasActiveFilters && (
@@ -252,6 +237,15 @@ export function SubjectCatalogLayout({
                             className="inline-flex items-center gap-1 rounded-full border border-[#0b0c0f]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#2c2f33]"
                           >
                             {filters.progress}
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                        {filters.language && filters.language !== "Toate" && (
+                          <button
+                            onClick={() => onFilterChange({ ...filters, language: "Toate" })}
+                            className="inline-flex items-center gap-1 rounded-full border border-[#0b0c0f]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#2c2f33]"
+                          >
+                            {filters.language === "cpp" ? "C++" : "Python"}
                             <X className="h-3 w-3" />
                           </button>
                         )}

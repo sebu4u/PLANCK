@@ -53,13 +53,13 @@ export function HomePageReusiteSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <h2
           id="home-reusite-heading"
-          className="mb-8 text-center font-serif text-3xl font-semibold tracking-tight text-gray-900 sm:mb-10 sm:text-4xl lg:mb-12 lg:text-[2.5rem]"
+          className="scroll-animate-fade-up mb-8 text-center font-serif text-3xl font-semibold tracking-tight text-gray-900 sm:mb-10 sm:text-4xl lg:mb-12 lg:text-[2.5rem]"
         >
           Învață alături de mii de elevi din toată țara
         </h2>
 
         {/* Mobil: 3 rânduri, fără separatoare; concurs mare, suprapus peste zona de dedesubt */}
-        <div className="flex flex-col gap-8 overflow-visible md:hidden">
+        <div className="scroll-animate-fade-up animate-delay-200 flex flex-col gap-8 overflow-visible md:hidden">
           <div className="relative z-30 flex justify-center overflow-visible py-2">
             {/* Înălțime de „slot” ca înainte — fluxul rămâne la fel pentru rândurile 2–3 */}
             <span className="invisible block h-16 w-px shrink-0 select-none" aria-hidden />
@@ -90,7 +90,7 @@ export function HomePageReusiteSection() {
         </div>
 
         {/* Desktop: 5 coloane, logo concurs suprapus */}
-        <div className="hidden md:block">
+        <div className="scroll-animate-fade-up animate-delay-200 hidden md:block">
           <div className="overflow-visible">
             <div className="grid w-full min-w-0 grid-cols-5 divide-x divide-gray-200 overflow-visible">
               {ITEMS.map((item) => {

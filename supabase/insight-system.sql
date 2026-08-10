@@ -149,6 +149,7 @@ create table if not exists public.insight_chat_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text,
+  problem_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   last_message_at timestamptz
@@ -167,15 +168,17 @@ create table if not exists public.insight_chat_messages (
 );
 
 -- Indexes for performance
-create index if not exists idx_insight_chat_sessions_user_id 
+create index if not exists idx_insight_chat_sessions_user_id
   on public.insight_chat_sessions(user_id);
-create index if not exists idx_insight_chat_sessions_last_message_at 
+create index if not exists idx_insight_chat_sessions_last_message_at
   on public.insight_chat_sessions(last_message_at desc nulls last);
-create index if not exists idx_insight_chat_sessions_updated_at 
+create index if not exists idx_insight_chat_sessions_updated_at
   on public.insight_chat_sessions(updated_at desc);
-create index if not exists idx_insight_chat_messages_session_id 
+create index if not exists idx_insight_chat_sessions_user_problem_last_message
+  on public.insight_chat_sessions(user_id, problem_id, last_message_at desc nulls last);
+create index if not exists idx_insight_chat_messages_session_id
   on public.insight_chat_messages(session_id);
-create index if not exists idx_insight_chat_messages_created_at 
+create index if not exists idx_insight_chat_messages_created_at
   on public.insight_chat_messages(created_at);
 
 -- 10. Enable Row Level Security for chat tables

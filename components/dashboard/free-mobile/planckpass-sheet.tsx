@@ -189,8 +189,15 @@ export function PlanckPassMobileShell({ children, className }: PlanckPassMobileS
         className="relative shrink-0 overflow-hidden"
         style={{ height: ready ? passHeight : PLANCKPASS_EXPANDED_HEIGHT, opacity: passOpacity }}
       >
-        <div className="absolute inset-0" style={{ height: PLANCKPASS_EXPANDED_HEIGHT }}>
-          <PlanckPassSection />
+        <div
+          className={cn(
+            "absolute inset-0",
+            (collapsed || !contentInteractive) && "pointer-events-none",
+          )}
+          style={{ height: PLANCKPASS_EXPANDED_HEIGHT }}
+          onClickCapture={onContentClickCapture}
+        >
+          <PlanckPassSection expanded={!collapsed} />
         </div>
       </motion.div>
 

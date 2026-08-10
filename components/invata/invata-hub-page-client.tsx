@@ -1,15 +1,24 @@
 "use client"
 
+import { useLayoutEffect, useState } from "react"
 import { InvataHubMain } from "@/components/invata/invata-hub-main"
 import { InvataMobileHubShell } from "@/components/invata/invata-mobile-hub-shell"
 import { InvataHowToLearnCard } from "@/components/invata/invata-how-to-learn-card"
 import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
+import { InvataHubTabBar } from "@/components/invata/invata-hub-tab-bar"
+import { InvataHubLectiiPanel } from "@/components/invata/invata-hub-lectii-panel"
 import {
   LearningPathsList,
   type LessonProgressByLessonId,
 } from "@/components/invata/learning-paths-list"
+import {
+  DEFAULT_INVATA_HUB_TAB,
+  readStoredInvataHubTab,
+  writeStoredInvataHubTab,
+  type InvataHubTab,
+} from "@/lib/invata-hub-tab"
 import type {
   LearningPathHubChapter,
   LearningPathHubLesson,
@@ -36,14 +45,40 @@ function HubLearningPaths(props: InvataHubPageClientProps) {
   )
 }
 
+function useInvataHubTab() {
+  const [tab, setTab] = useState<InvataHubTab>(DEFAULT_INVATA_HUB_TAB)
+
+  useLayoutEffect(() => {
+    setTab(readStoredInvataHubTab())
+  }, [])
+
+  const selectTab = (next: InvataHubTab) => {
+    setTab(next)
+    writeStoredInvataHubTab(next)
+  }
+
+  return { tab, selectTab }
+}
+
 export function InvataHubPageClient(props: InvataHubPageClientProps) {
+  const { tab, selectTab } = useInvataHubTab()
+  const showTrasee = tab === "trasee"
+
   return (
     <>
       <div className="sm:hidden">
         <InvataMobileHubShell top={<InvataHowToLearnCard />}>
           <div className="px-5 pt-5">
-            <InvataPersonalizedCourseEntry className="mb-6" />
-            <HubLearningPaths {...props} />
+            <InvataHubTabBar value={tab} onChange={selectTab} className="mb-4" />
+
+            {showTrasee ? (
+              <>
+                <InvataPersonalizedCourseEntry className="mb-6" />
+                <HubLearningPaths {...props} />
+              </>
+            ) : (
+              <InvataHubLectiiPanel compact className="pb-14" />
+            )}
           </div>
         </InvataMobileHubShell>
       </div>
@@ -51,22 +86,30 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
       <div className="hidden sm:block">
         <InvataHubMain>
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
-            <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">
-                  Trasee de învățare
-                </h1>
-                <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">
-                  Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
-                </p>
-              </div>
-              <div className="flex w-full max-w-[420px] flex-col items-start gap-3 sm:items-end">
-                <InvataPersonalizedCourseEntry className="w-full" />
-                <InvataAdminLearningPathsLink />
-              </div>
-            </header>
-            <HubLearningPaths {...props} />
-            <InvataSeoIntro />
+            <InvataHubTabBar value={tab} onChange={selectTab} className="mb-6" />
+
+            {showTrasee ? (
+              <>
+                <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#111111] sm:text-4xl">
+                      Trasee de învățare
+                    </h1>
+                    <p className="mt-1.5 text-sm text-[#6d6d6d] sm:text-base">
+                      Parcurge toată materia de la clasa a IX-a până la a XII-a, pas cu pas
+                    </p>
+                  </div>
+                  <div className="flex w-full max-w-[420px] flex-col items-start gap-3 sm:items-end">
+                    <InvataPersonalizedCourseEntry className="w-full" />
+                    <InvataAdminLearningPathsLink />
+                  </div>
+                </header>
+                <HubLearningPaths {...props} />
+                <InvataSeoIntro />
+              </>
+            ) : (
+              <InvataHubLectiiPanel />
+            )}
           </div>
         </InvataHubMain>
       </div>

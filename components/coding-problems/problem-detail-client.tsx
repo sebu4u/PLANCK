@@ -31,7 +31,10 @@ import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { useCatalogTheme } from "@/components/catalog-theme-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { ProblemAgentChatPanel } from "./problem-agent-chat-panel"
+import { MobileDesktopRecommendationCard } from "./mobile-desktop-recommendation-card"
 import type { EmbeddedIdeAgentBridge } from "@/lib/planckcode/embedded-ide-agent-bridge"
+import { cn } from "@/lib/utils"
+import { MOBILE_BOTTOM_NAV_OFFSET_CLASS, shouldShowMobileBottomNav } from "@/lib/mobile-app-nav"
 
 const EmbeddedIDE = dynamic(() => import("./embedded-ide"), {
   ssr: false,
@@ -129,6 +132,8 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   const [isAgentOpen, setIsAgentOpen] = useState(false)
   const [agentBridge, setAgentBridge] = useState<EmbeddedIdeAgentBridge | null>(null)
   const [isDesktopViewport, setIsDesktopViewport] = useState(false)
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
+  const [viewportReady, setViewportReady] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editDraft, setEditDraft] = useState<InformaticsContentDraft | null>(null)
   const [editMetadata, setEditMetadata] = useState<InformaticsPatchMetadata>({})
@@ -140,12 +145,20 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   const [contentTab, setContentTab] = useState<ProblemContentTab>("enunt")
 
   useEffect(() => {
+    const desktopMq = window.matchMedia("(min-width: 1024px)")
+    const mobileMq = window.matchMedia("(max-width: 767px)")
     const syncViewport = () => {
-      setIsDesktopViewport(typeof window !== "undefined" && window.innerWidth >= 1024)
+      setIsDesktopViewport(desktopMq.matches)
+      setIsMobileViewport(mobileMq.matches)
+      setViewportReady(true)
     }
     syncViewport()
-    window.addEventListener("resize", syncViewport)
-    return () => window.removeEventListener("resize", syncViewport)
+    desktopMq.addEventListener("change", syncViewport)
+    mobileMq.addEventListener("change", syncViewport)
+    return () => {
+      desktopMq.removeEventListener("change", syncViewport)
+      mobileMq.removeEventListener("change", syncViewport)
+    }
   }, [])
 
   const loadDetails = useCallback(async (options?: { silent?: boolean }) => {
@@ -216,6 +229,7 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
   const profileSynced = Boolean(user && profileSyncedUserId === user.id)
   const canEditProblem =
     profileSynced && canAccessCatalog(isDev, devSubjects, "informatics", isAdmin)
+  const showMobileBottomNav = shouldShowMobileBottomNav(pathname, Boolean(user))
 
   const handleEnterEdit = useCallback(async () => {
     if (!loadedProblem) return
@@ -385,7 +399,12 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
           <main className="md:ml-16 mt-16 h-screen-minus-64 flex overflow-hidden">
             {isReady ? (
               <ResizablePanelGroup direction="horizontal" className="flex-1 max-md:flex-col">
-                <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-auto max-md:!min-h-[50vh]">
+                <ResizablePanel
+                  defaultSize={50}
+                  minSize={30}
+                  maxSize={70}
+                  className="max-md:!h-full max-md:!min-h-0"
+                >
                   <StatementPanelBackground defaultBackgroundClass="bg-[#121212]">
                     <Tabs
                       value={contentTab}
@@ -402,7 +421,13 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
                       <ResizablePanel defaultSize={isAgentOpen ? 58 : 100} minSize={30}>
                         <ScrollArea className="h-full">
-                          <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 lg:px-12">
+                          <div
+                            className={cn(
+                              "mx-auto max-w-4xl px-6 py-8 sm:px-8 lg:px-12",
+                              isMobileViewport && (showMobileBottomNav ? "pb-52" : "pb-36"),
+                              !isMobileViewport && "md:pb-8",
+                            )}
+                          >
                             <div className="mb-8 space-y-3">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                                 {problemMetaLine.map((item, index) => (
@@ -447,7 +472,10 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                                 asChild
                                 variant="outline"
                                 size="sm"
-                                className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                className={cn(
+                                  "rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20",
+                                  user ? "hidden burger:inline-flex" : undefined,
+                                )}
                               >
                                 <Link
                                   href="/informatica/probleme"
@@ -558,30 +586,34 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                   </StatementPanelBackground>
                 </ResizablePanel>
 
-                <ResizableHandle withHandle className="bg-white/10 hover:bg-white/20 transition-colors max-md:hidden" />
+                {viewportReady && !isMobileViewport ? (
+                  <>
+                    <ResizableHandle withHandle className="bg-white/10 hover:bg-white/20 transition-colors max-md:hidden" />
 
-                <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-[50vh]">
-                  <div className="h-full overflow-hidden bg-black">
-                    <EmbeddedIDE
-                      key={`${slug}-${ideRevision}`}
-                      defaultLanguage={loadedProblem.language === "python" ? "python" : "cpp"}
-                      initialFiles={restoreFloatingWorkspace ? floatingSession!.files : undefined}
-                      initialActiveFileId={
-                        restoreFloatingWorkspace ? floatingSession!.activeFileId : undefined
-                      }
-                      initialCode={
-                        restoreFloatingWorkspace
-                          ? undefined
-                          : loadedProblem.language === "python"
-                            ? loadedProblem.boilerplate_python ?? undefined
-                            : loadedProblem.boilerplate_cpp ?? undefined
-                      }
-                      problemSlug={loadedProblem.language === "python" ? slug : undefined}
-                      onWorkspaceChange={handleFloatingWorkspaceChange}
-                      onAgentBridgeChange={setAgentBridge}
-                    />
-                  </div>
-                </ResizablePanel>
+                    <ResizablePanel defaultSize={50} minSize={30} maxSize={70} className="max-md:!h-[50vh]">
+                      <div className="h-full overflow-hidden bg-black">
+                        <EmbeddedIDE
+                          key={`${slug}-${ideRevision}`}
+                          defaultLanguage={loadedProblem.language === "python" ? "python" : "cpp"}
+                          initialFiles={restoreFloatingWorkspace ? floatingSession!.files : undefined}
+                          initialActiveFileId={
+                            restoreFloatingWorkspace ? floatingSession!.activeFileId : undefined
+                          }
+                          initialCode={
+                            restoreFloatingWorkspace
+                              ? undefined
+                              : loadedProblem.language === "python"
+                                ? loadedProblem.boilerplate_python ?? undefined
+                                : loadedProblem.boilerplate_cpp ?? undefined
+                          }
+                          problemSlug={loadedProblem.language === "python" ? slug : undefined}
+                          onWorkspaceChange={handleFloatingWorkspaceChange}
+                          onAgentBridgeChange={setAgentBridge}
+                        />
+                      </div>
+                    </ResizablePanel>
+                  </>
+                ) : null}
               </ResizablePanelGroup>
             ) : (
               <div className="flex h-full flex-1 items-center justify-center px-6">
@@ -590,6 +622,10 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
             )}
           </main>
 
+          {isReady && isMobileViewport && !isAgentOpen ? (
+            <MobileDesktopRecommendationCard />
+          ) : null}
+
           {isReady && isAgentOpen && !isDesktopViewport ? (
             <>
               <div
@@ -597,7 +633,12 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                 onClick={() => setIsAgentOpen(false)}
                 aria-hidden="true"
               />
-              <aside className="fixed inset-x-0 bottom-0 top-[42%] z-50 flex flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-[#141414] shadow-2xl lg:hidden">
+              <aside
+                className={cn(
+                  "fixed inset-x-0 top-[42%] z-50 flex flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-[#141414] shadow-2xl lg:hidden",
+                  showMobileBottomNav ? MOBILE_BOTTOM_NAV_OFFSET_CLASS : "bottom-0",
+                )}
+              >
                 <ProblemAgentChatPanel
                   isOpen={isAgentOpen}
                   onClose={() => setIsAgentOpen(false)}

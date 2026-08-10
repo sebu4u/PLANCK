@@ -14,6 +14,12 @@ import { cn } from "@/lib/utils"
 import { LP_AI_CHAT_PANEL_WIDTH_CLASS } from "@/lib/learning-path-ai-chat-layout"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { InvataAskThinkingDots } from "@/components/invata/invata-ask-thinking"
+import {
+  ChatMessageLimitHint,
+  ChatMessageLimitLockButton,
+  CHAT_MESSAGE_LIMIT_PLACEHOLDER,
+} from "@/components/chat-message-limit-lock"
+import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 
 type ChatMessage = {
   role: "user" | "assistant" | "system"
@@ -95,6 +101,7 @@ export function LearningPathItemAiChatPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [freePromptLimitReached, setFreePromptLimitReached] = useState(false)
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const initialMessageSentRef = useRef(false)
   const lastInitialMessageRef = useRef<string | null>(null)
@@ -194,7 +201,7 @@ export function LearningPathItemAiChatPanel({
   const submitMessage = useCallback(
     async (textOverride?: string, displayContentOverride?: string) => {
       const textToSend = textOverride ?? input
-      if (!textToSend.trim() || busy) return
+      if (!textToSend.trim() || busy || freePromptLimitReached) return
 
       setBusy(true)
       setError(null)
@@ -290,6 +297,8 @@ export function LearningPathItemAiChatPanel({
           setMessages((prev) => prev.slice(0, -2))
           if (isGuest || isFree) {
             setFreePromptLimitReached(true)
+            setInput("")
+            setPremiumUpgradeOpen(true)
             setError(null)
           } else {
             setError(data.error || "Limită zilnică atinsă.")
@@ -364,6 +373,8 @@ export function LearningPathItemAiChatPanel({
                   return prev
                 })
                 setFreePromptLimitReached(true)
+                setInput("")
+                setPremiumUpgradeOpen(true)
                 setError(null)
               } else if (data.type === "error") {
                 throw new Error(data.error || "Eroare la procesarea răspunsului.")
@@ -396,10 +407,14 @@ export function LearningPathItemAiChatPanel({
         setBusy(false)
       }
     },
-    [busy, input, isFree, messages, problemContextPreamble, problemId, sessionId, user],
+    [busy, freePromptLimitReached, input, isFree, messages, problemContextPreamble, problemId, sessionId, user],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (freePromptLimitReached) {
+      e.preventDefault()
+      return
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       void submitMessage()
@@ -584,25 +599,6 @@ export function LearningPathItemAiChatPanel({
               ) : null}
             </div>
           )}
-          {freePromptLimitReached ? (
-            <div className="relative z-[1] mt-auto px-1 pb-3 pt-5">
-              <p className="text-center text-base font-bold text-black">
-                Ai rămas fără mesaje disponibile
-              </p>
-              <a
-                href="/pricing"
-                className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white shadow-[0_3px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#9a5aa8]"
-                style={
-                  {
-                    "--start-glow-tint": "rgba(248, 220, 228, 0.88)",
-                    backgroundImage: "linear-gradient(to right, #8f91f1, #cd83db, #f2b93d)",
-                  } as React.CSSProperties
-                }
-              >
-                Încearcă Premium
-              </a>
-            </div>
-          ) : null}
           {error ? <p className="mt-3 text-center text-xs text-red-500">{error}</p> : null}
         </div>
 
@@ -612,6 +608,12 @@ export function LearningPathItemAiChatPanel({
             composerPaddingClassName ?? "pb-[max(1rem,env(safe-area-inset-bottom,0px))]",
           )}
         >
+          {freePromptLimitReached ? (
+            <ChatMessageLimitHint
+              className="relative z-[1] mb-2"
+              onUpgradeClick={() => setPremiumUpgradeOpen(true)}
+            />
+          ) : null}
           <div className="relative">
             {showEmptyStateDecor ? (
               <div
@@ -636,48 +638,62 @@ export function LearningPathItemAiChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Cum te pot ajuta?"
+              placeholder={
+                freePromptLimitReached ? CHAT_MESSAGE_LIMIT_PLACEHOLDER : "Cum te pot ajuta?"
+              }
               rows={1}
               disabled={busy || freePromptLimitReached}
+              readOnly={freePromptLimitReached}
               className={cn(
                 "max-h-28 flex-1 resize-none bg-transparent text-sm text-[#222] placeholder:text-[#999] focus:outline-none",
                 mobile ? "min-h-5 leading-5" : "min-h-[24px]",
               )}
             />
-            <button
-              type="button"
-              onClick={() => {
-                if (busy) {
-                  stopGeneration()
-                  return
-                }
-                void submitMessage()
-              }}
-              disabled={freePromptLimitReached || (!busy && !input.trim())}
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40",
-                mobile
-                  ? busy
-                    ? "bg-[#e5e5e5] text-[#565656]"
-                    : input.trim()
-                      ? "bg-[#58b9b3]"
-                      : "bg-transparent text-[#b6b6b6]"
-                  : "bg-[#7c3aed]",
-              )}
-              aria-label={busy ? "Oprește generarea" : "Trimite mesaj"}
-            >
-              {busy ? (
-                mobile ? <Square className="h-3.5 w-3.5 fill-current" /> : <Loader2 className="h-4 w-4 animate-spin" />
-              ) : mobile ? (
-                input.trim() ? <ArrowUp className="h-4 w-4" strokeWidth={2.5} /> : <Mic className="h-4 w-4" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
-            </button>
+            {freePromptLimitReached ? (
+              <ChatMessageLimitLockButton
+                onClick={() => setPremiumUpgradeOpen(true)}
+                iconSize={14}
+                className="h-8 w-8"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (busy) {
+                    stopGeneration()
+                    return
+                  }
+                  void submitMessage()
+                }}
+                disabled={!busy && !input.trim()}
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40",
+                  mobile
+                    ? busy
+                      ? "bg-[#e5e5e5] text-[#565656]"
+                      : input.trim()
+                        ? "bg-[#58b9b3]"
+                        : "bg-transparent text-[#b6b6b6]"
+                    : "bg-[#7c3aed]",
+                )}
+                aria-label={busy ? "Oprește generarea" : "Trimite mesaj"}
+              >
+                {busy ? (
+                  mobile ? <Square className="h-3.5 w-3.5 fill-current" /> : <Loader2 className="h-4 w-4 animate-spin" />
+                ) : mobile ? (
+                  input.trim() ? <ArrowUp className="h-4 w-4" strokeWidth={2.5} /> : <Mic className="h-4 w-4" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
           </div>
           </div>
         </div>
       </div>
+      {premiumUpgradeOpen ? (
+        <FreePlanComparisonOverlay onClose={() => setPremiumUpgradeOpen(false)} />
+      ) : null}
     </div>
   )
 }

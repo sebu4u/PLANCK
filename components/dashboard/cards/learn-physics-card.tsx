@@ -10,6 +10,7 @@ export interface RecommendedLesson {
     grade_number: number
     estimated_duration: number | null
     slug: string
+    subject?: string
 }
 
 interface LearnPhysicsCardProps {
@@ -40,7 +41,7 @@ export function LearnPhysicsCard({ lessons = [] }: LearnPhysicsCardProps) {
                 {lessons.map((lesson) => (
                     <Link
                         key={lesson.id}
-                        href={`/cursuri/${lesson.slug}`}
+                        href={`/invata/cursuri/${lesson.subject || 'fizica'}/${lesson.slug}`}
                         className="block p-3 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 hover:border-gray-200 transition-all group"
                     >
                         <div className="flex items-start justify-between gap-2">
@@ -72,7 +73,7 @@ export function LearnPhysicsCard({ lessons = [] }: LearnPhysicsCardProps) {
             </div>
 
             <Link
-                href="/cursuri"
+                href="/invata/cursuri"
                 className="mt-3 flex items-center justify-center gap-2 p-2 text-xs text-gray-600 hover:text-gray-900 transition-colors"
             >
                 <BookOpen className="w-3.5 h-3.5" />

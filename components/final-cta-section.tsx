@@ -121,7 +121,7 @@ export default function FinalCTASection() {
           </form>
 
           {/* CTA Button */}
-          <Link href="/cursuri" className="w-full sm:w-auto">
+          <Link href="/invata/cursuri" className="w-full sm:w-auto">
             <Button 
               size="lg" 
               className="bg-white text-black hover:bg-gray-200 transition-all duration-300 text-lg px-8 h-11 w-full sm:w-auto"

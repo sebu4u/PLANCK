@@ -22,7 +22,10 @@ function LightweightSearchPill({
   onOpen: () => void
 }) {
   return (
-    <div className={cn("relative w-full", PILL_HEIGHT_CLASS, className)}>
+    <div
+      data-guide-anchor="create-path"
+      className={cn("relative w-full", PILL_HEIGHT_CLASS, className)}
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -67,7 +70,11 @@ export function PersonalizedCourseGeneratorEntry(props: PersonalizedCourseGenera
   }, [Generator, isLoading])
 
   if (Generator) {
-    return <Generator {...props} initialOpen />
+    return (
+      <div data-guide-anchor="create-path" className={props.className}>
+        <Generator {...props} initialOpen className={undefined} />
+      </div>
+    )
   }
 
   return (

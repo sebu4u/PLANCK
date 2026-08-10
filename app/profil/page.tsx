@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -29,9 +29,9 @@ import {
 } from "@/components/ui/dialog";
 import { getNextRankThreshold } from "@/lib/dashboard-data";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-// Skeleton components for profile page
+// Skeleton components for profile page (section refresh only — route loading.tsx covers first paint)
 const ProfileSkeleton = () => (
   <div className="animate-pulse rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)]">
     <div className="flex flex-col items-center gap-4">
@@ -54,6 +54,7 @@ const ProfilPage = () => {
   const { user, loading, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<any>(null);
   const [bio, setBio] = useState("");
   const [bioEdit, setBioEdit] = useState(false);
@@ -67,6 +68,8 @@ const ProfilPage = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [userStats, setUserStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  // Route loading.tsx already showed the page skeleton — skip repeating it on first data fetch.
+  const suppressInitialSectionSkeletonRef = useRef(true);
   const [contestRegistration, setContestRegistration] = useState<{
     contest_code: string;
     full_name: string;
@@ -83,6 +86,19 @@ const ProfilPage = () => {
       router.replace("/login");
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (searchParams.get("setari") === "1") {
+      setShowPrivacyModal(true);
+      router.replace("/profil", { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    if (!profileLoading && !statsLoading) {
+      suppressInitialSectionSkeletonRef.current = false;
+    }
+  }, [profileLoading, statsLoading]);
 
   // Get rank color
   const getRankColor = (rankName: string) => {
@@ -254,33 +270,13 @@ const ProfilPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)]">
-        <Navigation />
-        <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1">
-                <ProfileSkeleton />
-              </div>
-              <div className="lg:col-span-2">
-                <StatsSkeleton />
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+  // AuthSessionGate + route loading.tsx already covered initial auth/page paint.
+  if (loading || !user) {
+    return null;
   }
 
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-      </div>
-    );
-  }
+  const showProfileSkeleton = profileLoading && !suppressInitialSectionSkeletonRef.current;
+  const showStatsSkeleton = statsLoading && !suppressInitialSectionSkeletonRef.current;
 
   const nextRankInfo = userStats ? getNextRankThreshold(userStats.elo) : { nextRank: 'Bronze II', threshold: 650, progress: 0 };
   const rankIconPath = userStats ? getRankIconPath(userStats.rank) : getRankIconPath("Bronze");
@@ -290,7 +286,7 @@ const ProfilPage = () => {
     <>
       <div className="min-h-screen bg-[linear-gradient(135deg,#ffffff_0%,#fafafa_38%,#fefefe_72%,#ffffff_100%)]">
         <Navigation />
-        <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
+        <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24 animate-fade-in-up", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
@@ -302,8 +298,10 @@ const ProfilPage = () => {
               {/* Left Side - Profile Info */}
               <div className="lg:col-span-1">
                 <div className="rounded-3xl border border-[#e5e5e5] bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.03)] transition-colors hover:border-[#d4d4d4]">
-                  {profileLoading ? (
+                  {showProfileSkeleton ? (
                     <ProfileSkeleton />
+                  ) : profileLoading ? (
+                    <div className="min-h-[20rem]" aria-busy="true" aria-label="Se încarcă profilul" />
                   ) : (
                     <div className="flex flex-col items-center gap-6">
                       {/* Avatar with Rank Badge + PLANCKPASS cosmetics */}
@@ -533,8 +531,10 @@ const ProfilPage = () => {
 
               {/* Right Side - Statistics */}
               <div className="lg:col-span-2 space-y-6">
-                {statsLoading ? (
+                {showStatsSkeleton ? (
                   <StatsSkeleton />
+                ) : statsLoading ? (
+                  <div className="min-h-[20rem]" aria-busy="true" aria-label="Se încarcă statisticile" />
                 ) : (
                   <>
                     {/* Rank & ELO Card */}

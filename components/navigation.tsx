@@ -10,7 +10,7 @@ import {
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Code, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound } from "lucide-react"
 import { BlogNotificationsDropdown } from "@/components/blog/blog-notifications-dropdown"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
@@ -31,12 +31,16 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import {
   getMobileTopBarContent,
+  getPracticeProblemCatalogHref,
   isClassroomsRoute,
   isExerseazaRoute,
+  isFlashcardRoute,
   isGrileRoute as matchGrileRoute,
+  isTesteRoute as matchTesteRoute,
   isInvataHubRoute,
   isMobileAppShellRoute,
   isMobileLessonItemsShellRoute,
+  isPracticeProblemDetailRoute,
   isPregatireRoute,
   isProfesorResurseRoute,
   isProfesorTemeRoute,
@@ -46,8 +50,6 @@ import {
   shouldShowMobileBottomNav,
 } from "@/lib/mobile-app-nav"
 import { isInformaticaProblemDetailRoute, isPlanckCodeShellRoute } from "@/lib/planckcode-shell-routes"
-import { getPlanckCodeNavHref } from "@/lib/planckcode-floating-session"
-import { usePlanckIdeFloatingOptional } from "@/components/planckcode-floating-provider"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { isStudentDashboardRoute, normalizePracticeSubject, type PracticeSubjectId } from "@/lib/practice-subject"
 
@@ -75,8 +77,6 @@ export function Navigation() {
   const router = useRouter()
   const pathname = usePathname()
   const isInvataHub = isInvataHubRoute(pathname)
-  const floatingIde = usePlanckIdeFloatingOptional()
-  const codeNavHref = getPlanckCodeNavHref(floatingIde?.session, floatingIde?.isVisible ?? false)
 
   // Dashboard, /invata, /grile, /probleme catalog, /matematica|informatica/probleme, /classrooms, and /profil share the same white navbar theme.
   const isDashboard =
@@ -85,6 +85,7 @@ export function Navigation() {
     pathname?.startsWith("/invata") === true
   const isProfileRoute = pathname?.startsWith("/profil") ?? false
   const isGrileRoute = matchGrileRoute(pathname)
+  const isTesteRoute = matchTesteRoute(pathname)
   const isDashboardPage = pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
   const isMatematicaProblemsCatalog = pathname === "/matematica/probleme"
   const isMatematicaProblemDetail = Boolean(pathname?.match(/^\/matematica\/probleme\/[^/]+$/))
@@ -435,7 +436,7 @@ export function Navigation() {
 
     return (
       <div
-        className="relative z-[300] h-16 max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:fixed sm:inset-x-0 sm:top-0 sm:border-b sm:border-gray-200 sm:bg-[#ffffff]"
+        className="relative z-0 h-16 max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:fixed sm:inset-x-0 sm:top-0 sm:z-[300] sm:border-b sm:border-gray-200 sm:bg-[#ffffff]"
         aria-hidden
       />
     )
@@ -447,6 +448,7 @@ export function Navigation() {
   const isRegisterRoute = pathname === '/register'
   const isTransparentRoute = isHomepage || isRegisterRoute
   const isPlanckCodeRoute = isPlanckCodeShellRoute(pathname)
+  const isInformaticaProblemDetail = isInformaticaProblemDetailRoute(pathname)
   const isBlogRoute = pathname?.startsWith("/blog") ?? false
   const isProblemsCatalog = pathname === "/probleme" || pathname?.startsWith("/probleme/pagina/") === true
   const isExerseazaHub = pathname === "/exerseaza" || pathname?.startsWith("/exerseaza/") === true
@@ -462,10 +464,12 @@ export function Navigation() {
   const isParentCatalogActive = isParentCatalogRoute(pathname)
   const isParentAbonamentActive = Boolean(pathname?.startsWith("/abonament"))
   const isParentHomeActive = isParentDashboardRoute(pathname)
+  const isCoursePage = pathname?.startsWith('/invata/cursuri') || pathname?.startsWith('/cursuri') || false
   const useLightNav =
     isDashboard ||
     isExerseazaHub ||
     isInvataSubjectHub ||
+    isCoursePage ||
     isProblemsCatalog ||
     isProblemPage ||
     isMatematicaProblemsCatalog ||
@@ -475,10 +479,10 @@ export function Navigation() {
     isProfesorTemeRoute(pathname) ||
     isProfesorResurseRoute(pathname) ||
     isGrileRoute ||
+    isTesteRoute ||
     isProfileRoute ||
     isBlogRoute ||
     isPregatireRoute(pathname)
-  const isCoursePage = pathname?.startsWith('/cursuri') ?? false
   /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
   const isGuestProblemeOrCursuri =
     !user &&
@@ -486,6 +490,7 @@ export function Navigation() {
       (pathname?.startsWith("/matematica/probleme") ?? false) ||
       (pathname?.startsWith("/informatica/probleme") ?? false) ||
       isExerseazaHub ||
+      (pathname?.startsWith("/invata/cursuri") ?? false) ||
       (pathname?.startsWith("/cursuri") ?? false))
   const isBacSimulationsPage = pathname?.startsWith('/simulari-bac') ?? false
   // On mobile, navbar should never be transparent when at the top of the screen
@@ -497,10 +502,10 @@ export function Navigation() {
 
   const navTheme = useLightNav
     ? {
-      background: 'bg-[#ffffff]',
-      border: 'border-gray-200',
-      dropdownBackground: 'bg-[#ffffff]',
-      dropdownBorder: 'border-gray-200',
+      background: isCoursePage ? 'bg-[#F8FAFD]' : 'bg-[#ffffff]',
+      border: isCoursePage ? 'border-transparent' : 'border-gray-200',
+      dropdownBackground: isCoursePage ? 'bg-[#F8FAFD]' : 'bg-[#ffffff]',
+      dropdownBorder: isCoursePage ? 'border-gray-200' : 'border-gray-200',
     }
     : isHomepage
       ? {
@@ -509,7 +514,7 @@ export function Navigation() {
         dropdownBackground: 'bg-[#111111]',
         dropdownBorder: 'border-gray-800/80',
       }
-      : isProblemPage || isCoursePage || isBacSimulationsPage
+      : isProblemPage || isBacSimulationsPage
         ? {
           background: 'bg-[#101010]',
           border: 'border-white/10',
@@ -545,10 +550,8 @@ export function Navigation() {
               }
   const navPrimaryText = useLightNav ? 'text-gray-900' : 'text-white'
   const navSecondaryText = useLightNav ? 'text-gray-600' : 'text-gray-300'
-  const navSubtleText = useLightNav ? 'text-gray-500' : 'text-gray-400'
   const navHoverText = useLightNav ? 'hover:text-gray-900' : 'hover:text-white'
   const navHoverBg = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
-  const navChipBg = useLightNav ? 'bg-gray-100 border-gray-200' : 'bg-white/5 border-white/10'
   const navDropdownItemHover = useLightNav ? 'hover:bg-gray-100' : 'hover:bg-white/10'
   const blogNotificationsBell = (
     <BlogNotificationsDropdown
@@ -558,7 +561,7 @@ export function Navigation() {
     />
   )
   const navDropShadowOnDesktop =
-    pathname?.startsWith('/invata') ||
+    (pathname?.startsWith('/invata') && !isCoursePage) ||
     isGrileRoute ||
     (isProblemPage && !isProblemsCatalog) ||
     isMatematicaProblemDetail
@@ -568,13 +571,21 @@ export function Navigation() {
     isMatematicaProblemDetail
   const showMobileLessonShell = Boolean(user && isMobileLessonItemsShellRoute(pathname, true))
   const showMobileGrileShell = Boolean(user && isMobile && matchGrileRoute(pathname))
-  const showMobileFocusedShell = showMobileLessonShell || showMobileGrileShell
+  const showMobileProblemDetailShell = Boolean(
+    user && isMobile && isPracticeProblemDetailRoute(pathname),
+  )
+  const showMobileFocusedShell =
+    showMobileLessonShell || showMobileGrileShell || showMobileProblemDetailShell
+  const mobileProblemCatalogHref = getPracticeProblemCatalogHref(pathname)
   const isExerseazaHubPage = pathname === "/exerseaza"
-  const isCatalogHubPage =
+  /** Practice catalog hubs: no navbar drop shadow on desktop. */
+  const isPracticeCatalogHubPage =
     isExerseazaHubPage ||
-    isInvataSubjectHub ||
     isMatematicaProblemsCatalog ||
     isInformaticaProblemsCatalog
+  const isCatalogHubPage =
+    isPracticeCatalogHubPage ||
+    isInvataSubjectHub
   const [planckPassExpanded, setPlanckPassExpanded] = useState(false)
 
   useEffect(() => {
@@ -591,7 +602,7 @@ export function Navigation() {
   }, [isDashboardPage])
 
   const navbarElevationClass =
-    isProblemDetailPage
+    isProblemDetailPage || isCoursePage
       ? "shadow-none"
       : showMobileFocusedShell
         ? "shadow-none burger:shadow-md"
@@ -601,24 +612,29 @@ export function Navigation() {
             : "shadow-none transition-shadow duration-300 burger:shadow-md"
           : isInvataHub
             ? "max-sm:shadow-none transition-shadow duration-300 burger:shadow-md sm:shadow-md"
-            : isCatalogHubPage || isProfileRoute
-              ? "shadow-none burger:shadow-md"
-              : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
+            : isPracticeCatalogHubPage
+              ? "shadow-none"
+              : isCatalogHubPage || isProfileRoute || isFlashcardRoute(pathname)
+                ? "shadow-none burger:shadow-md"
+                : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
-  // Planck Code routes (IDE + enunț informatică) folosesc navbar-ul întunecat, nu shell-ul alb mobil.
-  const showMobileAppShellNav = showMobileAppShell && !isPlanckCodeRoute
+  // Enunț informatică pe mobil: top bar minimal (ca restul app shell). IDE /planckcode rămâne pe navbar dark.
+  const showMobileAppShellNav =
+    showMobileAppShell && (!isPlanckCodeRoute || isInformaticaProblemDetail)
   const showMobileBottomNav = shouldShowMobileBottomNav(pathname, Boolean(user))
+  const mobileBottomNavVariant = isInformaticaProblemDetail ? "dark" : "light"
   const mobileDisplayName = profile?.nickname || profile?.name || "Student"
   const mobileTopBarContent = getMobileTopBarContent(pathname, mobileDisplayName)
   const showMobilePracticeSubjectSwitcher = Boolean(
     user &&
       isStudent &&
       (isStudentDashboardRoute(pathname) ||
+        isExerseazaHub ||
         isProblemsCatalog ||
         isMatematicaProblemsCatalog ||
         isInformaticaProblemsCatalog),
   )
-  const mobilePracticeSubject: PracticeSubjectId = isProblemsCatalog
+  const mobilePracticeSubject: PracticeSubjectId = isExerseazaHub || isProblemsCatalog
     ? "fizica"
     : isMatematicaProblemsCatalog
       ? "matematica"
@@ -634,16 +650,18 @@ export function Navigation() {
     }
     return () => document.body.classList.remove("mobile-app-shell")
   }, [showMobileAppShell])
-  const mobileShellNavSurfaceClass = isPlanckCodeRoute
-    ? `${navTheme.background} ${navTheme.border}`
-    : isInvataHub
-      ? "max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:bg-[#ffffff] sm:border-gray-200"
-      : showMobileFocusedShell
-        ? "bg-[#ffffff] border-transparent"
-        : showMobileAppShellNav
-          ? useLightNav
-            ? `${navTheme.background} ${navTheme.border}`
-            : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
+  const mobileShellNavSurfaceClass = showMobileAppShellNav
+    ? isInformaticaProblemDetail
+      ? "bg-[#ffffff] border-gray-200 burger:bg-[#181818] burger:border-gray-600"
+      : useLightNav
+        ? `${navTheme.background} ${navTheme.border}`
+        : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
+    : isPlanckCodeRoute
+      ? `${navTheme.background} ${navTheme.border}`
+      : isInvataHub
+        ? "max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:bg-[#ffffff] sm:border-gray-200"
+        : showMobileFocusedShell
+          ? "bg-[#ffffff] border-transparent"
           : `${navTheme.background} ${navTheme.border}`
   const navBackdropClass = showMobileFocusedShell
     ? ""
@@ -656,7 +674,10 @@ export function Navigation() {
       <div
         className={`${
           isInvataHub ? "max-sm:relative sm:fixed top-0 left-0 right-0" : "fixed top-0 left-0 right-0"
-        } z-[300] flex flex-col ${
+        } ${
+          // On mobile /invata the header character must paint above this bar (see INVATA_HUB_MOBILE_HEADER_Z).
+          isInvataHub ? "z-0 sm:z-[300]" : "z-[300]"
+        } flex flex-col ${
           isInvataHub
             ? "max-sm:animate-none max-sm:transition-none max-sm:bg-[#DCE6FA] sm:animate-slide-down sm:transition-transform sm:duration-300"
             : "animate-slide-down transition-transform duration-300"
@@ -730,14 +751,40 @@ export function Navigation() {
                       {blogNotificationsBell}
                     </div>
                   </>
+                ) : showMobileProblemDetailShell ? (
+                  <>
+                    <Link
+                      href={mobileProblemCatalogHref}
+                      aria-label="Înapoi la catalog"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                    >
+                      <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
+                    </Link>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <NavbarEloDisplay userElo={userElo} useLightNav />
+                      <NavbarTestBatteries useLightNav variant="pill" />
+                      {blogNotificationsBell}
+                    </div>
+                  </>
                 ) : showMobileAppShellNav ? (
                   <>
-                    <div className="flex min-w-0 flex-1 flex-col justify-center pr-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1 pr-2">
+                      {isCoursePage ? (
+                        <Link
+                          href="/invata/cursuri"
+                          aria-label="Înapoi la cursuri"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                        >
+                          <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
+                        </Link>
+                      ) : null}
+                      <div className="flex min-w-0 flex-1 flex-col justify-center">
                       {showMobilePracticeSubjectSwitcher ? (
                         <PracticeSubjectSwitcher
                           currentSubject={mobilePracticeSubject}
                           size={isStudentDashboardRoute(pathname) ? "navbar-lg" : "navbar"}
                           navigateOnChange={
+                            isExerseazaHub ||
                             isProblemsCatalog ||
                             isMatematicaProblemsCatalog ||
                             isInformaticaProblemsCatalog
@@ -753,6 +800,7 @@ export function Navigation() {
                           ) : null}
                         </>
                       )}
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <NavbarEloDisplay userElo={userElo} useLightNav />
@@ -891,9 +939,16 @@ export function Navigation() {
               <div className="hidden burger:flex items-center h-full gap-6 flex-1 min-w-0">
                 <Link
                   href="/"
-                  className={`relative flex h-full items-center gap-2 flex-shrink-0 text-2xl font-bold ${navPrimaryText} title-font animate-fade-in transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''} ${isHomepage ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : 'after:bg-transparent'}`}
+                  className={`relative flex h-full items-center gap-1 flex-shrink-0 text-2xl font-bold ${navPrimaryText} title-font animate-fade-in transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''} ${isHomepage ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : 'after:bg-transparent'}`}
                 >
-                  <Rocket className={`w-6 h-6 ${navPrimaryText}`} />
+                  <img
+                    src="/streak-icon.png"
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 shrink-0 object-contain"
+                    aria-hidden
+                  />
                   <span className="hidden logo:block font-black whitespace-nowrap">PLANCK</span>
                 </Link>
 
@@ -981,14 +1036,6 @@ export function Navigation() {
                     </Link>
 
                     <Link
-                      href={codeNavHref}
-                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPlanckCodeRoute ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
-                    >
-                      <Code size={16} />
-                      Code
-                    </Link>
-
-                    <Link
                       href="/classrooms"
                       className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
@@ -1020,15 +1067,6 @@ export function Navigation() {
                 </div>
 
                 {user ? <NavbarTestBatteries useLightNav={useLightNav} /> : null}
-
-                <button
-                  onClick={() => setIsSearchDialogOpen(true)}
-                  className={`inline-flex items-center gap-2 w-[180px] h-9 rounded-full ${navChipBg} px-3 text-sm ${navSubtleText} ${useLightNav ? 'hover:bg-gray-200' : 'hover:bg-white/10'} transition-colors`}
-                >
-                  <SearchIcon className="w-4 h-4" />
-                  <span className="flex-1 text-left">Search...</span>
-                  <kbd className={`px-1.5 py-0.5 text-xs ${useLightNav ? 'bg-gray-200 border-gray-300' : 'bg-white/10 border-white/10'} border rounded`}>/</kbd>
-                </button>
 
                 {blogNotificationsBell}
 
@@ -1237,7 +1275,7 @@ export function Navigation() {
 
         </nav>
       </div>
-      {showMobileBottomNav ? <MobileBottomNav /> : null}
+      {showMobileBottomNav ? <MobileBottomNav variant={mobileBottomNavVariant} /> : null}
     </>
   )
 }

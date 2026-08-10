@@ -155,7 +155,17 @@ export const updateProfileFromSubscription = async (
     updatePayload.plan = "free"
   }
 
+  let previousPlan: string | null = null
+  let targetUserId: string | null = userId ?? null
+
   if (userId) {
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("plan")
+      .eq("user_id", userId)
+      .maybeSingle()
+    previousPlan = typeof existing?.plan === "string" ? existing.plan : null
+
     const { error } = await supabase
       .from("profiles")
       .upsert(
@@ -168,13 +178,32 @@ export const updateProfileFromSubscription = async (
     if (error) {
       throw new Error(`[stripe] Failed to update profile by user ID: ${error.message}`)
     }
-    return
-  }
+  } else if (customerId) {
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("user_id, plan")
+      .eq("stripe_customer_id", customerId)
+      .maybeSingle()
+    previousPlan = typeof existing?.plan === "string" ? existing.plan : null
+    targetUserId = typeof existing?.user_id === "string" ? existing.user_id : null
 
-  if (customerId) {
     const { error } = await supabase.from("profiles").update(updatePayload).eq("stripe_customer_id", customerId)
     if (error) {
       throw new Error(`[stripe] Failed to update profile by customer ID: ${error.message}`)
+    }
+  }
+
+  const nextPlan = typeof updatePayload.plan === "string" ? updatePayload.plan.toLowerCase() : null
+  const prevNormalized = (previousPlan ?? "free").trim().toLowerCase()
+  const wasPremium = prevNormalized === "premium" || prevNormalized === "pro"
+  const isPremium = nextPlan === "premium" || nextPlan === "pro"
+
+  if (isPremium && !wasPremium && targetUserId) {
+    const { error: energyError } = await supabase.rpc("grant_premium_workshop_energy_upgrade", {
+      p_user_id: targetUserId,
+    })
+    if (energyError) {
+      console.error("[stripe] Failed to grant premium workshop energy:", energyError.message)
     }
   }
 }

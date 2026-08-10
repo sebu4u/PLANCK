@@ -65,7 +65,7 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
 
         {announcement.type === "lesson" && announcement.lesson_slug ? (
           <Link
-            href={`/cursuri/${announcement.lesson_slug}`}
+            href={`/invata/cursuri/fizica/${announcement.lesson_slug}`}
             className="inline-flex items-center rounded-lg bg-[#111827] px-3 py-2 text-sm font-medium text-white hover:bg-[#1f2937]"
           >
             Deschide lecția

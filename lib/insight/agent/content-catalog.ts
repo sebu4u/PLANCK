@@ -822,7 +822,7 @@ export async function searchPlanckContentCatalog(
       subject: 'fizica',
       topic: chapter?.title || null,
       difficulty: row.difficulty_level ? `Nivel ${row.difficulty_level}` : null,
-      url: `/cursuri/${slugify(row.title)}`,
+      url: `/invata/cursuri/fizica/${slugify(row.title)}`,
       reason: 'Lecție existentă din biblioteca Planck.',
       metadata: { chapter_id: row.chapter_id, estimated_duration: row.estimated_duration, source_table: 'lessons' },
       searchable: `${row.title} ${limitText(row.content, 2000)} ${chapter?.title} ${chapter?.description}`,

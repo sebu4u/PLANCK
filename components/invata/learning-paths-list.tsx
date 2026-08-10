@@ -20,6 +20,7 @@ import type {
 import type { ElasticLessonsScrollerProps } from "@/components/invata/elastic-lessons-scroller"
 import { GUEST_LEARNING_PATH_PROGRESS_COOKIE } from "@/lib/guest-learning-path-cookie"
 import { dispatchInvataHubRefresh, INVATA_HUB_REFRESH_EVENT } from "@/lib/invata/hub-events"
+import { LessonHubSquareCardProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { LearningPathSegmentedProgress } from "@/components/invata/learning-path-segmented-progress"
 import { InvataMobileLessonList } from "@/components/invata/invata-mobile-lesson-card"
 import {
@@ -165,8 +166,8 @@ function LazyElasticLessonsScroller({
       <div
         className={
           bleedMargins
-            ? "-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0"
-            : "overflow-x-auto scrollbar-hide px-5 pb-2"
+            ? "-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 sm:pb-0"
+            : "overflow-x-auto scrollbar-hide px-5 pb-2 sm:pb-0"
         }
       >
         <div
@@ -364,11 +365,17 @@ function InvataChapterSection({
       </div>
 
       <div className="hidden sm:block">
-        <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:p-6">
+        <div className="-mx-5 rounded-none bg-[#f7f7f7] p-5 sm:mx-0 sm:rounded-2xl sm:px-6 sm:pb-6 sm:pt-8">
           {chapterLessons.length ? (
             <LazyElasticLessonsScroller enabled={shouldEnhanceDesktopScroller}>
               {chapterLessons.map((lesson, lessonIndex) => {
                 const lessonHref = getLearningPathLessonHref(chapter, lesson)
+                const lessonProgress = lessonProgressByLessonId[lesson.id] ?? {
+                  completed: 0,
+                  total: 0,
+                }
+                const isLessonStarted =
+                  lessonProgress.completed > 0 || completedLessonIds.includes(lesson.id)
                 const cardContent = (
                   <div
                     className={
@@ -380,14 +387,21 @@ function InvataChapterSection({
                     <div
                       className={
                         isLocked
-                          ? "relative flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 sm:h-[162px] sm:w-[162px]"
-                          : "flex h-[142px] w-[142px] items-center justify-center rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]"
+                          ? "relative flex h-[142px] w-[142px] items-center justify-center overflow-hidden rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 sm:h-[162px] sm:w-[162px]"
+                          : "relative flex h-[142px] w-[142px] items-center justify-center overflow-hidden rounded-2xl border-[3px] border-[#e6e6e6] border-b-[7px] bg-white p-3 transition-[transform,border-color,border-bottom-width] duration-200 hover:translate-y-1 hover:border-[#cfcfcf] hover:border-b-[4px] sm:h-[162px] sm:w-[162px]"
                       }
                     >
                       {isLocked ? (
                         <div className="absolute inset-0 z-[1] flex items-center justify-center rounded-2xl bg-white/60">
                           <Lock className="h-6 w-6 text-[#8a8a8a]" aria-hidden="true" />
                         </div>
+                      ) : null}
+                      {!isLocked && isLessonStarted ? (
+                        <LessonHubSquareCardProgressBar
+                          completed={lessonProgress.completed}
+                          total={lessonProgress.total}
+                          accentColor={chapter.accent_color}
+                        />
                       ) : null}
                       {lesson.image_url ? (
                         <InvataDeferredImage

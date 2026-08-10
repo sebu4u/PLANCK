@@ -18,6 +18,7 @@ import { EngagementNotificationToaster } from "@/components/engagement/notificat
 import { PersonalizedCourseGenerationProvider } from "@/components/invata/personalized-course-generation-context"
 import { PlanckCodeFloatingShell } from "@/components/planckcode-floating-shell"
 import { SubjectChangeCelebrationProvider } from "@/components/exerseaza/subject-change-celebration-provider"
+import { ProductGuideProvider } from "@/components/product-guide/product-guide-provider"
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
@@ -93,10 +94,10 @@ export default function RootLayout({
         <style dangerouslySetInnerHTML={{
           __html: `
             html {
-              background-color: #121212;
+              background-color: #ffffff;
             }
             body {
-              background-color: #121212;
+              background-color: #ffffff;
             }
           `
         }} />
@@ -121,30 +122,32 @@ export default function RootLayout({
           <DashboardStartGlowClickSound />
           <TopLoader />
           <AuthProvider>
-            <SubjectChangeCelebrationProvider>
-              <GlobalLoadingOverlay />
-              <AnalyticsProvider>
-                <KatexProvider>
-                  <EngagementProvider>
-                    <PersonalizedCourseGenerationProvider>
-                      <PlanckCodeFloatingShell>
-                        <AuthSessionGate>{children}</AuthSessionGate>
-                      </PlanckCodeFloatingShell>
-                    </PersonalizedCourseGenerationProvider>
-                  </EngagementProvider>
-                </KatexProvider>
-                <Toaster />
-                <EngagementNotificationToaster />
-                <CookieConsentBanner />
+            <ProductGuideProvider>
+              <SubjectChangeCelebrationProvider>
+                <GlobalLoadingOverlay />
+                <AnalyticsProvider>
+                  <KatexProvider>
+                    <EngagementProvider>
+                      <PersonalizedCourseGenerationProvider>
+                        <PlanckCodeFloatingShell>
+                          <AuthSessionGate>{children}</AuthSessionGate>
+                        </PlanckCodeFloatingShell>
+                      </PersonalizedCourseGenerationProvider>
+                    </EngagementProvider>
+                  </KatexProvider>
+                  <Toaster />
+                  <EngagementNotificationToaster />
+                  <CookieConsentBanner />
 
-                <div
-                  className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
-                  aria-label="Versiunea site-ului"
-                >
-                  v1.04.52
-                </div>
-              </AnalyticsProvider>
-            </SubjectChangeCelebrationProvider>
+                  <div
+                    className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
+                    aria-label="Versiunea site-ului"
+                  >
+                    v1.04.52
+                  </div>
+                </AnalyticsProvider>
+              </SubjectChangeCelebrationProvider>
+            </ProductGuideProvider>
           </AuthProvider>
         </ErrorBoundary>
         <Analytics />

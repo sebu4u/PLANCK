@@ -23,12 +23,33 @@ export async function GET(req: NextRequest) {
     }
     const user = userData.user;
 
-    const { data, error } = await supabase
+    const problemIdParam = new URL(req.url).searchParams.get('problemId');
+    const problemId =
+      typeof problemIdParam === 'string' && problemIdParam.trim()
+        ? problemIdParam.trim().slice(0, 128)
+        : null;
+
+    const lessonIdParam = new URL(req.url).searchParams.get('lessonId');
+    const lessonId =
+      typeof lessonIdParam === 'string' && lessonIdParam.trim()
+        ? lessonIdParam.trim().slice(0, 128)
+        : null;
+
+    let query = supabase
       .from('insight_chat_sessions')
-      .select('id, title, created_at, updated_at, last_message_at')
+      .select('id, title, created_at, updated_at, last_message_at, problem_id, lesson_id')
       .eq('user_id', user.id)
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .order('updated_at', { ascending: false });
+
+    if (problemId) {
+      query = query.eq('problem_id', problemId);
+    }
+    if (lessonId) {
+      query = query.eq('lesson_id', lessonId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       logger.error('Failed to fetch sessions:', error);
@@ -66,14 +87,35 @@ export async function POST(req: NextRequest) {
     const user = userData.user;
 
     const body = await req.json();
-    const { title } = body || {};
+    const { title, problemId: rawProblemId, lessonId: rawLessonId } = body || {};
+    const problemId =
+      typeof rawProblemId === 'string' && rawProblemId.trim()
+        ? rawProblemId.trim().slice(0, 128)
+        : null;
+    const lessonId =
+      typeof rawLessonId === 'string' && rawLessonId.trim()
+        ? rawLessonId.trim().slice(0, 128)
+        : null;
+
+    const insertPayload: {
+      user_id: string;
+      title: string;
+      problem_id?: string;
+      lesson_id?: string;
+    } = {
+      user_id: user.id,
+      title: title ? String(title).slice(0, 80) : 'Nou chat',
+    };
+    if (problemId) {
+      insertPayload.problem_id = problemId;
+    }
+    if (lessonId) {
+      insertPayload.lesson_id = lessonId;
+    }
 
     const { data, error } = await supabase
       .from('insight_chat_sessions')
-      .insert({
-        user_id: user.id,
-        title: title ? title.slice(0, 80) : 'Nou chat',
-      })
+      .insert(insertPayload)
       .select('id')
       .single();
 

@@ -48,7 +48,7 @@ export default function ThreePanelSection() {
                 Lecții complete și gratuite de fizică pentru toate clasele de liceu, cu explicații clare și exemple practice.
               </p>
               <Link 
-                href="/cursuri"
+                href="/invata/cursuri"
                 className="inline-flex items-center text-blue-400 hover:text-blue-300 transition-colors duration-200 font-medium group w-fit"
               >
                 <span className="relative">

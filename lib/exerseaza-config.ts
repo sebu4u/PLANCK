@@ -54,13 +54,12 @@ export const EXERSEAZA_CARDS: ExerseazaCardConfig[] = [
   {
     id: "teste",
     title: "Teste",
-    subtitle: "În curând",
-    description: "Simulări și teste complete — disponibile în curând.",
-    href: null,
+    subtitle: "Simulări cronometrate",
+    description: "Teste pe clasă, materie și capitol — cu limită de timp și review cu Insight.",
+    href: "/teste",
     icon: ClipboardList,
     imageSrc: EXERSEAZA_CARD_IMAGE("teste.png"),
     imageGradient: "from-amber-400 via-orange-400 to-rose-500",
-    comingSoon: true,
   },
   {
     id: "flashcard",

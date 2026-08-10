@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
   if (searchParam && searchParam.trim().length > 0) {
     const term = searchParam.trim();
     query = query.or(
-      `title.ilike.%${term}%,statement_markdown.ilike.%${term}%`
+      `title.ilike.%${term}%,statement_markdown.ilike.%${term}%,display_id.ilike.%${term}%`
     );
   }
 

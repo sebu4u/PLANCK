@@ -13,6 +13,7 @@ import { badgePresetIdFromCosmetic } from "@/lib/planckpass/badge-presets"
 import type { PlanckPassClaimResult } from "@/lib/planckpass/types"
 import { BadgePresetPreview } from "@/components/planckpass/badges/badge-preset-layer"
 import { BorderPresetPreview } from "@/components/planckpass/borders/border-preset-layer"
+import { cn } from "@/lib/utils"
 
 const lilita = Lilita_One({
   weight: "400",
@@ -23,6 +24,8 @@ const lilita = Lilita_One({
 interface PlanckPassClaimRevealProps {
   reward: PlanckPassClaimResult
   onClose: () => void
+  /** Override shell classes (e.g. higher z-index above Trophy Road). */
+  className?: string
 }
 
 const SPARKLES = [
@@ -65,7 +68,7 @@ function RewardVisual({ reward }: { reward: PlanckPassClaimResult }) {
   return <Sparkles className="h-[55%] w-[55%] text-fuchsia-200" strokeWidth={2.5} />
 }
 
-export function PlanckPassClaimReveal({ reward, onClose }: PlanckPassClaimRevealProps) {
+export function PlanckPassClaimReveal({ reward, onClose, className }: PlanckPassClaimRevealProps) {
   const reduceMotion = useReducedMotion()
   const [phase, setPhase] = useState<"idle" | "collecting">("idle")
 
@@ -109,7 +112,10 @@ export function PlanckPassClaimReveal({ reward, onClose }: PlanckPassClaimReveal
 
   return (
     <motion.div
-      className="fixed inset-0 z-[550] flex cursor-pointer flex-col items-center justify-between overflow-hidden px-6 pb-14 pt-[max(3.5rem,env(safe-area-inset-top))] select-none"
+      className={cn(
+        "fixed inset-0 z-[550] flex cursor-pointer flex-col items-center justify-between overflow-hidden px-6 pb-14 pt-[max(3.5rem,env(safe-area-inset-top))] select-none",
+        className,
+      )}
       role="dialog"
       aria-modal="true"
       aria-label={`Tier ${reward.tierNumber} revendicat`}

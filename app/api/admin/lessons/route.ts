@@ -39,33 +39,56 @@ export async function GET(req: NextRequest) {
     if ("error" in auth) return auth.error
     const { supabase } = auth
 
-    // Fetch grades
-    const { data: grades, error: gradesErr } = await supabase
-      .from("grades")
-      .select("*")
-      .order("order_index")
+    const subject = req.nextUrl.searchParams.get("subject")?.trim() || null
+
+    let gradesQuery = supabase.from("grades").select("*").order("order_index")
+    if (subject) {
+      gradesQuery = gradesQuery.eq("subject", subject)
+    }
+
+    const { data: grades, error: gradesErr } = await gradesQuery
 
     if (gradesErr) {
       logger.error("[admin/lessons] Failed to fetch grades:", gradesErr)
       return NextResponse.json({ error: "Nu am putut încărca clasele." }, { status: 500 })
     }
 
-    // Fetch all chapters (inclusiv inactive)
-    const { data: chapters, error: chaptersErr } = await supabase
-      .from("chapters")
-      .select("*")
-      .order("order_index")
+    const gradeIds = (grades || []).map((g: { id: string }) => g.id)
+
+    // Fetch chapters for the selected subject's grades (inclusiv inactive)
+    let chaptersQuery = supabase.from("chapters").select("*").order("order_index")
+    if (subject) {
+      if (gradeIds.length === 0) {
+        return NextResponse.json({ grades: [], chapters: [], lessons: [] })
+      }
+      chaptersQuery = chaptersQuery.in("grade_id", gradeIds)
+    }
+
+    const { data: chapters, error: chaptersErr } = await chaptersQuery
 
     if (chaptersErr) {
       logger.error("[admin/lessons] Failed to fetch chapters:", chaptersErr)
       return NextResponse.json({ error: "Nu am putut încărca capitolele." }, { status: 500 })
     }
 
-    // Fetch all lessons (fără content pentru listare, inclusiv inactive)
-    const { data: lessons, error: lessonsErr } = await supabase
+    const chapterIds = (chapters || []).map((c: { id: string }) => c.id)
+
+    let lessonsQuery = supabase
       .from("lessons")
       .select("id, chapter_id, title, order_index, difficulty_level, estimated_duration, is_active, created_at, updated_at")
       .order("order_index")
+    if (subject) {
+      if (chapterIds.length === 0) {
+        return NextResponse.json({
+          grades: grades || [],
+          chapters: chapters || [],
+          lessons: [],
+        })
+      }
+      lessonsQuery = lessonsQuery.in("chapter_id", chapterIds)
+    }
+
+    const { data: lessons, error: lessonsErr } = await lessonsQuery
 
     if (lessonsErr) {
       logger.error("[admin/lessons] Failed to fetch lessons:", lessonsErr)

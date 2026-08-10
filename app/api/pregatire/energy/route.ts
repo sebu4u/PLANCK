@@ -29,9 +29,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Nu am putut încărca energia." }, { status: 500 })
     }
 
-    const row = data as { balance?: number; last_weekly_grant_week?: string | null } | null
+    const row = data as {
+      balance?: number
+      carryover_balance?: number
+      last_weekly_grant_week?: string | null
+    } | null
+
     return NextResponse.json({
       balance: row?.balance ?? 0,
+      carryoverBalance: row?.carryover_balance ?? 0,
+      lastWeeklyGrantWeek: row?.last_weekly_grant_week ?? null,
       last_weekly_grant_week: row?.last_weekly_grant_week ?? null,
     })
   } catch (err) {

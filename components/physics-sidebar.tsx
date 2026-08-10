@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import {
     ChevronDown,
-    ChevronRight,
     BookOpen,
     Atom,
     Calculator,
@@ -12,10 +12,15 @@ import {
     Target,
     X,
     Lock,
-    CheckCircle2
+    CheckCircle2,
+    ArrowLeft,
 } from 'lucide-react'
 import { Grade, Chapter, LessonSummary } from '@/lib/supabase-physics'
-import { slugify } from '@/lib/slug'
+import {
+  DEFAULT_CURSURI_SUBJECT,
+  getCursuriSubject,
+  type CursuriSubjectId,
+} from '@/lib/cursuri-subjects'
 
 interface PhysicsSidebarProps {
     grades: Grade[]
@@ -25,6 +30,7 @@ interface PhysicsSidebarProps {
     completedLessonIds?: Set<string>
     onLessonSelect: (lesson: LessonSummary) => void
     onClose?: () => void
+    subject?: CursuriSubjectId
 }
 
 interface GradeWithData extends Grade {
@@ -48,7 +54,8 @@ export function PhysicsSidebar({
     currentLessonId,
     completedLessonIds = new Set(),
     onLessonSelect,
-    onClose
+    onClose,
+    subject = DEFAULT_CURSURI_SUBJECT,
 }: PhysicsSidebarProps) {
     const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set())
     const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set())
@@ -167,15 +174,25 @@ export function PhysicsSidebar({
     }
 
     return (
-        <div className="lesson-sidebar-scroll w-full lg:w-80 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 lg:block">
+        <div className="lesson-sidebar-scroll w-full lg:w-80 h-full lg:h-[calc(100vh-4rem)] overflow-y-auto flex-shrink-0 lg:block bg-[#F8FAFD]">
             <div className="p-4">
+                <Link
+                    href="/invata/cursuri"
+                    className="mb-3 hidden lg:inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-900"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Toate cursurile
+                </Link>
+
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-white">Lecții de Fizică</h2>
+                    <h2 className="text-lg font-bold text-gray-900">
+                      Lecții de {getCursuriSubject(subject)?.shortLabel ?? 'curs'}
+                    </h2>
                     {onClose && (
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="lg:hidden text-white hover:text-white/80 hover:bg-white/10 transition-all duration-200"
+                            className="lg:hidden text-gray-700 hover:text-gray-900 hover:bg-gray-200/60 transition-all duration-200"
                             onClick={onClose}
                         >
                             <X className="w-4 h-4 animate-in zoom-in duration-200" />
@@ -200,22 +217,22 @@ export function PhysicsSidebar({
                                 <button
                                     className={`w-full text-left p-2 h-auto transition-all duration-200 ease-in-out ${isLocked
                                         ? 'opacity-50 cursor-not-allowed'
-                                        : 'hover:opacity-80'
+                                        : 'hover:bg-gray-200/40 rounded-lg'
                                         }`}
                                     onClick={() => !isLocked && toggleGrade(grade.id)}
                                     disabled={isLocked}
                                 >
                                     <div className="flex items-center w-full">
-                                        <ChevronDown className={`w-4 h-4 mr-2 transition-transform duration-500 ease-in-out ${hasSelectedLesson ? 'text-blue-400' : 'text-white'} ${isExpanded ? 'rotate-0' : '-rotate-90'
+                                        <ChevronDown className={`w-4 h-4 mr-2 transition-transform duration-500 ease-in-out ${hasSelectedLesson ? 'text-blue-600' : 'text-gray-500'} ${isExpanded ? 'rotate-0' : '-rotate-90'
                                             } ${isLocked ? 'invisible' : ''}`} />
-                                        <GradeIcon className={`w-5 h-5 mr-3 ${hasSelectedLesson ? 'text-blue-400' : 'text-white'}`} />
+                                        <GradeIcon className={`w-5 h-5 mr-3 ${hasSelectedLesson ? 'text-blue-600' : 'text-gray-700'}`} />
                                         <div className="flex-1 text-left">
-                                            <div className={`font-semibold ${hasSelectedLesson ? 'text-blue-400' : 'text-white'}`}>{grade.name}</div>
+                                            <div className={`font-semibold ${hasSelectedLesson ? 'text-blue-600' : 'text-gray-900'}`}>{grade.name}</div>
                                         </div>
-                                        <div className="text-xs text-white/50 bg-white/5 px-2 py-0.5 rounded-full ml-auto whitespace-nowrap">
+                                        <div className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full ml-auto whitespace-nowrap">
                                             {grade.completedLessons}/{grade.totalLessons}
                                         </div>
-                                        {isLocked && <Lock className="w-4 h-4 ml-2 text-white/50" />}
+                                        {isLocked && <Lock className="w-4 h-4 ml-2 text-gray-400" />}
                                     </div>
                                 </button>
 
@@ -235,14 +252,14 @@ export function PhysicsSidebar({
                                                 <div key={chapter.id} className="pl-6">
                                                     {/* Chapter Header */}
                                                     <button
-                                                        className="w-full text-left p-2 h-auto transition-all duration-200 ease-in-out hover:opacity-80"
+                                                        className="w-full text-left p-2 h-auto transition-all duration-200 ease-in-out hover:bg-gray-200/40 rounded-lg"
                                                         onClick={() => toggleChapter(chapter.id)}
                                                     >
                                                         <div className="flex items-center w-full">
-                                                            <ChevronDown className={`w-3 h-3 mr-2 transition-transform duration-500 ease-in-out ${hasSelectedLesson ? 'text-blue-400' : 'text-white'} ${isChapterExpanded ? 'rotate-0' : '-rotate-90'
+                                                            <ChevronDown className={`w-3 h-3 mr-2 transition-transform duration-500 ease-in-out ${hasSelectedLesson ? 'text-blue-600' : 'text-gray-400'} ${isChapterExpanded ? 'rotate-0' : '-rotate-90'
                                                                 }`} />
                                                             <div className="flex-1">
-                                                                <div className={`font-medium text-sm ${hasSelectedLesson ? 'text-blue-400' : 'text-white'}`}>
+                                                                <div className={`font-medium text-sm ${hasSelectedLesson ? 'text-blue-600' : 'text-gray-800'}`}>
                                                                     {chapter.title}
                                                                 </div>
                                                             </div>
@@ -256,23 +273,23 @@ export function PhysicsSidebar({
                                                             ? 'translate-y-0 opacity-100'
                                                             : '-translate-y-2 opacity-0'
                                                             }`}>
-                                                            {chapter.lessons.map((lesson, index) => {
+                                                            {chapter.lessons.map((lesson) => {
                                                                 const isCurrentLesson = currentLessonId === lesson.id
 
                                                                 return (
                                                                     <button
                                                                         key={lesson.id}
-                                                                        className={`w-full text-left p-2 h-auto transition-all duration-200 ease-in-out hover:opacity-80 pl-6`}
+                                                                        className={`w-full text-left p-2 h-auto transition-all duration-200 ease-in-out hover:bg-gray-200/40 rounded-lg pl-6 ${isCurrentLesson ? 'bg-blue-50' : ''}`}
                                                                         onClick={() => onLessonSelect(lesson)}
                                                                     >
                                                                         <div className="flex items-center w-full">
                                                                             <div className="flex items-center w-full group">
                                                                                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                                                                                    <div className={`font-medium text-sm break-words flex-1 ${isCurrentLesson ? 'text-blue-400' : 'text-white'}`}>
+                                                                                    <div className={`font-medium text-sm break-words flex-1 ${isCurrentLesson ? 'text-blue-600' : 'text-gray-700'}`}>
                                                                                         {lesson.title}
                                                                                     </div>
                                                                                     {completedLessonIds.has(lesson.id) && (
-                                                                                        <CheckCircle2 className={`w-4 h-4 text-green-500 shrink-0 ${isCurrentLesson ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} />
+                                                                                        <CheckCircle2 className={`w-4 h-4 text-green-600 shrink-0 ${isCurrentLesson ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} />
                                                                                     )}
                                                                                 </div>
                                                                             </div>

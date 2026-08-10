@@ -505,7 +505,7 @@ export function AuthSessionGate({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <div
-        className="min-h-[100dvh] bg-[#121212]"
+        className="min-h-[100dvh] bg-[#ffffff]"
         aria-busy="true"
         aria-label="Se încarcă sesiunea"
       />

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, LayoutGrid, List } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination"
@@ -12,16 +12,17 @@ import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { cn } from "@/lib/utils"
 import { SubjectCatalogLayout } from "@/components/catalog/subject-catalog-layout"
 import {
-  CATALOG_CLASS_OPTIONS,
   type FilterState,
+  type CatalogLanguageFilter,
 } from "@/components/problems/problems-catalog-sidebar"
 import {
-  CATALOG_CLASS_OPTIONS as CLASS_OPTIONS,
   mapNumericClassToLabel,
 } from "@/lib/catalog-class-labels"
 import {
+  INFORMATICA_CATALOG_CLASS_OPTIONS,
   INFORMATICA_CLASS_CARD_COPY,
   mergeInformaticaChaptersByClassLabel,
+  type InformaticaCatalogClassLabel,
 } from "@/lib/informatica-catalog-config"
 import {
   buildProgressByClass,
@@ -38,12 +39,18 @@ import {
 } from "@/components/coding-problems/informatica-catalog-card"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { CatalogMobileTopBanner } from "@/components/catalog/catalog-mobile-top-banner"
+import { CatalogLanguageFilter as CatalogLanguageFilterControl } from "@/components/catalog/catalog-language-filter"
+import { useIsMobile } from "@/hooks/use-mobile"
+
+const VALID_LANGUAGE: CatalogLanguageFilter[] = ["Toate", "cpp", "python"]
 
 const MONTHLY_FREE_PROBLEM_COUNT = 50
 const STORAGE_PREFIX = "informaticaCatalog"
+const VIEW_MODE_STORAGE_KEY = getStorageKey("viewMode")
 const VALID_PROGRESS: FilterState["progress"][] = ["Toate", "Nerezolvate", "Rezolvate"]
+export type InformaticaCatalogViewMode = "list" | "grid"
 const CODING_PROBLEM_LIST_COLUMNS =
-  "id,slug,title,statement_markdown,difficulty,class,chapter,points,time_limit_ms,memory_limit_kb,tags,language,created_at,updated_at"
+  "id,display_id,slug,title,statement_markdown,difficulty,class,chapter,points,time_limit_ms,memory_limit_kb,tags,language,created_at,updated_at"
 
 function getStorageKey(key: string) {
   return `${STORAGE_PREFIX}:${key}`
@@ -66,13 +73,22 @@ function loadStoredFilters(storageKey: string): FilterState | null {
     ) {
       return null
     }
+    const languageRaw = o.language
+    const language =
+      typeof languageRaw === "string" && VALID_LANGUAGE.includes(languageRaw as CatalogLanguageFilter)
+        ? (languageRaw as CatalogLanguageFilter)
+        : "Toate"
+    const classValue = INFORMATICA_CATALOG_CLASS_OPTIONS.includes(o.class as InformaticaCatalogClassLabel)
+      ? o.class
+      : "Toate"
     return {
       search: o.search,
       category: o.category,
       difficulty: o.difficulty,
       progress: o.progress as FilterState["progress"],
-      class: o.class,
+      class: classValue,
       chapter: o.chapter,
+      language,
     }
   } catch {
     return null
@@ -94,13 +110,31 @@ function loadStoredPage(storageKey: string): number | null {
 function loadStoredSelectedClass(storageKey: string): string | null {
   try {
     const storedClass = sessionStorage.getItem(storageKey)
-    if (storedClass && CLASS_OPTIONS.includes(storedClass as (typeof CLASS_OPTIONS)[number])) {
+    if (storedClass && INFORMATICA_CATALOG_CLASS_OPTIONS.includes(storedClass as InformaticaCatalogClassLabel)) {
       return storedClass
     }
   } catch {
     // ignore
   }
   return null
+}
+
+function loadStoredViewMode(): InformaticaCatalogViewMode {
+  try {
+    const stored = sessionStorage.getItem(VIEW_MODE_STORAGE_KEY)
+    if (stored === "grid" || stored === "list") return stored
+  } catch {
+    // ignore
+  }
+  return "list"
+}
+
+function saveStoredViewMode(mode: InformaticaCatalogViewMode) {
+  try {
+    sessionStorage.setItem(VIEW_MODE_STORAGE_KEY, mode)
+  } catch {
+    // ignore
+  }
 }
 
 function saveStoredFilters(storageKey: string, filters: FilterState) {
@@ -134,6 +168,7 @@ export function InformaticaCatalogClient({
 }: InformaticaCatalogClientProps) {
   const { user, isDev, profileSyncedUserId } = useAuth()
   const { isFree, isPaid } = useSubscriptionPlan()
+  const isMobile = useIsMobile()
   const showDevEdit = Boolean(user && profileSyncedUserId === user.id && isDev)
 
   const filtersStorageKey = getStorageKey("filters")
@@ -148,6 +183,7 @@ export function InformaticaCatalogClient({
     progress: "Toate",
     class: "Toate",
     chapter: normalizedInitialChapter || "Toate",
+    language: "Toate",
   }
 
   const restoredFiltersRef = useRef<FilterState | null | undefined>(undefined)
@@ -166,6 +202,11 @@ export function InformaticaCatalogClient({
     restoredPageRef.current = loadStoredPage(pageStorageKey)
   }
 
+  const restoredViewModeRef = useRef<InformaticaCatalogViewMode | undefined>(undefined)
+  if (restoredViewModeRef.current === undefined) {
+    restoredViewModeRef.current = loadStoredViewMode()
+  }
+
   const initialFilters =
     restoredFilters && normalizedInitialChapter && restoredFilters.chapter === "Toate"
       ? { ...restoredFilters, chapter: normalizedInitialChapter }
@@ -173,37 +214,49 @@ export function InformaticaCatalogClient({
 
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [currentPage, setCurrentPage] = useState(restoredPageRef.current ?? 1)
+  const [viewMode, setViewMode] = useState<InformaticaCatalogViewMode>(restoredViewModeRef.current ?? "list")
+  const effectiveViewMode: InformaticaCatalogViewMode = isMobile ? "grid" : viewMode
   const hasRestoredFiltersRef = useRef(Boolean(restoredFilters))
-  const [problems, setProblems] = useState<CodingProblem[]>(initialProblems)
+  const [problems, setProblems] = useState<CodingProblem[]>(
+    initialProblems.filter((problem) => problem.class !== 12),
+  )
   const [loading, setLoading] = useState(initialProblems.length === 0)
   const [solvedProblems, setSolvedProblems] = useState<string[]>([])
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [selectedClassGate, setSelectedClassGate] = useState<string | null>(restoredSelectedClassRef.current)
   const [sidebarScrolling, setSidebarScrolling] = useState(false)
   const sidebarScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Route loading.tsx already painted the catalog skeleton — skip repeating it on first fetch.
+  const suppressInitialGridSkeletonRef = useRef(true)
 
   // Always ask for class on first visit; restore from sessionStorage within the same tab session.
   const requiresClassSelection = true
   const catalogReady = Boolean(selectedClassGate)
-  const effectiveUserClass = selectedClassGate ?? CLASS_OPTIONS[0]
+  const effectiveUserClass = selectedClassGate ?? INFORMATICA_CATALOG_CLASS_OPTIONS[0]
+
+  const catalogProblems = useMemo(
+    () => problems.filter((problem) => problem.class !== 12),
+    [problems],
+  )
 
   const chapterOptions = useMemo(() => {
     const fromDb: Record<string, string[]> = {}
-    for (const problem of problems) {
+    for (const problem of catalogProblems) {
       const classLabel = mapNumericClassToLabel(problem.class)
       if (!classLabel || !problem.chapter?.trim()) continue
       if (!fromDb[classLabel]) fromDb[classLabel] = []
       if (!fromDb[classLabel].includes(problem.chapter)) fromDb[classLabel].push(problem.chapter)
     }
     return mergeInformaticaChaptersByClassLabel(fromDb)
-  }, [problems])
+  }, [catalogProblems])
 
   const sidebarConfig = useMemo(
     () => ({
-      classOptions: CATALOG_CLASS_OPTIONS,
+      classOptions: INFORMATICA_CATALOG_CLASS_OPTIONS,
       chapterOptions,
       difficultyOptions: ["Inițiere", "Ușor", "Mediu", "Avansat", "Concurs"] as const,
       showProgress: true,
+      showLanguageFilter: true,
     }),
     [chapterOptions],
   )
@@ -221,10 +274,12 @@ export function InformaticaCatalogClient({
 
       if (!error && data) {
         setProblems(
-          data.map((item) => ({
-            ...item,
-            tags: Array.isArray(item.tags) ? item.tags : [],
-          })) as CodingProblem[],
+          data
+            .map((item) => ({
+              ...item,
+              tags: Array.isArray(item.tags) ? item.tags : [],
+            }))
+            .filter((item) => item.class !== 12) as CodingProblem[],
         )
       }
     } catch (error) {
@@ -251,6 +306,12 @@ export function InformaticaCatalogClient({
       void fetchProblems({ background: true })
     }
   }, [fetchProblems, initialCatalogTotalCount, initialProblems.length])
+
+  useEffect(() => {
+    if (!loading) {
+      suppressInitialGridSkeletonRef.current = false
+    }
+  }, [loading])
 
   const fetchSolvedProblems = useCallback(async () => {
     if (!user) {
@@ -297,37 +358,47 @@ export function InformaticaCatalogClient({
     saveStoredPage(pageStorageKey, currentPage)
   }, [currentPage, pageStorageKey])
 
+  useEffect(() => {
+    saveStoredViewMode(viewMode)
+  }, [viewMode])
+
+  const handleViewModeChange = useCallback((mode: InformaticaCatalogViewMode) => {
+    setViewMode(mode)
+  }, [])
+
   const filteredProblems = useMemo(
     () =>
       filterSubjectCatalogProblems({
-        problems,
+        problems: catalogProblems,
         filters,
         solvedIds: solvedProblems,
         getClassLabel: (problem) => mapNumericClassToLabel(problem.class),
         getChapter: (problem) => problem.chapter ?? null,
         getId: (problem) => problem.id,
+        getLanguage: (problem) => problem.language ?? "cpp",
         getSearchText: (problem) => [
           problem.title,
           problem.statement_markdown ?? "",
+          problem.display_id ?? "",
           problem.slug,
           problem.id,
           ...(Array.isArray(problem.tags) ? problem.tags : []),
         ],
       }),
-    [filters, problems, solvedProblems],
+    [filters, catalogProblems, solvedProblems],
   )
 
   const monthlyFreeSet = useMemo(() => {
     if (initialMonthlyFreeSet.length > 0) return new Set(initialMonthlyFreeSet)
-    if (!problems.length) return new Set<string>()
+    if (!catalogProblems.length) return new Set<string>()
     const monthKey = getCurrentMonthKey()
-    const scored = problems.map((problem) => ({
+    const scored = catalogProblems.map((problem) => ({
       id: problem.id,
       score: scoreProblemForMonth(problem.id, monthKey),
     }))
     scored.sort((a, b) => a.score - b.score)
     return new Set(scored.slice(0, Math.min(MONTHLY_FREE_PROBLEM_COUNT, scored.length)).map((item) => item.id))
-  }, [initialMonthlyFreeSet, problems])
+  }, [initialMonthlyFreeSet, catalogProblems])
 
   const sortedProblems = useMemo(() => {
     const isFreeOnly = isFree && !isPaid
@@ -362,14 +433,15 @@ export function InformaticaCatalogClient({
   const progressByClass = useMemo(
     () =>
       buildProgressByClass({
-        problems,
+        problems: catalogProblems,
         solvedIds: solvedProblems,
         chapterOptions,
+        classOptions: INFORMATICA_CATALOG_CLASS_OPTIONS,
         getClassLabel: (problem) => mapNumericClassToLabel(problem.class),
         getChapter: (problem) => problem.chapter ?? null,
         getId: (problem) => problem.id,
       }),
-    [chapterOptions, problems, solvedProblems],
+    [chapterOptions, catalogProblems, solvedProblems],
   )
 
   const handleFilterChange = useCallback((nextFilters: FilterState) => {
@@ -378,7 +450,7 @@ export function InformaticaCatalogClient({
     setMobileSidebarOpen(false)
   }, [])
 
-  const selectClassAndOpenCatalog = (classValue: (typeof CLASS_OPTIONS)[number]) => {
+  const selectClassAndOpenCatalog = (classValue: InformaticaCatalogClassLabel) => {
     const nextFilters = { ...filters, class: classValue, chapter: "Toate" as const }
     setSelectedClassGate(classValue)
     setFilters(nextFilters)
@@ -391,15 +463,6 @@ export function InformaticaCatalogClient({
       // ignore
     }
   }
-
-  const clearClassGate = useCallback(() => {
-    setSelectedClassGate(null)
-    try {
-      sessionStorage.removeItem(selectedClassStorageKey)
-    } catch {
-      // ignore
-    }
-  }, [selectedClassStorageKey])
 
   const handleSidebarScroll = useCallback((_event: UIEvent<HTMLDivElement>) => {
     setSidebarScrolling(true)
@@ -419,18 +482,15 @@ export function InformaticaCatalogClient({
   return (
     <SubjectCatalogLayout
       catalogReady={catalogReady}
-      requiresClassSelection={requiresClassSelection}
-      selectedClassGate={selectedClassGate}
-      onSelectClass={(cls) => selectClassAndOpenCatalog(cls as (typeof CLASS_OPTIONS)[number])}
-      onClearClassGate={clearClassGate}
-      classOptions={CLASS_OPTIONS}
+      onSelectClass={(cls) => selectClassAndOpenCatalog(cls as InformaticaCatalogClassLabel)}
+      classOptions={INFORMATICA_CATALOG_CLASS_OPTIONS}
       classCardCopy={INFORMATICA_CLASS_CARD_COPY}
       title="Probleme de informatica"
       subtitle="Exerseaza pe capitole, urmareste progresul si deschide rapid orice problema in PlanckCode."
       filters={filters}
       onFilterChange={handleFilterChange}
       progressByClass={progressByClass}
-      totalProblems={problems.length}
+      totalProblems={catalogProblems.length}
       filteredCount={filteredProblems.length}
       effectiveUserClass={effectiveUserClass}
       sidebarConfig={sidebarConfig}
@@ -458,16 +518,76 @@ export function InformaticaCatalogClient({
           />
         </div>
 
-        <div className="relative z-10">
-          {loading ? (
-            <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <InformaticaCatalogCardSkeleton key={index} />
+        <div className="relative z-10 animate-fade-in-up">
+          {!loading && catalogReady ? (
+            <div className="mb-3 hidden items-center justify-between gap-3 pt-1 md:flex">
+              <CatalogLanguageFilterControl
+                compact
+                variant="inline"
+                value={filters.language ?? "Toate"}
+                onChange={(language: CatalogLanguageFilter) => handleFilterChange({ ...filters, language })}
+                className="space-y-0"
+              />
+              {paginationData.paginatedProblems.length > 0 ? (
+              <div
+                className="inline-flex rounded-full border border-[#0b0c0f]/15 bg-white p-1 shadow-sm"
+                role="group"
+                aria-label="Mod afișare probleme"
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleViewModeChange("list")}
+                  className={cn(
+                    "h-8 rounded-full px-3 text-[#2c2f33]",
+                    viewMode === "list" && "bg-[#0b0c0f] text-white hover:bg-[#0b0c0f] hover:text-white",
+                  )}
+                  aria-pressed={viewMode === "list"}
+                  aria-label="Listă"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleViewModeChange("grid")}
+                  className={cn(
+                    "h-8 rounded-full px-3 text-[#2c2f33]",
+                    viewMode === "grid" && "bg-[#0b0c0f] text-white hover:bg-[#0b0c0f] hover:text-white",
+                  )}
+                  aria-pressed={viewMode === "grid"}
+                  aria-label="Grilă"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {loading && !suppressInitialGridSkeletonRef.current ? (
+            <div
+              className={cn(
+                "gap-3 pt-1",
+                effectiveViewMode === "grid" ? "grid sm:grid-cols-2 lg:grid-cols-3" : "flex flex-col",
+              )}
+            >
+              {Array.from({ length: effectiveViewMode === "grid" ? 8 : 10 }).map((_, index) => (
+                <InformaticaCatalogCardSkeleton key={index} variant={effectiveViewMode} />
               ))}
             </div>
+          ) : loading ? (
+            <div className="min-h-[16rem]" aria-busy="true" aria-label="Se încarcă problemele" />
           ) : paginationData.paginatedProblems.length > 0 ? (
             <>
-              <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div
+                className={cn(
+                  "gap-3",
+                  effectiveViewMode === "grid" ? "grid pt-1 sm:grid-cols-2 lg:grid-cols-3" : "flex flex-col gap-2.5",
+                )}
+              >
                 {paginationData.paginatedProblems.map((problem) => {
                   const isFreeOnly = isFree && !isPaid
                   const canAccess = ALLOW_ALL_CODING_PROBLEMS ? true : !isFreeOnly || monthlyFreeSet.has(problem.id)
@@ -480,6 +600,7 @@ export function InformaticaCatalogClient({
                       solved={solvedProblems.includes(problem.id)}
                       isLocked={isLocked}
                       showDevEdit={showDevEdit}
+                      variant={effectiveViewMode}
                     />
                   )
                 })}
@@ -543,6 +664,7 @@ export function InformaticaCatalogClient({
                     progress: "Toate",
                     class: effectiveUserClass,
                     chapter: "Toate",
+                    language: "Toate",
                   })
                 }
                 className="mt-6 rounded-full bg-[#0b0c0f] px-6 py-2 text-sm font-semibold text-white hover:bg-[#222428]"

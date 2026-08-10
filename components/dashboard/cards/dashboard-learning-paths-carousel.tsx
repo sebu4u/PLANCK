@@ -571,7 +571,7 @@ export function DashboardLearningPathsCarousel({
             <article
               key={chapter.id}
               className={cn(
-                "absolute rounded-3xl border bg-white p-5 sm:p-6 transition-all",
+                "absolute rounded-3xl border-2 bg-white p-5 sm:p-6 transition-all",
                 isDragging ? "duration-0" : "duration-300 ease-out",
                 isActive ? undefined : "border-[#e5e5e5] shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
               )}
@@ -653,7 +653,7 @@ export function DashboardLearningPathsCarousel({
                   aria-label={`Mergi la learning path ${index + 1}`}
                   onClick={() => goTo(index)}
                   className={cn(
-                    "flex h-16 w-24 items-center justify-center rounded-2xl border bg-white p-3 transition-all sm:h-20 sm:w-28",
+                    "flex h-16 w-24 items-center justify-center rounded-2xl border-2 bg-white p-3 transition-all sm:h-20 sm:w-28",
                     isSelected ? undefined : "border-[#e5e5e5] hover:border-[#cfcfcf]"
                   )}
                   style={

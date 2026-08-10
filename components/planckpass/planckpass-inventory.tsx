@@ -38,6 +38,13 @@ const KIND_LABELS: Record<PlanckPassCosmeticKind, string> = {
   skin: "Skin-uri IDE",
 }
 
+const COSMETICS_CHANGED_EVENT = "planckpass:cosmetics-changed"
+
+function emitCosmeticsChanged(payload: { equipped: Equipped; inventory: InventoryItem[] }) {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new CustomEvent(COSMETICS_CHANGED_EVENT, { detail: payload }))
+}
+
 async function authHeaders() {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
@@ -86,6 +93,10 @@ export function PlanckPassInventory({
       const nextInventory = json.inventory ?? []
       setInventory(nextInventory)
       setEquipped(nextEquipped)
+      emitCosmeticsChanged({
+        equipped: nextEquipped,
+        inventory: nextInventory,
+      })
       onEquippedChangeRef.current?.({
         equipped: nextEquipped,
         inventory: nextInventory,
@@ -285,6 +296,18 @@ export function useEquippedCosmetics() {
     }
   }, [])
 
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ equipped: Equipped; inventory: InventoryItem[] }>).detail
+      if (!detail) return
+      setEquipped(detail.equipped)
+      setInventory(detail.inventory)
+      setLoaded(true)
+    }
+    window.addEventListener(COSMETICS_CHANGED_EVENT, onChanged)
+    return () => window.removeEventListener(COSMETICS_CHANGED_EVENT, onChanged)
+  }, [])
+
   const find = (id: string | null) =>
     inventory.find((i) => i.cosmeticId === id)?.cosmetic ?? null
 
@@ -296,6 +319,7 @@ export function useEquippedCosmetics() {
       setEquipped(payload.equipped)
       setInventory(payload.inventory)
       setLoaded(true)
+      emitCosmeticsChanged(payload)
     },
     icon: find(equipped.iconId),
     border: find(equipped.borderId),

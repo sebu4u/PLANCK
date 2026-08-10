@@ -451,7 +451,7 @@ function generatePlaceholderRecommendations(): Recommendation[] {
       type: 'lesson',
       title: 'Lecția 10.2 – Legea gazelor',
       description: 'Continuă cu teoria gazelor perfecte și ecuația de stare',
-      target_url: '/cursuri/fizica/lectia-10-2',
+      target_url: '/invata/cursuri/fizica/lectia-10-2',
       reason: 'Bazat pe progresul tău recent',
       priority: 1,
     },
@@ -532,7 +532,7 @@ export async function getContinueLearning(userId: string, accessToken: string): 
       type: 'lesson',
       title: 'Lecția 10.2 – Legea gazelor',
       description: 'Continuă de unde ai rămas',
-      url: '/cursuri/fizica/lectia-10-2',
+      url: '/invata/cursuri/fizica/lectia-10-2',
     },
     {
       type: 'problem',

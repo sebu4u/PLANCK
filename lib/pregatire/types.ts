@@ -38,9 +38,10 @@ export const WORKSHOP_SUBJECT_COLORS: Record<WorkshopSubject, string> = {
   chimie: "#ea580c",
 }
 
-export const WORKSHOP_ENERGY_FREE_WEEKLY = 25
-export const WORKSHOP_ENERGY_PLUS_WEEKLY = 25
+export const WORKSHOP_ENERGY_SIGNUP = 25
 export const WORKSHOP_ENERGY_PREMIUM_WEEKLY = 100
+export const WORKSHOP_ENERGY_FREE_WEEKLY = WORKSHOP_ENERGY_SIGNUP
+export const WORKSHOP_ENERGY_PLUS_WEEKLY = WORKSHOP_ENERGY_SIGNUP
 export const WORKSHOP_DEFAULT_DURATION_MINUTES = 60
 export const WORKSHOP_DEFAULT_ENERGY_COST = 25
 
@@ -50,12 +51,13 @@ export function isWorkshopSubject(value: unknown): value is WorkshopSubject {
   return typeof value === "string" && (WORKSHOP_SUBJECTS as readonly string[]).includes(value)
 }
 
+/** Premium weekly refill; free/plus get 0 weekly (one-time signup grant is separate). */
 export function weeklyEnergyForPlan(plan: string | null | undefined): number {
   const normalized = (plan ?? "free").trim().toLowerCase()
   if (normalized === "premium" || normalized === "pro") {
     return WORKSHOP_ENERGY_PREMIUM_WEEKLY
   }
-  return WORKSHOP_ENERGY_FREE_WEEKLY
+  return 0
 }
 
 export interface WorkshopTeacher {

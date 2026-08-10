@@ -31,11 +31,11 @@ export function CoursesSection() {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Link href="/cursuri" className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-md hover:from-purple-700 hover:to-pink-700 transition-colors">
+              <Link href="/invata/cursuri" className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-md hover:from-purple-700 hover:to-pink-700 transition-colors">
                 <PlayCircle className="w-5 h-5 mr-2" />
                 Deschide pagina de cursuri
               </Link>
-              <Link href="/cursuri" className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-purple-300 text-purple-700 hover:border-purple-500 hover:text-purple-800 transition-colors">
+              <Link href="/invata/cursuri" className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-purple-300 text-purple-700 hover:border-purple-500 hover:text-purple-800 transition-colors">
                 Vezi toate lecțiile <ArrowRight className="w-4 h-4 ml-2" />
               </Link>
             </div>
@@ -45,7 +45,7 @@ export function CoursesSection() {
             <div className="rounded-3xl border border-purple-200 bg-white shadow-sm p-4 sm:p-6">
               <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
                 {lessonPreviews.map((lesson, index) => (
-                  <Link key={lesson.id} href="/cursuri" className={`group block p-5 rounded-2xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all ${index >= 3 ? 'hidden sm:block' : ''}`}>
+                  <Link key={lesson.id} href="/invata/cursuri" className={`group block p-5 rounded-2xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all ${index >= 3 ? 'hidden sm:block' : ''}`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full">
                         {lesson.grade}
@@ -62,7 +62,7 @@ export function CoursesSection() {
                 ))}
               </div>
               <div className="mt-6 text-center">
-                <Link href="/cursuri" className="text-sm font-medium text-purple-700 hover:text-purple-800 inline-flex items-center">
+                <Link href="/invata/cursuri" className="text-sm font-medium text-purple-700 hover:text-purple-800 inline-flex items-center">
                   Vezi mai multe lecții <ArrowRight className="w-4 h-4 ml-1" />
                 </Link>
               </div>

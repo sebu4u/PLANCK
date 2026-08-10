@@ -369,6 +369,7 @@ function InsightChatPageContent() {
   const [plusPlanPopupType, setPlusPlanPopupType] = useState<'think' | 'teach' | null>(null);
   const [problemsDialogOpen, setProblemsDialogOpen] = useState(false);
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false);
+  const [messageLimitReached, setMessageLimitReached] = useState(false);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [agentPanelData, setAgentPanelData] = useState<InsightAgentPanelData | null>(null);
   const [agentPanelLoading, setAgentPanelLoading] = useState(false);
@@ -1110,10 +1111,10 @@ function InsightChatPageContent() {
       });
       return;
     }
-    if (!busy && !uploadingAttachments) {
+    if (!busy && !uploadingAttachments && !messageLimitReached) {
       attachmentInputRef.current?.click();
     }
-  }, [user, busy, uploadingAttachments, toast]);
+  }, [user, busy, uploadingAttachments, messageLimitReached, toast]);
 
   const canSendMessage =
     Boolean(input.trim()) || pendingAttachments.length > 0;
@@ -1122,7 +1123,7 @@ function InsightChatPageContent() {
     const messageSource = typeof overrideMessage === 'string' ? overrideMessage : input;
     const trimmedMessage = messageSource.trim();
     const attachmentsSnapshot = [...pendingAttachments];
-    if ((!trimmedMessage && attachmentsSnapshot.length === 0) || busy) return;
+    if ((!trimmedMessage && attachmentsSnapshot.length === 0) || busy || messageLimitReached) return;
 
     if (!user && attachmentsSnapshot.length > 0) {
       toast({
@@ -1277,7 +1278,21 @@ function InsightChatPageContent() {
       if (res.status === 429) {
         const data = await res.json();
         setLoadingMessage(null);
-        if (data.resetTime) {
+        const isFreeOrGuest = !user || !profile?.plan || profile.plan === 'free';
+        if (isFreeOrGuest) {
+          setMessageLimitReached(true);
+          setInput('');
+          setPremiumUpgradeOpen(true);
+          setError(null);
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            const secondLast = prev[prev.length - 2];
+            if (last?.role === 'assistant' && secondLast?.role === 'user') {
+              return prev.slice(0, -2);
+            }
+            return prev.slice(0, -1);
+          });
+        } else if (data.resetTime) {
           setPremiumUpgradeOpen(true);
           setError(null);
           setMessages((prev) => {
@@ -1374,6 +1389,8 @@ function InsightChatPageContent() {
                   });
                 } else if (data.type === 'done') {
                   if (data.anonLimitReached) {
+                    setMessageLimitReached(true);
+                    setInput('');
                     setMessages((prev) => {
                       const next = [...prev];
                       for (let i = next.length - 1; i >= 0; i--) {
@@ -1489,6 +1506,10 @@ function InsightChatPageContent() {
   }, [pendingPrefill, loadingSession, busy, authLoading]);
 
   const handleComposerKeyDown = (e: React.KeyboardEvent) => {
+    if (messageLimitReached) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -1496,10 +1517,10 @@ function InsightChatPageContent() {
   };
 
   const openCameraPicker = useCallback(() => {
-    if (user && !busy && !uploadingAttachments) {
+    if (user && !busy && !uploadingAttachments && !messageLimitReached) {
       cameraAttachmentInputRef.current?.click();
     }
-  }, [user, busy, uploadingAttachments]);
+  }, [user, busy, uploadingAttachments, messageLimitReached]);
 
   const composerPlaceholder = isMobile ? 'Ask Insight' : 'What do you want to know?';
 
@@ -1523,6 +1544,8 @@ function InsightChatPageContent() {
       user={user}
       isMobile={isMobile}
       placeholder={composerPlaceholder}
+      messageLimitReached={messageLimitReached}
+      onUpgradeClick={() => setPremiumUpgradeOpen(true)}
     />
   );
 

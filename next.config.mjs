@@ -37,6 +37,16 @@ const nextConfig = {
         destination: '/planckcode',
         permanent: true,
       },
+      {
+        source: '/cursuri',
+        destination: '/invata/cursuri',
+        permanent: true,
+      },
+      {
+        source: '/cursuri/:slug',
+        destination: '/invata/cursuri/fizica/:slug',
+        permanent: true,
+      },
     ]
   },
 }

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const [lessonsRes, problemsRes] = await Promise.all([
       supabase
         .from('lessons')
-        .select('id, title, is_active')
+        .select('id, title, is_active, chapters!inner(grades!inner(subject))')
         .eq('is_active', true)
         .ilike('title', pattern)
         .order('order_index', { ascending: true })
@@ -46,11 +46,15 @@ export async function GET(request: Request) {
 
     if (!lessonsRes.error && lessonsRes.data) {
       for (const lesson of lessonsRes.data as any[]) {
+        const subject =
+          lesson.chapters?.grades?.subject ||
+          (Array.isArray(lesson.chapters) ? lesson.chapters[0]?.grades?.subject : null) ||
+          'fizica'
         results.push({
           type: 'lesson',
           id: lesson.id,
           title: lesson.title,
-          url: `/cursuri/${slugify(lesson.title)}`,
+          url: `/invata/cursuri/${subject}/${slugify(lesson.title)}`,
         })
       }
     }

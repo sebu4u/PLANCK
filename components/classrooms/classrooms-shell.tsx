@@ -241,7 +241,7 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
                 isDraftPicking && isOnClassroomProblemPreview && "burger:pb-40 lg:pb-0",
               )}
             >
-              <div className={cn("mx-auto w-full max-w-5xl", isDraftPicking && "max-w-none")}>{children}</div>
+              <div className={cn("mx-auto w-full max-w-5xl animate-fade-in-up", isDraftPicking && "max-w-none")}>{children}</div>
             </main>
           </div>
         </div>

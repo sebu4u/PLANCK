@@ -10,6 +10,7 @@ import type {
   ClassroomMemberOverview,
   ClassroomSummary,
   TeacherAssignmentAttachmentGroup,
+  UserAssignmentListItem,
 } from "@/lib/classrooms/types"
 
 export interface AnnouncementLessonOption {
@@ -341,6 +342,108 @@ export async function getClassroomAssignments(classroomId: string): Promise<Clas
     problem_count: countsByAssignment.get(asString(row.id)) ?? 0,
     author_name: teacherName,
   }))
+}
+
+/** All assignments across classrooms the user belongs to (single flat list). */
+export async function getAssignmentsForUser(userId: string): Promise<UserAssignmentListItem[]> {
+  const { admin } = await getAuthenticatedContext()
+
+  const { data: membershipRows } = await admin
+    .from("classroom_members")
+    .select("classrooms!inner(id, name, teacher_id)")
+    .eq("user_id", userId)
+
+  const memberships = (membershipRows ?? []).filter(isObject)
+  const classroomMeta = new Map<string, { name: string; teacher_id: string }>()
+
+  for (const row of memberships) {
+    const classroom = isObject(row.classrooms) ? row.classrooms : null
+    if (!classroom) continue
+    const id = asString(classroom.id)
+    if (!id) continue
+    classroomMeta.set(id, {
+      name: asString(classroom.name, "Clasă"),
+      teacher_id: asString(classroom.teacher_id),
+    })
+  }
+
+  const classroomIds = Array.from(classroomMeta.keys())
+  if (classroomIds.length === 0) return []
+
+  const teacherIds = Array.from(
+    new Set(
+      Array.from(classroomMeta.values())
+        .map((c) => c.teacher_id)
+        .filter(Boolean),
+    ),
+  )
+
+  const teacherNameById = new Map<string, string>()
+  if (teacherIds.length > 0) {
+    const { data: teacherProfiles } = await admin
+      .from("profiles")
+      .select("user_id, name, nickname")
+      .in("user_id", teacherIds)
+
+    for (const profile of teacherProfiles ?? []) {
+      if (!isObject(profile)) continue
+      const id = asString(profile.user_id)
+      if (!id) continue
+      teacherNameById.set(
+        id,
+        asString(profile.nickname) || asString(profile.name) || "Profesor",
+      )
+    }
+  }
+
+  const { data: assignmentRows } = await admin
+    .from("assignments")
+    .select("id, classroom_id, title, description, deadline, created_at")
+    .in("classroom_id", classroomIds)
+    .order("created_at", { ascending: false })
+
+  const assignments = (assignmentRows ?? []).filter(isObject)
+  const assignmentIds = assignments.map((row) => asString(row.id)).filter(Boolean)
+
+  const countsByAssignment = new Map<string, number>()
+  if (assignmentIds.length > 0) {
+    const { data: problemRows } = await admin
+      .from("assignment_problems")
+      .select("assignment_id")
+      .in("assignment_id", assignmentIds)
+
+    for (const row of problemRows ?? []) {
+      if (!isObject(row)) continue
+      const assignmentId = asString(row.assignment_id)
+      if (!assignmentId) continue
+      countsByAssignment.set(assignmentId, (countsByAssignment.get(assignmentId) ?? 0) + 1)
+    }
+  }
+
+  const items: UserAssignmentListItem[] = assignments.map((row) => {
+    const classroomId = asString(row.classroom_id)
+    const meta = classroomMeta.get(classroomId)
+    return {
+      id: asString(row.id),
+      classroom_id: classroomId,
+      classroom_name: meta?.name ?? "Clasă",
+      title: asString(row.title, "Temă fără titlu"),
+      description: asString(row.description),
+      deadline: asNullableString(row.deadline),
+      created_at: asString(row.created_at),
+      problem_count: countsByAssignment.get(asString(row.id)) ?? 0,
+      author_name: teacherNameById.get(meta?.teacher_id ?? "") ?? "Profesor",
+    }
+  })
+
+  items.sort((a, b) => {
+    const aDeadline = a.deadline ? new Date(a.deadline).getTime() : Number.POSITIVE_INFINITY
+    const bDeadline = b.deadline ? new Date(b.deadline).getTime() : Number.POSITIVE_INFINITY
+    if (aDeadline !== bDeadline) return aDeadline - bDeadline
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+
+  return items
 }
 
 export async function getProblemPool() {

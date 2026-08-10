@@ -5,6 +5,10 @@ import { Grade, Chapter, LessonSummary } from '@/lib/supabase-physics'
 import { PhysicsLessonsClient } from '@/components/physics-lessons-client'
 import { CursuriWelcomeScreen } from '@/components/cursuri-welcome-screen'
 import { Navigation } from '@/components/navigation'
+import {
+  DEFAULT_CURSURI_SUBJECT,
+  type CursuriSubjectId,
+} from '@/lib/cursuri-subjects'
 
 const WELCOME_STORAGE_KEY = 'planck_cursuri_welcome_seen'
 
@@ -13,6 +17,7 @@ interface CursuriPageClientProps {
   chapters: { [gradeId: string]: Chapter[] }
   lessons: { [chapterId: string]: LessonSummary[] }
   initialLessonId?: string
+  subject?: CursuriSubjectId
 }
 
 export function CursuriPageClient({
@@ -20,6 +25,7 @@ export function CursuriPageClient({
   chapters,
   lessons,
   initialLessonId,
+  subject = DEFAULT_CURSURI_SUBJECT,
 }: CursuriPageClientProps) {
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null)
 
@@ -56,7 +62,7 @@ export function CursuriPageClient({
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#101010] text-white">
+    <div className="h-screen overflow-hidden bg-[#F8FAFD] text-gray-900">
       <Navigation />
 
       <div className="pt-16 h-full relative">
@@ -65,6 +71,7 @@ export function CursuriPageClient({
           chapters={chapters}
           lessons={lessons}
           initialLessonId={initialLessonId}
+          subject={subject}
         />
       </div>
     </div>

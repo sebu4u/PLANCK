@@ -3,7 +3,7 @@
 import Link from "next/link"
 import React, { type CSSProperties, Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Check, Loader2, Plus, Rocket, Sparkles, X } from "lucide-react"
+import { Check, Loader2, Plus, Rocket, X } from "lucide-react"
 import { AnimatePresence, motion, useSpring, useTransform } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
@@ -11,16 +11,41 @@ import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import { PricingMobileExitSheet } from "@/components/pricing/pricing-mobile-exit-sheet"
+import { PricingGradeGrowthChart } from "@/components/pricing/pricing-grade-growth-chart"
+import {
+  PricingCreatorCodeCard,
+  type AppliedPromo,
+} from "@/components/pricing/pricing-creator-code-card"
 import {
   getPremiumPeriodLabel,
   getPremiumPriceRon,
-  PREMIUM_FEATURE_BULLETS,
+  PREMIUM_CARD_BULLETS,
+  PREMIUM_LEFT_BENEFITS,
   PREMIUM_MONTHLY_VS_WEEKLY_SAVE_PERCENT,
   PREMIUM_PRICING_FAQ,
   PREMIUM_YEARLY_FULL_RON,
   PREMIUM_YEARLY_SAVE_PERCENT,
   type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
+
+function computeDiscountedPrice(priceRon: number, promo: AppliedPromo | null): number {
+  if (!promo) return priceRon
+  if (promo.percentOff != null) {
+    return Math.max(0, priceRon * (1 - promo.percentOff / 100))
+  }
+  if (promo.amountOff != null) {
+    return Math.max(0, priceRon - promo.amountOff / 100)
+  }
+  return priceRon
+}
+
+function formatDiscountLabel(promo: AppliedPromo): string {
+  if (promo.percentOff != null) return `${promo.percentOff}%`
+  if (promo.amountOff != null) {
+    return `${(promo.amountOff / 100).toLocaleString("ro-RO")} ${promo.currency?.toUpperCase() ?? "RON"}`
+  }
+  return "Reducere"
+}
 
 const MOBILE_BREAKPOINT_PX = 768
 
@@ -112,21 +137,47 @@ function PricingFaq() {
 
 function PricingIllustrationPanel() {
   return (
-    <div className="relative hidden h-full overflow-hidden lg:flex lg:flex-col lg:items-center lg:justify-center lg:px-10 xl:px-16">
-      <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center text-center">
-        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#5B47D6]">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          Planck Premium
-        </span>
+    <div className="relative hidden h-full flex-col overflow-hidden py-8 pl-10 pr-4 lg:flex xl:py-10 xl:pl-14 xl:pr-8">
+      <Link
+        href="/"
+        className="self-start text-4xl font-black tracking-tight text-gray-900 transition hover:opacity-80"
+      >
+        PLANCK
+      </Link>
 
-        <h1 className="mt-6 text-4xl font-black leading-[1.08] tracking-tight text-gray-900 xl:text-5xl">
-          Un singur abonament.{" "}
-          <span className="text-[#7C5CFC]">Acces complet</span> la Planck.
-        </h1>
-        <p className="mt-4 max-w-md text-base leading-relaxed text-gray-600 xl:text-lg">
-          Trasee de învățare, Insight 2.5, workshop-uri și PlanckPass — totul într-un loc.
-        </p>
+      <div className="ml-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 py-2 text-center">
+        <PricingGradeGrowthChart />
+
+        <div>
+          <h1 className="text-2xl font-black leading-tight tracking-tight text-gray-900 xl:text-[1.75rem]">
+            Învață alături de <span className="text-[#7C5CFC]">Planck</span>
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600 xl:text-base">
+            Trasee de învățare, Insight 2.5, workshop-uri și PlanckPass — totul într-un loc.
+          </p>
+        </div>
+
+        <ul className="grid w-full grid-cols-2 gap-3">
+          {PREMIUM_LEFT_BENEFITS.map((benefit) => {
+            const Icon = benefit.icon
+            return (
+              <li
+                key={benefit.label}
+                className="flex items-center gap-2.5 rounded-xl bg-white/60 px-3 py-2.5 text-left"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EBE8FF]">
+                  <Icon className="h-4 w-4 text-[#5B47D6]" aria-hidden />
+                </span>
+                <span className="text-xs font-semibold leading-tight text-gray-800 xl:text-[13px]">
+                  {benefit.label}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
       </div>
+
+      <p className="w-full max-w-md self-end text-center text-xs text-gray-500">Plăți securizate prin Stripe</p>
     </div>
   )
 }
@@ -144,6 +195,9 @@ type PricingCardProps = {
   isActionLoading: boolean
   ctaLabel: string
   handlePrimaryCta: () => void
+  appliedPromo: AppliedPromo | null
+  onApplyPromo: (promo: AppliedPromo) => void
+  onClearPromo: () => void
   className?: string
   /** Desktop bordered card vs mobile flat content inside the page sheet */
   chrome?: "card" | "flat"
@@ -162,10 +216,14 @@ function PricingCard({
   isActionLoading,
   ctaLabel,
   handlePrimaryCta,
+  appliedPromo,
+  onApplyPromo,
+  onClearPromo,
   className,
   chrome = "card",
 }: PricingCardProps) {
   const isFlat = chrome === "flat"
+  const displayPriceRon = computeDiscountedPrice(priceRon, appliedPromo)
 
   return (
     <motion.div
@@ -179,13 +237,9 @@ function PricingCard({
           "relative flex min-h-0 flex-1 flex-col",
           isFlat
             ? "bg-transparent p-0"
-            : "overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-[0_16px_40px_-24px_rgba(15,23,42,0.35)] sm:p-7 lg:h-full lg:justify-between lg:rounded-[2rem] lg:p-7 xl:p-8"
+            : "overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.28)] sm:p-7 lg:h-full lg:justify-between lg:rounded-2xl lg:p-7 xl:p-8"
         )}
       >
-        {!isFlat ? (
-          <div aria-hidden className="absolute inset-x-0 top-0 h-1 bg-[#7C5CFC]" />
-        ) : null}
-
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2
@@ -202,6 +256,11 @@ function PricingCard({
             {isCurrentPremium ? (
               <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gray-600">
                 Planul tău
+              </span>
+            ) : null}
+            {appliedPromo ? (
+              <span className="rounded-full bg-[#FEF3C7] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#92400E]">
+                {formatDiscountLabel(appliedPromo)} reducere aplicată
               </span>
             ) : null}
           </div>
@@ -260,12 +319,22 @@ function PricingCard({
 
           <div className="mt-4 flex flex-wrap items-end gap-2 lg:mt-5">
             <span className="text-4xl font-black tracking-tight text-gray-900 tabular-nums sm:text-5xl lg:text-5xl xl:text-6xl">
-              <AnimatedPrice value={priceRon} />
+              <AnimatedPrice value={displayPriceRon} />
             </span>
             <span className="pb-1.5 text-sm font-medium text-gray-500 sm:pb-2 sm:text-base lg:pb-2">
               RON{periodLabel}
             </span>
           </div>
+
+          {appliedPromo ? (
+            <p className="mt-1.5 text-sm text-gray-500">
+              <span className="line-through">{priceRon.toLocaleString("ro-RO")} RON</span>
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span className="font-semibold text-[#16a34a]">
+                cod {appliedPromo.code} aplicat
+              </span>
+            </p>
+          ) : null}
 
           {billingInterval === "month" ? (
             <p className="mt-1.5 text-sm font-medium text-[#5B47D6]">
@@ -288,7 +357,7 @@ function PricingCard({
           ) : null}
 
           <ul className="mt-4 space-y-2 lg:mt-5 lg:space-y-2.5">
-            {PREMIUM_FEATURE_BULLETS.map((feature) => (
+            {PREMIUM_CARD_BULLETS.map((feature) => (
               <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-700">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EBE8FF]">
                   <Check className="h-3 w-3 text-[#5B47D6]" strokeWidth={3} aria-hidden />
@@ -304,6 +373,14 @@ function PricingCard({
           >
             Vezi toate detaliile →
           </Link>
+
+          <div className="mt-4 lg:mt-5">
+            <PricingCreatorCodeCard
+              appliedPromo={appliedPromo}
+              onApply={onApplyPromo}
+              onClear={onClearPromo}
+            />
+          </div>
         </div>
 
         <div className={cn("mt-6 shrink-0", !isFlat && "lg:mt-0 lg:pt-4")}>
@@ -363,6 +440,7 @@ function PricingPageContent() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
   const [mobileExitSheetOpen, setMobileExitSheetOpen] = useState(false)
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
 
   const purchasesEnabled = canPurchaseSubscriptions()
   const hasPaidSubscription = subscriptionPlan === "plus" || subscriptionPlan === "premium"
@@ -453,6 +531,7 @@ function PricingPageContent() {
         body: JSON.stringify({
           plan: "premium",
           interval,
+          promotionCodeId: appliedPromo?.promotionCodeId,
         }),
       })
 
@@ -573,6 +652,9 @@ function PricingPageContent() {
     isActionLoading,
     ctaLabel,
     handlePrimaryCta,
+    appliedPromo,
+    onApplyPromo: setAppliedPromo,
+    onClearPromo: () => setAppliedPromo(null),
   }
 
   return (
@@ -625,14 +707,14 @@ function PricingPageContent() {
       </section>
 
       {/* Desktop: split illustration + pricing card */}
-      <section className="relative hidden bg-gradient-to-r from-[#e8edf8] via-[#f5f2f8] to-[#fdf8ee] lg:grid lg:h-[100dvh] lg:max-h-[100dvh] lg:grid-cols-2 lg:overflow-hidden">
+      <section className="relative hidden bg-[linear-gradient(to_top,transparent_0%,rgba(255,255,255,0.55)_38%,#ffffff_68%),linear-gradient(to_right,#E4E9FF,#FDF3D7)] lg:grid lg:h-[100dvh] lg:max-h-[100dvh] lg:grid-cols-2 lg:overflow-hidden">
         <PricingIllustrationPanel />
 
-        <div className="relative flex h-full min-h-0 flex-col items-stretch justify-start overflow-hidden p-8 xl:p-10">
+        <div className="relative flex h-full min-h-0 flex-col items-start justify-center overflow-hidden py-8 pl-4 pr-10 xl:py-10 xl:pl-8 xl:pr-14">
           <PricingCard
             {...cardProps}
             chrome="card"
-            className="mx-0 h-full min-h-0 max-w-none flex-1"
+            className="ml-0 mr-auto h-full max-h-full min-h-0 max-w-[540px] flex-1"
           />
         </div>
       </section>

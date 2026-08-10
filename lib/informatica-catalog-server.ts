@@ -4,7 +4,7 @@ import type { CodingProblem } from "@/components/coding-problems/types"
 export const INFORMATICA_CATALOG_SSR_PAGE_SIZE = 15
 
 const CODING_PROBLEM_LIST_COLUMNS =
-  "id,slug,title,statement_markdown,difficulty,class,chapter,points,time_limit_ms,memory_limit_kb,tags,language,created_at,updated_at"
+  "id,display_id,slug,title,statement_markdown,difficulty,class,chapter,points,time_limit_ms,memory_limit_kb,tags,language,created_at,updated_at"
 
 /** Lightweight SSR payload: first page + total count (avoids full-table SSR CPU). */
 export async function fetchInformaticaCatalogSsrSnapshot(

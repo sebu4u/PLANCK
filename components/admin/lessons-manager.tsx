@@ -18,6 +18,11 @@ import {
 import { ChapterForm } from "@/components/admin/chapter-form"
 import { LessonForm } from "@/components/admin/lesson-form"
 import type { Lesson } from "@/lib/supabase-physics"
+import {
+  CURSURI_SUBJECTS,
+  DEFAULT_CURSURI_SUBJECT,
+  type CursuriSubjectId,
+} from "@/lib/cursuri-subjects"
 
 // Types mirroring DB
 interface Grade {
@@ -26,6 +31,7 @@ interface Grade {
   name: string
   order_index: number
   is_active: boolean
+  subject?: CursuriSubjectId
 }
 
 interface Chapter {
@@ -60,6 +66,7 @@ type EditMode =
   | { type: "edit-lesson"; lesson: Lesson }
 
 export function LessonsManager() {
+  const [subject, setSubject] = useState<CursuriSubjectId>(DEFAULT_CURSURI_SUBJECT)
   const [grades, setGrades] = useState<Grade[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [lessons, setLessons] = useState<LessonSummary[]>([])
@@ -87,7 +94,7 @@ export function LessonsManager() {
         return
       }
 
-      const response = await fetch("/api/admin/lessons", {
+      const response = await fetch(`/api/admin/lessons?subject=${encodeURIComponent(subject)}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
 
@@ -100,12 +107,16 @@ export function LessonsManager() {
       setGrades(data.grades || [])
       setChapters(data.chapters || [])
       setLessons(data.lessons || [])
+      setExpandedGrades(new Set())
+      setExpandedChapters(new Set())
+      setEditMode({ type: "none" })
+      setEditingLesson(null)
     } catch (err: any) {
       setError(err.message || "Eroare la încărcarea datelor.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [subject])
 
   useEffect(() => {
     fetchData()
@@ -204,9 +215,29 @@ export function LessonsManager() {
     <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-12rem)]">
       {/* Left: Tree Navigation */}
       <div className="w-full lg:w-96 flex-shrink-0">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {CURSURI_SUBJECTS.map((s) => (
+            <Button
+              key={s.id}
+              type="button"
+              size="sm"
+              variant={subject === s.id ? "default" : "outline"}
+              className={
+                subject === s.id
+                  ? "bg-white text-black hover:bg-white/90"
+                  : "border-white/20 bg-transparent text-gray-200 hover:bg-white/10 hover:text-white"
+              }
+              onClick={() => setSubject(s.id)}
+            >
+              {s.shortLabel}
+            </Button>
+          ))}
+        </div>
         <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Structura cursuri</h3>
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+              Structura cursuri · {CURSURI_SUBJECTS.find((s) => s.id === subject)?.label}
+            </h3>
           </div>
 
           <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">

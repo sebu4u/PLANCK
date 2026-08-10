@@ -87,7 +87,7 @@ export default function AdminLessonsPage() {
             <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
             <h2 className="text-2xl font-semibold text-white mb-2">Acces interzis</h2>
             <p className="text-gray-400 mb-6">{error || "Doar adminii pot accesa această pagină."}</p>
-            <Button onClick={() => router.push("/cursuri")} variant="outline" className="border-white/30 bg-white/5 text-gray-100 hover:bg-white/10 hover:text-white">
+            <Button onClick={() => router.push("/invata/cursuri")} variant="outline" className="border-white/30 bg-white/5 text-gray-100 hover:bg-white/10 hover:text-white">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Înapoi la cursuri
             </Button>
@@ -106,7 +106,7 @@ export default function AdminLessonsPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push("/cursuri")}
+              onClick={() => router.push("/invata/cursuri")}
               className="text-gray-200 hover:text-white hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
@@ -115,7 +115,7 @@ export default function AdminLessonsPage() {
           </div>
           <h1 className="text-3xl font-bold mb-2">Administrare Lecții și Capitole</h1>
           <p className="text-gray-400">
-            Adaugă și editează capitole și lecții pentru toate clasele. Modificările sunt vizibile imediat pe platformă.
+            Adaugă și editează capitole și lecții pe materii (clasă → capitol → lecție). Modificările sunt vizibile imediat pe platformă.
           </p>
         </div>
 

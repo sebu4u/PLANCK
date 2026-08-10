@@ -159,7 +159,7 @@ export function EnhancedCoursesSection() {
                   <div className="border-t border-gray-100 pt-6">
 
                     <div className="flex gap-3">
-                      <Link href={`/cursuri/${course.id}`} className="flex-1">
+                      <Link href={`/invata/cursuri/fizica/${course.id}`} className="flex-1">
                         <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-300 cosmic-glow h-12">
                           <PlayCircle className="w-4 h-4 mr-2" />
                           Începe cursul

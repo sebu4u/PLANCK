@@ -18,10 +18,37 @@ import { getServiceRoleSupabase } from '@/lib/supabaseServiceRole';
 import { createAnonymousLimitExceededStream } from '@/lib/anonymous-limit-fake-stream';
 import {
   buildIdeAgentSystemPrompt,
+  deepseekThinkingExtra,
   getIdeAgentClient,
+  getIdeAgentFlashModel,
   normalizeIdeConversation,
   resolveIdeAgentModel,
+  shouldEnableDeepseekThinking,
 } from '@/lib/planckcode/ide-agent';
+import { extractInsightImageTexts, shouldSkipProblemFigureOcr } from '@/lib/insight-image-ocr';
+import {
+  buildLessonTutorSystemPrompt,
+  buildProblemTutorSystemPrompt,
+  resolveProblemTutorSubject,
+} from '@/lib/insight-problem-tutor-prompt';
+
+function isSafePublicProblemImageUrl(url: string): boolean {
+  if (!url || url.length > 2048) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function appendProblemFigureOcr(baseText: string, ocrText: string): string {
+  const base = baseText.trim();
+  const ocr = ocrText.trim();
+  if (!ocr) return base;
+  const block = `--- CONȚINUT EXTRAS DIN IMAGINEA ENUNȚULUI ---\n${ocr}`;
+  return base ? `${base}\n\n${block}` : block;
+}
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -121,8 +148,15 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
   }
 
   const isIdeRequest = persona === 'ide';
-  const isMainChatDeepSeek = requestSource === 'main_chat' && !isIdeRequest;
+  const isProblemTutor = persona === 'problem_tutor';
+  // Main chat + problem_tutor: DeepSeek text pipeline (anon cannot attach images).
+  const useDeepSeekTextPipeline =
+    (requestSource === 'main_chat' || isProblemTutor) && !isIdeRequest;
   const useRaptorFreeTierLimits = shouldUseRaptorFreeTierLimits(persona);
+  const interactiveTutor = Boolean((body as Record<string, unknown>)?.interactiveTutor);
+  const problemSubject = resolveProblemTutorSubject(
+    (body as Record<string, unknown>)?.problemSubject
+  );
 
   let userInput: string;
   if (Array.isArray(messages) && messages.length > 0) {
@@ -141,6 +175,31 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  const rawProblemImageUrl =
+    typeof (body as Record<string, unknown>)?.problemImageUrl === 'string'
+      ? String((body as Record<string, unknown>).problemImageUrl).trim().replace(/^@/, '')
+      : '';
+  const problemImageUrl = isSafePublicProblemImageUrl(rawProblemImageUrl)
+    ? rawProblemImageUrl
+    : '';
+
+  const originalUserInput = userInput;
+  if (
+    useDeepSeekTextPipeline &&
+    problemImageUrl &&
+    !shouldSkipProblemFigureOcr(userInput)
+  ) {
+    try {
+      const [figureOcr] = await extractInsightImageTexts([problemImageUrl], { detail: 'low' });
+      if (figureOcr?.trim()) {
+        userInput = appendProblemFigureOcr(userInput, figureOcr);
+      }
+    } catch (figureOcrErr: unknown) {
+      // Soft-fail: still answer from the text statement if figure OCR fails.
+      logger.error('Insight anonymous problem figure OCR error:', figureOcrErr);
+    }
   }
 
   const modelToUseParam = resolveInsightModel(body?.model);
@@ -177,89 +236,14 @@ export async function handleAnonymousInsightChat(req: NextRequest, body: any): P
   };
 
   if (personaKey === 'problem_tutor') {
-    const problemTutorContent = `Ești Insight, un profesor de fizică răbdător, clar și conversațional. Comportă-te ca un profesor util cu care elevul poate vorbi natural, nu ca un bot rigid. Poți fi cald, încurajator și scurt atunci când contextul cere asta.
+    systemMessage.content = buildProblemTutorSystemPrompt({
+      subject: problemSubject,
+      interactiveTutor,
+    });
+  }
 
-CONTEXT ACADEMIC:
-- Răspunde conform programei de fizică din învățământul preuniversitar românesc (cls. 9-12).
-- Folosește terminologia din manualele românești (ex: "tensiune electromotoare", nu "EMF").
-- Unitățile de măsură se scriu în română: "metri pe secundă", nu "m/s" în text liber.
-- Când o problemă are mai mulți pași, verifică întotdeauna consistența fizică înainte să răspunzi.
-
-REGULĂ GENERALĂ DE STIL:
-- Adaptează răspunsul la intenția reală a utilizatorului. Nu forța mereu același flow.
-- OBLIGATORIU: Orice formulă matematică, variabilă (ex: $x$, $y$), ecuație sau număr cu unitate de măsură trebuie scris între dolari ($...$ pentru inline, $$...$$ pentru block). NU scrie niciodată expresii matematice ca text simplu.
-- Dacă este natural, poți adăuga o scurtă notă de încurajare, dar fără să devii repetitiv sau robotic.
-
-REGULĂ PAGINĂ PROBLEMĂ:
-- Utilizatorul lucrează deja la o problemă specifică din Planck. Concentrează-te exclusiv pe această problemă.
-- NU recomanda alte exerciții, probleme, lecții, cursuri sau resurse Planck decât dacă utilizatorul cere explicit asta.
-- NU încheia răspunsul cu sugestii de tip „poți exersa și cu...”, „îți recomand și...” sau linkuri către alte resurse.
-- Explică, ghidează sau verifică doar în contextul problemei curente.
-
-ALEGE MODUL DE RĂSPUNS ÎN FUNCȚIE DE MESAJ:
-
-1. MOD GHIDARE SOCRATICĂ:
-Folosește acest mod doar când utilizatorul cere clar ajutor pentru a rezolva problema sau este blocat, de tipul:
-- "rezolvă problema"
-- "cum fac?"
-- "nu înțeleg"
-- "care e următorul pas?"
-- "dă-mi un indiciu"
-
-În acest mod:
-- NU rezolva problema numeric din prima, decât dacă utilizatorul cere explicit soluția completă.
-- Explică pe scurt ideea fizică relevantă.
-- Ghidează elevul pas cu pas.
-- Înainte să oferi o formulă, verifică dacă se aplică exact în contextul problemei (ex: bobină ideală vs. bobină cu rezistență internă).
-- Dacă elevul se blochează, dă un indiciu mic sau verifică direcția, nu oferi imediat toată rezolvarea.
-- Poți pune întrebări de ghidaj în răspuns dacă ajută conversația.
-
-2. MOD VERIFICARE RAPIDĂ:
-Folosește acest mod când utilizatorul vrea doar să verifice un rezultat, un pas sau o sub-concluzie, de tipul:
-- "am obținut $12\\,N$, e corect?"
-- "la a) mi-a dat $v = 3\\,m/s$, e bine?"
-- "formula asta e bună?"
-- "semnul minus aici e corect?"
-
-În acest mod:
-- Răspunde direct, scurt și clar.
-- Confirmă dacă este corect sau corectează punctual.
-- Dacă este util, spune într-o propoziție de ce.
-- NU forța flow-ul socratic.
-
-3. MOD RĂSPUNS LIBER / ÎNTREBARE LATERALĂ:
-Folosește acest mod când utilizatorul pune o întrebare care nu cere ghidare pas cu pas pe problema curentă, de exemplu:
-- cere explicația unui concept sau a unei formule
-- întreabă ceva legat de fizică, matematică sau informatică, chiar dacă nu este direct despre problema curentă
-- pune o întrebare scurtă auxiliară sau un "off-topic" util pentru învățare
-
-În acest mod:
-- Răspunde natural, util și conversațional.
-- Dacă întrebarea este despre un concept, oferă o explicație clară și suficientă, fără să o lungești artificial.
-- Dacă este relevant, poți menționa la final, într-o singură propoziție naturală, că poți reveni și la problema curentă.
-- NU forța întoarcerea la problemă.
-
-EXCEPTIE - SOLUȚIA COMPLETĂ:
-Dacă utilizatorul cere explicit "Vreau să văd soluția completă", "Arată-mi rezolvarea completă" sau ceva similar:
-1. Oferă rezolvarea completă, pas cu pas, cu calcule numerice.
-2. NU mai genera întrebări de ghidaj.
-3. NU mai genera blocul ---SUGGESTIONS--- la final.
-
-GENERARE ÎNTREBĂRI SUGERATE:
-După fiecare răspuns, generează la final blocul ---SUGGESTIONS--- cu exact 2 întrebări scurte despre problema curentă.
-Excepție: NU genera acest bloc doar când oferi soluția completă (EXCEPTIE - SOLUȚIA COMPLETĂ).
-Întrebările trebuie să fie pertinente pentru stadiul curent al discuției și să ajute elevul să avanseze pe problema curentă.
-IMPORTANT: Dacă generezi acest bloc, nu pune întrebări în zona de sugestii în alt format și nu adăuga text după el.
-
-Formatul TREBUIE să fie exact acesta la finalul mesajului, PRECEDAT DOAR DE LINII GOALE (fără alte texte înainte sau după acest bloc în zona de sugestii) și FĂRĂ markdown (nu pune în \`\`\`json ... \`\`\`):
-
----SUGGESTIONS---
-["Întrebare scurtă 1?", "Întrebare scurtă 2?"]
-
-Exemplu de întrebări: "Cum calculez forța?", "Ce formulă folosesc?", "E corect raționamentul?", "Care e următorul pas?".
-Asigură-te că JSON-ul este valid.`;
-
-    systemMessage.content = problemTutorContent;
+  if (personaKey === 'lesson_tutor') {
+    systemMessage.content = buildLessonTutorSystemPrompt();
   }
 
   const sanitizedContextMessages = Array.isArray(contextMessages)
@@ -286,7 +270,20 @@ Asigură-te că JSON-ul este valid.`;
   const lastHistoryMessage =
     historyMessages.length > 0 ? historyMessages[historyMessages.length - 1] : null;
   const isLastMessageCurrentUser =
-    lastHistoryMessage?.role === 'user' && lastHistoryMessage?.content === userInput;
+    lastHistoryMessage?.role === 'user' &&
+    (lastHistoryMessage.content === userInput ||
+      lastHistoryMessage.content === originalUserInput);
+
+  if (
+    isLastMessageCurrentUser &&
+    lastHistoryMessage &&
+    lastHistoryMessage.content !== userInput
+  ) {
+    historyMessages[historyMessages.length - 1] = {
+      ...lastHistoryMessage,
+      content: userInput,
+    };
+  }
 
   const chatMessages = [
     systemMessage,
@@ -305,8 +302,10 @@ Asigură-te că JSON-ul este valid.`;
 
   const activeModel = isIdeRequest
     ? resolveIdeAgentModel(modelToUseParam)
-    : isMainChatDeepSeek
-      ? resolveIdeAgentModel(modelToUseParam)
+    : useDeepSeekTextPipeline
+      ? isProblemTutor
+        ? getIdeAgentFlashModel()
+        : resolveIdeAgentModel(modelToUseParam)
       : (modelToUseParam as 'gpt-4o' | 'gpt-4o-mini');
 
   const maxTokensParam = {
@@ -340,7 +339,8 @@ Asigură-te că JSON-ul este valid.`;
   const t0 = Date.now();
   let stream: AsyncIterable<any>;
   try {
-    const openai = isIdeRequest || isMainChatDeepSeek ? getIdeAgentClient() : getOpenAIClient();
+    const useDeepSeekClient = isIdeRequest || useDeepSeekTextPipeline;
+    const openai = useDeepSeekClient ? getIdeAgentClient() : getOpenAIClient();
     stream = await openai.chat.completions.create({
       model: activeModel,
       messages: chatMessages,
@@ -349,7 +349,16 @@ Asigură-te că JSON-ul este valid.`;
       ...(personaKey === 'problem_tutor'
         ? { temperature: INSIGHT_PROBLEM_TUTOR_TEMPERATURE }
         : {}),
-    });
+      ...(useDeepSeekClient
+        ? deepseekThinkingExtra({
+            enabled: shouldEnableDeepseekThinking({
+              useDeepSeekClient: true,
+              isProblemTutor,
+              model: modelToUseParam,
+            }),
+          })
+        : {}),
+    } as OpenAI.Chat.ChatCompletionCreateParamsStreaming);
   } catch (openaiError: any) {
     if (openaiError?.status === 429) {
       const errorCode = openaiError?.code || '';
@@ -419,7 +428,7 @@ Asigură-te că JSON-ul este valid.`;
         const latencyMs = Date.now() - t0;
 
         const costUSD = estimateCostUSD(inputTokens, outputTokens, {
-          ideAgent: isIdeRequest || isMainChatDeepSeek,
+          ideAgent: isIdeRequest || useDeepSeekTextPipeline,
         });
 
         await admin.from('insight_logs').insert({

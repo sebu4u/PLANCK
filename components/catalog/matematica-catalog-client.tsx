@@ -169,6 +169,8 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
   const [selectedClassGate, setSelectedClassGate] = useState<string | null>(restoredSelectedClassRef.current)
   const [sidebarScrolling, setSidebarScrolling] = useState(false)
   const sidebarScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Route loading.tsx already painted the catalog skeleton — skip repeating it on first fetch.
+  const suppressInitialGridSkeletonRef = useRef(true)
 
   // Always ask for class on first visit; restore from sessionStorage within the same tab session.
   const requiresClassSelection = true
@@ -230,6 +232,12 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
       void fetchProblems()
     }
   }, [fetchProblems, initialProblems.length])
+
+  useEffect(() => {
+    if (!loading) {
+      suppressInitialGridSkeletonRef.current = false
+    }
+  }, [loading])
 
   useEffect(() => {
     if (hasRestoredFiltersRef.current) return
@@ -331,15 +339,6 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
     }
   }
 
-  const clearClassGate = useCallback(() => {
-    setSelectedClassGate(null)
-    try {
-      sessionStorage.removeItem(selectedClassStorageKey)
-    } catch {
-      // ignore
-    }
-  }, [selectedClassStorageKey])
-
   const handleSidebarScroll = useCallback((_event: UIEvent<HTMLDivElement>) => {
     setSidebarScrolling(true)
     if (sidebarScrollTimeoutRef.current) clearTimeout(sidebarScrollTimeoutRef.current)
@@ -358,10 +357,7 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
   return (
     <SubjectCatalogLayout
       catalogReady={catalogReady}
-      requiresClassSelection={requiresClassSelection}
-      selectedClassGate={selectedClassGate}
       onSelectClass={(cls) => selectClassAndOpenCatalog(cls as (typeof CLASS_OPTIONS)[number])}
-      onClearClassGate={clearClassGate}
       classOptions={CLASS_OPTIONS}
       classCardCopy={MATEMATICA_CLASS_CARD_COPY}
       title="Probleme de matematica"
@@ -397,13 +393,15 @@ export function MatematicaCatalogClient({ initialProblems, initialChapter }: Mat
           />
         </div>
 
-        <div className="relative z-10">
-          {loading ? (
+        <div className="relative z-10 animate-fade-in-up">
+          {loading && !suppressInitialGridSkeletonRef.current ? (
             <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 8 }).map((_, index) => (
                 <MatematicaCatalogCardSkeleton key={index} />
               ))}
             </div>
+          ) : loading ? (
+            <div className="min-h-[16rem]" aria-busy="true" aria-label="Se încarcă problemele" />
           ) : paginationData.paginatedProblems.length > 0 ? (
             <>
               <div className="grid gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">

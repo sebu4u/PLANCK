@@ -52,7 +52,7 @@ function DashboardSidebarComponent({
   const navLinks = useMemo(
     () => [
       { href: dashboardHomeHref, label: "Dashboard", icon: <Home className="w-4 h-4" /> },
-      { href: "/cursuri", label: "Cursuri de fizica", icon: <BookOpen className="w-4 h-4" /> },
+      { href: "/invata/cursuri", label: "Cursuri text", icon: <BookOpen className="w-4 h-4" /> },
       { href: "/insight/chat", label: "Insight", icon: <Sparkles className="w-4 h-4" /> },
       { href: "/grile", label: "Teste Grila", icon: <ListChecks className="w-4 h-4" /> },
       { href: "/simulari-bac", label: "Simulari Bac", icon: <GraduationCap className="w-4 h-4" /> },

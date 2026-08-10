@@ -313,8 +313,8 @@ export function ElasticLessonsScroller({
         ref={containerRef}
         className={
           bleedMargins
-            ? `-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 ${isPointerDragging ? "select-none" : ""}`
-            : `overflow-x-auto scrollbar-hide px-5 pb-2 ${isPointerDragging ? "select-none" : ""}`
+            ? `-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 sm:pb-0 ${isPointerDragging ? "select-none" : ""}`
+            : `overflow-x-auto scrollbar-hide px-5 pb-2 sm:pb-0 ${isPointerDragging ? "select-none" : ""}`
         }
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}

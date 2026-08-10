@@ -161,29 +161,29 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "physics-lessons": {
-    title: pageTitle('Lecții fizică – capitole structurate'),
-    description: "Lecții de fizică pentru clasele 9–12, structurate pe capitole și integrate în traseele Planck. Explicații clare, exemple practice și pregătire pentru BAC și admitere.",
-    keywords: "lecții fizică, lecții clasa 9, lecții clasa 10, capitole fizică, trasee invatare fizica, bac fizica",
+    title: pageTitle('Cursuri text – pe materii'),
+    description: "Cursuri text pentru liceu, structurate pe clase, capitole și lecții: fizică, matematică, informatică, chimie și biologie.",
+    keywords: "cursuri text, lecții fizică, lecții matematică, lecții informatică, capitole, trasee invatare",
     alternates: {
-      canonical: '/cursuri',
+      canonical: '/invata/cursuri',
     },
     openGraph: {
-      title: "Lecții de Fizică – Trasee și Capitole Structurate",
-      description: "Lecții de fizică pentru liceu, integrate în traseele Planck Academy.",
-      url: `${PLATFORM_SITE_URL}/cursuri`,
+      title: "Cursuri text – pe materii | PLANCK",
+      description: "Cursuri text pentru liceu, structurate pe clase, capitole și lecții.",
+      url: `${PLATFORM_SITE_URL}/invata/cursuri`,
       type: 'website',
       images: [
         {
           url: OG_IMAGE,
           width: 1200,
           height: 630,
-          alt: 'Lecții de Fizică – Planck Academy',
+          alt: 'Cursuri text – Planck Academy',
         },
       ],
     },
     twitter: {
-      title: "Lecții de Fizică – Planck Academy",
-      description: "Lecții structurate pe capitole, integrate în traseele de învățare.",
+      title: "Cursuri text – Planck Academy",
+      description: "Cursuri structurate pe materii, clase, capitole și lecții.",
       images: [OG_IMAGE],
       card: 'summary_large_image',
     },
@@ -683,6 +683,27 @@ export const pageMetadata: Record<string, Metadata> = {
     twitter: {
       title: `Teste Grilă – ${QUIZ_COUNT} Grile Rezolvate`,
       description: `Grile rezolvate pentru liceu, integrate în traseele Planck.`,
+    },
+  },
+
+  teste: {
+    title: pageTitle("Teste cronometrate – fizică, mate, info"),
+    description:
+      "Teste pe clasă, materie, capitol și dificultate, cu limită de timp. La final vezi scorul și poți rezolva problemele cu Insight.",
+    keywords:
+      "teste liceu, teste fizica, teste matematica, teste informatica, teste cronometrate, simulare test, planck teste",
+    alternates: {
+      canonical: "/teste",
+    },
+    openGraph: {
+      title: "Teste cronometrate – Planck Academy",
+      description:
+        "Teste pe clasă și materie, cu cronometru, scor automat și review cu Insight.",
+      url: `${PLATFORM_SITE_URL}/teste`,
+    },
+    twitter: {
+      title: "Teste cronometrate – Planck Academy",
+      description: "Teste pe clasă și materie, cu cronometru și Insight la review.",
     },
   },
 

@@ -12,6 +12,7 @@ export function buildProgressByClass<T>({
   getClassLabel,
   getChapter,
   getId,
+  classOptions = CATALOG_CLASS_OPTIONS,
 }: {
   problems: T[]
   solvedIds: string[]
@@ -19,12 +20,13 @@ export function buildProgressByClass<T>({
   getClassLabel: (problem: T) => string | null
   getChapter: (problem: T) => string | null
   getId: (problem: T) => string
+  classOptions?: readonly string[]
 }): Record<string, SidebarClassProgress> {
   const solvedSet = new Set(solvedIds)
   const result: Record<string, SidebarClassProgress> = {}
   const chapterLookup: Record<string, Record<string, string>> = {}
 
-  CATALOG_CLASS_OPTIONS.forEach((cls) => {
+  classOptions.forEach((cls) => {
     const chapters = chapterOptions[cls] ?? []
     const chapterProgress = Object.fromEntries(chapters.map((chapter) => [chapter, { total: 0, solved: 0 }]))
     result[cls] = {
@@ -64,6 +66,7 @@ export function filterSubjectCatalogProblems<T>({
   getChapter,
   getId,
   getSearchText,
+  getLanguage,
 }: {
   problems: T[]
   filters: FilterState
@@ -72,6 +75,7 @@ export function filterSubjectCatalogProblems<T>({
   getChapter: (problem: T) => string | null
   getId: (problem: T) => string
   getSearchText: (problem: T) => string[]
+  getLanguage?: (problem: T) => string | null | undefined
 }): T[] {
   const solvedSet = new Set(solvedIds)
   const hasSearch = Boolean(filters.search?.trim())
@@ -99,6 +103,11 @@ export function filterSubjectCatalogProblems<T>({
 
     if (filters.difficulty !== "Toate" && (problem as { difficulty?: string }).difficulty !== filters.difficulty) {
       return false
+    }
+
+    if (filters.language && filters.language !== "Toate") {
+      const language = getLanguage?.(problem)
+      if (language !== filters.language) return false
     }
 
     if (filters.progress === "Rezolvate" && !solvedSet.has(getId(problem))) return false

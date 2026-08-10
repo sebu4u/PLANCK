@@ -67,11 +67,17 @@ function splitOcrByImageMarkers(combined: string, imageCount: number): string[] 
   return Array.from({ length: imageCount }, () => combined.trim());
 }
 
-async function runVisionOcr(signedUrls: string[], model: string): Promise<string> {
+type VisionImageDetail = 'low' | 'high' | 'auto';
+
+async function runVisionOcr(
+  signedUrls: string[],
+  model: string,
+  detail: VisionImageDetail = 'high'
+): Promise<string> {
   const openai = getOpenAIClient();
   const imageParts = signedUrls.map((url) => ({
     type: 'image_url' as const,
-    image_url: { url, detail: 'high' as const },
+    image_url: { url, detail },
   }));
 
   const completion = await openai.chat.completions.create({
@@ -98,16 +104,32 @@ async function runVisionOcr(signedUrls: string[], model: string): Promise<string
   return completion.choices[0]?.message?.content?.trim() ?? '';
 }
 
+/** Skip figure OCR when the textual statement already gives the model enough context. */
+export const PROBLEM_FIGURE_OCR_MIN_TEXT_CHARS = 100;
+
+export function shouldSkipProblemFigureOcr(modelFacingText: string): boolean {
+  return modelFacingText.trim().length >= PROBLEM_FIGURE_OCR_MIN_TEXT_CHARS;
+}
+
+export type ExtractInsightImageTextsOptions = {
+  /** Vision detail; problem-figure OCR uses `low` for faster TTFT. Default `high` (user uploads). */
+  detail?: VisionImageDetail;
+};
+
 /**
  * Runs OpenAI vision OCR on signed image URLs. Returns one text block per image.
  */
-export async function extractInsightImageTexts(signedUrls: string[]): Promise<string[]> {
+export async function extractInsightImageTexts(
+  signedUrls: string[],
+  options?: ExtractInsightImageTextsOptions
+): Promise<string[]> {
   if (signedUrls.length === 0) return [];
 
-  let combined = await runVisionOcr(signedUrls, OCR_MINI_MODEL);
+  const detail = options?.detail ?? 'high';
+  let combined = await runVisionOcr(signedUrls, OCR_MINI_MODEL, detail);
   if (!isOcrResultUsable(combined)) {
     logger.info('Insight OCR: retrying with gpt-4o fallback');
-    combined = await runVisionOcr(signedUrls, OCR_FALLBACK_MODEL);
+    combined = await runVisionOcr(signedUrls, OCR_FALLBACK_MODEL, detail);
   }
 
   if (!isOcrResultUsable(combined)) {

@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Play } from 'lucide-react'
+import { Lock, Play } from 'lucide-react'
 
 interface LazyYouTubePlayerProps {
   videoId: string
   title: string
   className?: string
+  locked?: boolean
+  onLockedClick?: () => void
+  lockedLabel?: string
 }
 
 // Utility function to extract YouTube video ID from various URL formats
@@ -28,11 +31,22 @@ export function extractYouTubeVideoId(url: string): string | null {
   return null
 }
 
-export function LazyYouTubePlayer({ videoId, title, className = "" }: LazyYouTubePlayerProps) {
+export function LazyYouTubePlayer({
+  videoId,
+  title,
+  className = "",
+  locked = false,
+  onLockedClick,
+  lockedLabel = "Disponibil cu Planck Plus+",
+}: LazyYouTubePlayerProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   const handlePlayClick = () => {
+    if (locked) {
+      onLockedClick?.()
+      return
+    }
     setIsLoading(true)
     setIsLoaded(true)
   }
@@ -47,8 +61,8 @@ export function LazyYouTubePlayer({ videoId, title, className = "" }: LazyYouTub
 
   return (
     <div className={`relative w-full aspect-video rounded-lg overflow-hidden shadow-lg bg-gray-100 ${className}`}>
-      {!isLoaded ? (
-        // Thumbnail with play button
+      {!isLoaded || locked ? (
+        // Thumbnail with play button (or locked overlay)
         <div className="relative w-full h-full cursor-pointer group" onClick={handlePlayClick}>
           <img
             src={thumbnailUrl}
@@ -61,17 +75,34 @@ export function LazyYouTubePlayer({ videoId, title, className = "" }: LazyYouTub
             }}
           />
           
-          {/* Play button overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
-            <div className="bg-red-600 hover:bg-red-700 rounded-full p-4 transition-all duration-300 group-hover:scale-110 shadow-2xl">
-              <Play className="w-8 h-8 text-white fill-white ml-1" />
+          {locked ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center transition-all duration-300 group-hover:bg-black/65">
+              <div className="rounded-full bg-white/95 p-3.5 shadow-2xl">
+                <Lock className="h-6 w-6 text-[#0b0d10]" strokeWidth={2.25} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-white sm:text-base">Rezolvare video</p>
+                <p className="text-xs font-medium text-white/85 sm:text-sm">{lockedLabel}</p>
+              </div>
+              <span className="rounded-full border border-white/40 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                Upgrade
+              </span>
             </div>
-          </div>
-          
-          {/* YouTube logo overlay */}
-          <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-            YouTube
-          </div>
+          ) : (
+            <>
+              {/* Play button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
+                <div className="bg-red-600 hover:bg-red-700 rounded-full p-4 transition-all duration-300 group-hover:scale-110 shadow-2xl">
+                  <Play className="w-8 h-8 text-white fill-white ml-1" />
+                </div>
+              </div>
+              
+              {/* YouTube logo overlay */}
+              <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+                YouTube
+              </div>
+            </>
+          )}
         </div>
       ) : (
         // Iframe when loaded

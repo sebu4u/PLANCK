@@ -90,6 +90,11 @@
       bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
     }
 
+    /* Full-height cursuri viewer: top navbar (4rem) + bottom tab bar */
+    body.mobile-app-shell .mobile-cursuri-viewport {
+      height: calc(100dvh - 4rem - 4.5rem - env(safe-area-inset-bottom, 0px));
+    }
+
     body.mobile-app-shell .mobile-bottom-nav-quiz-pad {
       padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
     }
@@ -1120,11 +1125,35 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.28);
 }
 
-/* Trophy Road placeholder */
+.planckpass-locked-reward-card {
+  border-radius: 1.35rem;
+  border: 5px solid #27272a;
+  background: linear-gradient(180deg, #a1a1aa 0%, #71717a 48%, #52525b 100%);
+  box-shadow:
+    0 10px 0 #27272a,
+    0 18px 40px rgba(0, 0, 0, 0.28),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Trophy Road — Ascent Trail */
+.trophy-road-shell {
+  --tr-sky: #d9ecff;
+  --tr-mid: #eef6ff;
+  --tr-warm: #fff6d9;
+  background: linear-gradient(180deg, var(--tr-sky) 0%, var(--tr-mid) 42%, var(--tr-warm) 100%);
+}
+
+.trophy-road-atmosphere {
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255, 216, 77, 0.28), transparent 60%),
+    radial-gradient(ellipse 70% 45% at 20% 70%, rgba(125, 211, 168, 0.18), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 35%, rgba(158, 197, 255, 0.35), transparent 50%);
+}
+
 .trophy-road-scroll {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: rgba(26, 10, 74, 0.45) transparent;
+  scrollbar-color: rgba(30, 42, 58, 0.28) transparent;
 }
 
 .trophy-road-scroll::-webkit-scrollbar {
@@ -1133,13 +1162,54 @@
 }
 
 .trophy-road-scroll::-webkit-scrollbar-thumb {
-  background: rgba(26, 10, 74, 0.4);
+  background: rgba(30, 42, 58, 0.28);
   border-radius: 999px;
 }
 
-.trophy-road-node {
-  content-visibility: auto;
-  contain-intrinsic-size: 96px 120px;
+@keyframes trophy-road-row-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.trophy-road-row {
+  animation: trophy-road-row-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes trophy-road-node-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 4px 0 #c48900,
+      0 0 0 0 rgba(255, 216, 77, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 4px 0 #c48900,
+      0 0 0 10px rgba(255, 216, 77, 0);
+  }
+}
+
+.trophy-road-node-pulse {
+  animation: trophy-road-node-pulse 1.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trophy-road-row {
+    animation: none;
+  }
+
+  .trophy-road-node-pulse {
+    animation: none;
+    box-shadow:
+      0 4px 0 #c48900,
+      0 0 0 6px rgba(255, 216, 77, 0.35);
+  }
 }
 
 @keyframes planckpass-claim-sparkle-twinkle {
@@ -1531,6 +1601,17 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
   /* Safari and Chrome */
+}
+
+/* Custom text selection on lesson content (replaces browser default blue) */
+#lesson-content-wrapper ::selection {
+  background-color: rgba(17, 24, 39, 0.18);
+  color: #111827;
+}
+
+#lesson-content-wrapper ::-moz-selection {
+  background-color: rgba(17, 24, 39, 0.18);
+  color: #111827;
 }
 
 /* Clase pentru evidențierea conținutului în lecții */

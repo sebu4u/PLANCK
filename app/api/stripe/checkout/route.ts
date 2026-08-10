@@ -20,6 +20,7 @@ type BillingInterval = "week" | "month" | "year"
 type CheckoutBody = {
   plan?: string
   interval?: BillingInterval
+  promotionCodeId?: string
 }
 
 const FORBIDDEN_CARD_FIELDS = new Set([
@@ -116,6 +117,32 @@ export async function POST(req: NextRequest) {
     const stripe = getStripeClient()
     const { siteUrl } = getStripeConfig()
 
+    // Re-validate the promotion code server-side; never trust the client value.
+    let validPromotionCodeId: string | null = null
+    const requestedPromotionCodeId =
+      typeof body?.promotionCodeId === "string" ? body.promotionCodeId.trim() : ""
+    if (requestedPromotionCodeId) {
+      try {
+        const promotionCode = await stripe.promotionCodes.retrieve(requestedPromotionCodeId, {
+          expand: ["promotion.coupon"],
+        })
+        const coupon = promotionCode.promotion?.coupon
+        const isRedeemable =
+          promotionCode.active &&
+          typeof coupon !== "string" &&
+          coupon?.valid !== false &&
+          !(
+            typeof promotionCode.max_redemptions === "number" &&
+            promotionCode.times_redeemed >= promotionCode.max_redemptions
+          )
+        if (isRedeemable) {
+          validPromotionCodeId = promotionCode.id
+        }
+      } catch (error) {
+        console.warn("[stripe/checkout] Invalid promotion code id, ignoring:", error)
+      }
+    }
+
     const user = userData.user
     const { data: profile } = await supabase
       .from("profiles")
@@ -188,7 +215,9 @@ export async function POST(req: NextRequest) {
       mode: "subscription",
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      allow_promotion_codes: true,
+      ...(validPromotionCodeId
+        ? { discounts: [{ promotion_code: validPromotionCodeId }] }
+        : { allow_promotion_codes: true }),
       success_url: `${siteUrl}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/pricing?checkout=canceled`,
       client_reference_id: user.id,

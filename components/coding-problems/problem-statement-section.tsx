@@ -291,14 +291,14 @@ export function ProblemStatementSection({
         headingClass
       )}
     >
-      {typeof problem.numeric_id === "number" && (
+      {problem.display_id?.trim() && (
         <span
           className={cn(
             "font-mono text-sm uppercase tracking-[0.3em]",
             isLight ? "text-[#8d7b9f]" : "text-white/50"
           )}
         >
-          #{problem.numeric_id}
+          {problem.display_id.trim()}
         </span>
       )}
       <span>{problem.title}</span>

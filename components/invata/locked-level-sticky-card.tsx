@@ -21,6 +21,7 @@ interface LockedLevelStickyCardProps {
   isLocked?: boolean
   /** Păstrează culorile nivelului chiar și când cardul nu e sticky/focus. */
   isColored?: boolean
+  className?: string
 }
 
 export function LockedLevelStickyCard({
@@ -30,6 +31,7 @@ export function LockedLevelStickyCard({
   labelColorClass,
   isLocked = true,
   isColored = false,
+  className,
 }: LockedLevelStickyCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [isPinned, setIsPinned] = useState(false)
@@ -59,8 +61,9 @@ export function LockedLevelStickyCard({
     <div
       ref={cardRef}
       className={cn(
-        "sticky top-16 z-10 mx-auto mb-6 w-full max-w-[min(100%,22rem)] rounded-2xl border-t-[3px] border-l-[3px] border-r-[3px] border-b-[6px] bg-white px-4 py-3 text-center transition-[color,border-color] duration-200 burger:top-28 sm:max-w-[min(100%,28rem)] sm:px-6 sm:py-3.5",
-        showTheme ? "" : "border-[#c4c4c4]"
+        "sticky top-16 z-20 mx-auto mb-6 w-full max-w-[min(100%,22rem)] self-start rounded-2xl border-t-[3px] border-l-[3px] border-r-[3px] border-b-[6px] bg-white px-4 py-3 text-center shadow-[0_8px_24px_rgba(82,44,111,0.06)] transition-[color,border-color] duration-200 burger:top-28 sm:max-w-[min(100%,28rem)] sm:px-6 sm:py-3.5",
+        showTheme ? "" : "border-[#c4c4c4]",
+        className,
       )}
       style={showTheme ? { borderColor: outlineColor } : undefined}
     >

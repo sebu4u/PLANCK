@@ -6,7 +6,12 @@ import { ProblemStatementSection } from "@/components/coding-problems/problem-st
 import type { CodingProblem, CodingProblemExample } from "@/components/coding-problems/types"
 import { PlanckCodeSettingsProvider } from "@/components/planckcode-settings-provider"
 import { ProblemFeedbackBar } from "@/components/invata/problem-feedback-bar"
-import { useRegisterLearningPathFixedBottomBar } from "@/components/invata/learning-path-item-chrome-context"
+import {
+  useRegisterLearningPathFixedBottomBar,
+  useRegisterLearningPathAiContext,
+} from "@/components/invata/learning-path-item-chrome-context"
+import { formatCodingProblemLearningPathContext } from "@/lib/learning-path-insight-context"
+import type { EmbeddedIdeAgentBridge } from "@/lib/planckcode/embedded-ide-agent-bridge"
 import { useNavigateToNextLearningPathItem } from "@/components/invata/learning-path-item-navigation-context"
 import { useLearningPathItemCompletion } from "@/hooks/use-learning-path-item-completion"
 import { fireLearningPathCorrectConfetti } from "@/lib/learning-path-confetti"
@@ -46,6 +51,7 @@ export function LearningPathCodingProblemSection({
   initialCompleted = false,
 }: LearningPathCodingProblemSectionProps) {
   const [solved, setSolved] = useState(initialCompleted)
+  const [agentBridge, setAgentBridge] = useState<EmbeddedIdeAgentBridge | null>(null)
   const markComplete = useLearningPathItemCompletion({
     itemId: currentItemId,
     lessonId,
@@ -71,6 +77,24 @@ export function LearningPathCodingProblemSection({
   const handleAcceptedContinue = useCallback(async () => {
     await navigateToNextItem()
   }, [navigateToNextItem])
+
+  useRegisterLearningPathAiContext(
+    () =>
+      formatCodingProblemLearningPathContext({
+        problem,
+        examples,
+        activeFileName: agentBridge?.activeFileName,
+        activeFileLanguage: agentBridge?.activeFileLanguage,
+        activeFileContent: agentBridge?.activeFileContent,
+      }),
+    [
+      problem,
+      examples,
+      agentBridge?.activeFileName,
+      agentBridge?.activeFileLanguage,
+      agentBridge?.activeFileContent,
+    ],
+  )
 
   useRegisterLearningPathFixedBottomBar(
     () =>
@@ -113,6 +137,7 @@ export function LearningPathCodingProblemSection({
               problemSlug={isPython ? problem.slug : undefined}
               onAcceptedSubmit={handleAcceptedSubmit}
               onAcceptedContinue={handleAcceptedContinue}
+              onAgentBridgeChange={setAgentBridge}
             />
           </section>
         </div>

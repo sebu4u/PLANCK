@@ -165,7 +165,7 @@ interface ItemFormState {
 }
 
 const NEW_LESSON_KIND_LABEL: Record<LearningPathLessonKind, string> = {
-  text: "Text (/cursuri)",
+  text: "Text (/invata/cursuri)",
   video: "Video",
   grila: "Grilă",
   problem: "Problemă",
@@ -1010,7 +1010,7 @@ export function LearningPathsManager({
         if (!currentForm.custom_text_body.trim()) return "Conținutul pentru text personalizat este obligatoriu."
         break
       case "text":
-        if (!currentForm.cursuri_lesson_slug.trim()) return "Slug-ul lecției din /cursuri este obligatoriu."
+        if (!currentForm.cursuri_lesson_slug.trim()) return "Slug-ul lecției din /invata/cursuri este obligatoriu."
         break
       case "video":
         if (!currentForm.youtube_url.trim()) return "URL-ul YouTube este obligatoriu."
@@ -2207,7 +2207,7 @@ export function LearningPathsManager({
     if (form.item_type === "text") {
       return (
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-white">Lecție text din /cursuri</p>
+          <p className="text-sm font-semibold text-white">Lecție text din /invata/cursuri</p>
           <Input
             value={form.cursuri_lesson_slug}
             onChange={(e) => updateForm("cursuri_lesson_slug", e.target.value)}

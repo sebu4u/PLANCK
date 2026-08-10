@@ -569,7 +569,7 @@ function CTASection() {
             Începe gratuit
           </Link>
           <Link
-            href="/cursuri"
+            href="/invata/cursuri"
             className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full border border-white/15 text-white/80 font-semibold text-base hover:bg-white/5 hover:border-purple-500/30 hover:text-white transition-all duration-300"
           >
             Explorează cursurile
