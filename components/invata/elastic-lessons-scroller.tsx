@@ -5,11 +5,16 @@ import {
   useEffect,
   useRef,
   useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent,
   type ReactNode,
   type TouchEvent,
 } from "react"
 import { ArrowRight } from "lucide-react"
+
+/** Pixels of movement before a pointer gesture counts as a scroll drag (not a click). */
+const POINTER_DRAG_THRESHOLD_PX = 6
 
 export interface ElasticLessonsScrollerProps {
   children: ReactNode
@@ -35,6 +40,8 @@ export function ElasticLessonsScroller({
   })
   const pointerDragRef = useRef({
     isDragging: false,
+    didDrag: false,
+    suppressClick: false,
     pointerId: -1,
     startX: 0,
     startScrollLeft: 0,
@@ -219,12 +226,15 @@ export function ElasticLessonsScroller({
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!isDesktopViewport || event.pointerType === "touch" || event.button !== 0) return
-    if ((event.target as HTMLElement)?.closest?.("a")) return
+    // Allow drag-to-scroll even when starting on lesson links; skip real controls.
+    if ((event.target as HTMLElement)?.closest?.("button")) return
     const container = containerRef.current
     if (!container) return
 
     stopScrollAnimation()
     pointerDragRef.current.isDragging = true
+    pointerDragRef.current.didDrag = false
+    pointerDragRef.current.suppressClick = false
     pointerDragRef.current.pointerId = event.pointerId
     pointerDragRef.current.startX = event.clientX
     pointerDragRef.current.startScrollLeft = container.scrollLeft
@@ -232,8 +242,6 @@ export function ElasticLessonsScroller({
     pointerDragRef.current.lastTs = performance.now()
     pointerDragRef.current.velocityX = 0
     pointerDragRef.current.hadElasticOverdrag = false
-    container.setPointerCapture(event.pointerId)
-    setIsPointerDragging(true)
     applyTrackOffset(0, false)
   }
 
@@ -249,6 +257,25 @@ export function ElasticLessonsScroller({
     pointerDragRef.current.lastTs = now
 
     const deltaX = event.clientX - pointerDragRef.current.startX
+    if (
+      !pointerDragRef.current.didDrag &&
+      Math.abs(deltaX) < POINTER_DRAG_THRESHOLD_PX
+    ) {
+      return
+    }
+
+    // Capture only after the gesture is a real drag. Capturing on pointerdown
+    // retargets the click to this container, so lesson links never navigate.
+    if (!pointerDragRef.current.didDrag) {
+      pointerDragRef.current.didDrag = true
+      try {
+        container.setPointerCapture(event.pointerId)
+      } catch {
+        // Pointer may already be released.
+      }
+      setIsPointerDragging(true)
+    }
+
     const desiredScrollLeft = pointerDragRef.current.startScrollLeft - deltaX
     const maxScroll = Math.max(container.scrollWidth - container.clientWidth, 0)
 
@@ -270,23 +297,45 @@ export function ElasticLessonsScroller({
     event.preventDefault()
   }
 
-  const releasePointerDrag = () => {
+  const releasePointerDrag = (event?: PointerEvent<HTMLDivElement>) => {
     if (!pointerDragRef.current.isDragging) return
+    const container = containerRef.current
     const hadElasticOverdrag = pointerDragRef.current.hadElasticOverdrag
     const velocityX = pointerDragRef.current.velocityX
+    const didDrag = pointerDragRef.current.didDrag
+    const pointerId = event?.pointerId ?? pointerDragRef.current.pointerId
     pointerDragRef.current.isDragging = false
     pointerDragRef.current.pointerId = -1
     pointerDragRef.current.velocityX = 0
     pointerDragRef.current.hadElasticOverdrag = false
+    // After a real drag, block the synthetic click so links don't navigate.
+    pointerDragRef.current.suppressClick = didDrag
+    pointerDragRef.current.didDrag = false
     setIsPointerDragging(false)
 
+    if (container && pointerId >= 0 && container.hasPointerCapture(pointerId)) {
+      container.releasePointerCapture(pointerId)
+    }
+
     applyTrackOffset(0, true)
-    if (!hadElasticOverdrag) {
+    if (!hadElasticOverdrag && didDrag) {
       const scrollVelocity = -velocityX
       if (Math.abs(scrollVelocity) > 0.08) {
         startMomentumScroll(scrollVelocity)
       }
     }
+  }
+
+  const onClickCapture = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!pointerDragRef.current.suppressClick) return
+    event.preventDefault()
+    event.stopPropagation()
+    pointerDragRef.current.suppressClick = false
+  }
+
+  const onDragStart = (event: DragEvent<HTMLDivElement>) => {
+    // Stop the browser from dragging <a href> / images as URL payloads.
+    event.preventDefault()
   }
 
   const onScrollButtonClick = () => {
@@ -313,8 +362,8 @@ export function ElasticLessonsScroller({
         ref={containerRef}
         className={
           bleedMargins
-            ? `-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 sm:pb-0 ${isPointerDragging ? "select-none" : ""}`
-            : `overflow-x-auto scrollbar-hide px-5 pb-2 sm:pb-0 ${isPointerDragging ? "select-none" : ""}`
+            ? `-mx-5 overflow-x-auto scrollbar-hide px-5 pb-2 sm:mx-0 sm:px-0 sm:pb-0 [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${isPointerDragging ? "cursor-grabbing select-none" : "sm:cursor-grab"}`
+            : `overflow-x-auto scrollbar-hide px-5 pb-2 sm:pb-0 [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${isPointerDragging ? "cursor-grabbing select-none" : "sm:cursor-grab"}`
         }
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -324,6 +373,8 @@ export function ElasticLessonsScroller({
         onPointerMove={onPointerMove}
         onPointerUp={releasePointerDrag}
         onPointerCancel={releasePointerDrag}
+        onClickCapture={onClickCapture}
+        onDragStart={onDragStart}
       >
         <div
           ref={trackRef}

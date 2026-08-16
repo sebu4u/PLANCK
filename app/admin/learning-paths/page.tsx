@@ -101,7 +101,7 @@ export default function AdminLearningPathsPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navigation />
-      <div className="container mx-auto px-4 py-8 max-w-[1500px]">
+      <div className="container mx-auto max-w-[1500px] px-4 pb-8 pt-24">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Button
@@ -120,6 +120,14 @@ export default function AdminLearningPathsPage() {
               className="text-gray-200 hover:text-white hover:bg-white/10"
             >
               Dev users
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/admin/content-reports")}
+              className="text-gray-200 hover:text-white hover:bg-white/10"
+            >
+              Rapoarte
             </Button>
           </div>
           <h1 className="text-3xl font-bold mb-2">Administrare Learning Paths</h1>

@@ -4,9 +4,10 @@ import type Stripe from "stripe"
 import { getStripeClient } from "@/lib/stripe"
 import { getStripeWebhookSecretEntries, type StripeMode } from "@/lib/stripe-config"
 import {
+  applyStripeSubscription,
   getSupabaseAdmin,
+  isParentForChildPurchase,
   resolveCustomerId,
-  updateProfileFromSubscription,
 } from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
@@ -122,13 +123,26 @@ export async function POST(req: NextRequest) {
 
         const customerId = resolveCustomerId(session.customer)
         const subscriptionId = resolveSubscriptionId(session.subscription)
-        const userId = session.metadata?.user_id || session.client_reference_id || null
+        const userId =
+          session.metadata?.payer_user_id ||
+          session.metadata?.user_id ||
+          session.client_reference_id ||
+          null
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
             expand: ["items.data.price"],
           })
-          await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
+          if (
+            isParentForChildPurchase(session.metadata) &&
+            !isParentForChildPurchase(subscription.metadata)
+          ) {
+            subscription.metadata = {
+              ...subscription.metadata,
+              ...session.metadata,
+            }
+          }
+          await applyStripeSubscription(subscription, customerId, userId, stripeMode)
         } else if (userId && customerId) {
           const supabase = getSupabaseAdmin()
           await supabase
@@ -143,8 +157,9 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = resolveCustomerId(subscription.customer)
-        const userId = subscription.metadata?.user_id || null
-        await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
+        const userId =
+          subscription.metadata?.payer_user_id || subscription.metadata?.user_id || null
+        await applyStripeSubscription(subscription, customerId, userId, stripeMode)
         break
       }
       case "invoice.paid":
@@ -156,8 +171,9 @@ export async function POST(req: NextRequest) {
             expand: ["items.data.price"],
           })
           const customerId = resolveCustomerId(subscription.customer)
-          const userId = subscription.metadata?.user_id || null
-          await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
+          const userId =
+            subscription.metadata?.payer_user_id || subscription.metadata?.user_id || null
+          await applyStripeSubscription(subscription, customerId, userId, stripeMode)
         }
         break
       }

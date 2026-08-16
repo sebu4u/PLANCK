@@ -20,6 +20,9 @@ import { WorkInProgressCard } from '@/components/work-in-progress-card'
 import { ShareLessonDialog } from '@/components/share-lesson-dialog'
 import { PremiumFeatureDialog } from '@/components/premium-feature-dialog'
 import { LessonRichContent } from '@/components/lesson-rich-content'
+import { ReportIssueButton } from '@/components/content-reports/report-issue-button'
+import { slugify } from '@/lib/slug'
+import type { CursuriSubjectId } from '@/lib/cursuri-subjects'
 
 import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from '@/lib/mobile-app-nav'
 
@@ -33,6 +36,7 @@ interface LessonViewerProps {
   onProgressChange?: (progress: number) => void
   isCompleted?: boolean
   onComplete?: () => void
+  subject?: CursuriSubjectId
 }
 
 const lessonNavBtnClass =
@@ -53,7 +57,8 @@ export function LessonViewer({
   currentGrade,
   onProgressChange,
   isCompleted = false,
-  onComplete
+  onComplete,
+  subject,
 }: LessonViewerProps) {
 
   const formatDuration = (minutes: number | null) => {
@@ -213,6 +218,18 @@ export function LessonViewer({
                     <Download className="w-4 h-4 mr-1 lg:mr-2" />
                     <span className="hidden sm:inline">Descarcă</span>
                   </Button>
+                  {lesson ? (
+                    <ReportIssueButton
+                      sourceType="course_lesson"
+                      sourceId={lesson.id}
+                      sourceMeta={{
+                        subject,
+                        slug: slugify(lesson.title),
+                        title: lesson.title,
+                        chapter_id: lesson.chapter_id,
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
 

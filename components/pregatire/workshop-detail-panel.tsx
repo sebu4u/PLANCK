@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -25,6 +25,8 @@ import {
   WORKSHOP_SUBJECT_LABELS,
   type WorkshopDetail,
 } from "@/lib/pregatire/types"
+import { WorkshopMaterialsTabs } from "@/components/pregatire/workshop-materials-tabs"
+import { WorkshopWhiteboardCard } from "@/components/pregatire/workshop-whiteboard-card"
 import { cn } from "@/lib/utils"
 
 export function WorkshopDetailPanel({
@@ -46,6 +48,10 @@ export function WorkshopDetailPanel({
   const { toast } = useToast()
   const [workshop, setWorkshop] = useState(initial)
   const [unlocking, setUnlocking] = useState(false)
+
+  useEffect(() => {
+    setWorkshop(initial)
+  }, [initial])
 
   const past = isWorkshopPast(workshop.starts_at, workshop.duration_minutes)
   const full = workshop.seats_remaining === 0 && !workshop.unlocked
@@ -100,6 +106,21 @@ export function WorkshopDetailPanel({
       }
       setWorkshop(next)
       onUnlocked?.(next)
+
+      try {
+        const detailRes = await fetch(`/api/pregatire/${workshop.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (detailRes.ok) {
+          const detailPayload = await detailRes.json()
+          if (detailPayload.workshop) {
+            setWorkshop(detailPayload.workshop)
+            onUnlocked?.(detailPayload.workshop)
+          }
+        }
+      } catch {
+        // Meet/recording already applied above.
+      }
       if (typeof payload.balance === "number") {
         onBalanceChange?.({
           balance: payload.balance,
@@ -124,7 +145,7 @@ export function WorkshopDetailPanel({
   }
 
   return (
-    <div className={cn(!compact && "mx-auto max-w-2xl")}>
+    <div className={cn(!compact && "mx-auto max-w-4xl")}>
       {showBack ? (
         <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2 text-[#6b7280]">
           <Link href="/pregatire">
@@ -250,6 +271,20 @@ export function WorkshopDetailPanel({
           </div>
         </div>
       </div>
+
+      {workshop.unlocked && workshop.whiteboard_url ? (
+        <WorkshopWhiteboardCard url={workshop.whiteboard_url} compact={compact} />
+      ) : null}
+
+      {workshop.unlocked ? (
+        <WorkshopMaterialsTabs
+          notesMarkdown={workshop.notes_markdown ?? null}
+          notesPdfUrl={workshop.notes_pdf_url ?? null}
+          homeworkPdfUrl={workshop.homework_pdf_url ?? null}
+          homeworkItems={workshop.homework_items ?? []}
+          compact={compact}
+        />
+      ) : null}
     </div>
   )
 }

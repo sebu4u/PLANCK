@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
+import type { ChildBillingSnapshot } from "@/lib/parent/billing-types"
 import { PricingMobileExitSheet } from "@/components/pricing/pricing-mobile-exit-sheet"
 import { PricingGradeGrowthChart } from "@/components/pricing/pricing-grade-growth-chart"
 import {
@@ -198,6 +199,7 @@ type PricingCardProps = {
   appliedPromo: AppliedPromo | null
   onApplyPromo: (promo: AppliedPromo) => void
   onClearPromo: () => void
+  headerSlot?: React.ReactNode
   className?: string
   /** Desktop bordered card vs mobile flat content inside the page sheet */
   chrome?: "card" | "flat"
@@ -219,6 +221,7 @@ function PricingCard({
   appliedPromo,
   onApplyPromo,
   onClearPromo,
+  headerSlot,
   className,
   chrome = "card",
 }: PricingCardProps) {
@@ -241,6 +244,7 @@ function PricingCard({
         )}
       >
         <div className="min-w-0">
+          {headerSlot}
           <div className="flex flex-wrap items-center gap-2">
             <h2
               className={cn(
@@ -430,10 +434,61 @@ function PricingCard({
   )
 }
 
+type ParentPricingChild = {
+  child_id: string
+  name: string
+  billing: ChildBillingSnapshot
+}
+
+function ParentChildPicker({
+  childrenList,
+  selectedChildId,
+  onSelect,
+}: {
+  childrenList: ParentPricingChild[]
+  selectedChildId: string | null
+  onSelect: (childId: string) => void
+}) {
+  if (childrenList.length === 0) {
+    return (
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Conectează mai întâi un copil din{" "}
+        <Link href="/dashboard/parent" className="font-semibold underline">
+          dashboard-ul de părinte
+        </Link>
+        , apoi poți cumpăra Premium pentru el.
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4 space-y-2">
+      <p className="text-sm font-medium text-gray-700">Cumperi Premium pentru</p>
+      <div className="flex flex-wrap gap-2">
+        {childrenList.map((child) => (
+          <button
+            key={child.child_id}
+            type="button"
+            onClick={() => onSelect(child.child_id)}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-sm font-medium transition",
+              selectedChildId === child.child_id
+                ? "border-[#5B47D6] bg-[#EBE8FF] text-[#5B47D6]"
+                : "border-gray-200 bg-white text-gray-600 hover:text-gray-900"
+            )}
+          >
+            {child.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function PricingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, subscriptionPlan, refreshProfile } = useAuth()
+  const { user, subscriptionPlan, refreshProfile, isParent } = useAuth()
   const { toast } = useToast()
   const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>("month")
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -441,17 +496,90 @@ function PricingPageContent() {
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
   const [mobileExitSheetOpen, setMobileExitSheetOpen] = useState(false)
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
+  const [parentChildren, setParentChildren] = useState<ParentPricingChild[]>([])
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
+  const [parentChildrenLoading, setParentChildrenLoading] = useState(false)
+
+  const selectedChild =
+    parentChildren.find((child) => child.child_id === selectedChildId) ?? parentChildren[0] ?? null
 
   const purchasesEnabled = canPurchaseSubscriptions()
-  const hasPaidSubscription = subscriptionPlan === "plus" || subscriptionPlan === "premium"
-  const isCurrentPremium = subscriptionPlan === "premium"
-  const shouldManageInPortal = hasPaidSubscription
-  const isPurchaseDisabled = !purchasesEnabled && !hasPaidSubscription
-  const isActionLoading = checkoutLoading || portalLoading
-  const isCtaDisabled = isActionLoading || isPurchaseDisabled || (isCurrentPremium && !shouldManageInPortal)
+  const hasPaidSubscription = isParent
+    ? Boolean(selectedChild?.billing.can_manage)
+    : subscriptionPlan === "plus" || subscriptionPlan === "premium"
+  const isCurrentPremium = isParent
+    ? selectedChild?.billing.plan === "premium"
+    : subscriptionPlan === "premium"
+  const shouldManageInPortal = isParent
+    ? Boolean(selectedChild?.billing.can_manage)
+    : hasPaidSubscription
+  const parentNeedsChild = isParent && !parentChildrenLoading && parentChildren.length === 0
+  const parentCannotAct =
+    isParent &&
+    Boolean(selectedChild) &&
+    !selectedChild?.billing.can_purchase &&
+    !selectedChild?.billing.can_manage
+  const isPurchaseDisabled =
+    (!purchasesEnabled && !hasPaidSubscription) || parentNeedsChild || parentCannotAct
+  const isActionLoading = checkoutLoading || portalLoading || (isParent && parentChildrenLoading)
+  const isCtaDisabled =
+    isActionLoading ||
+    (isPurchaseDisabled && !parentNeedsChild) ||
+    (isCurrentPremium && !shouldManageInPortal)
 
   const priceRon = getPremiumPriceRon(billingInterval)
   const periodLabel = getPremiumPeriodLabel(billingInterval)
+
+  useEffect(() => {
+    if (!isParent || !user) {
+      setParentChildren([])
+      setSelectedChildId(null)
+      return
+    }
+
+    let cancelled = false
+    const loadChildren = async () => {
+      setParentChildrenLoading(true)
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+        if (!accessToken) return
+        const response = await fetch("/api/parent/children-billing", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (!response.ok) throw new Error("children_failed")
+        const payload = await response.json()
+        const nextChildren = Array.isArray(payload.children) ? payload.children : []
+        if (cancelled) return
+        setParentChildren(nextChildren)
+        const requestedChildId = searchParams?.get("child")
+        setSelectedChildId((current) => {
+          if (requestedChildId && nextChildren.some((child: ParentPricingChild) => child.child_id === requestedChildId)) {
+            return requestedChildId
+          }
+          if (current && nextChildren.some((child: ParentPricingChild) => child.child_id === current)) {
+            return current
+          }
+          return nextChildren[0]?.child_id ?? null
+        })
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Nu am putut încărca copiii",
+            description: "Reîncarcă pagina sau deschide dashboard-ul de părinte.",
+            variant: "destructive",
+          })
+        }
+      } finally {
+        if (!cancelled) setParentChildrenLoading(false)
+      }
+    }
+
+    void loadChildren()
+    return () => {
+      cancelled = true
+    }
+  }, [isParent, user, searchParams, toast])
 
   useEffect(() => {
     const status = searchParams?.get("checkout")
@@ -460,7 +588,9 @@ function PricingPageContent() {
     if (status === "success") {
       toast({
         title: "Plată reușită",
-        description: "Abonamentul va fi activat în câteva secunde.",
+        description: isParent
+          ? "Abonamentul copilului va fi activat în câteva secunde."
+          : "Abonamentul va fi activat în câteva secunde.",
       })
     } else if (status === "canceled") {
       toast({
@@ -505,11 +635,15 @@ function PricingPageContent() {
     }
 
     syncSubscription()
-  }, [searchParams, toast, user, syncingSessionId, refreshProfile])
+  }, [searchParams, toast, user, syncingSessionId, refreshProfile, isParent])
 
   const startCheckout = async (interval: PremiumBillingInterval = billingInterval) => {
     if (!user) {
       router.push("/login")
+      return
+    }
+    if (isParent && !selectedChild) {
+      router.push("/dashboard/parent")
       return
     }
 
@@ -532,6 +666,7 @@ function PricingPageContent() {
           plan: "premium",
           interval,
           promotionCodeId: appliedPromo?.promotionCodeId,
+          ...(isParent && selectedChild ? { childId: selectedChild.child_id } : {}),
         }),
       })
 
@@ -574,8 +709,12 @@ function PricingPageContent() {
       const response = await fetch("/api/stripe/portal", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
+        body: JSON.stringify(
+          isParent && selectedChild ? { childId: selectedChild.child_id } : {}
+        ),
       })
       const payload = await response.json()
       if (!response.ok) {
@@ -599,13 +738,24 @@ function PricingPageContent() {
 
   const ctaLabel = (() => {
     if (isActionLoading) return "Se deschide..."
+    if (parentNeedsChild) return "Conectează un copil"
+    if (parentCannotAct) return "Are deja Premium"
     if (isPurchaseDisabled) return "Indisponibil momentan"
-    if (shouldManageInPortal && isCurrentPremium) return "Gestionează planul"
+    if (shouldManageInPortal && isCurrentPremium) {
+      return isParent && selectedChild
+        ? `Gestionează planul lui ${selectedChild.name}`
+        : "Gestionează planul"
+    }
     if (shouldManageInPortal) return "Upgrade din portal"
+    if (isParent && selectedChild) return `Cumpără Premium pentru ${selectedChild.name}`
     return "Devino Premium"
   })()
 
   const handlePrimaryCta = async () => {
+    if (parentNeedsChild) {
+      router.push("/dashboard/parent")
+      return
+    }
     if (isCtaDisabled) return
     if (shouldManageInPortal) {
       await openBillingPortal()
@@ -655,6 +805,13 @@ function PricingPageContent() {
     appliedPromo,
     onApplyPromo: setAppliedPromo,
     onClearPromo: () => setAppliedPromo(null),
+    headerSlot: isParent ? (
+      <ParentChildPicker
+        childrenList={parentChildren}
+        selectedChildId={selectedChild?.child_id ?? null}
+        onSelect={setSelectedChildId}
+      />
+    ) : null,
   }
 
   return (

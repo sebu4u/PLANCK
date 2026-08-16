@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, List, CheckCircle2, ChevronRight, Loader2 } from "lucide-react"
+import { ArrowLeft, List, CheckCircle2, ChevronRight, Loader2, Camera } from "lucide-react"
 import type { Problem } from "@/data/problems"
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -43,6 +43,7 @@ import {
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { ProblemsPwaInstallBanner } from "@/components/problems-pwa-install-banner"
 import { extractYouTubeVideoId, LazyYouTubePlayer } from "@/components/lazy-youtube-player"
+import { ReportIssueButton } from "@/components/content-reports/report-issue-button"
 
 // Array cu 10 iconițe variate pentru probleme (același sistem ca în problem-card)
 const problemIcons = [
@@ -191,7 +192,15 @@ export default function ProblemDetailClient({
   useSocialProofTrigger({ enabled: Boolean(user?.id) && !isClassroomEmbed, problemId: problem.id })
 
   useEffect(() => {
-    if (insightSidebarOpen) setInsightChatMounted(true)
+    const mountIfNeeded = () => {
+      if (insightSidebarOpen || window.matchMedia("(min-width: 1024px)").matches) {
+        setInsightChatMounted(true)
+      }
+    }
+    mountIfNeeded()
+    const media = window.matchMedia("(min-width: 1024px)")
+    media.addEventListener("change", mountIfNeeded)
+    return () => media.removeEventListener("change", mountIfNeeded)
   }, [insightSidebarOpen])
 
   useEffect(() => {
@@ -259,17 +268,19 @@ export default function ProblemDetailClient({
       : null
   const problemTags = useMemo(() => normalizeProblemTags(problem.tags), [problem.tags])
 
-  const renderProblemMetaBadges = (className?: string) => (
+  const renderProblemMetaBadges = (className?: string, options?: { hideDifficulty?: boolean; hideVideo?: boolean }) => (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <Badge
-        variant="outline"
-        className={cn(
-          "cursor-default border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]",
-          difficultyTone,
-        )}
-      >
-        {problem.difficulty}
-      </Badge>
+      {!options?.hideDifficulty && (
+        <Badge
+          variant="outline"
+          className={cn(
+            "cursor-default border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em]",
+            difficultyTone,
+          )}
+        >
+          {problem.difficulty}
+        </Badge>
+      )}
       <Badge
         variant="outline"
         className="flex cursor-default items-center gap-2 border border-[#0b0d10]/15 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-[#2C2F33] hover:bg-white hover:text-[#2C2F33] hover:border-[#0b0d10]/15"
@@ -277,7 +288,7 @@ export default function ProblemDetailClient({
         <span className="text-base leading-none">{categoryIcons?.[problem.category] ?? '📘'}</span>
         {problem.category}
       </Badge>
-      {hasVideo && (
+      {hasVideo && !options?.hideVideo && (
         <Badge
           variant="outline"
           className="cursor-default border border-red-600/30 bg-red-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-red-800 hover:border-red-600/30 hover:bg-red-50 hover:text-red-800"
@@ -467,14 +478,34 @@ export default function ProblemDetailClient({
           <div className="mx-auto max-w-[1600px] space-y-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={() => setSidebarOpen(true)}
-                  variant="outline"
-                  className="flex items-center gap-2 rounded-full border-[#0b0d10]/15 bg-white/80 px-4 py-2 text-sm font-medium text-[#0b0d10] transition hover:bg-white"
-                >
-                  <List className="w-4 h-4" />
-                  <span>Toate problemele</span>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setSidebarOpen(true)}
+                    variant="outline"
+                    className="flex items-center gap-2 rounded-full border-[#0b0d10]/15 bg-white/80 px-4 py-2 text-sm font-medium text-[#0b0d10] transition hover:bg-white"
+                  >
+                    <List className="w-4 h-4" />
+                    <span>Toate problemele</span>
+                  </Button>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "lg:hidden cursor-default shrink-0 border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                      difficultyTone,
+                    )}
+                  >
+                    {problem.difficulty}
+                  </Badge>
+                  {hasVideo ? (
+                    <span
+                      className="lg:hidden inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-600/25 bg-red-50 text-red-800"
+                      aria-label="Are rezolvare video"
+                      title="Are rezolvare video"
+                    >
+                      <Camera className="h-4 w-4" strokeWidth={2.1} />
+                    </span>
+                  ) : null}
+                </div>
                 {isClassroomEmbed ? (
                   <Link
                     href={catalogBackHref}
@@ -513,6 +544,11 @@ export default function ProblemDetailClient({
                   <span className="text-lg leading-none">{problemIcon}</span>
                   <span>ID {problem.id}</span>
                 </span>
+                <ReportIssueButton
+                  sourceType={subject === "math" ? "math_problem" : "physics_problem"}
+                  sourceId={problem.id}
+                  sourceMeta={{ subject }}
+                />
                 {isSolved && (
                   <span className="inline-flex items-center gap-2 rounded-full border border-emerald-600/30 bg-emerald-50 px-3 py-1 text-emerald-800">
                     <CheckCircle2 className="w-4 h-4" />
@@ -525,7 +561,7 @@ export default function ProblemDetailClient({
             <div className="grid items-start gap-8">
               <section className="space-y-8">
                 <div className="flex flex-col gap-6">
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-[#0b0d10]">
+                  <h1 className="text-[1.3125rem] sm:text-4xl lg:text-5xl font-semibold leading-tight text-[#0b0d10]">
                     {renderInlineMath(problem.title)}
                   </h1>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-[#2C2F33]/75 sm:hidden">
@@ -538,6 +574,11 @@ export default function ProblemDetailClient({
                       <span className="text-base leading-none">{problemIcon}</span>
                       <span>ID {problem.id}</span>
                     </span>
+                    <ReportIssueButton
+                      sourceType={subject === "math" ? "math_problem" : "physics_problem"}
+                      sourceId={problem.id}
+                      sourceMeta={{ subject }}
+                    />
                   </div>
 
                   {problemTags.length > 0 && (
@@ -746,7 +787,7 @@ export default function ProblemDetailClient({
                     )}
                   </div>
                 </div>
-                {renderProblemMetaBadges("lg:hidden")}
+                {renderProblemMetaBadges("lg:hidden", { hideDifficulty: true, hideVideo: true })}
               </section>
 
               {/* Pe mobil: card problema recomandată sub datele problemei, înainte de footer */}
@@ -821,15 +862,16 @@ export default function ProblemDetailClient({
       {!isClassroomEmbed && (
         <ProblemOrbButton
           style={
-            hasAnswerCard && !insightSidebarOpen
+            hasAnswerCard
               ? {
                   // Keep base clearance for the minimised bar; lift extra with GPU transform when maximised.
                   bottom: "calc(4.75rem + env(safe-area-inset-bottom, 0px))",
-                  transform: mobileAnswerMaximised
-                    ? problem.answer_type === "grila"
-                      ? "translate3d(0, -13.5rem, 0)"
-                      : "translate3d(0, -4.25rem, 0)"
-                    : "translate3d(0, 0, 0)",
+                  transform:
+                    !insightSidebarOpen && mobileAnswerMaximised
+                      ? problem.answer_type === "grila"
+                        ? "translate3d(0, -13.5rem, 0)"
+                        : "translate3d(0, -4.25rem, 0)"
+                      : "translate3d(0, 0, 0)",
                 }
               : undefined
           }
@@ -841,28 +883,26 @@ export default function ProblemDetailClient({
       )}
 
       {hasAnswerCard ? (
-        <div className={cn(insightSidebarOpen && "invisible pointer-events-none")}>
-          <ProblemAnswerCard
-            layout="bottomBar"
-            problem={problem}
-            onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
-            onSolvedCorrectly={handleMarkSolved}
-            isSolved={isSolved}
-            userId={user?.id ?? null}
-            onWrongAnswerPenalty={handleWrongAnswerPenalty}
-            onMobileMaximisedChange={setMobileAnswerMaximised}
-            showHintButton={!isClassroomEmbed}
-            onHintClick={
-              !isClassroomEmbed
-                ? () => {
-                    setOpenedInsightFromCard(true)
-                    setInsightSidebarOpen(true)
-                    setInitialHintMessage("Am nevoie de un hint")
-                  }
-                : undefined
-            }
-          />
-        </div>
+        <ProblemAnswerCard
+          layout="bottomBar"
+          problem={problem}
+          onCanMarkSolvedChange={setCanMarkSolvedByAnswer}
+          onSolvedCorrectly={handleMarkSolved}
+          isSolved={isSolved}
+          userId={user?.id ?? null}
+          onWrongAnswerPenalty={handleWrongAnswerPenalty}
+          onMobileMaximisedChange={setMobileAnswerMaximised}
+          showHintButton={!isClassroomEmbed}
+          onHintClick={
+            !isClassroomEmbed
+              ? () => {
+                  setOpenedInsightFromCard(true)
+                  setInsightSidebarOpen(true)
+                  setInitialHintMessage("Am nevoie de un hint")
+                }
+              : undefined
+          }
+        />
       ) : null}
 
       {!isClassroomEmbed && insightChatMounted && (

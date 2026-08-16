@@ -10,6 +10,7 @@ import { DashboardClientWrapper } from "@/components/dashboard/dashboard-client-
 import { DashboardSidebarProvider } from "@/components/dashboard/dashboard-sidebar-context"
 import { ChildLeaderboardCard } from "@/components/dashboard/parent/child-leaderboard-card"
 import { ChildStatsCard } from "@/components/dashboard/parent/child-stats-card"
+import { ChildSubscriptionCard } from "@/components/dashboard/parent/child-subscription-card"
 import { EstimatedGradeChartCard } from "@/components/dashboard/parent/estimated-grade-chart-card"
 import { RecentWorkCard } from "@/components/dashboard/parent/recent-work-card"
 import { Button } from "@/components/ui/button"
@@ -85,12 +86,15 @@ function AddChildSection({
 function ChildDashboardGrid({
   child,
   onTargetGradeChange,
+  onBillingChange,
 }: {
   child: ChildProgressSnapshot
   onTargetGradeChange: (childId: string, value: number) => void
+  onBillingChange?: () => void
 }) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <ChildSubscriptionCard child={child} onBillingChange={onBillingChange} />
       <EstimatedGradeChartCard
         childId={child.child_id}
         estimatedGrade={child.estimated_grade}
@@ -113,6 +117,7 @@ export function ParentDashboard() {
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
+  const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
 
   const parentName = profile?.nickname?.trim() || profile?.name?.trim() || "părinte"
 
@@ -167,7 +172,18 @@ export function ParentDashboard() {
       })
       if (!response.ok) throw new Error("children_failed")
       const payload = await response.json()
-      const nextChildren = Array.isArray(payload.children) ? payload.children : []
+      const nextChildren = (Array.isArray(payload.children) ? payload.children : []).map(
+        (child: ChildProgressSnapshot) => ({
+          ...child,
+          billing: child.billing ?? {
+            plan: "free",
+            billing_source: "none",
+            current_period_end: null,
+            can_manage: false,
+            can_purchase: true,
+          },
+        })
+      )
       setChildren(nextChildren)
       setSelectedChildId((current) => {
         if (current && nextChildren.some((child: ChildProgressSnapshot) => child.child_id === current)) {
@@ -199,6 +215,60 @@ export function ParentDashboard() {
     void fetchInvite()
     void fetchChildren()
   }, [authLoading, user, isParent, router, fetchInvite, fetchChildren])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get("checkout")
+    const sessionId = params.get("session_id")
+
+    if (status === "success") {
+      toast({
+        title: "Plată reușită",
+        description: "Abonamentul copilului va fi activat în câteva secunde.",
+      })
+    } else if (status === "canceled") {
+      toast({
+        title: "Plata a fost anulată",
+        description: "Poți relua comanda oricând.",
+      })
+    }
+
+    if (!sessionId || status !== "success") return
+    if (syncingSessionId === sessionId) return
+
+    const syncSubscription = async () => {
+      try {
+        setSyncingSessionId(sessionId)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+        if (!accessToken) return
+
+        const response = await fetch("/api/stripe/sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ session_id: sessionId }),
+        })
+        const payload = await response.json()
+        if (!response.ok) {
+          throw new Error(payload?.error || "Nu am putut sincroniza abonamentul.")
+        }
+        await fetchChildren()
+        router.replace("/dashboard/parent")
+      } catch (error) {
+        toast({
+          title: "Sincronizare eșuată",
+          description: error instanceof Error ? error.message : "Încearcă din nou.",
+          variant: "destructive",
+        })
+      }
+    }
+
+    void syncSubscription()
+  }, [user, toast, syncingSessionId, fetchChildren, router])
 
   const copyInviteLink = async () => {
     if (!inviteUrl) return
@@ -294,6 +364,7 @@ export function ParentDashboard() {
                     <ChildDashboardGrid
                       child={selectedChild}
                       onTargetGradeChange={handleTargetGradeChange}
+                      onBillingChange={() => void fetchChildren()}
                     />
                   ) : null}
 

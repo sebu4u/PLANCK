@@ -14,7 +14,7 @@ import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-l
 
 const LEARNING_PATH_HUB_CACHE_SECONDS = 5 * 60
 const LEARNING_PATH_HUB_CHAPTER_COLUMNS =
-  "id, slug, title, nav_title, description, icon_url, accent_color, order_index, is_personalized, generation_status, created_at"
+  "id, slug, title, nav_title, description, icon_url, accent_color, problem_category, materie, order_index, is_personalized, generation_status, created_at"
 
 function createAnonSupabaseClient() {
   return createClient(
@@ -60,7 +60,7 @@ async function loadPublicLearningPathHubCatalog(): Promise<PublicLearningPathHub
 
 export const getCachedPublicLearningPathHubCatalog = unstable_cache(
   loadPublicLearningPathHubCatalog,
-  ["learning-path-hub-public-catalog-v2"],
+  ["learning-path-hub-public-catalog-v3"],
   { revalidate: LEARNING_PATH_HUB_CACHE_SECONDS }
 )
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAccessTokenFromRequest } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
+import { lockedMaterials, loadUnlockedMaterials } from "@/lib/pregatire/materials"
 import { fetchTeachersByIds, mapWorkshopPublic } from "@/lib/pregatire/queries"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
@@ -49,6 +50,7 @@ export async function GET(
     let unlocked = false
     let meetUrl: string | null = null
     let recordingUrl: string | null = null
+    let materials = lockedMaterials()
 
     if (userId) {
       const { data: unlock } = await supabase
@@ -60,13 +62,16 @@ export async function GET(
 
       unlocked = Boolean(unlock)
       if (unlocked) {
-        const { data: full } = await supabase
-          .from("workshops")
-          .select("meet_url, recording_url")
-          .eq("id", id)
-          .maybeSingle()
-        meetUrl = full?.meet_url ?? null
-        recordingUrl = full?.recording_url ?? null
+        const unlockedPayload = await loadUnlockedMaterials(supabase, id)
+        meetUrl = unlockedPayload.meet_url
+        recordingUrl = unlockedPayload.recording_url
+        materials = {
+          whiteboard_url: unlockedPayload.whiteboard_url,
+          notes_markdown: unlockedPayload.notes_markdown,
+          notes_pdf_url: unlockedPayload.notes_pdf_url,
+          homework_pdf_url: unlockedPayload.homework_pdf_url,
+          homework_items: unlockedPayload.homework_items,
+        }
       }
     }
 
@@ -78,6 +83,7 @@ export async function GET(
       ),
       meet_url: unlocked ? meetUrl : null,
       recording_url: unlocked ? recordingUrl : null,
+      ...materials,
     }
 
     return NextResponse.json({ workshop })

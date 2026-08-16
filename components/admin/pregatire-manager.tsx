@@ -16,10 +16,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  EMPTY_WORKSHOP_MATERIALS_FORM,
+  WorkshopMaterialsFields,
+  type WorkshopMaterialsFormValue,
+} from "@/components/admin/workshop-materials-fields"
+import {
   WORKSHOP_DEFAULT_DURATION_MINUTES,
   WORKSHOP_DEFAULT_ENERGY_COST,
   WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_LABELS,
+  type WorkshopHomeworkItem,
   type WorkshopSubject,
   type WorkshopTeacher,
 } from "@/lib/pregatire/types"
@@ -39,6 +45,13 @@ interface AdminWorkshop {
   recording_url: string | null
   max_seats: number | null
   is_published: boolean
+  whiteboard_url?: string | null
+  notes_markdown?: string | null
+  notes_pdf_path?: string | null
+  homework_pdf_path?: string | null
+  notes_pdf_url?: string | null
+  homework_pdf_url?: string | null
+  homework_items?: WorkshopHomeworkItem[]
   workshop_teachers?: { id: string; name: string; icon_url: string | null } | null
 }
 
@@ -58,6 +71,18 @@ const EMPTY_FORM = {
   is_published: false,
 }
 
+function materialsFromWorkshop(workshop: AdminWorkshop): WorkshopMaterialsFormValue {
+  return {
+    whiteboard_url: workshop.whiteboard_url ?? "",
+    notes_markdown: workshop.notes_markdown ?? "",
+    notes_pdf_path: workshop.notes_pdf_path ?? "",
+    notes_pdf_url: workshop.notes_pdf_url ?? "",
+    homework_pdf_path: workshop.homework_pdf_path ?? "",
+    homework_pdf_url: workshop.homework_pdf_url ?? "",
+    homework_items: workshop.homework_items ?? [],
+  }
+}
+
 export function PregatireManager() {
   const [workshops, setWorkshops] = useState<AdminWorkshop[]>([])
   const [teachers, setTeachers] = useState<WorkshopTeacher[]>([])
@@ -67,6 +92,7 @@ export function PregatireManager() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [materials, setMaterials] = useState<WorkshopMaterialsFormValue>(EMPTY_WORKSHOP_MATERIALS_FORM)
 
   const getAccessToken = useCallback(async () => {
     const { data } = await supabase.auth.getSession()
@@ -111,6 +137,7 @@ export function PregatireManager() {
   const resetForm = () => {
     setEditingId(null)
     setForm(EMPTY_FORM)
+    setMaterials(EMPTY_WORKSHOP_MATERIALS_FORM)
   }
 
   const handleEdit = (workshop: AdminWorkshop) => {
@@ -131,6 +158,7 @@ export function PregatireManager() {
       unlimited_seats: workshop.max_seats == null,
       is_published: workshop.is_published,
     })
+    setMaterials(materialsFromWorkshop(workshop))
     setSuccessMessage(null)
     setError(null)
   }
@@ -176,6 +204,11 @@ export function PregatireManager() {
           ? null
           : Math.max(1, Number(form.max_seats) || 1),
         is_published: form.is_published,
+        whiteboard_url: materials.whiteboard_url.trim() || null,
+        notes_markdown: materials.notes_markdown,
+        notes_pdf_path: materials.notes_pdf_path || null,
+        homework_pdf_path: materials.homework_pdf_path || null,
+        homework_items: materials.homework_items,
         ...(editingId ? { id: editingId } : {}),
       }
 
@@ -192,8 +225,13 @@ export function PregatireManager() {
         setError(data.error ?? "Nu am putut salva.")
         return
       }
-      setSuccessMessage(editingId ? "Pregătire actualizată." : "Pregătire creată.")
-      resetForm()
+      const saved = data.workshop as AdminWorkshop | undefined
+      setSuccessMessage(editingId ? "Pregătire actualizată." : "Pregătire creată. Poți încărca PDF-urile.")
+      if (saved?.id) {
+        handleEdit(saved)
+      } else {
+        resetForm()
+      }
       await refresh()
     } catch {
       setError("Eroare la salvare.")
@@ -426,6 +464,13 @@ export function PregatireManager() {
               onCheckedChange={(checked) => setForm((c) => ({ ...c, is_published: checked }))}
             />
           </div>
+
+          <WorkshopMaterialsFields
+            value={materials}
+            onChange={setMaterials}
+            workshopId={editingId}
+            getAccessToken={getAccessToken}
+          />
 
           {error ? (
             <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">

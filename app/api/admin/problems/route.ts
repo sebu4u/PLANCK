@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
 
       let query = supabase
         .from("coding_problems")
-        .select("id, title, difficulty, class, chapter, created_at")
+        .select("id, slug, display_id, title, difficulty, class, chapter, created_at")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
 
@@ -99,6 +99,8 @@ export async function GET(req: NextRequest) {
       const rows =
         problems?.map((p) => ({
           id: p.id,
+          slug: p.slug,
+          display_id: p.display_id,
           title: p.title,
           difficulty: p.difficulty,
           class: p.class,

@@ -19,6 +19,12 @@ import {
   writeStoredInvataHubTab,
   type InvataHubTab,
 } from "@/lib/invata-hub-tab"
+import {
+  DEFAULT_INVATA_SUBJECT_FILTER,
+  readStoredInvataSubjectFilter,
+  writeStoredInvataSubjectFilter,
+  type InvataSubjectFilter,
+} from "@/lib/invata-config"
 import type {
   LearningPathHubChapter,
   LearningPathHubLesson,
@@ -32,7 +38,10 @@ interface InvataHubPageClientProps {
   lessonProgressByLessonId: LessonProgressByLessonId
 }
 
-function HubLearningPaths(props: InvataHubPageClientProps) {
+function HubLearningPaths({
+  subjectFilter,
+  ...props
+}: InvataHubPageClientProps & { subjectFilter: InvataSubjectFilter }) {
   return (
     <LearningPathsList
       chapters={props.chapters}
@@ -41,6 +50,7 @@ function HubLearningPaths(props: InvataHubPageClientProps) {
       lockedChapterIds={props.lockedChapterIds}
       completedLessonIds={[]}
       lessonProgressByLessonId={props.lessonProgressByLessonId}
+      subjectFilter={subjectFilter}
     />
   )
 }
@@ -60,8 +70,26 @@ function useInvataHubTab() {
   return { tab, selectTab }
 }
 
+function useInvataSubjectFilter() {
+  const [subjectFilter, setSubjectFilter] = useState<InvataSubjectFilter>(
+    DEFAULT_INVATA_SUBJECT_FILTER,
+  )
+
+  useLayoutEffect(() => {
+    setSubjectFilter(readStoredInvataSubjectFilter())
+  }, [])
+
+  const selectSubjectFilter = (next: InvataSubjectFilter) => {
+    setSubjectFilter(next)
+    writeStoredInvataSubjectFilter(next)
+  }
+
+  return { subjectFilter, selectSubjectFilter }
+}
+
 export function InvataHubPageClient(props: InvataHubPageClientProps) {
   const { tab, selectTab } = useInvataHubTab()
+  const { subjectFilter, selectSubjectFilter } = useInvataSubjectFilter()
   const showTrasee = tab === "trasee"
 
   return (
@@ -69,12 +97,18 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
       <div className="sm:hidden">
         <InvataMobileHubShell top={<InvataHowToLearnCard />}>
           <div className="px-5 pt-5">
-            <InvataHubTabBar value={tab} onChange={selectTab} className="mb-4" />
+            <InvataHubTabBar
+              value={tab}
+              onChange={selectTab}
+              subjectFilter={subjectFilter}
+              onSubjectFilterChange={selectSubjectFilter}
+              className="mb-4"
+            />
 
             {showTrasee ? (
               <>
                 <InvataPersonalizedCourseEntry className="mb-6" />
-                <HubLearningPaths {...props} />
+                <HubLearningPaths {...props} subjectFilter={subjectFilter} />
               </>
             ) : (
               <InvataHubLectiiPanel compact className="pb-14" />
@@ -86,7 +120,13 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
       <div className="hidden sm:block">
         <InvataHubMain>
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">
-            <InvataHubTabBar value={tab} onChange={selectTab} className="mb-6" />
+            <InvataHubTabBar
+              value={tab}
+              onChange={selectTab}
+              subjectFilter={subjectFilter}
+              onSubjectFilterChange={selectSubjectFilter}
+              className="mb-6"
+            />
 
             {showTrasee ? (
               <>
@@ -104,7 +144,7 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
                     <InvataAdminLearningPathsLink />
                   </div>
                 </header>
-                <HubLearningPaths {...props} />
+                <HubLearningPaths {...props} subjectFilter={subjectFilter} />
                 <InvataSeoIntro />
               </>
             ) : (

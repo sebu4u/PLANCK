@@ -19,6 +19,7 @@ import {
   normalizePracticeSubject,
 } from "@/lib/practice-subject"
 import { cn } from "@/lib/utils"
+import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 
 const LIVE_LOOKBACK_MS = 4 * 60 * 60 * 1000
 
@@ -93,6 +94,7 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
         </div>
         <Link
           href="/pregatire"
+          onClick={() => setPregatireBackTarget("/dashboard")}
           className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity active:opacity-70"
         >
           Calendar
@@ -113,6 +115,7 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
           </p>
           <Link
             href="/pregatire"
+            onClick={() => setPregatireBackTarget("/dashboard")}
             className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity active:opacity-70"
           >
             Vezi calendarul
@@ -127,6 +130,7 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
               <li key={workshop.id}>
                 <Link
                   href={`/pregatire/${workshop.id}`}
+                  onClick={() => setPregatireBackTarget("/dashboard")}
                   className={cn(
                     "flex items-start justify-between gap-3 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-3 py-2.5 transition",
                     "active:scale-[0.99] active:bg-[#f3f4f6]",

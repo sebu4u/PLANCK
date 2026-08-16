@@ -15,7 +15,6 @@ import { useAuth } from "@/components/auth-provider"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
-import { ExerseazaPregatireCta } from "@/components/exerseaza/exerseaza-pregatire-cta"
 import { ExerseazaPregatirePromoCard } from "@/components/exerseaza/exerseaza-pregatire-promo-card"
 import { ExerseazaMonthCalendar } from "@/components/exerseaza/exerseaza-month-calendar"
 import { ExerseazaWeekCalendar } from "@/components/exerseaza/exerseaza-week-calendar"
@@ -122,7 +121,7 @@ function CardImageArea({ card }: { card: ExerseazaCardConfig }) {
           src={card.imageSrc}
           alt=""
           fill
-          className="object-cover"
+          className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.06]"
           sizes="(max-width: 1024px) 50vw, 25vw"
         />
       </div>
@@ -137,7 +136,7 @@ function CardImageArea({ card }: { card: ExerseazaCardConfig }) {
       )}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.25),transparent_55%)]" />
-      <Icon className="relative h-12 w-12 text-white/90 drop-shadow-sm" strokeWidth={1.5} />
+      <Icon className="relative h-12 w-12 text-white/90 drop-shadow-sm transition-transform duration-300 ease-out group-hover:scale-110" strokeWidth={1.5} />
     </div>
   )
 }
@@ -202,7 +201,7 @@ function DesktopCard({
   const content = (
     <article
       className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-2xl border border-[#e5e5e5] bg-white transition-colors duration-200 hover:border-[#d4d4d4]",
+        "group flex h-full flex-col overflow-hidden rounded-2xl border-2 border-[#e5e5e5] bg-white shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-[#d1d5db] hover:shadow-[0_14px_32px_rgba(0,0,0,0.08)]",
         card.comingSoon && "opacity-75",
       )}
     >
@@ -312,14 +311,15 @@ function BibliotecaPanel({
 }) {
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">Exersează</h1>
-        <p className="text-sm text-[#2c2f33]/75 sm:text-base">
-          Alege cum vrei să exersezi: probleme, grile, teste sau flashcard-uri.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-2">
+          <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">Exersează</h1>
+          <p className="text-sm text-[#2c2f33]/75 sm:text-base">
+            Alege cum vrei să exersezi: probleme, grile, teste sau flashcard-uri.
+          </p>
+        </div>
+        <PracticeSubjectSwitcher currentSubject="fizica" className="shrink-0 pt-1" />
       </header>
-
-      <PracticeSubjectSwitcher currentSubject="fizica" />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
         <div className="grid grid-cols-2 gap-3 xl:gap-4">
@@ -398,7 +398,7 @@ export function ExerseazaHub({ counts, assignments = [] }: ExerseazaHubProps) {
             {/* Mobile layout */}
             <div className="space-y-4 px-5 pb-12 pt-5 burger:mt-0 sm:px-8 lg:hidden">
               <h1 className="text-2xl font-bold tracking-tight text-[#2c2f33]">Exersează</h1>
-              <ExerseazaPregatireCta />
+              <ExerseazaPregatirePromoCard />
               <ExerseazaWeekCalendar />
               <div className="flex flex-col gap-3 pt-1">
                 {EXERSEAZA_CARDS.map((card) => (

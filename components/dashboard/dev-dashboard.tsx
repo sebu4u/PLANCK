@@ -172,12 +172,20 @@ export function DevDashboard() {
                       })}
                     </div>
                     {isAdmin ? (
-                      <Link
-                        href="/admin/lessons"
-                        className="mt-4 block rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-semibold text-violet-950 transition hover:border-violet-300 hover:bg-violet-100"
-                      >
-                        Admin — Lecții
-                      </Link>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <Link
+                          href="/admin/lessons"
+                          className="block rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-semibold text-violet-950 transition hover:border-violet-300 hover:bg-violet-100"
+                        >
+                          Admin — Lecții
+                        </Link>
+                        <Link
+                          href="/admin/content-reports"
+                          className="block rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-semibold text-violet-950 transition hover:border-violet-300 hover:bg-violet-100"
+                        >
+                          Admin — Rapoarte
+                        </Link>
+                      </div>
                     ) : null}
                   </div>
                 </div>

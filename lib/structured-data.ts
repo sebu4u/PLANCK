@@ -73,7 +73,7 @@ export const organizationStructuredData = {
   "contactPoint": {
     "@type": "ContactPoint",
     "contactType": "customer service",
-    "email": "contact@planck.academy"
+    "email": "planck.fizica@gmail.com"
   },
   "sameAs": [
     "https://facebook.com/planck",

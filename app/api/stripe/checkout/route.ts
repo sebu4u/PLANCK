@@ -7,11 +7,18 @@ import { normalizeSubscriptionPlan } from "@/lib/subscription-plan"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import {
+  PARENT_FOR_CHILD_PURCHASE_TYPE,
   getOrCreateStripeCustomerId,
   getSupabaseAdmin,
   hasPortalManagedSubscription,
   isStripeMissingCustomerError,
 } from "@/lib/stripe-subscription"
+import {
+  ParentChildBillingError,
+  assertParentCanPurchaseForChild,
+  childHasEntitledParentGrant,
+} from "@/lib/parent/billing"
+import { normalizeUserType } from "@/lib/user-types"
 
 export const runtime = "nodejs"
 
@@ -21,6 +28,7 @@ type CheckoutBody = {
   plan?: string
   interval?: BillingInterval
   promotionCodeId?: string
+  childId?: string
 }
 
 const FORBIDDEN_CARD_FIELDS = new Set([
@@ -113,6 +121,38 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    const childId = typeof body?.childId === "string" ? body.childId.trim() : ""
+    const user = userData.user
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("stripe_customer_id, stripe_subscription_status, user_type")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    const userType = normalizeUserType(profile?.user_type)
+
+    if (childId) {
+      if (userType !== "parinte") {
+        return NextResponse.json(
+          { error: "Doar un părinte poate cumpăra Premium pentru un copil." },
+          { status: 403 }
+        )
+      }
+      await assertParentCanPurchaseForChild(user.id, childId)
+    } else if (userType === "parinte") {
+      return NextResponse.json(
+        { error: "Alege un copil pentru care cumperi Premium." },
+        { status: 400 }
+      )
+    } else if (await childHasEntitledParentGrant(supabaseAdmin, user.id)) {
+      return NextResponse.json(
+        { error: "Ai deja Premium prin părinte. Nu poți cumpăra un al doilea abonament." },
+        { status: 409 }
+      )
+    }
+
     const priceId = resolvePriceId(interval)
     const stripe = getStripeClient()
     const { siteUrl } = getStripeConfig()
@@ -143,16 +183,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const user = userData.user
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("stripe_customer_id, stripe_subscription_status")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
     let existingCustomerId = profile?.stripe_customer_id ?? null
     const existingStatus = profile?.stripe_subscription_status ?? null
-    if (existingCustomerId && hasPortalManagedSubscription(existingStatus)) {
+    const isParentForChild = Boolean(childId)
+
+    if (!isParentForChild && existingCustomerId && hasPortalManagedSubscription(existingStatus)) {
       try {
         const portalSession = await stripe.billingPortal.sessions.create({
           customer: existingCustomerId,
@@ -173,7 +208,6 @@ export async function POST(req: NextRequest) {
         )
         existingCustomerId = null
 
-        const supabaseAdmin = getSupabaseAdmin()
         const { error: cleanupError } = await supabaseAdmin
           .from("profiles")
           .update({
@@ -200,7 +234,6 @@ export async function POST(req: NextRequest) {
     })
 
     if (stripeCustomerId !== existingCustomerId) {
-      const supabaseAdmin = getSupabaseAdmin()
       const { error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({ stripe_customer_id: stripeCustomerId })
@@ -210,6 +243,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const successUrl = isParentForChild
+      ? `${siteUrl}/dashboard/parent?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+      : `${siteUrl}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+    const cancelUrl = isParentForChild
+      ? `${siteUrl}/dashboard/parent?checkout=canceled`
+      : `${siteUrl}/pricing?checkout=canceled`
+
+    const sharedMetadata: Record<string, string> = isParentForChild
+      ? {
+          user_id: user.id,
+          payer_user_id: user.id,
+          beneficiary_user_id: childId,
+          purchase_type: PARENT_FOR_CHILD_PURCHASE_TYPE,
+          plan: normalizedPlan,
+          interval,
+        }
+      : {
+          user_id: user.id,
+          plan: normalizedPlan,
+          interval,
+        }
+
     // We only create hosted Checkout sessions here; sensitive card input stays on Stripe.
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -218,20 +273,12 @@ export async function POST(req: NextRequest) {
       ...(validPromotionCodeId
         ? { discounts: [{ promotion_code: validPromotionCodeId }] }
         : { allow_promotion_codes: true }),
-      success_url: `${siteUrl}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/pricing?checkout=canceled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       client_reference_id: user.id,
-      metadata: {
-        user_id: user.id,
-        plan: normalizedPlan,
-        interval,
-      },
+      metadata: sharedMetadata,
       subscription_data: {
-        metadata: {
-          user_id: user.id,
-          plan: normalizedPlan,
-          interval,
-        },
+        metadata: sharedMetadata,
       },
     })
 
@@ -240,7 +287,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ url: session.url })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof ParentChildBillingError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     console.error("[stripe/checkout] Error:", error)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }

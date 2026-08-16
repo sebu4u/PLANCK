@@ -7,10 +7,49 @@ import { slugify } from "@/lib/slug"
 import {
   WORKSHOP_DEFAULT_DURATION_MINUTES,
   WORKSHOP_DEFAULT_ENERGY_COST,
+  WORKSHOP_HOMEWORK_ITEM_TYPES,
   WORKSHOP_SUBJECTS,
 } from "@/lib/pregatire/types"
+import {
+  fetchHomeworkItemsByWorkshopIds,
+  replaceHomeworkItems,
+  signWorkshopPdfUrls,
+  WORKSHOP_MATERIALS_BUCKET,
+} from "@/lib/pregatire/materials"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
+
+const homeworkItemSchema = z.object({
+  item_type: z.enum(WORKSHOP_HOMEWORK_ITEM_TYPES),
+  ref_id: z.string().trim().min(1).max(180),
+  title: z.string().trim().min(1).max(300),
+  href: z.string().trim().min(1).max(500),
+})
+
+const optionalUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .optional()
+  .nullable()
+  .transform((value) => {
+    if (value == null || value === "") return null
+    return value
+  })
+  .refine((value) => value == null || /^https?:\/\//i.test(value), {
+    message: "URL-ul tablei trebuie să înceapă cu http(s).",
+  })
+
+const optionalPath = z
+  .string()
+  .trim()
+  .max(512)
+  .optional()
+  .nullable()
+  .transform((value) => {
+    if (value == null || value === "") return null
+    return value
+  })
 
 const workshopSchema = z.object({
   id: z.string().uuid().optional(),
@@ -26,6 +65,11 @@ const workshopSchema = z.object({
   recording_url: z.string().url().nullable().optional(),
   max_seats: z.number().int().min(1).max(10000).nullable().optional(),
   is_published: z.boolean().default(false),
+  whiteboard_url: optionalUrl,
+  notes_markdown: z.string().max(100_000).optional().nullable(),
+  notes_pdf_path: optionalPath,
+  homework_pdf_path: optionalPath,
+  homework_items: z.array(homeworkItemSchema).max(80).optional(),
 })
 
 async function verifyAdmin(req: NextRequest) {
@@ -75,6 +119,30 @@ async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
   }
 }
 
+async function attachMaterials<T extends { id: string; notes_pdf_path?: string | null; homework_pdf_path?: string | null }>(
+  rows: T[],
+) {
+  const supabase = getServiceRoleSupabase()
+  const ids = rows.map((row) => row.id)
+  const homeworkMap = await fetchHomeworkItemsByWorkshopIds(supabase, ids)
+  const signed = await signWorkshopPdfUrls(
+    supabase,
+    rows.flatMap((row) => [row.notes_pdf_path, row.homework_pdf_path]),
+  )
+  return rows.map((row) => ({
+    ...row,
+    notes_pdf_url: row.notes_pdf_path ? signed.get(row.notes_pdf_path) ?? null : null,
+    homework_pdf_url: row.homework_pdf_path ? signed.get(row.homework_pdf_path) ?? null : null,
+    homework_items: homeworkMap.get(row.id) ?? [],
+  }))
+}
+
+async function removeStorageIfUnused(path: string | null | undefined) {
+  if (!path?.trim()) return
+  const supabase = getServiceRoleSupabase()
+  await supabase.storage.from(WORKSHOP_MATERIALS_BUCKET).remove([path.trim()])
+}
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifyAdmin(req)
@@ -91,10 +159,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Nu am putut încărca pregătirile." }, { status: 500 })
     }
 
-    return NextResponse.json({ workshops: data ?? [] })
+    const workshops = await attachMaterials(data ?? [])
+    return NextResponse.json({ workshops })
   } catch (err) {
     logger.error("[admin/pregatiri] GET error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
+  }
+}
+
+function materialsFields(parsed: z.infer<typeof workshopSchema>) {
+  return {
+    whiteboard_url: parsed.whiteboard_url ?? null,
+    notes_markdown: parsed.notes_markdown?.trim() ?? "",
+    notes_pdf_path: parsed.notes_pdf_path ?? null,
+    homework_pdf_path: parsed.homework_pdf_path ?? null,
   }
 }
 
@@ -138,6 +216,7 @@ export async function POST(req: NextRequest) {
         max_seats: parsed.data.max_seats ?? null,
         is_published: parsed.data.is_published,
         updated_at: now,
+        ...materialsFields(parsed.data),
       })
       .select("*, workshop_teachers(id, name, icon_url, is_active)")
       .single()
@@ -147,7 +226,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nu am putut crea pregătirea." }, { status: 500 })
     }
 
-    return NextResponse.json({ workshop: data }, { status: 201 })
+    if (parsed.data.homework_items) {
+      await replaceHomeworkItems(supabase, data.id, parsed.data.homework_items)
+    }
+
+    const [workshop] = await attachMaterials([data])
+    return NextResponse.json({ workshop }, { status: 201 })
   } catch (err) {
     logger.error("[admin/pregatiri] POST error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
@@ -181,6 +265,14 @@ export async function PUT(req: NextRequest) {
     const slug = await uniqueSlug(parsed.data.slug || parsed.data.title, parsed.data.id)
     const supabase = getServiceRoleSupabase()
 
+    const { data: previous } = await supabase
+      .from("workshops")
+      .select("notes_pdf_path, homework_pdf_path")
+      .eq("id", parsed.data.id)
+      .maybeSingle()
+
+    const nextMaterials = materialsFields(parsed.data)
+
     const { data, error } = await supabase
       .from("workshops")
       .update({
@@ -197,6 +289,7 @@ export async function PUT(req: NextRequest) {
         max_seats: parsed.data.max_seats ?? null,
         is_published: parsed.data.is_published,
         updated_at: new Date().toISOString(),
+        ...nextMaterials,
       })
       .eq("id", parsed.data.id)
       .select("*, workshop_teachers(id, name, icon_url, is_active)")
@@ -210,7 +303,19 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Pregătirea nu a fost găsită." }, { status: 404 })
     }
 
-    return NextResponse.json({ workshop: data })
+    if (parsed.data.homework_items) {
+      await replaceHomeworkItems(supabase, parsed.data.id, parsed.data.homework_items)
+    }
+
+    if (previous?.notes_pdf_path && previous.notes_pdf_path !== nextMaterials.notes_pdf_path) {
+      await removeStorageIfUnused(previous.notes_pdf_path)
+    }
+    if (previous?.homework_pdf_path && previous.homework_pdf_path !== nextMaterials.homework_pdf_path) {
+      await removeStorageIfUnused(previous.homework_pdf_path)
+    }
+
+    const [workshop] = await attachMaterials([data])
+    return NextResponse.json({ workshop })
   } catch (err) {
     logger.error("[admin/pregatiri] PUT error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
@@ -228,11 +333,21 @@ export async function DELETE(req: NextRequest) {
     }
 
     const supabase = getServiceRoleSupabase()
+    const { data: previous } = await supabase
+      .from("workshops")
+      .select("notes_pdf_path, homework_pdf_path")
+      .eq("id", id)
+      .maybeSingle()
+
     const { error } = await supabase.from("workshops").delete().eq("id", id)
     if (error) {
       logger.error("[admin/pregatiri] DELETE failed:", error)
       return NextResponse.json({ error: "Nu am putut șterge pregătirea." }, { status: 500 })
     }
+
+    await removeStorageIfUnused(previous?.notes_pdf_path)
+    await removeStorageIfUnused(previous?.homework_pdf_path)
+    await supabase.storage.from(WORKSHOP_MATERIALS_BUCKET).remove([`${id}/notes`, `${id}/homework`]).catch(() => undefined)
 
     return NextResponse.json({ success: true })
   } catch (err) {

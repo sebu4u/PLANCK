@@ -16,6 +16,7 @@ import {
   type WorkshopPublic,
 } from "@/lib/pregatire/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 import { cn } from "@/lib/utils"
 
 const WEEKDAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"] as const
@@ -260,7 +261,10 @@ export function ExerseazaWeekCalendar() {
                   </p>
                   <Link
                     href={`/pregatire/${workshop.id}`}
-                    onClick={() => setSelectedDayKey(null)}
+                    onClick={() => {
+                      setPregatireBackTarget("/exerseaza")
+                      setSelectedDayKey(null)
+                    }}
                     className="mt-2.5 inline-flex text-sm font-semibold text-[#2563eb] transition-opacity hover:opacity-80"
                   >
                     Vezi

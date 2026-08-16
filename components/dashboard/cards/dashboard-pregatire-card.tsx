@@ -23,6 +23,7 @@ import {
   normalizePracticeSubject,
 } from "@/lib/practice-subject"
 import { cn } from "@/lib/utils"
+import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 
 const LIVE_LOOKBACK_MS = 4 * 60 * 60 * 1000
 const MAX_LIST_ITEMS = 2
@@ -146,10 +147,14 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
       role="link"
       tabIndex={0}
       aria-label="Deschide calendarul de pregătiri"
-      onClick={() => router.push("/pregatire")}
+      onClick={() => {
+        setPregatireBackTarget("/dashboard")
+        router.push("/pregatire")
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
+          setPregatireBackTarget("/dashboard")
           router.push("/pregatire")
         }
       }}
@@ -164,7 +169,10 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
         </div>
         <Link
           href="/pregatire"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            setPregatireBackTarget("/dashboard")
+          }}
           className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity hover:opacity-70"
         >
           Calendar
@@ -240,7 +248,10 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
             </p>
             <Link
               href="/pregatire"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setPregatireBackTarget("/dashboard")
+              }}
               className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity hover:opacity-70"
             >
               Vezi calendarul
@@ -255,7 +266,10 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
                 <li key={workshop.id}>
                   <Link
                     href={`/pregatire/${workshop.id}`}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPregatireBackTarget("/dashboard")
+                    }}
                     className={cn(
                       "flex items-start justify-between gap-2 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-2.5 py-2 transition",
                       "hover:bg-[#f3f4f6] active:scale-[0.99]",

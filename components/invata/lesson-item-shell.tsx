@@ -27,6 +27,7 @@ import { useMomentumTrigger } from "@/hooks/engagement/use-momentum-trigger"
 import { useStreakTrigger } from "@/hooks/engagement/use-streak-trigger"
 import { useStuckTrigger } from "@/hooks/engagement/use-stuck-trigger"
 import { LessonXpBadge } from "@/components/invata/lesson-xp-badge"
+import { ReportIssueButton } from "@/components/content-reports/report-issue-button"
 import type { LearningPathEloAward } from "@/lib/learning-path-elo"
 import {
   formatGrilaLearningPathContext,
@@ -165,6 +166,7 @@ function LessonItemShellInner({
   const navigateToNextItem = useNavigateToNextLearningPathItem(nextItemHref)
   const navigateToPrevItem = useNavigateToPrevLearningPathItem(prevItemHref)
   const animateFirstItemEntry = itemNavigation?.animateFirstItemEntry ?? false
+  const currentItem = items.find((item) => item.id === currentItemId)
 
   const completedItemIdsKey = completedItemIdsForLesson.join(",")
   const lessonProgress = useMemo(() => {
@@ -398,7 +400,23 @@ function LessonItemShellInner({
           </div>
         </div>
 
-        <LessonXpBadge itemIds={lessonXpItemIds} />
+        <div className="flex shrink-0 items-center gap-1">
+          <ReportIssueButton
+            sourceType="learning_path_item"
+            sourceId={currentItemId}
+            sourceMeta={{
+              chapterSlug,
+              lessonSlug,
+              lessonId,
+              chapterId: chapterId ?? undefined,
+              itemIndex,
+              item_type: currentItem?.item_type,
+              problem_id: currentItem?.problem_id,
+              quiz_question_id: currentItem?.quiz_question_id,
+            }}
+          />
+          <LessonXpBadge itemIds={lessonXpItemIds} />
+        </div>
       </nav>
 
       {prevItemHref && !flashcardFlow.isActive ? (

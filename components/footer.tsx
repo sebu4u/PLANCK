@@ -57,7 +57,7 @@ export function Footer({
                 <Youtube size={20} />
               </Link>
               <Link
-                href="#"
+                href="mailto:planck.fizica@gmail.com"
                 className={linkClass}
                 aria-label="Email"
               >

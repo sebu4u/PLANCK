@@ -9,8 +9,17 @@ import {
   getSupabaseAdmin,
   isStripeMissingCustomerError,
 } from "@/lib/stripe-subscription"
+import {
+  ParentChildBillingError,
+  assertParentCanManageChildGrant,
+} from "@/lib/parent/billing"
+import { normalizeUserType } from "@/lib/user-types"
 
 export const runtime = "nodejs"
+
+type PortalBody = {
+  childId?: string
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,13 +34,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
     }
 
+    let childId = ""
+    const contentType = req.headers.get("content-type") ?? ""
+    if (contentType.includes("application/json")) {
+      try {
+        const body = (await req.json()) as PortalBody
+        childId = typeof body?.childId === "string" ? body.childId.trim() : ""
+      } catch {
+        childId = ""
+      }
+    }
+
+    const stripe = getStripeClient()
+    const { siteUrl } = getStripeConfig()
+    const supabaseAdmin = getSupabaseAdmin()
+
+    if (childId) {
+      const grant = await assertParentCanManageChildGrant(userData.user.id, childId)
+      try {
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: grant.customerId,
+          return_url: `${siteUrl}/dashboard/parent`,
+          flow_data: {
+            type: "subscription_update",
+            subscription_update: {
+              subscription: grant.subscriptionId,
+            },
+          },
+        })
+        return NextResponse.json({ url: portalSession.url })
+      } catch (error) {
+        if (isStripeMissingCustomerError(error)) {
+          return NextResponse.json({ error: "Nu există abonament activ." }, { status: 400 })
+        }
+        console.warn("[stripe/portal] Child subscription_update flow failed, using generic portal:", error)
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: grant.customerId,
+          return_url: `${siteUrl}/dashboard/parent`,
+        })
+        return NextResponse.json({ url: portalSession.url })
+      }
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, user_type")
       .eq("user_id", userData.user.id)
       .maybeSingle()
 
-    const stripe = getStripeClient()
+    if (normalizeUserType(profile?.user_type) === "parinte") {
+      return NextResponse.json(
+        { error: "Alege copilul al cărui abonament vrei să îl gestionezi." },
+        { status: 400 }
+      )
+    }
+
     let recoveredCustomerId = profile?.stripe_customer_id ?? null
     let hadInvalidStoredCustomer = false
     if (recoveredCustomerId) {
@@ -60,7 +117,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (hadInvalidStoredCustomer && !recoveredCustomerId) {
-      const supabaseAdmin = getSupabaseAdmin()
       const { error: cleanupError } = await supabaseAdmin
         .from("profiles")
         .update({
@@ -81,10 +137,8 @@ export async function POST(req: NextRequest) {
     if (!recoveredCustomerId) {
       return NextResponse.json({ error: "Nu există abonament activ." }, { status: 400 })
     }
-    const { siteUrl } = getStripeConfig()
 
     if (recoveredCustomerId !== profile?.stripe_customer_id) {
-      const supabaseAdmin = getSupabaseAdmin()
       const { error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({ stripe_customer_id: recoveredCustomerId })
@@ -101,7 +155,10 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json({ url: portalSession.url })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof ParentChildBillingError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     console.error("[stripe/portal] Error:", error)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }

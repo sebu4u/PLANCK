@@ -1,11 +1,13 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Plus } from "lucide-react"
+import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 
 export function ExerseazaPregatireCta() {
   return (
     <Link
       href="/pregatire"
+      onClick={() => setPregatireBackTarget("/exerseaza")}
       className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#60a5fa] px-4 py-4 shadow-[0_10px_28px_-12px_rgba(37,99,235,0.55)] transition-transform active:scale-[0.99]"
     >
       <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1e3a8a] text-white shadow-sm">

@@ -20,6 +20,10 @@ import type {
 import type { ElasticLessonsScrollerProps } from "@/components/invata/elastic-lessons-scroller"
 import { GUEST_LEARNING_PATH_PROGRESS_COOKIE } from "@/lib/guest-learning-path-cookie"
 import { dispatchInvataHubRefresh, INVATA_HUB_REFRESH_EVENT } from "@/lib/invata/hub-events"
+import {
+  chapterMatchesInvataSubjectFilter,
+  type InvataSubjectFilter,
+} from "@/lib/invata-config"
 import { LessonHubSquareCardProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { LearningPathSegmentedProgress } from "@/components/invata/learning-path-segmented-progress"
 import { InvataMobileLessonList } from "@/components/invata/invata-mobile-lesson-card"
@@ -44,6 +48,7 @@ interface LearningPathsListProps {
   lockedChapterIds?: string[]
   completedLessonIds?: string[]
   lessonProgressByLessonId?: LessonProgressByLessonId
+  subjectFilter?: InvataSubjectFilter
 }
 
 type HubProgressResponse = {
@@ -436,7 +441,13 @@ function InvataChapterSection({
                 }
 
                 return (
-                  <Link key={lesson.id} href={lessonHref} className="block shrink-0">
+                  <Link
+                    key={lesson.id}
+                    href={lessonHref}
+                    draggable={false}
+                    onDragStart={(event) => event.preventDefault()}
+                    className="block shrink-0"
+                  >
                     {cardContent}
                   </Link>
                 )
@@ -580,6 +591,7 @@ export function LearningPathsList({
   lockedChapterIds = [],
   completedLessonIds = [],
   lessonProgressByLessonId = {},
+  subjectFilter = "all",
 }: LearningPathsListProps) {
   const { loading: authLoading, user } = useAuth()
   const setInvataHubChapters = useSetInvataHubChapters()
@@ -672,18 +684,24 @@ export function LearningPathsList({
   const visibleChapters = useMemo(
     () =>
       hubChapters.filter(
-        (chapter) => !deletedChapterIds.has(chapter.id) && !isHiddenGeneratingChapter(chapter),
+        (chapter) =>
+          !deletedChapterIds.has(chapter.id) &&
+          !isHiddenGeneratingChapter(chapter) &&
+          chapterMatchesInvataSubjectFilter(chapter, subjectFilter),
       ),
-    [hubChapters, deletedChapterIds],
+    [hubChapters, deletedChapterIds, subjectFilter],
   )
   const visibleArchivedChapters = useMemo(
     () =>
       hubArchivedChapters.length === 0
         ? []
         : hubArchivedChapters.filter(
-            (chapter) => !deletedChapterIds.has(chapter.id) && !isHiddenGeneratingChapter(chapter),
+            (chapter) =>
+              !deletedChapterIds.has(chapter.id) &&
+              !isHiddenGeneratingChapter(chapter) &&
+              chapterMatchesInvataSubjectFilter(chapter, subjectFilter),
           ),
-    [hubArchivedChapters, deletedChapterIds],
+    [hubArchivedChapters, deletedChapterIds, subjectFilter],
   )
 
   useEffect(() => {
@@ -822,9 +840,20 @@ export function LearningPathsList({
   if (!visibleChapters.length) {
     return (
       <section className="rounded-2xl border border-[#e6e6e6] bg-[#f7f7f7] p-8 text-center">
-        <h2 className="text-lg font-semibold text-[#1f1f1f]">Nu există încă learning paths.</h2>
+        <h2 className="text-lg font-semibold text-[#1f1f1f]">
+          {subjectFilter === "all"
+            ? "Nu există încă learning paths."
+            : "Niciun traseu pentru această materie."}
+        </h2>
         <p className="mt-2 text-sm text-[#6f6f6f]">
-          Adaugă capitole și lecții în tabelele dedicate pentru pagina <span className="font-medium">/invata</span>.
+          {subjectFilter === "all" ? (
+            <>
+              Adaugă capitole și lecții în tabelele dedicate pentru pagina{" "}
+              <span className="font-medium">/invata</span>.
+            </>
+          ) : (
+            "Schimbă filtrul din bara de tab-uri ca să vezi traseele altor materii."
+          )}
         </p>
       </section>
     )

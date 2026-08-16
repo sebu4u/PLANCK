@@ -5,9 +5,9 @@ import { LandingPageContent } from "@/components/landing-page-content"
 import { pageTitle } from "@/lib/metadata"
 
 export const metadata: Metadata = {
-  title: pageTitle("Ofertă specială – înveți cu AI"),
+  title: pageTitle("Earlybird Premium — 799 RON/an până pe 7 septembrie"),
   description:
-    "Cursuri complete pe toate materiile de liceu, 1000+ probleme rezolvate video și un traseu personalizat creat de Insight. Preț redus până pe 1 august.",
+    "1 an de Planck Premium la 799 RON — ofertă earlybird până pe 7 septembrie. Trasee complete, Insight AI, pregătiri live și PlanckPass. Începe gratuit.",
 }
 
 export default function LandingPage() {

@@ -10,7 +10,7 @@ import {
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus } from "lucide-react"
 import { BlogNotificationsDropdown } from "@/components/blog/blog-notifications-dropdown"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
@@ -52,6 +52,7 @@ import {
 import { isInformaticaProblemDetailRoute, isPlanckCodeShellRoute } from "@/lib/planckcode-shell-routes"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { isStudentDashboardRoute, normalizePracticeSubject, type PracticeSubjectId } from "@/lib/practice-subject"
+import { getPregatireBackTarget } from "@/lib/pregatire/back-target"
 
 function isInsideMonacoEditor(element: EventTarget | null): boolean {
   if (!(element instanceof HTMLElement)) return false
@@ -64,6 +65,7 @@ type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string;
 const GUEST_REGISTER_CTA_CLASS =
   "dashboard-start-glow inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] px-2 py-1.5 text-[11px] font-semibold leading-tight text-white shadow-[0_3px_0_#5b21b6] transition-[transform,box-shadow] hover:translate-y-0.5 hover:shadow-[0_1px_0_#5b21b6] active:translate-y-0.5 active:shadow-[0_1px_0_#5b21b6] sm:px-2.5 sm:py-2 sm:text-xs"
 const GUEST_REGISTER_GLOW_STYLE = { "--start-glow-tint": "rgba(221, 211, 255, 0.84)" } as CSSProperties
+const NAV_DROPDOWN_ICON_CLASS = "h-4 w-4 shrink-0 stroke-[1.75] text-current opacity-70"
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -462,7 +464,9 @@ export function Navigation() {
   const isProfesorResurseActive = isProfesorResurseRoute(pathname)
   const isParentTemeActive = isParentTemeRoute(pathname)
   const isParentCatalogActive = isParentCatalogRoute(pathname)
-  const isParentAbonamentActive = Boolean(pathname?.startsWith("/abonament"))
+  const isParentAbonamentActive = Boolean(
+    pathname?.startsWith("/abonament") || pathname?.startsWith("/pricing")
+  )
   const isParentHomeActive = isParentDashboardRoute(pathname)
   const isCoursePage = pathname?.startsWith('/invata/cursuri') || pathname?.startsWith('/cursuri') || false
   const useLightNav =
@@ -578,6 +582,7 @@ export function Navigation() {
     showMobileLessonShell || showMobileGrileShell || showMobileProblemDetailShell
   const mobileProblemCatalogHref = getPracticeProblemCatalogHref(pathname)
   const isExerseazaHubPage = pathname === "/exerseaza"
+  const isPregatireHubPage = pathname === "/pregatire"
   /** Practice catalog hubs: no navbar drop shadow on desktop. */
   const isPracticeCatalogHubPage =
     isExerseazaHubPage ||
@@ -769,6 +774,20 @@ export function Navigation() {
                 ) : showMobileAppShellNav ? (
                   <>
                     <div className="flex min-w-0 flex-1 items-center gap-1 pr-2">
+                      {isPregatireHubPage ? (
+                        <Link
+                          href="/dashboard"
+                          aria-label="Înapoi"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            router.push(getPregatireBackTarget())
+                          }}
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                        >
+                          <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
+                        </Link>
+                      ) : (
+                        <>
                       {isCoursePage ? (
                         <Link
                           href="/invata/cursuri"
@@ -801,6 +820,8 @@ export function Navigation() {
                         </>
                       )}
                       </div>
+                        </>
+                      )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <NavbarEloDisplay userElo={userElo} useLightNav />
@@ -855,7 +876,7 @@ export function Navigation() {
                             <BookOpen className="h-5 w-5" />
                           </Link>
                           <Link
-                            href="/abonament"
+                            href="/pricing"
                             aria-label="Abonamentul elevului"
                             className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentAbonamentActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
@@ -1010,7 +1031,7 @@ export function Navigation() {
                     </Link>
 
                     <Link
-                      href="/abonament"
+                      href="/pricing"
                       className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isParentAbonamentActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
                       <KeyRound size={16} />
@@ -1048,8 +1069,20 @@ export function Navigation() {
 
               <div className={`hidden burger:flex items-center animate-fade-in-delay-2 justify-end gap-3 ${isTransparent ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}>
                 <div className="inline-flex items-center gap-2 px-1 py-1">
-                  <span className={`text-xs font-medium leading-tight ${subscriptionPlan === 'premium' ? 'text-orange-400' : subscriptionPlan === 'plus' ? (useLightNav ? 'text-emerald-600' : 'text-green-400') : 'text-gray-400'}`}>
-                    {subscriptionPlan === 'premium' ? 'premium' : subscriptionPlan === 'plus' ? 'plus+' : 'free'}
+                  <span
+                    className={`text-xs leading-tight ${
+                      subscriptionPlan === "premium"
+                        ? "bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] bg-clip-text font-extrabold uppercase text-transparent"
+                        : `font-medium ${
+                            subscriptionPlan === "plus"
+                              ? useLightNav
+                                ? "text-emerald-600"
+                                : "text-green-400"
+                              : "text-gray-400"
+                          }`
+                    }`}
+                  >
+                    {subscriptionPlan === "premium" ? "premium" : subscriptionPlan === "plus" ? "plus+" : "free"}
                   </span>
                   {user ? (
                     <NavbarEloDisplay
@@ -1081,11 +1114,21 @@ export function Navigation() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" sideOffset={12} className={`z-[600] ${navTheme.dropdownBackground} ${navTheme.dropdownBorder}`}>
                     <DropdownMenuItem asChild>
-                      <a href="/profil" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>Profil</a>
+                      <a href="/profil" className={`flex items-center gap-2.5 px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                        <User className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />
+                        Profil
+                      </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/pricing" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                      <Link href="/pricing" className={`flex items-center gap-2.5 px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                        <Sparkles className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />
                         Abonament
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/contact" className={`flex items-center gap-2.5 px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                        <MessageSquare className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />
+                        Feedback
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
@@ -1097,14 +1140,16 @@ export function Navigation() {
                             toast({ title: "Te-ai delogat cu succes!" })
                             router.push("/")
                           }}
-                          className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20"
+                          className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-red-400 hover:bg-red-900/20"
                         >
+                          <LogOut className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />
                           Log out
                         </button>
                       </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem asChild>
-                        <a href="/register" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                        <a href="/register" className={`flex items-center gap-2.5 px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                          <UserPlus className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />
                           Creeaza cont acum
                         </a>
                       </DropdownMenuItem>

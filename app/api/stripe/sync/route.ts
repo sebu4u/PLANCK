@@ -4,7 +4,12 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
 import { getStripeClient } from "@/lib/stripe"
 import { resolveStripeModeFromLivemode } from "@/lib/stripe-config"
-import { updateProfileFromSubscription, resolveCustomerId } from "@/lib/stripe-subscription"
+import {
+  applyStripeSubscription,
+  isParentForChildPurchase,
+  parseStripePurchaseMetadata,
+  resolveCustomerId,
+} from "@/lib/stripe-subscription"
 
 export const runtime = "nodejs"
 
@@ -46,7 +51,9 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = userData.user.id
-    const sessionUserId = session.metadata?.user_id || session.client_reference_id
+    const purchase = parseStripePurchaseMetadata(session.metadata)
+    const sessionUserId =
+      purchase.payerUserId || purchase.userId || session.client_reference_id || null
     if (sessionUserId && sessionUserId !== userId) {
       return NextResponse.json({ error: "Sesiune neautorizată." }, { status: 403 })
     }
@@ -56,9 +63,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sesiunea nu are abonament." }, { status: 400 })
     }
 
+    if (
+      isParentForChildPurchase(session.metadata) &&
+      !isParentForChildPurchase(subscription.metadata)
+    ) {
+      subscription.metadata = {
+        ...subscription.metadata,
+        ...session.metadata,
+      }
+    }
+
     const customerId = resolveCustomerId(session.customer)
     const stripeMode = resolveStripeModeFromLivemode(session.livemode)
-    await updateProfileFromSubscription(subscription, customerId, userId, stripeMode)
+    await applyStripeSubscription(subscription, customerId, userId, stripeMode)
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {

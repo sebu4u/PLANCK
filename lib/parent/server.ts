@@ -2,8 +2,14 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import { estimateGradeFromElo } from "@/lib/parent/grade-estimate"
 import { generateParentInviteCode, normalizeParentInviteCode } from "@/lib/parent/invite-code"
+import {
+  getChildrenBillingForParent,
+} from "@/lib/parent/billing"
+import type { ChildBillingSnapshot } from "@/lib/parent/billing-types"
 import { normalizeUserType } from "@/lib/user-types"
 import type { UserType } from "@/lib/user-types"
+
+export type { ChildBillingSnapshot } from "@/lib/parent/billing-types"
 
 export interface ParentChildSummary {
   relationship_id: string
@@ -61,6 +67,7 @@ export interface ChildProgressSnapshot {
     at: string
     success: boolean | null
   }>
+  billing: ChildBillingSnapshot
 }
 
 const MINUTES_PER_ITEM = 2
@@ -264,12 +271,21 @@ export async function getParentChildren(parentId: string): Promise<ParentChildSu
   })
 }
 
+const DEFAULT_CHILD_BILLING: ChildBillingSnapshot = {
+  plan: "free",
+  billing_source: "none",
+  current_period_end: null,
+  can_manage: false,
+  can_purchase: true,
+}
+
 export async function getChildrenProgressForParent(parentId: string): Promise<ChildProgressSnapshot[]> {
   const children = await getParentChildren(parentId)
   if (children.length === 0) return []
 
   const admin = createAdminClient()
   const childIds = children.map((child) => child.child_id)
+  const billingByChild = await getChildrenBillingForParent(parentId, childIds)
   const since = new Date()
   since.setDate(since.getDate() - 30)
   const sinceIso = since.toISOString().slice(0, 10)
@@ -496,6 +512,7 @@ export async function getChildrenProgressForParent(parentId: string): Promise<Ch
       },
       activity_last_30_days: activityByUser.get(child.child_id) ?? [],
       recent_work: activitySummary?.recentWork ?? [],
+      billing: billingByChild.get(child.child_id) ?? DEFAULT_CHILD_BILLING,
     }
   })
 }

@@ -1,17 +1,26 @@
 import "server-only"
 
 import type Stripe from "stripe"
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@supabase/supabase-js"
 
 import {
+  getStripeMode,
   getStripePrices,
   resolvePlanFromPriceId,
   resolveStripeModeFromLivemode,
   type StripeMode,
 } from "@/lib/stripe-config"
+import {
+  FREE_PLAN,
+  PREMIUM_PLAN,
+  normalizeSubscriptionPlan,
+  type SubscriptionPlan,
+} from "@/lib/subscription-plan"
 
-const ENTITLED_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"])
-const PORTAL_MANAGED_SUBSCRIPTION_STATUSES = new Set([
+export const PARENT_FOR_CHILD_PURCHASE_TYPE = "parent_for_child"
+
+export const ENTITLED_SUBSCRIPTION_STATUS_LIST = ["active", "trialing", "past_due"] as const
+export const PORTAL_MANAGED_SUBSCRIPTION_STATUS_LIST = [
   "active",
   "trialing",
   "past_due",
@@ -19,7 +28,12 @@ const PORTAL_MANAGED_SUBSCRIPTION_STATUSES = new Set([
   "paused",
   "incomplete",
   "incomplete_expired",
-])
+] as const
+
+const ENTITLED_SUBSCRIPTION_STATUSES = new Set<string>(ENTITLED_SUBSCRIPTION_STATUS_LIST)
+const PORTAL_MANAGED_SUBSCRIPTION_STATUSES = new Set<string>(
+  PORTAL_MANAGED_SUBSCRIPTION_STATUS_LIST
+)
 
 export const getSupabaseAdmin = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -37,6 +51,11 @@ export const resolveCustomerId = (
   return typeof customer === "string" ? customer : customer.id
 }
 
+export const hasEntitledSubscriptionStatus = (status: string | null | undefined) => {
+  if (!status) return false
+  return ENTITLED_SUBSCRIPTION_STATUSES.has(status)
+}
+
 export const hasPortalManagedSubscription = (status: string | null | undefined) => {
   if (!status) return false
   return PORTAL_MANAGED_SUBSCRIPTION_STATUSES.has(status)
@@ -45,6 +64,34 @@ export const hasPortalManagedSubscription = (status: string | null | undefined) 
 export const isStripeMissingCustomerError = (error: unknown): boolean => {
   const message = typeof error === "object" && error && "message" in error ? String(error.message) : ""
   return /no such customer/i.test(message)
+}
+
+export type StripePurchaseMetadata = {
+  purchaseType: string | null
+  payerUserId: string | null
+  beneficiaryUserId: string | null
+  userId: string | null
+}
+
+export const parseStripePurchaseMetadata = (
+  metadata?: Stripe.Metadata | null
+): StripePurchaseMetadata => {
+  const purchaseType = metadata?.purchase_type?.trim() || null
+  const payerUserId = metadata?.payer_user_id?.trim() || null
+  const beneficiaryUserId = metadata?.beneficiary_user_id?.trim() || null
+  const userId = metadata?.user_id?.trim() || null
+  return { purchaseType, payerUserId, beneficiaryUserId, userId }
+}
+
+export const isParentForChildPurchase = (metadata?: Stripe.Metadata | null) => {
+  const parsed = parseStripePurchaseMetadata(metadata)
+  const payer = parsed.payerUserId || parsed.userId
+  return (
+    parsed.purchaseType === PARENT_FOR_CHILD_PURCHASE_TYPE &&
+    Boolean(parsed.beneficiaryUserId) &&
+    Boolean(payer) &&
+    parsed.beneficiaryUserId !== payer
+  )
 }
 
 export const findStripeCustomerIdForUser = async ({
@@ -118,26 +165,166 @@ export const getOrCreateStripeCustomerId = async ({
   return customer.id
 }
 
+const subscriptionPeriodEnd = (subscription: Stripe.Subscription): string | null => {
+  const rawCurrentPeriodEnd =
+    (subscription as Stripe.Subscription & { current_period_end?: number | null }).current_period_end ??
+    subscription.items.data[0]?.current_period_end ??
+    null
+  return rawCurrentPeriodEnd ? new Date(rawCurrentPeriodEnd * 1000).toISOString() : null
+}
+
+const grantPremiumWorkshopEnergy = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string
+) => {
+  const { error: energyError } = await supabase.rpc("grant_premium_workshop_energy_upgrade", {
+    p_user_id: userId,
+  })
+  if (energyError) {
+    console.error("[stripe] Failed to grant premium workshop energy:", energyError.message)
+  }
+}
+
+export const recomputeUserEntitlement = async (userId: string, mode?: StripeMode) => {
+  const supabase = getSupabaseAdmin()
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("plan, plus_months_remaining, stripe_subscription_status, stripe_price_id")
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (profileError) {
+    throw new Error(`[stripe] Failed to load profile for entitlement: ${profileError.message}`)
+  }
+  if (!profile) return
+
+  const previousPlan = normalizeSubscriptionPlan(profile.plan)
+  const plusMonths =
+    typeof profile.plus_months_remaining === "number" ? profile.plus_months_remaining : 0
+
+  let nextPlan: SubscriptionPlan = FREE_PLAN
+  const ownEntitled = hasEntitledSubscriptionStatus(profile.stripe_subscription_status)
+
+  if (ownEntitled) {
+    const prices = getStripePrices(mode ?? getStripeMode())
+    const ownPlan = resolvePlanFromPriceId(profile.stripe_price_id, prices)
+    if (ownPlan) {
+      nextPlan = ownPlan
+    } else if (previousPlan === "plus" || previousPlan === "premium") {
+      nextPlan = previousPlan
+    } else {
+      nextPlan = PREMIUM_PLAN
+    }
+  }
+
+  if (nextPlan !== PREMIUM_PLAN) {
+    const { data: grants } = await supabase
+      .from("parent_child_subscriptions")
+      .select("id")
+      .eq("child_id", userId)
+      .in("stripe_subscription_status", [...ENTITLED_SUBSCRIPTION_STATUS_LIST])
+      .limit(1)
+
+    if ((grants?.length ?? 0) > 0) {
+      nextPlan = PREMIUM_PLAN
+    }
+  }
+
+  if (nextPlan === FREE_PLAN && plusMonths > 0) {
+    nextPlan = "plus"
+  }
+
+  if (nextPlan === previousPlan) return
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ plan: nextPlan })
+    .eq("user_id", userId)
+
+  if (updateError) {
+    throw new Error(`[stripe] Failed to recompute entitlement: ${updateError.message}`)
+  }
+
+  if (nextPlan === PREMIUM_PLAN && previousPlan !== PREMIUM_PLAN) {
+    await grantPremiumWorkshopEnergy(supabase, userId)
+  }
+}
+
+const upsertParentChildGrant = async ({
+  parentId,
+  childId,
+  customerId,
+  subscription,
+  mode,
+}: {
+  parentId: string
+  childId: string
+  customerId: string | null
+  subscription: Stripe.Subscription
+  mode?: StripeMode
+}) => {
+  const supabase = getSupabaseAdmin()
+  const effectiveMode = mode ?? resolveStripeModeFromLivemode(subscription.livemode)
+  const prices = getStripePrices(effectiveMode)
+  const priceId = subscription.items.data[0]?.price?.id ?? null
+  const plan = resolvePlanFromPriceId(priceId, prices)
+  const status = subscription.status
+  const currentPeriodEnd = subscriptionPeriodEnd(subscription)
+
+  const { data: existingByPair } = await supabase
+    .from("parent_child_subscriptions")
+    .select("id, stripe_customer_id")
+    .eq("parent_id", parentId)
+    .eq("child_id", childId)
+    .maybeSingle()
+
+  const payload = {
+    parent_id: parentId,
+    child_id: childId,
+    stripe_customer_id: customerId || existingByPair?.stripe_customer_id || "",
+    stripe_subscription_id: subscription.id,
+    stripe_price_id: priceId,
+    stripe_subscription_status: status,
+    plan: plan ?? (hasEntitledSubscriptionStatus(status) ? PREMIUM_PLAN : null),
+    current_period_end: currentPeriodEnd,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (existingByPair?.id) {
+    const { error } = await supabase
+      .from("parent_child_subscriptions")
+      .update(payload)
+      .eq("id", existingByPair.id)
+    if (error) {
+      throw new Error(`[stripe] Failed to update parent-child grant: ${error.message}`)
+    }
+    return
+  }
+
+  const { error } = await supabase.from("parent_child_subscriptions").insert(payload)
+  if (error) {
+    throw new Error(`[stripe] Failed to insert parent-child grant: ${error.message}`)
+  }
+}
+
 export const updateProfileFromSubscription = async (
   subscription: Stripe.Subscription,
   customerId: string | null,
   userId?: string | null,
   mode?: StripeMode
 ) => {
+  if (isParentForChildPurchase(subscription.metadata)) {
+    throw new Error("[stripe] parent_for_child subscriptions must use applyStripeSubscription")
+  }
+
   const supabase = getSupabaseAdmin()
 
   const effectiveMode = mode ?? resolveStripeModeFromLivemode(subscription.livemode)
-  const prices = getStripePrices(effectiveMode)
   const priceId = subscription.items.data[0]?.price?.id ?? null
-  const plan = resolvePlanFromPriceId(priceId, prices)
   const status = subscription.status
-  const rawCurrentPeriodEnd =
-    (subscription as Stripe.Subscription & { current_period_end?: number | null }).current_period_end ?? null
-  const currentPeriodEnd = rawCurrentPeriodEnd
-    ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
-    : null
+  const currentPeriodEnd = subscriptionPeriodEnd(subscription)
 
-  const updatePayload: Record<string, any> = {
+  const updatePayload: Record<string, unknown> = {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
     stripe_price_id: priceId,
@@ -145,27 +332,9 @@ export const updateProfileFromSubscription = async (
     stripe_current_period_end: currentPeriodEnd,
   }
 
-  if (ENTITLED_SUBSCRIPTION_STATUSES.has(status)) {
-    if (plan) {
-      updatePayload.plan = plan
-    } else {
-      console.warn("[stripe] Unknown price ID:", priceId)
-    }
-  } else {
-    updatePayload.plan = "free"
-  }
-
-  let previousPlan: string | null = null
   let targetUserId: string | null = userId ?? null
 
   if (userId) {
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("user_id", userId)
-      .maybeSingle()
-    previousPlan = typeof existing?.plan === "string" ? existing.plan : null
-
     const { error } = await supabase
       .from("profiles")
       .upsert(
@@ -181,10 +350,9 @@ export const updateProfileFromSubscription = async (
   } else if (customerId) {
     const { data: existing } = await supabase
       .from("profiles")
-      .select("user_id, plan")
+      .select("user_id")
       .eq("stripe_customer_id", customerId)
       .maybeSingle()
-    previousPlan = typeof existing?.plan === "string" ? existing.plan : null
     targetUserId = typeof existing?.user_id === "string" ? existing.user_id : null
 
     const { error } = await supabase.from("profiles").update(updatePayload).eq("stripe_customer_id", customerId)
@@ -193,17 +361,55 @@ export const updateProfileFromSubscription = async (
     }
   }
 
-  const nextPlan = typeof updatePayload.plan === "string" ? updatePayload.plan.toLowerCase() : null
-  const prevNormalized = (previousPlan ?? "free").trim().toLowerCase()
-  const wasPremium = prevNormalized === "premium" || prevNormalized === "pro"
-  const isPremium = nextPlan === "premium" || nextPlan === "pro"
-
-  if (isPremium && !wasPremium && targetUserId) {
-    const { error: energyError } = await supabase.rpc("grant_premium_workshop_energy_upgrade", {
-      p_user_id: targetUserId,
-    })
-    if (energyError) {
-      console.error("[stripe] Failed to grant premium workshop energy:", energyError.message)
-    }
+  if (targetUserId) {
+    await recomputeUserEntitlement(targetUserId, effectiveMode)
   }
+}
+
+export const applyStripeSubscription = async (
+  subscription: Stripe.Subscription,
+  customerId: string | null,
+  fallbackUserId?: string | null,
+  mode?: StripeMode
+) => {
+  const effectiveMode = mode ?? resolveStripeModeFromLivemode(subscription.livemode)
+  const parsed = parseStripePurchaseMetadata(subscription.metadata)
+
+  if (isParentForChildPurchase(subscription.metadata)) {
+    const parentId = parsed.payerUserId || parsed.userId
+    const childId = parsed.beneficiaryUserId
+    if (!parentId || !childId) {
+      throw new Error("[stripe] parent_for_child subscription is missing payer or beneficiary")
+    }
+    await upsertParentChildGrant({
+      parentId,
+      childId,
+      customerId,
+      subscription,
+      mode: effectiveMode,
+    })
+    await recomputeUserEntitlement(childId, effectiveMode)
+    return
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { data: existingGrant } = await supabase
+    .from("parent_child_subscriptions")
+    .select("parent_id, child_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle()
+
+  if (existingGrant?.parent_id && existingGrant?.child_id) {
+    await upsertParentChildGrant({
+      parentId: existingGrant.parent_id,
+      childId: existingGrant.child_id,
+      customerId,
+      subscription,
+      mode: effectiveMode,
+    })
+    await recomputeUserEntitlement(existingGrant.child_id, effectiveMode)
+    return
+  }
+
+  await updateProfileFromSubscription(subscription, customerId, fallbackUserId, effectiveMode)
 }

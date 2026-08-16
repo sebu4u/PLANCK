@@ -1,24 +1,26 @@
 import Image from "next/image"
 import Link from "next/link"
 import { CalendarDays } from "lucide-react"
+import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 
 export function ExerseazaPregatirePromoCard() {
   return (
     <Link
       href="/pregatire"
-      className="group relative mt-6 block overflow-visible transition-transform active:scale-[0.99]"
+      onClick={() => setPregatireBackTarget("/exerseaza")}
+      className="group relative block overflow-visible pt-2 transition-transform active:scale-[0.99]"
     >
       {/*
-        Tall red layers tuck ~14px under the pink card so rotation never
-        opens a seam against the page background.
+        Red layers tuck under the pink card so rotation never opens a seam
+        against the page background.
       */}
       <span
         aria-hidden
-        className="pointer-events-none absolute -top-5 left-5 right-5 z-0 h-9 origin-[50%_100%] rounded-t-2xl bg-[#b91c1c] transition-transform duration-300 ease-out will-change-transform [backface-visibility:hidden] group-hover:-translate-x-3 group-hover:-rotate-6 sm:left-6 sm:right-6 sm:group-hover:-translate-x-4"
+        className="pointer-events-none absolute -top-2 left-7 right-7 z-0 h-6 origin-[50%_100%] rounded-t-2xl bg-[#b91c1c] transition-transform duration-300 ease-out will-change-transform [backface-visibility:hidden] group-hover:-translate-x-1.5 group-hover:-rotate-[4deg] sm:left-8 sm:right-8 sm:group-hover:-translate-x-2.5"
       />
       <span
         aria-hidden
-        className="pointer-events-none absolute -top-2.5 left-2.5 right-2.5 z-10 h-8 origin-[50%_100%] rounded-t-2xl bg-[#ef4444] transition-transform duration-300 ease-out will-change-transform [backface-visibility:hidden] group-hover:translate-x-2.5 group-hover:rotate-[4deg] sm:left-3 sm:right-3 sm:group-hover:translate-x-3.5"
+        className="pointer-events-none absolute -top-1 left-4 right-4 z-10 h-5 origin-[50%_100%] rounded-t-2xl bg-[#ef4444] transition-transform duration-300 ease-out will-change-transform [backface-visibility:hidden] group-hover:translate-x-1 group-hover:rotate-[2.5deg] sm:left-5 sm:right-5 sm:group-hover:translate-x-2"
       />
 
       {/* Main card stays put vertically — lifting it opened white gaps */}

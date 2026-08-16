@@ -432,6 +432,7 @@ export function PhysicsLessonsClient({
                 hasPrevious={hasPrevious}
                 hasNext={hasNext}
                 currentGrade={currentGrade}
+                subject={subject}
                 isCompleted={currentLesson ? completedLessonIds.has(currentLesson.id) : false}
                 onComplete={async () => {
                   if (user && currentLesson) {

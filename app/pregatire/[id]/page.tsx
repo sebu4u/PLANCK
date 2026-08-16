@@ -73,7 +73,7 @@ export default function PregatireDetailPage() {
           MOBILE_BOTTOM_NAV_PADDING_CLASS,
         )}
       >
-        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
           {user ? (
             <div className="mb-4 flex justify-end">
               <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} />

@@ -28,6 +28,7 @@ import { PlanckCodeSidebar } from "@/components/planckcode-sidebar"
 import { usePlanckIdeFloatingOptional } from "@/components/planckcode-floating-provider"
 import type { FileItem } from "@/lib/types"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
+import { ReportIssueButton } from "@/components/content-reports/report-issue-button"
 import { useCatalogTheme } from "@/components/catalog-theme-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { ProblemAgentChatPanel } from "./problem-agent-chat-panel"
@@ -540,6 +541,16 @@ export function CodingProblemDetailClient({ slug }: CodingProblemDetailClientPro
                                 <Sparkles className="h-4 w-4" />
                                 {isAgentOpen ? "Închide Agent" : "Planck Agent"}
                               </Button>
+                              <ReportIssueButton
+                                sourceType="coding_problem"
+                                sourceId={loadedProblem.id}
+                                sourceMeta={{
+                                  slug: loadedProblem.slug,
+                                  display_id: loadedProblem.display_id,
+                                  language: loadedProblem.language,
+                                }}
+                                className="text-white/70 hover:bg-white/10 hover:text-white"
+                              />
                               </div>
                             </div>
                             {editFlash ? (

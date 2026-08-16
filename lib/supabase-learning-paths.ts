@@ -76,11 +76,14 @@ export type LearningPathHubChapter = Pick<
   | "description"
   | "icon_url"
   | "accent_color"
+  | "problem_category"
   | "order_index"
   | "is_personalized"
   | "generation_status"
   | "created_at"
->
+> & {
+  materie?: string | null
+}
 
 export interface LearningPathLesson {
   id: string
@@ -279,7 +282,7 @@ export async function getUserPersonalizedLearningPathHubChapters(
   const { data, error } = await client
     .from("learning_path_chapters")
     .select(
-      "id, slug, title, nav_title, description, icon_url, accent_color, order_index, is_personalized, generation_status, created_at"
+      "id, slug, title, nav_title, description, icon_url, accent_color, problem_category, materie, order_index, is_personalized, generation_status, created_at"
     )
     .eq("generated_by_user_id", userId)
     .eq("is_personalized", true)

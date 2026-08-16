@@ -877,7 +877,7 @@ export default function InsightChatSidebar({
     starterChipsToShow.length > 0 &&
     !messageLimitReached
   const showProblemContextCard =
-    Boolean(problemContext) && !busy && !messageLimitReached && !isMobileBottomSheet
+    Boolean(problemContext) && !busy && !messageLimitReached && !isMobileBottomSheet && !isProblemLightTheme
   const lastAssistantMessageIndex = useMemo(() => {
     for (let i = visibleMessages.length - 1; i >= 0; i--) {
       if (visibleMessages[i]?.role === 'assistant') return i
@@ -1858,7 +1858,8 @@ export default function InsightChatSidebar({
         onTransitionEnd={handlePanelTransitionEnd}
         aria-hidden={isMobileBottomSheet ? !isOpen : undefined}
         className={cn(
-          "z-[500] flex flex-col overscroll-contain",
+          "flex flex-col overscroll-contain",
+          isDesktopEmbedded ? "z-20" : "z-[500]",
           isDesktopEmbedded
             ? cn(
                 isProblemLightTheme ? "bg-white" : "bg-[#101010] border-l border-white/10",
@@ -2234,7 +2235,7 @@ export default function InsightChatSidebar({
                     isProblemLightTheme ? 'text-[#6b7280]' : 'text-gray-400'
                   )}
                 >
-                  Ai nevoie de un sfat?
+                  {isProblemLightTheme ? 'Bună! Ce ai vrea să știi?' : 'Ai nevoie de un sfat?'}
                 </p>
               </div>
               <div className="min-h-0 flex-[1]" aria-hidden />
@@ -2492,7 +2493,7 @@ export default function InsightChatSidebar({
                       messageLimitReached
                         ? CHAT_MESSAGE_LIMIT_PLACEHOLDER
                         : problemContext
-                          ? isMobile
+                          ? isMobile || isProblemLightTheme
                             ? 'Scrie...'
                             : 'Adaugă detalii sau întreabă...'
                           : 'Scrie un mesaj...'

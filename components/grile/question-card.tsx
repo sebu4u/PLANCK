@@ -7,6 +7,8 @@ import { difficultyLabels } from '@/lib/types/quiz-questions';
 import 'katex/dist/katex.min.css';
 import { hasMixedLatexDelimiters, splitMixedLatex } from '@/lib/parse-mixed-latex';
 import { ExternalLink } from 'lucide-react';
+import { ReportIssueButton } from '@/components/content-reports/report-issue-button';
+import { useGrileSubject } from '@/components/grile/grile-subject-context';
 
 // Lazy load KaTeX components
 const LazyInlineMath = lazy(() =>
@@ -45,6 +47,7 @@ function LatexContent({ content }: { content: string }) {
 export function QuestionCard({ question }: QuestionCardProps) {
     const displayTitle = question.title?.trim() || question.question_id;
     const hasTags = (question.tags?.length ?? 0) > 0;
+    const { materie, catalogPath } = useGrileSubject();
 
     return (
         <div className="w-full space-y-4">
@@ -65,6 +68,17 @@ export function QuestionCard({ question }: QuestionCardProps) {
                           </span>
                       ))
                     : null}
+                <ReportIssueButton
+                    sourceType="grila"
+                    sourceId={question.id}
+                    sourceMeta={{
+                        question_id: question.question_id,
+                        materie,
+                        class: question.class,
+                        catalogPath,
+                    }}
+                    className="h-8 w-8"
+                />
             </div>
 
             {question.description?.trim() ? (

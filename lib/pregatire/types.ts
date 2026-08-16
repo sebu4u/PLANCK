@@ -91,12 +91,93 @@ export interface WorkshopPublic {
   seats_remaining?: number | null
 }
 
+export const WORKSHOP_HOMEWORK_ITEM_TYPES = [
+  "physics_problem",
+  "math_problem",
+  "coding_problem",
+  "grila_fizica",
+  "grila_biologie",
+] as const
+
+export type WorkshopHomeworkItemType = (typeof WORKSHOP_HOMEWORK_ITEM_TYPES)[number]
+
+export const WORKSHOP_HOMEWORK_ITEM_LABELS: Record<WorkshopHomeworkItemType, string> = {
+  physics_problem: "Problemă fizică",
+  math_problem: "Problemă matematică",
+  coding_problem: "Problemă informatică",
+  grila_fizica: "Grilă fizică",
+  grila_biologie: "Grilă biologie",
+}
+
+export function isWorkshopHomeworkItemType(value: unknown): value is WorkshopHomeworkItemType {
+  return (
+    typeof value === "string" &&
+    (WORKSHOP_HOMEWORK_ITEM_TYPES as readonly string[]).includes(value)
+  )
+}
+
+export function workshopHomeworkHref(
+  itemType: WorkshopHomeworkItemType,
+  refId: string,
+  codingSlug?: string,
+): string {
+  switch (itemType) {
+    case "physics_problem":
+      return `/probleme/${encodeURIComponent(refId)}`
+    case "math_problem":
+      return `/matematica/probleme/${encodeURIComponent(refId)}`
+    case "coding_problem":
+      return `/informatica/probleme/${encodeURIComponent(codingSlug || refId)}`
+    case "grila_fizica":
+      return `/grile?question=${encodeURIComponent(refId)}`
+    case "grila_biologie":
+      return `/biologie/grile?question=${encodeURIComponent(refId)}`
+  }
+}
+
+export interface WorkshopHomeworkItem {
+  id?: string
+  item_type: WorkshopHomeworkItemType
+  ref_id: string
+  title: string
+  href: string
+  sort_order?: number
+}
+
+export interface WorkshopMaterials {
+  whiteboard_url: string | null
+  notes_markdown: string | null
+  notes_pdf_url: string | null
+  homework_pdf_url: string | null
+  homework_items: WorkshopHomeworkItem[]
+}
+
+export const EMPTY_WORKSHOP_MATERIALS: WorkshopMaterials = {
+  whiteboard_url: null,
+  notes_markdown: null,
+  notes_pdf_url: null,
+  homework_pdf_url: null,
+  homework_items: [],
+}
+
 export interface WorkshopAdmin extends Omit<WorkshopPublic, "has_recording" | "unlock_count"> {
   meet_url: string
   recording_url: string | null
+  whiteboard_url: string | null
+  notes_markdown: string
+  notes_pdf_path: string | null
+  homework_pdf_path: string | null
+  notes_pdf_url: string | null
+  homework_pdf_url: string | null
+  homework_items: WorkshopHomeworkItem[]
 }
 
 export interface WorkshopDetail extends WorkshopPublic {
   meet_url?: string | null
   recording_url?: string | null
+  whiteboard_url?: string | null
+  notes_markdown?: string | null
+  notes_pdf_url?: string | null
+  homework_pdf_url?: string | null
+  homework_items?: WorkshopHomeworkItem[]
 }

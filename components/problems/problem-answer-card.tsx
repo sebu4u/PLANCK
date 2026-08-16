@@ -275,7 +275,7 @@ function ValueAnswerCard({
 
   const shellClass = isBottomBar
     ? cn(
-        "border-t border-[#0b0d10]/10 bg-white px-3 shadow-[0_-10px_30px_-16px_rgba(11,13,16,0.35)]",
+        "rounded-t-3xl border-t border-[#0b0d10]/10 bg-white px-3 shadow-[0_-10px_30px_-16px_rgba(11,13,16,0.35)]",
         "pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pt-2.5",
       )
     : "rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)] lg:p-4"
@@ -552,7 +552,7 @@ function GrilaAnswerCard({
 
   const shellClass = isBottomBar
     ? cn(
-        "border-t border-[#0b0d10]/10 bg-white px-3 shadow-[0_-10px_30px_-16px_rgba(11,13,16,0.35)]",
+        "rounded-t-3xl border-t border-[#0b0d10]/10 bg-white px-3 shadow-[0_-10px_30px_-16px_rgba(11,13,16,0.35)]",
         "pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pt-2.5",
       )
     : "rounded-3xl border border-[#0b0d10]/10 bg-white/90 p-5 shadow-[0px_20px_50px_-40px_rgba(11,13,16,0.6)]"
