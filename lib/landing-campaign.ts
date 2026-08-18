@@ -4,21 +4,21 @@ import { useEffect, useState } from "react"
 import {
   PREMIUM_MONTHLY_RON,
   PREMIUM_WEEKLY_RON,
-  PREMIUM_YEARLY_RON,
 } from "@/components/pricing/premium-pricing"
+import {
+  LANDING_DEADLINE,
+} from "@/lib/landing-earlybird"
 
-/** Earlybird annual offer — marketing display on /landing only (checkout stays at PREMIUM_YEARLY_RON). */
-export const LANDING_DEADLINE = new Date("2026-09-07T23:59:59")
+export {
+  EARLYBIRD_DEADLINE_LABEL,
+  EARLYBIRD_SAVE_PERCENT,
+  EARLYBIRD_YEARLY_RON,
+  FULL_YEARLY_RON,
+  LANDING_DEADLINE,
+} from "@/lib/landing-earlybird"
 
-export const EARLYBIRD_YEARLY_RON = 799
-export const FULL_YEARLY_RON = PREMIUM_YEARLY_RON
 export const LANDING_WEEKLY_RON = PREMIUM_WEEKLY_RON
 export const LANDING_MONTHLY_RON = PREMIUM_MONTHLY_RON
-
-export const EARLYBIRD_DEADLINE_LABEL = "7 septembrie"
-export const EARLYBIRD_SAVE_PERCENT = Math.round(
-  ((FULL_YEARLY_RON - EARLYBIRD_YEARLY_RON) / FULL_YEARLY_RON) * 100,
-)
 
 export type CountdownState = {
   days: number

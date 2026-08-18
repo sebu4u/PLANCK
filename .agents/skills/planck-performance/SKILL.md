@@ -1,6 +1,6 @@
 ---
 name: planck-performance
-description: Performance & CPU patterns the PLANCK site enforces after a CPU optimization pass — middleware auth roundtrip, long-running API routes (`runtime`/`maxDuration`), CDN caching headers, N+1 batch queries, requestAnimationFrame pause behavior, dynamic imports for heavy client libs, polling intervals, and removed dependencies. Use when touching middleware, server loops, API route config, requestAnimationFrame, heavy client libraries, polling, or `package.json` deps. Don't undo these patterns.
+description: Performance & CPU patterns the PLANCK site enforces after a CPU optimization pass — middleware session refresh without Auth roundtrips, long-running API routes (`runtime`/`maxDuration`), CDN caching headers, N+1 batch queries, requestAnimationFrame pause behavior, dynamic imports for heavy client libs, polling intervals, and removed dependencies. Use when touching middleware, server loops, API route config, requestAnimationFrame, heavy client libraries, polling, or `package.json` deps. Don't undo these patterns.
 ---
 
 # PLANCK performance & CPU patterns
@@ -9,7 +9,9 @@ The PLANCK site had a CPU optimization pass (see `cpu-usage-optimization` branch
 
 ## Middleware
 
-- `middleware.ts` calls `supabase.auth.getUser()` on every matched request — an external HTTP roundtrip per request.
+- `middleware.ts` refreshes the SSR cookie session. It skips work when there is no `*-auth-token` cookie.
+- When a session cookie exists it calls `supabase.auth.getSession()` (local JWT + refresh only if expired). Do **not** switch this back to `getUser()` — that adds an Auth HTTP roundtrip on every navigation and this middleware does not authorize routes.
+- Handlers that need a verified user still call `getUser()` themselves.
 - The `config.matcher` excludes routes that authenticate via forwarded JWT (so they don't need a cookie refresh) and public read-only routes. The exclusion list lives in `middleware.ts` itself.
 - **`api/user/marketing-emails` is intentionally NOT excluded.** It uses the cookie client (`@/lib/supabase/server`) whose `setAll` depends on the middleware session refresh; removing it from the matcher breaks it. There is a code comment in `middleware.ts` flagging this.
 

@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import React, { type CSSProperties, Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Check, Loader2, Plus, Rocket, X } from "lucide-react"
+import { Check, Loader2, Plus, X } from "lucide-react"
 import { AnimatePresence, motion, useSpring, useTransform } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
@@ -28,9 +29,11 @@ import {
   PREMIUM_YEARLY_SAVE_PERCENT,
   type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
+import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 
 function computeDiscountedPrice(priceRon: number, promo: AppliedPromo | null): number {
   if (!promo) return priceRon
+  if (promo.isTrial) return 0
   if (promo.percentOff != null) {
     return Math.max(0, priceRon * (1 - promo.percentOff / 100))
   }
@@ -38,14 +41,6 @@ function computeDiscountedPrice(priceRon: number, promo: AppliedPromo | null): n
     return Math.max(0, priceRon - promo.amountOff / 100)
   }
   return priceRon
-}
-
-function formatDiscountLabel(promo: AppliedPromo): string {
-  if (promo.percentOff != null) return `${promo.percentOff}%`
-  if (promo.amountOff != null) {
-    return `${(promo.amountOff / 100).toLocaleString("ro-RO")} ${promo.currency?.toUpperCase() ?? "RON"}`
-  }
-  return "Reducere"
 }
 
 const MOBILE_BREAKPOINT_PX = 768
@@ -240,7 +235,7 @@ function PricingCard({
           "relative flex min-h-0 flex-1 flex-col",
           isFlat
             ? "bg-transparent p-0"
-            : "overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.28)] sm:p-7 lg:h-full lg:justify-between lg:rounded-2xl lg:p-7 xl:p-8"
+            : "rounded-xl border border-gray-200 bg-white p-6 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.28)] sm:p-7 lg:justify-between lg:rounded-2xl lg:p-7 xl:p-8"
         )}
       >
         <div className="min-w-0">
@@ -260,11 +255,6 @@ function PricingCard({
             {isCurrentPremium ? (
               <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gray-600">
                 Planul tău
-              </span>
-            ) : null}
-            {appliedPromo ? (
-              <span className="rounded-full bg-[#FEF3C7] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#92400E]">
-                {formatDiscountLabel(appliedPromo)} reducere aplicată
               </span>
             ) : null}
           </div>
@@ -287,18 +277,25 @@ function PricingCard({
           >
             {INTERVAL_OPTIONS.map((option) => {
               const isActive = billingInterval === option.id
+              const isLockedOut = Boolean(appliedPromo?.lockedInterval && appliedPromo.lockedInterval !== option.id)
               return (
                 <button
                   key={option.id}
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  onClick={() => setBillingInterval(option.id)}
+                  disabled={isLockedOut}
+                  onClick={() => {
+                    if (isLockedOut) return
+                    setBillingInterval(option.id)
+                  }}
                   className={cn(
                     "relative flex flex-1 flex-col items-center justify-center rounded-full px-1.5 py-2 text-center transition-all lg:py-2.5",
                     isActive
                       ? "bg-white text-gray-900 shadow-sm ring-1 ring-[#7C5CFC]/20"
-                      : "text-gray-500 hover:text-gray-700"
+                      : isLockedOut
+                        ? "cursor-not-allowed text-gray-300"
+                        : "text-gray-500 hover:text-gray-700"
                   )}
                 >
                   <span className="text-[11px] font-semibold leading-tight sm:text-xs lg:text-[13px]">
@@ -330,7 +327,11 @@ function PricingCard({
             </span>
           </div>
 
-          {appliedPromo ? (
+          {appliedPromo?.isTrial ? (
+            <p className="mt-1.5 text-sm font-medium text-[#16a34a]">
+              7 zile gratuite, apoi {priceRon.toLocaleString("ro-RO")} RON/lună
+            </p>
+          ) : appliedPromo ? (
             <p className="mt-1.5 text-sm text-gray-500">
               <span className="line-through">{priceRon.toLocaleString("ro-RO")} RON</span>
               <span className="mx-1.5 text-gray-300">·</span>
@@ -387,7 +388,7 @@ function PricingCard({
           </div>
         </div>
 
-        <div className={cn("mt-6 shrink-0", !isFlat && "lg:mt-0 lg:pt-4")}>
+        <div className="mt-6 shrink-0">
           <button
             type="button"
             onClick={handlePrimaryCta}
@@ -582,6 +583,69 @@ function PricingPageContent() {
   }, [isParent, user, searchParams, toast])
 
   useEffect(() => {
+    if (!user || isParent) return
+    let cancelled = false
+    const loadPersonalPromo = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+        if (!accessToken) return
+        const response = await fetch("/api/prize-wheel", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (response.ok) {
+          const payload = await response.json()
+          const prize = payload?.user?.prize
+          if (!cancelled && prize && !prize.redeemedAt) {
+            setBillingInterval(prize.interval)
+            setAppliedPromo({
+              promotionCodeId: `wheel:${prize.id}`,
+              code: prize.code,
+              percentOff: prize.percentOff,
+              amountOff: prize.amountOff,
+              currency: prize.currency,
+              source: "prize_wheel",
+              lockedInterval: prize.interval,
+              isTrial: prize.isTrial,
+            })
+            return
+          }
+        }
+
+        const selectedShopCouponId =
+          searchParams?.get("source") === "shop" ? searchParams.get("shop_coupon") : null
+        if (!selectedShopCouponId) return
+        const shopResponse = await fetch("/api/shop", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (!shopResponse.ok) return
+        const shopPayload = await shopResponse.json()
+        const coupon = shopPayload?.activeCoupons?.find(
+          (item: { id?: string }) => item.id === selectedShopCouponId
+        )
+        if (cancelled || !coupon) return
+        setBillingInterval(coupon.interval)
+        setAppliedPromo({
+          promotionCodeId: `shop:${coupon.id}`,
+          shopCouponId: coupon.id,
+          code: coupon.code,
+          percentOff: coupon.percentOff,
+          amountOff: null,
+          currency: null,
+          source: "shop",
+          lockedInterval: coupon.interval,
+        })
+      } catch {
+        // Pricing remains usable without a personal promotion.
+      }
+    }
+    void loadPersonalPromo()
+    return () => {
+      cancelled = true
+    }
+  }, [user, isParent, searchParams])
+
+  useEffect(() => {
     const status = searchParams?.get("checkout")
     const sessionId = searchParams?.get("session_id")
 
@@ -656,29 +720,29 @@ function PricingPageContent() {
         return
       }
 
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          plan: "premium",
-          interval,
-          promotionCodeId: appliedPromo?.promotionCodeId,
-          ...(isParent && selectedChild ? { childId: selectedChild.child_id } : {}),
-        }),
+      const result = await startPremiumCheckout({
+        accessToken,
+        interval,
+        promotionCodeId: appliedPromo?.promotionCodeId,
+        shopCouponId: appliedPromo?.shopCouponId,
+        ...(isParent && selectedChild ? { childId: selectedChild.child_id } : {}),
       })
 
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload?.error || "Nu am putut iniția checkout-ul.")
+      if (!result.ok) {
+        throw new Error(result.error)
       }
 
-      if (payload?.url) {
-        window.location.assign(payload.url)
-      } else {
-        throw new Error("Checkout URL lipsă.")
+      if ("applied" in result && result.applied) {
+        toast({
+          title: "Reducerea a fost aplicată",
+          description: "Abonamentul tău a fost actualizat cu premiul de la roată.",
+        })
+        await refreshProfile()
+        return
+      }
+
+      if ("url" in result) {
+        window.location.assign(result.url)
       }
     } catch (error: any) {
       toast({
@@ -741,6 +805,12 @@ function PricingPageContent() {
     if (parentNeedsChild) return "Conectează un copil"
     if (parentCannotAct) return "Are deja Premium"
     if (isPurchaseDisabled) return "Indisponibil momentan"
+    if (appliedPromo?.isTrial) return "Începe 7 zile gratuite"
+    if (appliedPromo?.source === "prize_wheel" && appliedPromo.lockedInterval === "year") {
+      return "Ia anualul cu reducerea ta"
+    }
+    if (appliedPromo?.source === "prize_wheel") return "Aplică reducerea"
+    if (appliedPromo?.source === "shop") return "Folosește cuponul din magazin"
     if (shouldManageInPortal && isCurrentPremium) {
       return isParent && selectedChild
         ? `Gestionează planul lui ${selectedChild.name}`
@@ -757,6 +827,10 @@ function PricingPageContent() {
       return
     }
     if (isCtaDisabled) return
+    if (appliedPromo?.source === "prize_wheel" || appliedPromo?.source === "shop") {
+      await startCheckout()
+      return
+    }
     if (shouldManageInPortal) {
       await openBillingPortal()
       return
@@ -782,6 +856,10 @@ function PricingPageContent() {
   }
 
   const handleMobileExitCheckout = async (interval: "month" | "year") => {
+    if (appliedPromo?.source === "prize_wheel" || appliedPromo?.source === "shop") {
+      await startCheckout(appliedPromo.lockedInterval ?? interval)
+      return
+    }
     if (shouldManageInPortal) {
       await openBillingPortal()
       return
@@ -803,7 +881,10 @@ function PricingPageContent() {
     ctaLabel,
     handlePrimaryCta,
     appliedPromo,
-    onApplyPromo: setAppliedPromo,
+    onApplyPromo: (promo) => {
+      setAppliedPromo(promo)
+      if (promo.lockedInterval) setBillingInterval(promo.lockedInterval)
+    },
     onClearPromo: () => setAppliedPromo(null),
     headerSlot: isParent ? (
       <ParentChildPicker
@@ -817,14 +898,14 @@ function PricingPageContent() {
   return (
     <div className="relative min-h-[100dvh] overflow-x-hidden bg-white text-gray-900">
       <div
-        className="fixed inset-0 -z-10 bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f2b93d)] lg:bg-none lg:bg-white"
+        className="fixed inset-0 -z-10 bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f4d4c8)] lg:bg-none lg:bg-white"
         aria-hidden
       />
 
       <button
         type="button"
         onClick={handleCloseButtonClick}
-        className="absolute right-3 top-3 z-30 p-2 text-white/70 transition hover:text-white lg:right-5 lg:top-5 lg:text-gray-400 lg:hover:text-gray-700"
+        className="absolute right-3 top-3 z-30 p-2 text-gray-800/55 transition hover:text-gray-900 lg:right-5 lg:top-5 lg:text-gray-400 lg:hover:text-gray-700"
         aria-label="Înapoi acasă"
         title="Înapoi acasă"
       >
@@ -833,13 +914,20 @@ function PricingPageContent() {
 
       {/* Mobile: premium gradient header + white sheet */}
       <section className="relative lg:hidden">
-        <div className="bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f2b93d)] px-5 pb-20 pt-[max(5.25rem,calc(env(safe-area-inset-top)+3.75rem))]">
-          <h1 className="flex items-center justify-center gap-2.5 pb-2 text-center text-[2.35rem] font-black leading-[1.05] tracking-tight text-white sm:gap-3 sm:text-5xl">
-            <Rocket className="h-8 w-8 shrink-0 text-white sm:h-10 sm:w-10" strokeWidth={2} aria-hidden />
-            <span>
-              Devino{" "}
-              <span className="uppercase">PREMIUM</span>
-            </span>
+        <div className="relative overflow-hidden bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f4d4c8)] px-5 pb-10 pt-[max(4.25rem,calc(env(safe-area-inset-top)+2.75rem))]">
+          <Image
+            src="/images/exerseaza/pregatiri-icon.png"
+            alt=""
+            width={420}
+            height={480}
+            priority
+            aria-hidden
+            className="pointer-events-none absolute -bottom-5 right-[-6%] z-0 h-[15.5rem] w-auto max-w-[72%] select-none object-contain object-right-bottom"
+          />
+          <h1 className="relative z-10 max-w-[58%] pb-1 text-left text-[2.35rem] font-black leading-[1.05] tracking-tight text-white sm:text-5xl">
+            Devino
+            <br />
+            <span className="uppercase">PREMIUM</span>
           </h1>
         </div>
 
@@ -871,7 +959,7 @@ function PricingPageContent() {
           <PricingCard
             {...cardProps}
             chrome="card"
-            className="ml-0 mr-auto h-full max-h-full min-h-0 max-w-[540px] flex-1"
+            className="ml-0 mr-auto max-h-full max-w-[540px]"
           />
         </div>
       </section>

@@ -11,6 +11,10 @@ export type AppliedPromo = {
   percentOff: number | null
   amountOff: number | null
   currency: string | null
+  source?: "creator" | "prize_wheel" | "shop"
+  shopCouponId?: string
+  lockedInterval?: "week" | "month" | "year"
+  isTrial?: boolean
 }
 
 type PricingCreatorCodeCardProps = {
@@ -64,6 +68,20 @@ export function PricingCreatorCodeCard({
         percentOff: typeof payload.percent_off === "number" ? payload.percent_off : null,
         amountOff: typeof payload.amount_off === "number" ? payload.amount_off : null,
         currency: payload.currency ?? null,
+        source:
+          payload.source === "prize_wheel"
+            ? "prize_wheel"
+            : payload.source === "shop"
+              ? "shop"
+              : "creator",
+        shopCouponId:
+          payload.source === "shop" && typeof payload.promotion_code_id === "string"
+            ? payload.promotion_code_id.replace(/^shop:/, "")
+            : undefined,
+        lockedInterval: payload.interval === "month" || payload.interval === "year" || payload.interval === "week"
+          ? payload.interval
+          : undefined,
+        isTrial: Boolean(payload.is_trial),
       })
       setIsOpen(false)
       setCode("")
@@ -90,21 +108,31 @@ export function PricingCreatorCodeCard({
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-gray-900">{appliedPromo.code}</p>
-            <p className="text-xs font-medium text-[#16a34a]">{discountLabel} reducere aplicată</p>
+            <p className="text-xs font-medium text-[#16a34a]">
+              {appliedPromo.isTrial
+                ? "7 zile gratuite, apoi prețul lunar"
+                : appliedPromo.source === "prize_wheel"
+                  ? `${discountLabel} din roata cu premii`
+                  : appliedPromo.source === "shop"
+                    ? `${discountLabel} din magazinul PLANCKPASS`
+                  : `${discountLabel} reducere aplicată`}
+            </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            onClear()
-            setError(null)
-          }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-          aria-label="Elimină codul"
-          title="Elimină codul"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {appliedPromo.source === "prize_wheel" ? null : (
+          <button
+            type="button"
+            onClick={() => {
+              onClear()
+              setError(null)
+            }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Elimină codul"
+            title="Elimină codul"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
     )
   }

@@ -142,3 +142,42 @@ export async function loadUnlockedMaterials(
 export function lockedMaterials(): WorkshopMaterials {
   return { ...EMPTY_WORKSHOP_MATERIALS }
 }
+
+export type WorkshopMaterialPresence = {
+  has_whiteboard: boolean
+  has_notes: boolean
+  has_homework: boolean
+}
+
+export function materialsPresenceFrom(materials: WorkshopMaterials): WorkshopMaterialPresence {
+  return {
+    has_whiteboard: Boolean(materials.whiteboard_url?.trim()),
+    has_notes: Boolean(materials.notes_markdown?.trim() || materials.notes_pdf_url),
+    has_homework: Boolean(materials.homework_pdf_url || materials.homework_items.length > 0),
+  }
+}
+
+/** Booleans only — do not return markdown, signed URLs, or homework titles. */
+export async function loadMaterialPresence(
+  supabase: SupabaseClient,
+  workshopId: string,
+): Promise<WorkshopMaterialPresence> {
+  const [{ data: full }, { count }] = await Promise.all([
+    supabase
+      .from("workshops")
+      .select("whiteboard_url, notes_markdown, notes_pdf_path, homework_pdf_path")
+      .eq("id", workshopId)
+      .maybeSingle(),
+    supabase
+      .from("workshop_homework_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workshop_id", workshopId),
+  ])
+
+  const notesMarkdown = typeof full?.notes_markdown === "string" ? full.notes_markdown.trim() : ""
+  return {
+    has_whiteboard: Boolean(full?.whiteboard_url?.trim()),
+    has_notes: Boolean(notesMarkdown || full?.notes_pdf_path?.trim()),
+    has_homework: Boolean(full?.homework_pdf_path?.trim() || (count ?? 0) > 0),
+  }
+}

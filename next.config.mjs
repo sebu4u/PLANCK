@@ -1,4 +1,8 @@
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { validateEnvOrThrow } from './lib/env-validate.mjs'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Validate environment variables at build time
 try {
@@ -14,6 +18,12 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Cursor opens the git parent (`PLANCK/`), which also has a stray `app/` folder
+  // and `.pnpm-store`. Pin Turbopack to this Next app so it does not watch the parent.
+  turbopack: {
+    root: __dirname,
+  },
+  outputFileTracingRoot: __dirname,
   typescript: {
     ignoreBuildErrors: true,
   },

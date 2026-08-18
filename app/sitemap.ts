@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { createClient } from '@supabase/supabase-js'
 import { PLATFORM_SITE_URL } from '@/lib/platform-marketing'
 import { getPublishedBlogCategories, getPublishedBlogPosts } from '@/lib/blog'
-import { CURSURI_SUBJECT_IDS } from '@/lib/cursuri-subjects'
+import { PUBLIC_CURSURI_SUBJECT_IDS } from '@/lib/cursuri-subjects'
 
 async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -85,7 +85,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Get all lessons for dynamic sitemap with updated_at
   const allLessons: Array<{ title: string; id: string; updated_at: string; subject: string }> = []
 
-  for (const subject of CURSURI_SUBJECT_IDS) {
+  for (const subject of PUBLIC_CURSURI_SUBJECT_IDS) {
     const grades = await getAllGrades(subject)
     for (const grade of grades) {
       const chapters = await getChaptersByGradeId(grade.id)
@@ -135,7 +135,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.9,
     },
-    ...CURSURI_SUBJECT_IDS.map((subject) => ({
+    ...PUBLIC_CURSURI_SUBJECT_IDS.map((subject) => ({
       url: `${baseUrl}/invata/cursuri/${subject}`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,

@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import { useMemo, useState } from "react"
 import { Star } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -56,7 +55,8 @@ function ReviewAvatar({ src, name }: { src: string; name: string }) {
 
   return (
     <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-gray-200/80">
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element -- tiny local avatars; next/image optimizer stalls `next dev` */}
+      <img
         src={src}
         alt=""
         width={28}

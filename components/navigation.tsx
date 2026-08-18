@@ -10,7 +10,7 @@ import {
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus, ShoppingBag } from "lucide-react"
 import { BlogNotificationsDropdown } from "@/components/blog/blog-notifications-dropdown"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
@@ -47,6 +47,7 @@ import {
   isParentCatalogRoute,
   isParentDashboardRoute,
   isParentTemeRoute,
+  isCastigaRoute,
   shouldShowMobileBottomNav,
 } from "@/lib/mobile-app-nav"
 import { isInformaticaProblemDetailRoute, isPlanckCodeShellRoute } from "@/lib/planckcode-shell-routes"
@@ -80,7 +81,7 @@ export function Navigation() {
   const pathname = usePathname()
   const isInvataHub = isInvataHubRoute(pathname)
 
-  // Dashboard, /invata, /grile, /probleme catalog, /matematica|informatica/probleme, /classrooms, and /profil share the same white navbar theme.
+  // Dashboard, /invata, /grile, /probleme catalog, /matematica|informatica/probleme, /classrooms, /profil, and /castiga share the same white navbar theme.
   const isDashboard =
     pathname === "/dashboard" ||
     pathname?.startsWith("/dashboard/") === true ||
@@ -485,6 +486,8 @@ export function Navigation() {
     isGrileRoute ||
     isTesteRoute ||
     isProfileRoute ||
+    isCastigaRoute(pathname) ||
+    pathname?.startsWith("/shop") === true ||
     isBlogRoute ||
     isPregatireRoute(pathname)
   /** Guests pe catalog probleme / cursuri: navbar fără cele 4 link-uri principale; CTA înregistrare. */
@@ -619,7 +622,7 @@ export function Navigation() {
             ? "max-sm:shadow-none transition-shadow duration-300 burger:shadow-md sm:shadow-md"
             : isPracticeCatalogHubPage
               ? "shadow-none"
-              : isCatalogHubPage || isProfileRoute || isFlashcardRoute(pathname)
+              : isCatalogHubPage || isProfileRoute || isCastigaRoute(pathname) || isFlashcardRoute(pathname)
                 ? "shadow-none burger:shadow-md"
                 : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
   const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
@@ -929,6 +932,13 @@ export function Navigation() {
                               Abonament
                             </Link>
                           </DropdownMenuItem>
+                          {user ? (
+                            <DropdownMenuItem asChild>
+                              <Link href="/shop" className={`block px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                                Magazin PLANCKPASS
+                              </Link>
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuSeparator className={useLightNav ? "bg-gray-200" : "bg-white/10"} />
                           {user ? (
                             <DropdownMenuItem asChild>
@@ -1125,6 +1135,14 @@ export function Navigation() {
                         Abonament
                       </Link>
                     </DropdownMenuItem>
+                    {user ? (
+                      <DropdownMenuItem asChild>
+                        <Link href="/shop" className={`flex items-center gap-2.5 px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
+                          <ShoppingBag className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />
+                          Magazin PLANCKPASS
+                        </Link>
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem asChild>
                       <Link href="/contact" className={`flex items-center gap-2.5 px-4 py-2 text-sm ${useLightNav ? 'text-gray-700' : 'text-gray-300'} ${navDropdownItemHover} rounded-md transition-colors`}>
                         <MessageSquare className={NAV_DROPDOWN_ICON_CLASS} aria-hidden />

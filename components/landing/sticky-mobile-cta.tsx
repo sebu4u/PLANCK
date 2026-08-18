@@ -29,10 +29,10 @@ export function LandingStickyMobileCta() {
           transition={{ type: "spring", stiffness: 380, damping: 32 }}
         >
           <Link
-            href="/register"
+            href="/rezerva"
             className="flex h-12 w-full items-center justify-center rounded-full bg-[#7C5CFC] text-sm font-bold text-white shadow-[0_4px_0_#5B47D6]"
           >
-            Începe gratuit
+            Rezervă-ți locul
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </motion.div>

@@ -56,6 +56,11 @@ export function WorkshopDetailPanel({
   const past = isWorkshopPast(workshop.starts_at, workshop.duration_minutes)
   const full = workshop.seats_remaining === 0 && !workshop.unlocked
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
+  const unlockCtaLabel = full
+    ? "Locuri epuizate"
+    : isLoggedIn
+      ? `Deblochează · ${workshop.energy_cost} energie`
+      : "Autentifică-te pentru a debloca"
 
   const handleUnlock = async () => {
     if (!isLoggedIn) {
@@ -236,11 +241,7 @@ export function WorkshopDetailPanel({
                 ) : (
                   <Zap className="mr-2 h-4 w-4 fill-amber-300 text-amber-300" />
                 )}
-                {full
-                  ? "Locuri epuizate"
-                  : isLoggedIn
-                    ? `Deblochează · ${workshop.energy_cost} energie`
-                    : "Autentifică-te pentru a debloca"}
+                {unlockCtaLabel}
               </Button>
             ) : null}
 
@@ -272,17 +273,37 @@ export function WorkshopDetailPanel({
         </div>
       </div>
 
-      {workshop.unlocked && workshop.whiteboard_url ? (
-        <WorkshopWhiteboardCard url={workshop.whiteboard_url} compact={compact} />
+      {workshop.has_whiteboard || workshop.whiteboard_url ? (
+        <WorkshopWhiteboardCard
+          url={workshop.whiteboard_url}
+          compact={compact}
+          locked={!workshop.unlocked}
+          onUnlock={() => void handleUnlock()}
+          unlocking={unlocking}
+          unlockDisabled={full}
+          unlockLabel={unlockCtaLabel}
+        />
       ) : null}
 
-      {workshop.unlocked ? (
+      {workshop.has_notes ||
+      workshop.has_homework ||
+      workshop.notes_markdown ||
+      workshop.notes_pdf_url ||
+      workshop.homework_pdf_url ||
+      (workshop.homework_items?.length ?? 0) > 0 ? (
         <WorkshopMaterialsTabs
           notesMarkdown={workshop.notes_markdown ?? null}
           notesPdfUrl={workshop.notes_pdf_url ?? null}
           homeworkPdfUrl={workshop.homework_pdf_url ?? null}
           homeworkItems={workshop.homework_items ?? []}
           compact={compact}
+          locked={!workshop.unlocked}
+          hasNotes={workshop.has_notes}
+          hasHomework={workshop.has_homework}
+          onUnlock={() => void handleUnlock()}
+          unlocking={unlocking}
+          unlockDisabled={full}
+          unlockLabel={unlockCtaLabel}
         />
       ) : null}
     </div>

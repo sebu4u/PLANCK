@@ -96,6 +96,14 @@ const config: Config = {
   				'0%': { transform: 'translateX(0)' },
   				'100%': { transform: 'translateX(-50%)' }
   			},
+  			'marquee-left': {
+  				'0%': { transform: 'translateX(0)' },
+  				'100%': { transform: 'translateX(-50%)' }
+  			},
+  			'marquee-right': {
+  				'0%': { transform: 'translateX(-50%)' },
+  				'100%': { transform: 'translateX(0)' }
+  			},
   			'grile-wrong-shake': {
   				'0%, 100%': { transform: 'translateX(0)' },
   				'15%': { transform: 'translateX(-7px)' },
@@ -110,6 +118,8 @@ const config: Config = {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
   			'stats-marquee': 'stats-marquee 50s linear infinite',
+  			'marquee-left': 'marquee-left 36s linear infinite',
+  			'marquee-right': 'marquee-right 36s linear infinite',
   			'grile-wrong-shake': 'grile-wrong-shake 0.48s ease-in-out both'
   		}
   	}

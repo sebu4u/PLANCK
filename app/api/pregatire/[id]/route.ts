@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAccessTokenFromRequest } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
-import { lockedMaterials, loadUnlockedMaterials } from "@/lib/pregatire/materials"
+import {
+  loadMaterialPresence,
+  lockedMaterials,
+  loadUnlockedMaterials,
+  materialsPresenceFrom,
+} from "@/lib/pregatire/materials"
 import { fetchTeachersByIds, mapWorkshopPublic } from "@/lib/pregatire/queries"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
@@ -75,6 +80,10 @@ export async function GET(
       }
     }
 
+    const presence = unlocked
+      ? materialsPresenceFrom(materials)
+      : await loadMaterialPresence(supabase, id)
+
     const workshop = {
       ...mapWorkshopPublic(
         row as Parameters<typeof mapWorkshopPublic>[0],
@@ -84,6 +93,7 @@ export async function GET(
       meet_url: unlocked ? meetUrl : null,
       recording_url: unlocked ? recordingUrl : null,
       ...materials,
+      ...presence,
     }
 
     return NextResponse.json({ workshop })

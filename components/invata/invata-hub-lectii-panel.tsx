@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
-import { CURSURI_SUBJECTS } from "@/lib/cursuri-subjects"
+import { ChevronRight, Lock } from "lucide-react"
+import { CURSURI_LOCKED_UNLOCK_LABEL, CURSURI_SUBJECTS } from "@/lib/cursuri-subjects"
 import { cn } from "@/lib/utils"
 
 interface InvataHubLectiiPanelProps {
@@ -28,30 +28,58 @@ export function InvataHubLectiiPanel({ className, compact = false }: InvataHubLe
       <ul className="divide-y divide-[#ececec] border-t border-[#ececec]">
         {CURSURI_SUBJECTS.map((subject) => {
           const Icon = subject.icon
+          const locked = subject.locked === true
+          const rowClassName =
+            "flex items-center gap-3 py-3.5 sm:gap-3.5 sm:py-4"
+
           return (
             <li key={subject.id}>
-              <Link
-                href={subject.href}
-                className="flex items-center gap-3 py-3.5 transition-colors hover:bg-[#fafafa] active:bg-[#f5f5f5] sm:gap-3.5 sm:py-4"
-              >
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#111111]">
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-medium text-[#111111] sm:text-base">
-                    {subject.label}
+              {locked ? (
+                <div
+                  className={cn(rowClassName, "cursor-not-allowed opacity-55")}
+                  aria-disabled="true"
+                  title={`Se deblochează pe ${CURSURI_LOCKED_UNLOCK_LABEL}`}
+                >
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#111111]">
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
                   </span>
-                  {!compact ? (
-                    <span className="mt-0.5 block text-sm text-[#8a8a8a]">
-                      {subject.description}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium text-[#111111] sm:text-base">
+                      {subject.label}
                     </span>
-                  ) : null}
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 shrink-0 text-[#c0c0c0]"
-                  aria-hidden
-                />
-              </Link>
+                    <span className="mt-0.5 block text-sm text-[#8a8a8a]">
+                      {CURSURI_LOCKED_UNLOCK_LABEL}
+                    </span>
+                  </span>
+                  <Lock className="h-4 w-4 shrink-0 text-[#c0c0c0]" aria-hidden />
+                </div>
+              ) : (
+                <Link
+                  href={subject.href}
+                  className={cn(
+                    rowClassName,
+                    "transition-colors hover:bg-[#fafafa] active:bg-[#f5f5f5]",
+                  )}
+                >
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#111111]">
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium text-[#111111] sm:text-base">
+                      {subject.label}
+                    </span>
+                    {!compact ? (
+                      <span className="mt-0.5 block text-sm text-[#8a8a8a]">
+                        {subject.description}
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 text-[#c0c0c0]"
+                    aria-hidden
+                  />
+                </Link>
+              )}
             </li>
           )
         })}

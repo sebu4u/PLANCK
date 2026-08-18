@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import { Star } from "lucide-react"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/scroll-animations"
 import {
@@ -9,12 +8,12 @@ import {
 } from "@/lib/homepage-testimonials"
 
 const AVATAR_FALLBACKS = [
-  "/reviews/avatar-1.png",
-  "/reviews/avatar-2.png",
-  "/reviews/avatar-3.png",
-  "/reviews/avatar-5.png",
-  "/reviews/avatar-6.png",
-  "/reviews/avatar-1.png",
+  "/reviews/avatar-1.webp",
+  "/reviews/avatar-2.webp",
+  "/reviews/avatar-3.webp",
+  "/reviews/avatar-5.webp",
+  "/reviews/avatar-6.webp",
+  "/reviews/avatar-1.webp",
 ]
 
 /** Prefer students with concrete results; fill with other strong quotes. */
@@ -48,7 +47,8 @@ function TestimonialCard({
       </div>
       <p className="flex-1 text-sm leading-relaxed text-gray-600 sm:text-base">„{t.quote}”</p>
       <div className="mt-5 flex items-center gap-3">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny local avatars; next/image optimizer stalls `next dev` */}
+        <img
           src={t.avatarSrc}
           alt={t.name}
           width={40}

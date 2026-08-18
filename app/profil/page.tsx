@@ -10,6 +10,7 @@ import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav";
 import { Pencil, Settings, Lock, Shield, Trophy, Gift, GraduationCap, Copy, Check, CreditCard, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserBadges } from "@/components/user-badges";
+import { ProfilePrizeWheelCard } from "@/components/prize-wheel/profile-prize-wheel-card";
 import { CosmeticsAvatarFrame } from "@/components/planckpass/cosmetics-avatar-frame";
 import {
   PlanckPassInventory,
@@ -479,6 +480,7 @@ const ProfilPage = () => {
 
                         {/* Settings Buttons */}
                         <div className="w-full mt-4 space-y-3">
+                          <ProfilePrizeWheelCard />
                           <Button
                             onClick={() => router.push('/profil/referral')}
                             className="w-full rounded-full border-none bg-gradient-to-r from-purple-600 to-pink-600 font-bold text-white shadow-lg shadow-purple-500/20 transition-all duration-300 hover:scale-[1.02] hover:from-purple-500 hover:to-pink-500 hover:shadow-purple-500/40"

@@ -1,10 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, ArrowRight, Trophy, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Trophy, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { FadeInUp } from "@/components/scroll-animations"
 import { TESTIMONIALS_LABEL } from "@/lib/platform-marketing"
@@ -25,19 +24,24 @@ function needsExpand(quote: string): boolean {
   return quote.trim().length > PREVIEW_CHAR_LIMIT
 }
 
+function TestimonialInitials({ name }: { name: string }) {
+  const initial = name.trim().charAt(0).toUpperCase() || "?"
+
+  return (
+    <div
+      className="flex aspect-[4/3] w-full items-center justify-center rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 text-2xl font-semibold text-gray-400"
+      aria-hidden
+    >
+      {initial}
+    </div>
+  )
+}
+
 function TestimonialImage({ testimonial }: { testimonial: HomepageTestimonial }) {
   const [failed, setFailed] = useState(false)
-  const initial = testimonial.name.trim().charAt(0).toUpperCase() || "?"
 
-  if (failed) {
-    return (
-      <div
-        className="flex aspect-[4/3] w-full items-center justify-center rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 text-2xl font-semibold text-gray-400"
-        aria-hidden
-      >
-        {initial}
-      </div>
-    )
+  if (!testimonial.imageSrc || failed) {
+    return <TestimonialInitials name={testimonial.name} />
   }
 
   return (
@@ -275,26 +279,6 @@ export function ReviewsSection() {
           </button>
         </div>
       </FadeInUp>
-
-      <div className="relative mx-auto max-w-7xl px-4 md:px-8">
-        <FadeInUp delay={0.2} className="mt-14 flex flex-col items-center">
-          <p className="mb-6 text-center text-lg font-medium text-gray-600">
-            Alătură-te elevilor care deja învață altfel
-          </p>
-          <div className="flex w-full max-w-2xl justify-center px-4">
-            <Link
-              href="/register"
-              className="dashboard-start-glow box-border inline-flex h-14 w-full shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-9 text-base font-semibold text-white shadow-[0_4px_0_#5B47D6] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#5B47D6] active:translate-y-1 active:shadow-[0_1px_0_#5B47D6] lg:w-auto"
-              style={{ "--start-glow-tint": "rgba(224, 215, 255, 0.88)" } as CSSProperties}
-            >
-              <span className="relative z-10 inline-flex items-center gap-2 text-white">
-                Vreau să încep acum
-                <ArrowRight className="h-4 w-4 shrink-0 text-white" aria-hidden />
-              </span>
-            </Link>
-          </div>
-        </FadeInUp>
-      </div>
 
       <AnimatePresence>
         {expandedTestimonial && (

@@ -9,6 +9,8 @@ import {
   cursuriSubjectHref,
   getCursuriSubject,
   isCursuriSubjectId,
+  isCursuriSubjectLocked,
+  PUBLIC_CURSURI_SUBJECT_IDS,
 } from "@/lib/cursuri-subjects"
 import { slugify } from "@/lib/slug"
 import type { LessonSummary } from "@/lib/supabase-physics"
@@ -16,14 +18,7 @@ import type { LessonSummary } from "@/lib/supabase-physics"
 export const revalidate = 21600
 
 export async function generateStaticParams() {
-  return [
-    { subject: "fizica" },
-    { subject: "mate" },
-    { subject: "info-cpp" },
-    { subject: "info-py" },
-    { subject: "chimie" },
-    { subject: "biologie" },
-  ]
+  return PUBLIC_CURSURI_SUBJECT_IDS.map((subject) => ({ subject }))
 }
 
 export async function generateMetadata({
@@ -32,7 +27,7 @@ export async function generateMetadata({
   params: Promise<{ subject: string }>
 }): Promise<Metadata> {
   const { subject: raw } = await params
-  if (!isCursuriSubjectId(raw)) {
+  if (!isCursuriSubjectId(raw) || isCursuriSubjectLocked(raw)) {
     return buildMetadata("physics-lessons")
   }
   const subject = getCursuriSubject(raw)!
@@ -59,7 +54,7 @@ export default async function InvataCursuriSubjectPage({
   params: Promise<{ subject: string }>
 }) {
   const { subject: raw } = await params
-  if (!isCursuriSubjectId(raw)) notFound()
+  if (!isCursuriSubjectId(raw) || isCursuriSubjectLocked(raw)) notFound()
 
   const subjectConfig = getCursuriSubject(raw)!
   const { grades, chapters, lessons } = await loadCursuriCatalog(raw)

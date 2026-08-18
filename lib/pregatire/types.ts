@@ -180,4 +180,8 @@ export interface WorkshopDetail extends WorkshopPublic {
   notes_pdf_url?: string | null
   homework_pdf_url?: string | null
   homework_items?: WorkshopHomeworkItem[]
+  /** Public presence flags — never leak actual material content when locked. */
+  has_whiteboard?: boolean
+  has_notes?: boolean
+  has_homework?: boolean
 }

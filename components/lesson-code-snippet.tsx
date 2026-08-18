@@ -17,15 +17,23 @@ const VERTICAL_PADDING = 20
 const MIN_HEIGHT = 80
 const MAX_HEIGHT = 420
 
+export type LessonCodeLanguage = "python" | "cpp"
+
 interface LessonCodeSnippetProps {
   code: string
+  language?: LessonCodeLanguage
+}
+
+const LANGUAGE_LABEL: Record<LessonCodeLanguage, string> = {
+  python: "Python",
+  cpp: "C++",
 }
 
 export function normalizeCodeSnippetContent(value: string): string {
   return value.replace(/^\r?\n/, "").replace(/\r?\n$/, "")
 }
 
-export function LessonCodeSnippet({ code }: LessonCodeSnippetProps) {
+export function LessonCodeSnippet({ code, language = "python" }: LessonCodeSnippetProps) {
   const normalizedCode = useMemo(() => normalizeCodeSnippetContent(code), [code])
   const lineCount = Math.max(normalizedCode.split("\n").length, 1)
   const height = Math.min(Math.max(lineCount * LINE_HEIGHT + VERTICAL_PADDING, MIN_HEIGHT), MAX_HEIGHT)
@@ -33,12 +41,12 @@ export function LessonCodeSnippet({ code }: LessonCodeSnippetProps) {
   return (
     <div className="lesson-code-snippet my-4 overflow-hidden rounded-xl border border-[#3b3b3b] bg-[#1e1e1e]">
       <div className="flex items-center border-b border-[#3b3b3b] bg-[#252526] px-3 py-1.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Python</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{LANGUAGE_LABEL[language]}</span>
       </div>
       <div style={{ height }}>
         <Editor
           height="100%"
-          language="python"
+          language={language}
           value={normalizedCode}
           theme="vs-dark"
           options={{

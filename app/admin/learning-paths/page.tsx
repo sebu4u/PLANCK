@@ -129,6 +129,14 @@ export default function AdminLearningPathsPage() {
             >
               Rapoarte
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/admin/roata")}
+              className="text-gray-200 hover:text-white hover:bg-white/10"
+            >
+              Roată
+            </Button>
           </div>
           <h1 className="text-3xl font-bold mb-2">Administrare Learning Paths</h1>
           <p className="text-gray-400">

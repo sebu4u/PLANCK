@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getStripeClient } from "@/lib/stripe"
 import { parseAccessToken } from "@/lib/subscription-plan-server"
+import { getPrizeByCodeForUser } from "@/lib/prize-wheel/server"
+import { getShopCouponByCodeForUser } from "@/lib/shop/server"
+import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
 
@@ -44,6 +47,34 @@ export async function POST(req: NextRequest) {
     const stripe = getStripeClient()
     const normalizedCode = rawCode.toUpperCase()
 
+    const wheelPrize = await getPrizeByCodeForUser(userData.user.id, normalizedCode)
+    if (wheelPrize) {
+      return NextResponse.json({
+        promotion_code_id: `wheel:${wheelPrize.id}`,
+        code: wheelPrize.code,
+        percent_off: wheelPrize.percentOff,
+        amount_off: wheelPrize.amountOff,
+        currency: wheelPrize.currency,
+        prize_type: wheelPrize.type,
+        interval: wheelPrize.interval,
+        is_trial: wheelPrize.isTrial,
+        source: "prize_wheel",
+      })
+    }
+
+    const shopCoupon = await getShopCouponByCodeForUser(userData.user.id, normalizedCode)
+    if (shopCoupon) {
+      return NextResponse.json({
+        promotion_code_id: `shop:${shopCoupon.id}`,
+        code: shopCoupon.code,
+        percent_off: shopCoupon.percentOff,
+        amount_off: null,
+        currency: null,
+        interval: shopCoupon.interval,
+        source: "shop",
+      })
+    }
+
     const list = await stripe.promotionCodes.list({
       code: normalizedCode,
       active: true,
@@ -78,8 +109,8 @@ export async function POST(req: NextRequest) {
       amount_off: coupon.amount_off ?? null,
       currency: coupon.currency ?? null,
     })
-  } catch (error: any) {
-    console.error("[stripe/promo-code] Error:", error)
+  } catch (error: unknown) {
+    logger.error("[stripe/promo-code] Error:", error)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }

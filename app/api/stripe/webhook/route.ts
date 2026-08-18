@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import type Stripe from "stripe"
+import Stripe from "stripe"
 
 import { getStripeClient } from "@/lib/stripe"
 import { getStripeWebhookSecretEntries, type StripeMode } from "@/lib/stripe-config"
@@ -7,14 +7,34 @@ import {
   applyStripeSubscription,
   getSupabaseAdmin,
   isParentForChildPurchase,
+  isStripeMissingResourceError,
   resolveCustomerId,
 } from "@/lib/stripe-subscription"
+import { markPrizeRedeemed } from "@/lib/prize-wheel/server"
+import { markShopCouponRedeemed } from "@/lib/shop/server"
 
 export const runtime = "nodejs"
 
 type WebhookEventClaim = {
   shouldProcess: boolean
   releaseOnFailure: boolean
+}
+
+const isSchemaMissingError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false
+  const code = "code" in error ? String(error.code) : ""
+  const message = "message" in error ? String(error.message).toLowerCase() : ""
+  const details = "details" in error ? String(error.details).toLowerCase() : ""
+  return (
+    code === "42P01" ||
+    code === "42703" ||
+    code === "PGRST204" ||
+    code === "PGRST205" ||
+    message.includes("does not exist") ||
+    message.includes("could not find") ||
+    message.includes("schema cache") ||
+    details.includes("purchased_balance")
+  )
 }
 
 const claimWebhookEvent = async (eventId: string): Promise<WebhookEventClaim> => {
@@ -74,8 +94,57 @@ const resolveInvoiceSubscriptionId = (invoice: Stripe.Invoice) => {
   return resolveSubscriptionId(legacySubscription ?? nestedSubscription ?? null)
 }
 
+const retrieveSubscription = async (stripe: Stripe, subscriptionId: string) => {
+  try {
+    return await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ["items.data.price"],
+    })
+  } catch (error) {
+    if (isStripeMissingResourceError(error)) {
+      console.warn("[stripe/webhook] Ignoring missing Stripe subscription:", subscriptionId)
+      return null
+    }
+    throw error
+  }
+}
+
+const redeemCheckoutPerks = async (session: Stripe.Checkout.Session) => {
+  const prizeId = session.metadata?.prize_wheel_prize_id?.trim() || null
+  if (prizeId) {
+    try {
+      await markPrizeRedeemed({
+        prizeId,
+        sessionId: session.id,
+      })
+    } catch (error) {
+      if (!isSchemaMissingError(error)) throw error
+      console.warn("[stripe/webhook] prize_wheel_prizes table missing; skipping prize redemption.")
+    }
+  }
+
+  const shopCouponId = session.metadata?.shop_coupon_id?.trim() || null
+  if (shopCouponId) {
+    try {
+      await markShopCouponRedeemed({
+        couponId: shopCouponId,
+        sessionId: session.id,
+      })
+    } catch (error) {
+      if (!isSchemaMissingError(error)) throw error
+      console.warn("[stripe/webhook] planckpass_shop_coupons table missing; skipping shop coupon redemption.")
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
-  const webhookSecretEntries = getStripeWebhookSecretEntries()
+  let webhookSecretEntries: ReturnType<typeof getStripeWebhookSecretEntries>
+  try {
+    webhookSecretEntries = getStripeWebhookSecretEntries()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : error
+    console.error("[stripe/webhook] Missing webhook secrets:", message)
+    return NextResponse.json({ error: "Webhook secrets are not configured." }, { status: 500 })
+  }
 
   const signature = req.headers.get("stripe-signature")
   if (!signature) {
@@ -89,8 +158,7 @@ export async function POST(req: NextRequest) {
 
   for (const entry of webhookSecretEntries) {
     try {
-      const stripe = getStripeClient(entry.mode)
-      event = stripe.webhooks.constructEvent(body, signature, entry.secret)
+      event = Stripe.webhooks.constructEvent(body, signature, entry.secret)
       verifiedMode = entry.mode
       signatureError = null
       break
@@ -100,17 +168,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (!event) {
-    const err: any = signatureError
-    console.error("[stripe/webhook] Signature error:", err?.message || err)
+    const err: { message?: string } | unknown = signatureError
+    const message = typeof err === "object" && err && "message" in err ? err.message : err
+    console.error("[stripe/webhook] Signature error:", message)
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 })
   }
 
   const stripeMode = verifiedMode ?? (event.livemode ? "live" : "test")
-  const stripe = getStripeClient(stripeMode)
-
   let claim: WebhookEventClaim | null = null
 
   try {
+    const stripe = getStripeClient(stripeMode)
+
     claim = await claimWebhookEvent(event.id)
     if (!claim.shouldProcess) {
       return NextResponse.json({ received: true, duplicate: true })
@@ -130,19 +199,19 @@ export async function POST(req: NextRequest) {
           null
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-            expand: ["items.data.price"],
-          })
-          if (
-            isParentForChildPurchase(session.metadata) &&
-            !isParentForChildPurchase(subscription.metadata)
-          ) {
-            subscription.metadata = {
-              ...subscription.metadata,
-              ...session.metadata,
+          const subscription = await retrieveSubscription(stripe, subscriptionId)
+          if (subscription) {
+            if (
+              isParentForChildPurchase(session.metadata) &&
+              !isParentForChildPurchase(subscription.metadata)
+            ) {
+              subscription.metadata = {
+                ...subscription.metadata,
+                ...session.metadata,
+              }
             }
+            await applyStripeSubscription(subscription, customerId, userId, stripeMode)
           }
-          await applyStripeSubscription(subscription, customerId, userId, stripeMode)
         } else if (userId && customerId) {
           const supabase = getSupabaseAdmin()
           await supabase
@@ -150,6 +219,8 @@ export async function POST(req: NextRequest) {
             .update({ stripe_customer_id: customerId })
             .eq("user_id", userId)
         }
+
+        await redeemCheckoutPerks(session)
         break
       }
       case "customer.subscription.created":
@@ -167,13 +238,13 @@ export async function POST(req: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice
         const subscriptionId = resolveInvoiceSubscriptionId(invoice)
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-            expand: ["items.data.price"],
-          })
-          const customerId = resolveCustomerId(subscription.customer)
-          const userId =
-            subscription.metadata?.payer_user_id || subscription.metadata?.user_id || null
-          await applyStripeSubscription(subscription, customerId, userId, stripeMode)
+          const subscription = await retrieveSubscription(stripe, subscriptionId)
+          if (subscription) {
+            const customerId = resolveCustomerId(subscription.customer)
+            const userId =
+              subscription.metadata?.payer_user_id || subscription.metadata?.user_id || null
+            await applyStripeSubscription(subscription, customerId, userId, stripeMode)
+          }
         }
         break
       }
@@ -182,7 +253,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ received: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (claim?.releaseOnFailure) {
       await releaseWebhookEventClaim(event.id)
     }

@@ -12,7 +12,7 @@ interface LessonRichContentProps {
   emphasizedBody?: boolean
 }
 
-const MARKER_TAG_PATTERN = /\[(FORMULA|COD|CODINLINE|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]/
+const MARKER_TAG_PATTERN = /\[(FORMULA|CODECPP|CODE|COD|CODINLINE|ENUNT|IMPORTANT|DEFINITIE|EXEMPLU|INDENT)\]/
 
 /** True if `value` contains any of the `[FORMULA]`/`[IMPORTANT]`/`[COD]`/... markers this component parses. */
 export function hasLessonMarkers(value: string): boolean {
@@ -221,12 +221,16 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
         return
       }
 
-      if (trimmed.startsWith("[COD]")) {
+      if (trimmed.startsWith("[CODECPP]") || trimmed.startsWith("[CODE]") || trimmed.startsWith("[COD]")) {
         flushParagraph(idx)
-        const codMatch = trimmed.match(/^\[COD\]([\s\S]*?)\[\/COD\]$/)
+        const codMatch = trimmed.match(/^\[(CODECPP|CODE|COD)\]([\s\S]*?)\[\/\1\]$/)
         if (codMatch) {
           blocks.push(
-            <LessonCodeSnippet key={`cod-${keyPrefix}-${idx}`} code={normalizeCodeSnippetContent(codMatch[1])} />
+            <LessonCodeSnippet
+              key={`cod-${keyPrefix}-${idx}`}
+              code={normalizeCodeSnippetContent(codMatch[2])}
+              language={codMatch[1] === "CODECPP" ? "cpp" : "python"}
+            />
           )
         }
         return
@@ -294,7 +298,7 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
 
   const renderContentWithMath = (value: string) => {
     const tagPattern =
-      /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[COD\][\s\S]*?\[\/COD\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\]|\[INDENT\][\s\S]*?\[\/INDENT\])/g
+      /(\[FORMULA\][\s\S]*?\[\/FORMULA\]|\[CODECPP\][\s\S]*?\[\/CODECPP\]|\[CODE\][\s\S]*?\[\/CODE\]|\[COD\][\s\S]*?\[\/COD\]|\[ENUNT\][\s\S]*?\[\/ENUNT\]|\[IMPORTANT\][\s\S]*?\[\/IMPORTANT\]|\[DEFINITIE\][\s\S]*?\[\/DEFINITIE\]|\[EXEMPLU\][\s\S]*?\[\/EXEMPLU\]|\[INDENT\][\s\S]*?\[\/INDENT\])/g
     const segments = value.split(tagPattern)
 
     return (
@@ -302,10 +306,14 @@ export function LessonRichContent({ content, theme = "dark", emphasizedBody = fa
         {segments.map((segment, idx) => {
           if (!segment) return null
 
-          const codMatch = segment.match(/^\[COD\]([\s\S]*?)\[\/COD\]$/)
+          const codMatch = segment.match(/^\[(CODECPP|CODE|COD)\]([\s\S]*?)\[\/\1\]$/)
           if (codMatch) {
             return (
-              <LessonCodeSnippet key={`cod-${idx}`} code={normalizeCodeSnippetContent(codMatch[1])} />
+              <LessonCodeSnippet
+                key={`cod-${idx}`}
+                code={normalizeCodeSnippetContent(codMatch[2])}
+                language={codMatch[1] === "CODECPP" ? "cpp" : "python"}
+              />
             )
           }
 

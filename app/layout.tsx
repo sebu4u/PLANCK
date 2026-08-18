@@ -80,12 +80,6 @@ export default function RootLayout({
     <html lang="ro">
       <head>
         <link
-          rel="preload"
-          href="/videos/loading.webm"
-          as="video"
-          type="video/webm"
-        />
-        <link
           rel="alternate"
           type="text/plain"
           href="/llms.txt"

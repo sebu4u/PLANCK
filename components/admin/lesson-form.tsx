@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Loader2, Save, X, Eye, EyeOff, BookOpen, AlertTriangle, FileText, Lightbulb, Type, MoveRight } from "lucide-react"
+import { Loader2, Save, X, Eye, EyeOff, BookOpen, AlertTriangle, FileText, Lightbulb, Type, MoveRight, Code2 } from "lucide-react"
 import type { Lesson } from "@/lib/supabase-physics"
 
 const LessonViewer = lazy(() => import("@/components/lesson-viewer").then((m) => ({ default: m.LessonViewer })))
@@ -31,6 +31,8 @@ const MARKERS = [
   { tag: "DEFINITIE", label: "Definiție", icon: BookOpen, description: "Definiții" },
   { tag: "EXEMPLU", label: "Exemplu", icon: Lightbulb, description: "Exemple practice" },
   { tag: "INDENT", label: "Indent", icon: MoveRight, description: "Text indentat" },
+  { tag: "CODE", label: "Python", icon: Code2, description: "Bloc de cod cu highlight (Python)" },
+  { tag: "CODECPP", label: "C++", icon: Code2, description: "Bloc de cod cu highlight (C++)" },
 ]
 
 export function LessonForm({ chapters, lesson, defaultChapterId, onSave, onCancel }: LessonFormProps) {
@@ -252,7 +254,7 @@ export function LessonForm({ chapters, lesson, defaultChapterId, onSave, onCance
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder={`Scrie conținutul lecției aici...\n\nExemple de marcatori:\n[FORMULA]$$F = ma$$[/FORMULA]\n[IMPORTANT]Aceasta este o informație importantă![/IMPORTANT]\n[DEFINITIE]Forța este...[/DEFINITIE]\n[EXEMPLU]Dacă aplicăm...[/EXEMPLU]\n[ENUNT]Legea spune că...[/ENUNT]\n\n# Heading 1\n## Heading 2\n**bold** *italic*`}
+            placeholder={`Scrie conținutul lecției aici...\n\nExemple de marcatori:\n[FORMULA]$$F = ma$$[/FORMULA]\n[IMPORTANT]Aceasta este o informație importantă![/IMPORTANT]\n[DEFINITIE]Forța este...[/DEFINITIE]\n[EXEMPLU]Dacă aplicăm...[/EXEMPLU]\n[ENUNT]Legea spune că...[/ENUNT]\n[CODE]print("hello")[/CODE]\n[CODECPP]cout << "hello";[/CODECPP]\n\n# Heading 1\n## Heading 2\n**bold** *italic*`}
             rows={20}
             className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-white text-sm font-mono resize-y min-h-[300px] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           />

@@ -7,10 +7,11 @@ import { StructuredData } from "@/components/structured-data"
 import { breadcrumbStructuredData } from "@/lib/structured-data"
 import { findLessonIdBySlug, loadCursuriCatalog } from "@/lib/cursuri-catalog"
 import {
-  CURSURI_SUBJECT_IDS,
   cursuriSubjectHref,
   getCursuriSubject,
   isCursuriSubjectId,
+  isCursuriSubjectLocked,
+  PUBLIC_CURSURI_SUBJECT_IDS,
 } from "@/lib/cursuri-subjects"
 import { slugify } from "@/lib/slug"
 
@@ -19,7 +20,7 @@ export const revalidate = 2592000 // 30 days
 export async function generateStaticParams() {
   const params: { subject: string; slug: string }[] = []
 
-  for (const subject of CURSURI_SUBJECT_IDS) {
+  for (const subject of PUBLIC_CURSURI_SUBJECT_IDS) {
     const { grades, chapters, lessons } = await loadCursuriCatalog(subject)
     for (const grade of grades) {
       for (const chapter of chapters[grade.id] ?? []) {
@@ -39,7 +40,7 @@ export async function generateMetadata({
   params: Promise<{ subject: string; slug: string }>
 }): Promise<Metadata> {
   const { subject: raw, slug } = await params
-  if (!isCursuriSubjectId(raw)) {
+  if (!isCursuriSubjectId(raw) || isCursuriSubjectLocked(raw)) {
     return generatePageMetadata("physics-lessons")
   }
 
@@ -103,7 +104,7 @@ export default async function InvataCursuriLessonPage({
   params: Promise<{ subject: string; slug: string }>
 }) {
   const { subject: raw, slug } = await params
-  if (!isCursuriSubjectId(raw)) notFound()
+  if (!isCursuriSubjectId(raw) || isCursuriSubjectLocked(raw)) notFound()
 
   const subjectConfig = getCursuriSubject(raw)!
   const { grades, chapters, lessons } = await loadCursuriCatalog(raw)

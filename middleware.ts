@@ -36,9 +36,11 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    // This will refresh session if expired - required for Server Components
-    // https://supabase.com/docs/guides/auth/server-side/nextjs
-    await supabase.auth.getUser()
+    // Refresh cookies if the access token is expired. This middleware does not
+    // authorize routes — it only keeps the SSR cookie session alive.
+    // `getSession()` does that locally and only hits Auth when a refresh is due.
+    // `getUser()` would add an HTTP roundtrip to Supabase on every navigation.
+    await supabase.auth.getSession()
 
     // Belt-and-suspenders: never cache middleware responses that may carry refreshed auth cookies.
     if (!response.headers.get('Cache-Control')) {
@@ -48,7 +50,20 @@ export async function updateSession(request: NextRequest) {
     return response
 }
 
+function hasSupabaseAuthCookie(request: NextRequest) {
+    return request.cookies.getAll().some(({ name }) => name.includes('-auth-token'))
+}
+
 export async function middleware(request: NextRequest) {
+    // Anonymous traffic has nothing to refresh — skip the Supabase client entirely.
+    if (!hasSupabaseAuthCookie(request)) {
+        return NextResponse.next({
+            request: {
+                headers: request.headers,
+            },
+        })
+    }
+
     return await updateSession(request)
 }
 

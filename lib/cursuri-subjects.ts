@@ -20,7 +20,11 @@ export interface CursuriSubjectConfig {
   description: string
   icon: LucideIcon
   href: string
+  /** Dacă e true, materia apare în listă dar nu e accesibilă din /invata. */
+  locked?: boolean
 }
+
+export const CURSURI_LOCKED_UNLOCK_LABEL = "7.09.2026"
 
 export const CURSURI_SUBJECTS: CursuriSubjectConfig[] = [
   {
@@ -54,6 +58,7 @@ export const CURSURI_SUBJECTS: CursuriSubjectConfig[] = [
     description: "Lecții de informatică în Python pe clase, capitole și lecții.",
     icon: Code2,
     href: "/invata/cursuri/info-py",
+    locked: true,
   },
   {
     id: "chimie",
@@ -62,6 +67,7 @@ export const CURSURI_SUBJECTS: CursuriSubjectConfig[] = [
     description: "Lecții de chimie pe clase, capitole și lecții.",
     icon: FlaskConical,
     href: "/invata/cursuri/chimie",
+    locked: true,
   },
   {
     id: "biologie",
@@ -70,12 +76,21 @@ export const CURSURI_SUBJECTS: CursuriSubjectConfig[] = [
     description: "Lecții de biologie pe clase, capitole și lecții.",
     icon: Leaf,
     href: "/invata/cursuri/biologie",
+    locked: true,
   },
 ]
 
 export function isCursuriSubjectId(value: string): value is CursuriSubjectId {
   return (CURSURI_SUBJECT_IDS as readonly string[]).includes(value)
 }
+
+export function isCursuriSubjectLocked(id: string): boolean {
+  return getCursuriSubject(id)?.locked === true
+}
+
+export const PUBLIC_CURSURI_SUBJECT_IDS = CURSURI_SUBJECT_IDS.filter(
+  (id) => !isCursuriSubjectLocked(id),
+) as CursuriSubjectId[]
 
 export function getCursuriSubject(id: string): CursuriSubjectConfig | null {
   return CURSURI_SUBJECTS.find((s) => s.id === id) ?? null

@@ -5,11 +5,11 @@ import { Footer } from "@/components/footer"
 import { FomoBanner } from "@/components/landing/fomo-banner"
 import { LandingHeroSection } from "@/components/landing/hero-section"
 import { LandingSocialProofSection } from "@/components/landing/social-proof-section"
-import { LandingProblemSection } from "@/components/landing/problem-section"
-import { LandingSolutionSection } from "@/components/landing/solution-section"
-import { LandingLiveTutoringSection } from "@/components/landing/live-tutoring-section"
-import { LandingInsightSection } from "@/components/landing/insight-section"
-import { LandingPlanckCodeSection } from "@/components/landing/planck-code-section"
+import { LandingSubjectsPickerSection } from "@/components/landing/subjects-picker-section"
+import { LandingHowItWorksSection } from "@/components/landing/how-it-works-section"
+import { LandingWorkshopsCalendarSection } from "@/components/landing/workshops-calendar-section"
+import { LandingTeachersSection } from "@/components/landing/teachers-section"
+import { LandingDemoVideoSection } from "@/components/landing/demo-video-section"
 import { LandingPlanckPassSection } from "@/components/landing/planckpass-section"
 import { LandingFounderSection } from "@/components/landing/founder-section"
 import { LandingTestimonialsSection } from "@/components/landing/testimonials-section"
@@ -25,16 +25,16 @@ export function LandingPageContent() {
   return (
     <div className="relative min-h-screen bg-white pb-16 sm:pb-0">
       <FomoBanner days={countdown.days} />
-      <div className="relative">
+      <div className="relative bg-[#ffffff]">
         <HomePageNavbar variant="light" />
         <LandingHeroSection />
       </div>
       <LandingSocialProofSection />
-      <LandingProblemSection />
-      <LandingSolutionSection />
-      <LandingLiveTutoringSection />
-      <LandingInsightSection />
-      <LandingPlanckCodeSection />
+      <LandingSubjectsPickerSection />
+      <LandingHowItWorksSection />
+      <LandingWorkshopsCalendarSection />
+      <LandingTeachersSection />
+      <LandingDemoVideoSection />
       <LandingPlanckPassSection />
       <LandingFounderSection />
       <LandingTestimonialsSection />

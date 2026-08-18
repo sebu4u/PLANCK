@@ -1,70 +1,105 @@
 "use client"
 
-import Link from "next/link"
-import { ArrowRight, Sparkles, Star } from "lucide-react"
+import { ArrowRight, Award, ShieldCheck, Star } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
+import {
+  LandingHeroReviewRowsDesktop,
+  LandingHeroReviewRowsMobile,
+} from "@/components/landing/hero-review-rows"
 
-/** Hero — leave UI/copy unchanged for campaign restructure. */
 export function LandingHeroSection() {
   return (
-    <section className="relative min-h-screen bg-white">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 left-1/2 h-[700px] w-[700px] -translate-x-1/2 rounded-full bg-[#EBE8FF] opacity-40 blur-[120px]" />
-      </div>
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-4 pb-16 pt-28 text-center">
-        <FadeInUp>
-          <span className="mb-6 inline-flex items-center gap-1.5 rounded-full bg-[#EBE8FF] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[#5B47D6]">
-            <Sparkles className="h-3.5 w-3.5" />
-            Ofertă specială de lansare
-          </span>
-        </FadeInUp>
-
-        <FadeInUp delay={0.1}>
-          <h1 className="mx-auto max-w-4xl text-4xl font-black leading-[1.08] tracking-tight text-gray-900 sm:text-5xl md:text-6xl lg:text-7xl">
-            Materia pe care nu ai{" "}
-            <br className="hidden sm:block" />
-            înțeles-o niciodată,{" "}
-            <span className="bg-gradient-to-r from-[#9a7bff] via-[#c77bff] to-[#ffb56b] bg-clip-text text-transparent">
-              explicată simplu.
+    <section className="relative overflow-hidden bg-[#ffffff]">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-8 pt-32 sm:px-6 sm:pb-12 sm:pt-36 lg:px-8 lg:pb-20 lg:pt-40">
+        <div className="flex max-w-xl flex-col text-center lg:max-w-lg lg:text-left xl:max-w-xl">
+          <FadeInUp>
+            <span className="mx-auto inline-flex items-center rounded-xl bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(124,92,252,0.28)] lg:mx-0">
+              Un AN de PLANCK
             </span>
-          </h1>
-        </FadeInUp>
+          </FadeInUp>
 
-        <FadeInUp delay={0.18} className="mt-6">
-          <p className="mx-auto max-w-2xl text-base leading-relaxed text-gray-500 sm:text-lg sm:leading-8">
-            Cursuri complete pe toate materiile, un catalog de{" "}
-            <strong className="font-semibold text-gray-700">1000+ probleme rezolvate video</strong>, și un profesor AI care îți creează un{" "}
-            <strong className="font-semibold text-gray-700">traseu personalizat</strong> — totul într-un singur abonament.
-          </p>
-        </FadeInUp>
+          <FadeInUp delay={0.08}>
+            <h1 className="mt-5 text-4xl font-black leading-[1.08] tracking-tight text-gray-900 sm:text-5xl lg:text-[3.25rem] xl:text-6xl">
+              Meditații zilnice, un singur abonament
+            </h1>
+          </FadeInUp>
 
-        <FadeInUp delay={0.26} className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <Link
-            href="/register"
-            className="inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98]"
-          >
-            Încearcă gratuit
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-          <a
-            href="#pricing"
-            className="inline-flex h-14 items-center justify-center rounded-full border border-gray-300 border-b-[3px] border-b-[#b8bcc4] bg-white px-8 text-base font-bold text-gray-900 transition-[background-color,border-color] hover:border-gray-400 hover:bg-gray-50"
-          >
-            Vezi planurile
-          </a>
-        </FadeInUp>
+          <FadeInUp delay={0.14}>
+            <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg sm:leading-8">
+              Simulări și pregătiri pentru BAC, în fiecare zi! De la doar{" "}
+              <strong className="font-semibold text-gray-700">79 RON/săptămână</strong>. Peste{" "}
+              <strong className="font-semibold text-gray-700">10.000 de grile și exerciții</strong>{" "}
+              rezolvate video complet.
+            </p>
+          </FadeInUp>
 
-        <FadeInUp delay={0.34} className="mt-8 flex flex-col items-center gap-1.5 sm:flex-row sm:gap-2">
-          <div className="flex">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Star key={i} className="h-4 w-4 fill-[#F59E3A] text-[#F59E3A]" />
-            ))}
-          </div>
-          <p className="text-sm text-gray-500">
-            <span className="font-semibold text-gray-700">Peste 1.000 de elevi</span> învață deja pe PLANCK
-          </p>
-        </FadeInUp>
+          <FadeInUp delay={0.2} className="mt-8">
+            <a
+              href="/rezerva"
+              className="inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98]"
+            >
+              Rezervă-ți locul
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </a>
+          </FadeInUp>
+
+          <FadeInUp delay={0.24}>
+            <p className="mt-2.5 text-sm leading-relaxed text-gray-500 sm:text-[15px]">
+              Pentru toți elevii de clasa a 9-a până la clasa a 12-a. 5 materii într-un abonament.
+            </p>
+          </FadeInUp>
+
+          <FadeInUp delay={0.28} className="mt-4">
+            <div className="rounded-xl border border-[#EBE8FF] bg-[#F8F7FF] px-4 py-2.5 text-left sm:px-5">
+              <p className="text-sm font-semibold leading-snug text-gray-700">
+                De la 7 RON/meditație. Abonament săptămânal. Toate pregătirile înregistrate video.
+              </p>
+            </div>
+          </FadeInUp>
+
+          <FadeInUp delay={0.34} className="mt-6 sm:mt-8">
+            <div className="flex items-center justify-center gap-2 sm:gap-2.5 lg:justify-start">
+              <Award className="hidden h-7 w-7 shrink-0 text-[#F59E3A] sm:block" aria-hidden />
+
+              <div
+                className="flex w-full max-w-[280px] overflow-hidden rounded-xl border border-amber-100 bg-white shadow-[0_6px_24px_rgba(15,23,42,0.06)] sm:max-w-[320px]"
+                role="group"
+                aria-label="Rating mediu 4,8 din 5 și peste 100 de recenzii verificate"
+              >
+                <div className="flex min-w-0 flex-1 flex-col items-center justify-center border-r border-gray-100 px-2.5 py-2.5 sm:px-3 sm:py-3">
+                  <div className="flex items-center gap-0.5" aria-hidden>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star
+                        key={i}
+                        className="h-3 w-3 fill-[#F59E3A] text-[#F59E3A] sm:h-3.5 sm:w-3.5"
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-1 text-lg font-bold text-[#4F6EF7] sm:text-xl">4,8/5</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500 sm:text-xs">rating mediu</p>
+                </div>
+
+                <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-2.5 py-2.5 sm:px-3 sm:py-3">
+                  <div className="flex items-center gap-1">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-[#4F6EF7]" aria-hidden />
+                    <p className="text-lg font-bold text-[#4F6EF7] sm:text-xl">100+</p>
+                  </div>
+                  <p className="mt-1 text-[11px] text-gray-500 sm:text-xs">recenzii verificate</p>
+                </div>
+              </div>
+
+              <Award
+                className="hidden h-7 w-7 shrink-0 scale-x-[-1] text-[#F59E3A] sm:block"
+                aria-hidden
+              />
+            </div>
+          </FadeInUp>
+        </div>
+
+        <LandingHeroReviewRowsMobile />
       </div>
+
+      <LandingHeroReviewRowsDesktop />
     </section>
   )
 }

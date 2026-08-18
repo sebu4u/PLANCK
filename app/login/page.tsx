@@ -46,7 +46,7 @@ function LoginPageContent() {
     // Redirect if already logged in
     useEffect(() => {
         if (!user || profileSyncedUserId !== user.id) return
-        if (needsOnboarding) {
+        if (needsOnboarding && !(redirectTo?.startsWith("/rezerva"))) {
             router.push(REGISTER_ONBOARDING_PATH)
             return
         }

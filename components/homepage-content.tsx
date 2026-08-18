@@ -4,42 +4,26 @@
 import { Footer } from "@/components/footer"
 import { ProgressNotification } from "@/components/progress-notification"
 import { useAuth } from "@/components/auth-provider"
-import { Button } from "@/components/ui/button"
-import FinalCTASection from "@/components/final-cta-section"
-import { Suspense, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import dynamic from "next/dynamic"
 import { HomePageHeroRedesign } from "@/components/homepage-hero-redesign"
 import { HomePageScrollNavbar } from "@/components/homepage-scroll-navbar"
 import { AIDemoSection } from "@/components/ai-demo-section"
-import { AICodeAnalysisSection } from "@/components/ai-code-analysis-section"
-import { NewWayToLearnSection } from "@/components/new-way-to-learn-section"
-import { HomePageReusiteSection } from "@/components/homepage-reusite-section"
 import { HomePagePlatformVideoSection } from "@/components/homepage-platform-video-section"
-import { HomePageVirtualTeacherSection } from "@/components/homepage-virtual-teacher-section"
 import { HomePageSubjectsSection } from "@/components/homepage-subjects-section"
 import { HomePagePlanckPassSection } from "@/components/homepage-planckpass-section"
 import { HomePageLearningPathPreviewSection } from "@/components/homepage-learning-path-preview-section"
+import { LandingWorkshopsCalendarSection } from "@/components/landing/workshops-calendar-section"
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
 import { ReviewsSection } from "@/components/homepage-reviews"
 import { HomepageMobileReviewsBar } from "@/components/homepage-mobile-reviews-bar"
+import { HomepageHeroTestimonials } from "@/components/landing/hero-review-rows"
 import { FAQSection } from "@/components/faq-section"
-
-// Lazy load heavy Three.js components to reduce initial bundle size
-
-const ColorBends = dynamic(() => import("@/components/ColorBends").then((mod) => ({ default: mod.default })), {
-  ssr: false,
-  loading: () => null, // Don't show loading state for background animation
-})
-
-const HowItWorksSection = dynamic(() => import("@/components/how-it-works-section"))
 
 const HOME_SECTION_IDS = [
   "home-hero",
-  "home-reusite",
   "home-platform",
-  "home-virtual-teacher",
   "home-subjects",
   "home-courses",
   "home-mai-eficient",
@@ -178,11 +162,9 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
         <HomePageHeroRedesign isMobile={isMobile} />
       </section>
 
-      <HomePageReusiteSection />
+      <HomepageHeroTestimonials />
 
       <HomePagePlatformVideoSection />
-
-      <HomePageVirtualTeacherSection />
 
       <HomePageSubjectsSection />
 
@@ -195,6 +177,8 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
       </section>
 
       <HomePageLearningPathPreviewSection />
+
+      <LandingWorkshopsCalendarSection />
 
       <HomePageMaiEficientSection />
 

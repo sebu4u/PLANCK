@@ -624,6 +624,41 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  castiga: {
+    title: pageTitle('Roata cu premii'),
+    description:
+      "Învârte roata Planck și poți câștiga 7 zile Premium, reduceri la abonament sau anualul la 1 leu.",
+    keywords: "roată premii, planck câștigă, reducere abonament, trial premium, anual 1 leu",
+    alternates: {
+      canonical: "/castiga",
+    },
+    openGraph: {
+      title: "Roata cu premii – PLANCK",
+      description:
+        "Învârte și poți lua 7 zile Premium, reduceri sau anualul la 1 leu.",
+      url: `${PLATFORM_SITE_URL}/castiga`,
+    },
+    twitter: {
+      title: "Roata cu premii – PLANCK",
+      description:
+        "Învârte și poți lua 7 zile Premium, reduceri sau anualul la 1 leu.",
+    },
+  },
+
+  shop: {
+    title: pageTitle("Magazin PLANCKPASS"),
+    description:
+      "Folosește monedele PLANCKPASS pentru energie și cupoane personale de reducere la Premium.",
+    keywords: "magazin planckpass, monede planck, reduceri premium, energie planck",
+    alternates: { canonical: "/shop" },
+    openGraph: {
+      title: "Magazin PLANCKPASS",
+      description: "Transformă progresul în energie și reduceri personale la Premium.",
+      url: `${PLATFORM_SITE_URL}/shop`,
+    },
+    robots: { index: false, follow: false },
+  },
+
   "math-problems": {
     title: pageTitle('Probleme matematică – catalog'),
     description:

@@ -1,46 +1,48 @@
 "use client"
 
-import Image from "next/image"
-import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/scroll-animations"
-import { PLATFORM_STATS } from "@/lib/platform-marketing"
+import { BookOpen, GraduationCap, Layers, Sparkles, Users } from "lucide-react"
 
-const LOGOS = [
-  { src: "/images/reusite/zbr.png", alt: "Zbor" },
-  { src: "/images/reusite/TIA.png", alt: "Tinerii în Arenă" },
-  { src: "/images/reusite/concurs.png", alt: "Concursul Național de Fizică PLANCK" },
-  { src: "/images/reusite/startYourStartUp.png", alt: "Start your Start up" },
-  { src: "/images/reusite/Lace%20(2).png", alt: "Lace Magazine" },
+const STATS = [
+  { value: "50.000+", label: "elevi", Icon: Users },
+  { value: "20+", label: "olimpici profesori", Icon: GraduationCap },
+  { value: "10.000+", label: "exerciții", Icon: BookOpen },
+  { value: "5", label: "materii", Icon: Layers },
+  { value: "Tutor AI", label: null, Icon: Sparkles },
 ] as const
+
+function StatsRow({ hidden }: { hidden?: boolean }) {
+  return (
+    <div className="flex gap-3 pr-3 sm:gap-4 sm:pr-4" aria-hidden={hidden || undefined}>
+      {STATS.map(({ value, label, Icon }) => (
+        <div
+          key={value}
+          className="flex min-w-[220px] flex-shrink-0 items-center gap-3 rounded-2xl bg-[#F8F7FF] px-5 py-4 ring-1 ring-[#EBE8FF] sm:min-w-[250px] sm:px-6"
+        >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-[#EBE8FF]">
+            <Icon className="h-5 w-5 text-[#7C5CFC]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">{value}</p>
+            {label ? <p className="text-sm font-medium text-gray-500">{label}</p> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function LandingSocialProofSection() {
   return (
-    <section className="border-y border-[#EBE8FF] bg-[#F8F7FF] py-14 sm:py-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <FadeInUp className="text-center">
-          <h2 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl md:text-3xl">
-            Recomandat de profesori și elevi olimpici din toată țara
-          </h2>
-          <p className="mt-3 text-base font-semibold text-[#7C5CFC]">
-            {PLATFORM_STATS.activeUsers} elevi activi în ultimul an
-          </p>
-        </FadeInUp>
-
-        <StaggerContainer
-          className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-6 sm:gap-x-12"
-          staggerDelay={0.06}
-        >
-          {LOGOS.map((logo) => (
-            <StaggerItem key={logo.alt}>
-              <Image
-                src={logo.src}
-                alt={logo.alt}
-                width={140}
-                height={56}
-                className="h-10 w-auto object-contain opacity-80 grayscale transition-[opacity,filter] hover:opacity-100 hover:grayscale-0 sm:h-12"
-              />
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+    <section
+      className="overflow-hidden border-y border-[#EBE8FF] bg-white py-8 sm:py-10"
+      aria-label="Rezultatele platformei"
+    >
+      <div
+        className="flex w-max motion-safe:animate-stats-marquee motion-safe:hover:[animation-play-state:paused] motion-reduce:animate-none"
+        style={{ animationDuration: "28s" }}
+      >
+        <StatsRow />
+        <StatsRow hidden />
       </div>
     </section>
   )

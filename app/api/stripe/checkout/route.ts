@@ -19,6 +19,24 @@ import {
   childHasEntitledParentGrant,
 } from "@/lib/parent/billing"
 import { normalizeUserType } from "@/lib/user-types"
+import { getUnusedPrizeForUser } from "@/lib/prize-wheel/server"
+import {
+  applyPrizeToExistingSubscription,
+  buildPrizeCheckoutDiscounts,
+  resolveIntervalForPrize,
+  withPrizeMetadata,
+} from "@/lib/prize-wheel/checkout"
+import { ensureShopStripeCoupon } from "@/lib/shop/coupons"
+import { getShopCouponByIdForUser } from "@/lib/shop/server"
+import type { ShopCouponView } from "@/lib/shop/types"
+import { logger } from "@/lib/logger"
+import { ensureEarlybirdStripeCoupon } from "@/lib/landing-earlybird-coupon"
+import { isEarlybirdActive } from "@/lib/landing-earlybird"
+import {
+  buildCheckoutCancelUrl,
+  buildCheckoutSuccessUrl,
+  parseAllowedCheckoutPath,
+} from "@/lib/stripe-checkout-paths"
 
 export const runtime = "nodejs"
 
@@ -29,6 +47,10 @@ type CheckoutBody = {
   interval?: BillingInterval
   promotionCodeId?: string
   childId?: string
+  shopCouponId?: string
+  successPath?: string
+  cancelPath?: string
+  campaign?: string
 }
 
 const FORBIDDEN_CARD_FIELDS = new Set([
@@ -114,8 +136,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Plan invalid." }, { status: 400 })
     }
 
-    const interval = parseBillingInterval(body?.interval)
-    if (!interval) {
+    const parsedInterval = parseBillingInterval(body?.interval)
+    if (!parsedInterval) {
       return NextResponse.json(
         { error: "Interval invalid. Folosește week, month sau year." },
         { status: 400 }
@@ -127,9 +149,26 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin()
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("stripe_customer_id, stripe_subscription_status, user_type")
+      .select(
+        "stripe_customer_id, stripe_subscription_id, stripe_subscription_status, stripe_price_id, user_type"
+      )
       .eq("user_id", user.id)
       .maybeSingle()
+
+    const wheelPrize = childId ? null : await getUnusedPrizeForUser(user.id)
+    const requestedShopCouponId =
+      typeof body?.shopCouponId === "string" ? body.shopCouponId.trim() : ""
+    let shopCoupon: ShopCouponView | null = null
+    if (!childId && !wheelPrize && requestedShopCouponId) {
+      shopCoupon = await getShopCouponByIdForUser(user.id, requestedShopCouponId)
+      if (!shopCoupon) {
+        return NextResponse.json(
+          { error: "Cuponul din magazin nu este valid sau a expirat." },
+          { status: 400 }
+        )
+      }
+    }
+    const interval = shopCoupon?.interval ?? resolveIntervalForPrize(parsedInterval, wheelPrize)
 
     const userType = normalizeUserType(profile?.user_type)
 
@@ -158,10 +197,16 @@ export async function POST(req: NextRequest) {
     const { siteUrl } = getStripeConfig()
 
     // Re-validate the promotion code server-side; never trust the client value.
+    // Wheel prizes take precedence and are applied as Stripe coupons, not shareable promo codes.
     let validPromotionCodeId: string | null = null
     const requestedPromotionCodeId =
       typeof body?.promotionCodeId === "string" ? body.promotionCodeId.trim() : ""
-    if (requestedPromotionCodeId) {
+    const hasPersonalDiscount =
+      requestedPromotionCodeId.startsWith("wheel:") ||
+      requestedPromotionCodeId.startsWith("shop:") ||
+      Boolean(wheelPrize) ||
+      Boolean(shopCoupon)
+    if (requestedPromotionCodeId && !hasPersonalDiscount) {
       try {
         const promotionCode = await stripe.promotionCodes.retrieve(requestedPromotionCodeId, {
           expand: ["promotion.coupon"],
@@ -179,13 +224,67 @@ export async function POST(req: NextRequest) {
           validPromotionCodeId = promotionCode.id
         }
       } catch (error) {
-        console.warn("[stripe/checkout] Invalid promotion code id, ignoring:", error)
+        logger.warn("[stripe/checkout] Invalid promotion code id, ignoring:", error)
       }
     }
 
+    const prizeDiscounts = await buildPrizeCheckoutDiscounts(wheelPrize, stripe)
+    const shopCouponStripeId = shopCoupon
+      ? await ensureShopStripeCoupon(shopCoupon, stripe)
+      : null
+
+    const wantsEarlybird =
+      body?.campaign === "earlybird" && interval === "year" && isEarlybirdActive()
+    const earlybirdCouponId =
+      wantsEarlybird && !wheelPrize && !shopCoupon && !validPromotionCodeId
+        ? await ensureEarlybirdStripeCoupon(stripe)
+        : null
+
     let existingCustomerId = profile?.stripe_customer_id ?? null
     const existingStatus = profile?.stripe_subscription_status ?? null
+    const existingSubscriptionId = profile?.stripe_subscription_id ?? null
     const isParentForChild = Boolean(childId)
+
+    if (
+      shopCoupon &&
+      !isParentForChild &&
+      existingCustomerId &&
+      existingSubscriptionId &&
+      hasPortalManagedSubscription(existingStatus)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Cuponul din magazin nu poate fi aplicat unui abonament activ gestionat din portal.",
+        },
+        { status: 409 }
+      )
+    }
+
+    if (
+      !isParentForChild &&
+      wheelPrize &&
+      existingCustomerId &&
+      existingSubscriptionId &&
+      hasPortalManagedSubscription(existingStatus)
+    ) {
+      if (wheelPrize.isTrial) {
+        return NextResponse.json(
+          { error: "Ai deja un abonament activ. Trial-ul de 7 zile nu se mai aplică." },
+          { status: 409 }
+        )
+      }
+      await applyPrizeToExistingSubscription({
+        stripe,
+        subscriptionId: existingSubscriptionId,
+        prize: wheelPrize,
+        priceId,
+      })
+      return NextResponse.json({
+        applied: true,
+        flow: "subscription_update",
+      })
+    }
 
     if (!isParentForChild && existingCustomerId && hasPortalManagedSubscription(existingStatus)) {
       try {
@@ -203,7 +302,7 @@ export async function POST(req: NextRequest) {
           throw error
         }
 
-        console.warn(
+        logger.warn(
           `[stripe/checkout] Stored customer ${existingCustomerId} not found in current mode; recreating customer.`
         )
         existingCustomerId = null
@@ -221,7 +320,7 @@ export async function POST(req: NextRequest) {
           .eq("user_id", user.id)
 
         if (cleanupError) {
-          console.warn("[stripe/checkout] Failed to clear stale Stripe references:", cleanupError.message)
+          logger.warn("[stripe/checkout] Failed to clear stale Stripe references:", cleanupError.message)
         }
       }
     }
@@ -239,46 +338,73 @@ export async function POST(req: NextRequest) {
         .update({ stripe_customer_id: stripeCustomerId })
         .eq("user_id", user.id)
       if (updateError) {
-        console.warn("[stripe/checkout] Failed to persist customer ID:", updateError.message)
+        logger.warn("[stripe/checkout] Failed to persist customer ID:", updateError.message)
       }
     }
 
     const successUrl = isParentForChild
       ? `${siteUrl}/dashboard/parent?checkout=success&session_id={CHECKOUT_SESSION_ID}`
-      : `${siteUrl}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+      : buildCheckoutSuccessUrl(
+          siteUrl,
+          parseAllowedCheckoutPath(body?.successPath) ?? "/pricing",
+        )
     const cancelUrl = isParentForChild
       ? `${siteUrl}/dashboard/parent?checkout=canceled`
-      : `${siteUrl}/pricing?checkout=canceled`
+      : buildCheckoutCancelUrl(
+          siteUrl,
+          parseAllowedCheckoutPath(body?.cancelPath) ?? "/pricing",
+        )
 
-    const sharedMetadata: Record<string, string> = isParentForChild
+    const prizeMetadata = withPrizeMetadata(
+      isParentForChild
+        ? {
+            user_id: user.id,
+            payer_user_id: user.id,
+            beneficiary_user_id: childId,
+            purchase_type: PARENT_FOR_CHILD_PURCHASE_TYPE,
+            plan: normalizedPlan,
+            interval,
+          }
+        : {
+            user_id: user.id,
+            plan: normalizedPlan,
+            interval,
+          },
+      isParentForChild ? null : wheelPrize
+    )
+    const sharedMetadata = shopCoupon
       ? {
-          user_id: user.id,
-          payer_user_id: user.id,
-          beneficiary_user_id: childId,
-          purchase_type: PARENT_FOR_CHILD_PURCHASE_TYPE,
-          plan: normalizedPlan,
-          interval,
+          ...prizeMetadata,
+          shop_coupon_id: shopCoupon.id,
+          shop_product_key: shopCoupon.productKey,
         }
-      : {
-          user_id: user.id,
-          plan: normalizedPlan,
-          interval,
-        }
+      : prizeMetadata
+
+    const discountConfig = prizeDiscounts.couponId
+      ? { discounts: [{ coupon: prizeDiscounts.couponId }] }
+      : shopCouponStripeId
+        ? { discounts: [{ coupon: shopCouponStripeId }] }
+      : validPromotionCodeId
+        ? { discounts: [{ promotion_code: validPromotionCodeId }] }
+        : earlybirdCouponId
+          ? { discounts: [{ coupon: earlybirdCouponId }] }
+        : { allow_promotion_codes: true }
 
     // We only create hosted Checkout sessions here; sensitive card input stays on Stripe.
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      ...(validPromotionCodeId
-        ? { discounts: [{ promotion_code: validPromotionCodeId }] }
-        : { allow_promotion_codes: true }),
+      ...discountConfig,
       success_url: successUrl,
       cancel_url: cancelUrl,
       client_reference_id: user.id,
       metadata: sharedMetadata,
       subscription_data: {
         metadata: sharedMetadata,
+        ...(prizeDiscounts.trialPeriodDays
+          ? { trial_period_days: prizeDiscounts.trialPeriodDays }
+          : {}),
       },
     })
 
@@ -291,7 +417,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof ParentChildBillingError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
     }
-    console.error("[stripe/checkout] Error:", error)
+    logger.error("[stripe/checkout] Error:", error)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
   }
 }

@@ -61,9 +61,41 @@ export const hasPortalManagedSubscription = (status: string | null | undefined) 
   return PORTAL_MANAGED_SUBSCRIPTION_STATUSES.has(status)
 }
 
+const stripeErrorCode = (error: unknown): string => {
+  if (!error || typeof error !== "object" || !("code" in error)) return ""
+  return String(error.code)
+}
+
+const stripeErrorMessage = (error: unknown): string => {
+  if (!error || typeof error !== "object" || !("message" in error)) return ""
+  return String(error.message)
+}
+
+export const isStripeMissingResourceError = (error: unknown): boolean => {
+  const code = stripeErrorCode(error)
+  const message = stripeErrorMessage(error)
+  return (
+    code === "resource_missing" ||
+    /no such (customer|subscription|invoice|price|product)/i.test(message)
+  )
+}
+
 export const isStripeMissingCustomerError = (error: unknown): boolean => {
-  const message = typeof error === "object" && error && "message" in error ? String(error.message) : ""
-  return /no such customer/i.test(message)
+  return /no such customer/i.test(stripeErrorMessage(error))
+}
+
+const isMissingRelationError = (error: { code?: string; message?: string } | null): boolean => {
+  if (!error) return false
+  const code = error.code ?? ""
+  const message = (error.message ?? "").toLowerCase()
+  return (
+    code === "42P01" ||
+    code === "PGRST204" ||
+    code === "PGRST205" ||
+    message.includes("does not exist") ||
+    message.includes("could not find") ||
+    message.includes("schema cache")
+  )
 }
 
 export type StripePurchaseMetadata = {
@@ -218,14 +250,19 @@ export const recomputeUserEntitlement = async (userId: string, mode?: StripeMode
   }
 
   if (nextPlan !== PREMIUM_PLAN) {
-    const { data: grants } = await supabase
+    const { data: grants, error: grantsError } = await supabase
       .from("parent_child_subscriptions")
       .select("id")
       .eq("child_id", userId)
       .in("stripe_subscription_status", [...ENTITLED_SUBSCRIPTION_STATUS_LIST])
       .limit(1)
 
-    if ((grants?.length ?? 0) > 0) {
+    if (grantsError) {
+      if (!isMissingRelationError(grantsError)) {
+        throw new Error(`[stripe] Failed to load parent-child grants: ${grantsError.message}`)
+      }
+      console.warn("[stripe] parent_child_subscriptions table missing; skipping grant lookup.")
+    } else if ((grants?.length ?? 0) > 0) {
       nextPlan = PREMIUM_PLAN
     }
   }
@@ -393,13 +430,20 @@ export const applyStripeSubscription = async (
   }
 
   const supabase = getSupabaseAdmin()
-  const { data: existingGrant } = await supabase
+  const { data: existingGrant, error: existingGrantError } = await supabase
     .from("parent_child_subscriptions")
     .select("parent_id, child_id")
     .eq("stripe_subscription_id", subscription.id)
     .maybeSingle()
 
-  if (existingGrant?.parent_id && existingGrant?.child_id) {
+  if (existingGrantError) {
+    if (!isMissingRelationError(existingGrantError)) {
+      throw new Error(`[stripe] Failed to load parent-child grant: ${existingGrantError.message}`)
+    }
+    console.warn(
+      "[stripe] parent_child_subscriptions table missing; applying as own subscription."
+    )
+  } else if (existingGrant?.parent_id && existingGrant?.child_id) {
     await upsertParentChildGrant({
       parentId: existingGrant.parent_id,
       childId: existingGrant.child_id,

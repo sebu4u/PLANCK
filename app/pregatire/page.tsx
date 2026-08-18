@@ -1,9 +1,11 @@
 import { Navigation } from "@/components/navigation"
 import { PregatirePageClient } from "@/components/pregatire/pregatire-page-client"
+import { CheckoutSuccessSync } from "@/components/pricing/checkout-success-sync"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { pageTitle } from "@/lib/metadata"
 import { cn } from "@/lib/utils"
 import type { Metadata } from "next"
+import { Suspense } from "react"
 
 export const metadata: Metadata = {
   title: pageTitle("Pregatire"),
@@ -21,6 +23,9 @@ export default function PregatirePage() {
           MOBILE_BOTTOM_NAV_PADDING_CLASS,
         )}
       >
+        <Suspense fallback={null}>
+          <CheckoutSuccessSync />
+        </Suspense>
         <PregatirePageClient />
       </main>
     </>

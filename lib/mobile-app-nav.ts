@@ -163,6 +163,11 @@ export function isClassroomsRoute(pathname: string | null | undefined): boolean 
   return pathname === "/classrooms" || pathname.startsWith("/classrooms/")
 }
 
+export function isCastigaRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/castiga" || pathname.startsWith("/castiga/")
+}
+
 export function isProfesorRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return pathname === "/profesor" || pathname.startsWith("/profesor/")
@@ -186,6 +191,8 @@ export function isMobileAppShellRoute(
     isSubjectPracticeRoute(pathname) ||
     pathname.startsWith("/abonament") ||
     pathname.startsWith("/profil") ||
+    pathname.startsWith("/shop") ||
+    isCastigaRoute(pathname) ||
     isClassroomsRoute(pathname) ||
     isProfesorRoute(pathname) ||
     isGrileRoute(pathname) ||
@@ -279,6 +286,14 @@ export function getMobileTopBarContent(
 
   if (pathname?.startsWith("/profil")) {
     return { primary: "Profil" }
+  }
+
+  if (pathname?.startsWith("/shop")) {
+    return { primary: "Magazin PLANCKPASS" }
+  }
+
+  if (isCastigaRoute(pathname)) {
+    return { primary: "Roata cu premii" }
   }
 
   if (pathname === "/grile") {

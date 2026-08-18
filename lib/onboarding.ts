@@ -102,7 +102,7 @@ export function getOnboardingBlockedToast(
 }
 
 export function isOnboardingRoute(pathname: string | null | undefined): boolean {
-  return pathname === "/register" || pathname === "/register/guardian"
+  return pathname === "/register" || pathname === "/register/guardian" || pathname === "/rezerva"
 }
 
 export function resolveIncompleteOnboardingPath(): string {
