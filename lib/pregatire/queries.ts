@@ -16,6 +16,7 @@ type WorkshopPublicRow = {
   energy_cost: number
   max_seats: number | null
   is_published: boolean
+  is_bac: boolean
   has_recording: boolean
   unlock_count: number
   created_at?: string
@@ -43,6 +44,7 @@ export function mapWorkshopPublic(
     energy_cost: row.energy_cost,
     max_seats: row.max_seats,
     is_published: row.is_published,
+    is_bac: Boolean(row.is_bac),
     has_recording: Boolean(row.has_recording),
     unlock_count: row.unlock_count ?? 0,
     created_at: row.created_at,

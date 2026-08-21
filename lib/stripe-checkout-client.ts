@@ -1,4 +1,5 @@
 import type { PremiumBillingInterval } from "@/components/pricing/premium-pricing"
+import { premiumCheckoutValue, tiktokPixel, type TikTokCheckoutOffer } from "@/lib/tiktok-pixel"
 
 export type StartPremiumCheckoutInput = {
   accessToken: string
@@ -19,6 +20,14 @@ export type StartPremiumCheckoutResult =
 export async function startPremiumCheckout(
   input: StartPremiumCheckoutInput,
 ): Promise<StartPremiumCheckoutResult> {
+  const offer: TikTokCheckoutOffer = {
+    interval: input.interval,
+    value: premiumCheckoutValue(input.interval, input.campaign),
+    contentName: input.campaign === "earlybird" ? "Planck Premium anual earlybird" : "Planck Premium",
+    campaign: input.campaign,
+  }
+  tiktokPixel.trackCheckoutStart(offer)
+
   const response = await fetch("/api/stripe/checkout", {
     method: "POST",
     headers: {
@@ -48,10 +57,12 @@ export async function startPremiumCheckout(
   }
 
   if (payload?.applied) {
+    tiktokPixel.trackCheckoutSuccess(`applied_${input.interval}`)
     return { ok: true, applied: true }
   }
 
   if (payload?.url) {
+    tiktokPixel.trackCheckoutPaymentInfo(offer)
     return { ok: true, url: payload.url }
   }
 

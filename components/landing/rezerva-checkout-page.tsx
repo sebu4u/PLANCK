@@ -23,6 +23,12 @@ import {
   isEarlybirdActive,
   remainingEarlybirdSeats,
 } from "@/lib/landing-earlybird"
+import {
+  LAUNCH_20_DEADLINE_LABEL,
+  LAUNCH_20_PERCENT,
+  isLaunch20Active,
+} from "@/lib/launch-20-discount"
+import { getCampaignPriceRon } from "@/lib/pricing-campaign"
 import { useCountdown } from "@/lib/landing-campaign"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 import { supabase } from "@/lib/supabaseClient"
@@ -56,8 +62,10 @@ function RezervaCheckoutForm() {
   const checkoutStatus = searchParams.get("checkout")
   const canceled = checkoutStatus === "canceled"
   const earlybirdOn = isEarlybirdActive()
+  const launch20On = isLaunch20Active()
   const seatsLeft = remainingEarlybirdSeats()
   const countdown = useCountdown()
+  const weeklyPriceRon = getCampaignPriceRon("week")
 
   const { user, login, isParent, isTeacher, profileSyncedUserId, refreshProfile, refreshUser } =
     useAuth()
@@ -295,13 +303,30 @@ function RezervaCheckoutForm() {
           )}
         >
           <p className="text-[11px] font-bold uppercase tracking-wider opacity-70">Săptămânal</p>
-          <p className="mt-1 text-2xl font-black tracking-tight">
-            {PREMIUM_WEEKLY_RON}{" "}
-            <span className="text-sm font-semibold opacity-70">RON/săpt.</span>
-          </p>
-          <p className={cn("mt-1 text-xs", interval === "week" ? "text-white/70" : "text-gray-500")}>
-            Flexibil — anulezi oricând.
-          </p>
+          {launch20On ? (
+            <>
+              <p className="mt-1 text-xs font-medium opacity-50 line-through">
+                {PREMIUM_WEEKLY_RON} RON/săpt.
+              </p>
+              <p className="text-2xl font-black tracking-tight">
+                {weeklyPriceRon}{" "}
+                <span className="text-sm font-semibold opacity-70">RON/săpt.</span>
+              </p>
+              <p className={cn("mt-1 text-xs font-bold", interval === "week" ? "text-emerald-200" : "text-emerald-700")}>
+                −{LAUNCH_20_PERCENT}% până pe {LAUNCH_20_DEADLINE_LABEL}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-2xl font-black tracking-tight">
+                {PREMIUM_WEEKLY_RON}{" "}
+                <span className="text-sm font-semibold opacity-70">RON/săpt.</span>
+              </p>
+              <p className={cn("mt-1 text-xs", interval === "week" ? "text-white/70" : "text-gray-500")}>
+                Flexibil — anulezi oricând.
+              </p>
+            </>
+          )}
         </button>
 
         <button
@@ -388,7 +413,7 @@ function RezervaCheckoutForm() {
             </>
           ) : (
             <>
-              Plătește {PREMIUM_WEEKLY_RON} RON/săptămână
+              Plătește {weeklyPriceRon} RON/săptămână
               <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}

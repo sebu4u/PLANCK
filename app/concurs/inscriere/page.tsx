@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
 import { useToast } from "@/hooks/use-toast"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { Rocket, CheckCircle2, ArrowLeft, GraduationCap, School, User, Copy, Check } from "lucide-react"
 
 export default function ContestRegistrationPage() {
@@ -55,6 +56,8 @@ export default function ContestRegistrationPage() {
 
                 if (data.registered && data.registration) {
                     setExistingRegistration(data.registration)
+                    tiktokPixel.trackSubmitApplication("concurs", "Concurs PLANCK")
+                    tiktokPixel.trackApplicationApproval("concurs", "Înscriere concurs PLANCK", user.id)
                 }
             } catch (error) {
                 console.error('Error checking registration status:', error)

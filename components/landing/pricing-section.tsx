@@ -10,12 +10,21 @@ import {
   EARLYBIRD_SAVE_PERCENT,
   EARLYBIRD_YEARLY_RON,
   FULL_YEARLY_RON,
-  LANDING_MONTHLY_RON,
   LANDING_PREMIUM_BULLETS,
-  LANDING_WEEKLY_RON,
   useCountdown,
   type CountdownState,
 } from "@/lib/landing-campaign"
+import {
+  PREMIUM_MONTHLY_RON,
+  PREMIUM_WEEKLY_RON,
+} from "@/components/pricing/premium-pricing"
+import {
+  LAUNCH_20_DEADLINE_LABEL,
+  LAUNCH_20_PERCENT,
+  isLaunch20Active,
+} from "@/lib/launch-20-discount"
+import { getCampaignPriceRon } from "@/lib/pricing-campaign"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { cn } from "@/lib/utils"
 
 type Interval = "year" | "month" | "week"
@@ -30,18 +39,24 @@ function priceFor(interval: Interval) {
     }
   }
   if (interval === "month") {
+    const launch20 = isLaunch20Active()
     return {
-      display: LANDING_MONTHLY_RON,
-      struck: null as number | null,
+      display: getCampaignPriceRon("month"),
+      struck: launch20 ? PREMIUM_MONTHLY_RON : null,
       unit: "RON/lună",
-      note: "Facturare lunară",
+      note: launch20
+        ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
+        : "Facturare lunară",
     }
   }
+  const launch20 = isLaunch20Active()
   return {
-    display: LANDING_WEEKLY_RON,
-    struck: null as number | null,
+    display: getCampaignPriceRon("week"),
+    struck: launch20 ? PREMIUM_WEEKLY_RON : null,
     unit: "RON/săptămână",
-    note: "Ideal ca să testezi Premium",
+    note: launch20
+      ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
+      : "Ideal ca să testezi Premium",
   }
 }
 
@@ -107,7 +122,26 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => setBillingInterval(opt.id)}
+                      onClick={() => {
+                        setBillingInterval(opt.id)
+                        const next = priceFor(opt.id)
+                        tiktokPixel.trackCustomizeProduct({
+                          contents: [
+                            {
+                              content_id: opt.id === "year" ? "premium_year_earlybird" : `premium_${opt.id}`,
+                              content_type: "product",
+                              content_name:
+                                opt.id === "year"
+                                  ? "Planck Premium anual earlybird"
+                                  : opt.id === "month"
+                                    ? "Planck Premium lunar"
+                                    : "Planck Premium săptămânal",
+                            },
+                          ],
+                          value: next.display,
+                          currency: "RON",
+                        })
+                      }}
                       className={cn(
                         "rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors sm:px-3",
                         interval === opt.id
@@ -127,8 +161,17 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
                     <span className="text-sm font-medium text-gray-400 line-through">
                       {price.struck} {price.unit}
                     </span>
-                    <span className="rounded-full bg-[#FFE566] px-2 py-0.5 text-[11px] font-bold text-[#7A6000]">
-                      -{EARLYBIRD_SAVE_PERCENT}% earlybird
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                        isYear
+                          ? "bg-[#FFE566] text-[#7A6000]"
+                          : "bg-[#dcfce7] text-[#166534]",
+                      )}
+                    >
+                      {isYear
+                        ? `−${EARLYBIRD_SAVE_PERCENT}% earlybird`
+                        : `−${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`}
                     </span>
                   </div>
                 )}

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
  * Paste a full YouTube URL here when ready, e.g.
  * "https://www.youtube.com/watch?v=XXXXXXXXXXX"
  */
-export const INVATA_HOWTO_YOUTUBE_URL = ""
+export const INVATA_HOWTO_YOUTUBE_URL = "https://www.youtube.com/watch?v=S0pa880n2D8"
 
 const TITLE = "Cum să înveți cu PLANCK?"
 const SUBTITLE = "Descoperă toată platforma"
@@ -45,9 +45,15 @@ export function InvataHowToLearnCard({ className }: { className?: string }) {
             {videoId ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+                src={`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+                }}
               />
             ) : (
               <div

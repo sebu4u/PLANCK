@@ -28,6 +28,7 @@ import { computeLearningPathLessonEloTotal } from "@/lib/learning-path-elo"
 import type { LearningPathSlideDirection } from "@/components/invata/learning-path-item-slide-container"
 import { getFizicaMapHref } from "@/lib/supabase-fizica-learning-map"
 import { getSubjectMapHref } from "@/lib/subject-map/navigation"
+import { GUEST_DEMO_SIGNUP_PATH, getGuestDemoStatus, markGuestDemoCompleted } from "@/lib/onboarding"
 
 interface LearningPathItemExperienceProps {
   initialPayload: LearningPathItemPayload
@@ -91,8 +92,18 @@ function resolveLessonExitHref(payload: LearningPathItemPayload): string {
   return payload.lessonBaseHref
 }
 
-function resolveCompletionFinishHref(payload: LearningPathItemPayload): string {
-  if (payload.isOnboardingLesson) return "/dashboard"
+function resolveOnboardingFinishHref(isGuest: boolean): string {
+  if (!isGuest) return "/dashboard"
+  const status = getGuestDemoStatus()
+  if (status === "started" || status === "completed") {
+    if (status === "started") markGuestDemoCompleted()
+    return GUEST_DEMO_SIGNUP_PATH
+  }
+  return "/dashboard"
+}
+
+function resolveCompletionFinishHref(payload: LearningPathItemPayload, isGuest: boolean): string {
+  if (payload.isOnboardingLesson) return resolveOnboardingFinishHref(isGuest)
   if (payload.fizicaMapContext || payload.subjectMapContext) {
     return payload.nextItemHref
   }
@@ -334,14 +345,14 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
 
   const goToNextItem = useCallback(async () => {
     if (payload.isOnboardingLesson && payload.isLastItem) {
-      openLessonCompletion(resolveCompletionFinishHref(payload))
+      openLessonCompletion(resolveCompletionFinishHref(payload, !user))
       return
     }
 
     const assignmentItems = getMapAssignmentItems(payload)
     if ((payload.fizicaMapContext || payload.subjectMapContext) && assignmentItems?.length) {
       if (payload.isLastItem) {
-        openLessonCompletion(resolveCompletionFinishHref(payload))
+        openLessonCompletion(resolveCompletionFinishHref(payload, !user))
         return
       }
       const currentIndex = findMapAssignmentIndex(assignmentItems, payload)
@@ -353,23 +364,23 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     }
 
     if (payload.isLastItem) {
-      openLessonCompletion(resolveCompletionFinishHref(payload))
+      openLessonCompletion(resolveCompletionFinishHref(payload, !user))
       return
     }
     await goToItemIndex(payload.itemIndex + 1, { urlMode: "push", direction: "forward" })
-  }, [goToItem, goToItemIndex, openLessonCompletion, payload])
+  }, [goToItem, goToItemIndex, openLessonCompletion, payload, user])
 
   const dismissLessonCompletion = useCallback(() => {
     const exitHref =
       completionExitHref ??
-      (payload.isOnboardingLesson ? "/dashboard" : payload.nextItemHref)
+      (payload.isOnboardingLesson ? resolveOnboardingFinishHref(!user) : payload.nextItemHref)
     setShowLessonCompletion(false)
     setCompletionExitHref(null)
-    if (payload.isOnboardingLesson || exitHref === "/dashboard") {
+    if (payload.isOnboardingLesson || exitHref === "/dashboard" || exitHref.startsWith("/register")) {
       setIsLeavingToDashboard(true)
     }
     router.push(exitHref)
-  }, [completionExitHref, payload.isOnboardingLesson, payload.nextItemHref, router])
+  }, [completionExitHref, payload.isOnboardingLesson, payload.nextItemHref, router, user])
 
   const goToPrevItem = useCallback(async () => {
     const assignmentItems = getMapAssignmentItems(payload)
@@ -487,7 +498,7 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
             computeLearningPathLessonEloTotal(payload.items)
           }
           itemIds={payload.items.map((lessonItem) => lessonItem.id)}
-          showOfferPhase={payload.isOnboardingLesson}
+          showOfferPhase={payload.isOnboardingLesson && Boolean(user)}
           onContinue={dismissLessonCompletion}
         />
       ) : null}

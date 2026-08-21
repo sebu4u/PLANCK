@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { ArrowRight, Zap } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import {
@@ -24,6 +23,7 @@ import {
 } from "@/lib/practice-subject"
 import { cn } from "@/lib/utils"
 import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
+import { WorkshopBacBadge } from "@/components/pregatire/workshop-bac-badge"
 
 const LIVE_LOOKBACK_MS = 4 * 60 * 60 * 1000
 const MAX_LIST_ITEMS = 2
@@ -72,7 +72,6 @@ function buildNextFiveDays(workshopDayKeys: Set<string>, now = new Date()): Week
 }
 
 export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireCardProps) {
-  const router = useRouter()
   const practiceSubject = normalizePracticeSubject(preferredMaterie)
   const workshopSubject = practiceSubjectToWorkshopSubject(practiceSubject)
   const subjectLabel = getPracticeSubjectLabel(practiceSubject)
@@ -80,14 +79,12 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
 
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
 
     async function load() {
       setLoading(true)
-      setSelectedDayKey(null)
       try {
         const { data } = await supabase.auth.getSession()
         const token = data.session?.access_token
@@ -135,30 +132,17 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
 
   const weekDays = useMemo(() => buildNextFiveDays(workshopDayKeys), [workshopDayKeys])
 
-  const listedWorkshops = useMemo(() => {
-    const filtered = selectedDayKey
-      ? workshops.filter((w) => formatWorkshopDayKey(w.starts_at) === selectedDayKey)
-      : workshops
-    return filtered.slice(0, MAX_LIST_ITEMS)
-  }, [workshops, selectedDayKey])
+  const listedWorkshops = useMemo(
+    () => workshops.slice(0, MAX_LIST_ITEMS),
+    [workshops],
+  )
 
   return (
-    <section
-      role="link"
-      tabIndex={0}
+    <Link
+      href="/pregatire"
       aria-label="Deschide calendarul de pregătiri"
-      onClick={() => {
-        setPregatireBackTarget("/dashboard")
-        router.push("/pregatire")
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault()
-          setPregatireBackTarget("/dashboard")
-          router.push("/pregatire")
-        }
-      }}
-      className="cursor-pointer rounded-[2rem] border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-colors hover:border-[#d1d5db]"
+      onClick={() => setPregatireBackTarget("/dashboard")}
+      className="block cursor-pointer rounded-[2rem] border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-colors hover:border-[#d1d5db]"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -167,69 +151,44 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
             Următoarele pentru {WORKSHOP_SUBJECT_LABELS[workshopSubject]}
           </p>
         </div>
-        <Link
-          href="/pregatire"
-          onClick={(e) => {
-            e.stopPropagation()
-            setPregatireBackTarget("/dashboard")
-          }}
-          className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity hover:opacity-70"
-        >
+        <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827]">
           Calendar
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </Link>
+        </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-5 gap-0.5" role="list" aria-label="Următoarele 5 zile">
-        {weekDays.map((day) => {
-          const selected = selectedDayKey === day.key
-          return (
-            <button
-              key={day.key}
-              type="button"
-              role="listitem"
-              onClick={(e) => {
-                e.stopPropagation()
-                setSelectedDayKey((prev) => (prev === day.key ? null : day.key))
-              }}
-              className="flex min-w-0 flex-col items-center gap-1 rounded-lg py-0.5 transition-colors hover:bg-[#f9fafb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1d5db]"
-              aria-pressed={selected}
-              aria-label={`${day.label} ${day.dayNumber}${day.hasWorkshops ? ", are pregătiri" : ""}`}
+      <div className="mt-3 grid grid-cols-5 gap-0.5" aria-hidden>
+        {weekDays.map((day) => (
+          <div key={day.key} className="flex min-w-0 flex-col items-center gap-1 rounded-lg py-0.5">
+            <span
+              className={cn(
+                "flex aspect-square w-full max-w-[2rem] items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
+                day.isToday
+                  ? "border-[#d1d5db] bg-[#111827] text-white"
+                  : day.hasWorkshops
+                    ? "border-[#e5e5e5] bg-[#fafafa] text-[#111827]"
+                    : "border-[#e5e5e5] bg-[#fafafa] text-[#c6c6c6]",
+              )}
             >
-              <span
-                className={cn(
-                  "flex aspect-square w-full max-w-[2rem] items-center justify-center rounded-full border text-xs font-semibold tabular-nums transition-colors",
-                  selected
-                    ? "border-transparent text-white"
-                    : day.isToday
-                      ? "border-[#d1d5db] bg-[#111827] text-white"
-                      : day.hasWorkshops
-                        ? "border-[#e5e5e5] bg-[#fafafa] text-[#111827]"
-                        : "border-[#e5e5e5] bg-[#fafafa] text-[#c6c6c6]",
-                )}
-                style={selected ? { backgroundColor: accent, borderColor: accent } : undefined}
-              >
-                {day.dayNumber}
-              </span>
-              <span
-                className={cn(
-                  "text-[10px] font-medium leading-none",
-                  day.isToday || selected ? "text-[#2e2e2e]" : "text-[#6f6f6f]",
-                )}
-              >
-                {day.label}
-              </span>
-              <span
-                className={cn(
-                  "h-1 w-1 rounded-full transition-opacity",
-                  day.hasWorkshops ? "opacity-100" : "opacity-0",
-                )}
-                style={{ backgroundColor: accent }}
-                aria-hidden
-              />
-            </button>
-          )
-        })}
+              {day.dayNumber}
+            </span>
+            <span
+              className={cn(
+                "text-[10px] font-medium leading-none",
+                day.isToday ? "text-[#2e2e2e]" : "text-[#6f6f6f]",
+              )}
+            >
+              {day.label}
+            </span>
+            <span
+              className={cn(
+                "h-1 w-1 rounded-full transition-opacity",
+                day.hasWorkshops ? "opacity-100" : "opacity-0",
+              )}
+              style={{ backgroundColor: accent }}
+            />
+          </div>
+        ))}
       </div>
 
       <div className="mt-3 border-t border-[#f0f0f0] pt-3">
@@ -242,21 +201,12 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
         ) : listedWorkshops.length === 0 ? (
           <div className="rounded-2xl bg-[#f9fafb] px-3 py-3 text-center">
             <p className="text-sm text-[#6b7280]">
-              {selectedDayKey
-                ? "Nicio pregătire în ziua selectată."
-                : `Nu sunt pregătiri programate pentru ${subjectLabel}.`}
+              Nu sunt pregătiri programate pentru {subjectLabel}.
             </p>
-            <Link
-              href="/pregatire"
-              onClick={(e) => {
-                e.stopPropagation()
-                setPregatireBackTarget("/dashboard")
-              }}
-              className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity hover:opacity-70"
-            >
+            <span className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-[#111827]">
               Vezi calendarul
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-            </Link>
+            </span>
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -264,17 +214,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
               const live = isWorkshopLive(workshop)
               return (
                 <li key={workshop.id}>
-                  <Link
-                    href={`/pregatire/${workshop.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setPregatireBackTarget("/dashboard")
-                    }}
-                    className={cn(
-                      "flex items-start justify-between gap-2 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-2.5 py-2 transition",
-                      "hover:bg-[#f3f4f6] active:scale-[0.99]",
-                    )}
-                  >
+                  <div className="flex items-start justify-between gap-2 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-2.5 py-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span
@@ -288,6 +228,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
                             Acum
                           </span>
                         ) : null}
+                        {workshop.is_bac ? <WorkshopBacBadge compact /> : null}
                       </div>
                       <p className="mt-0.5 truncate pl-3.5 text-xs text-[#6b7280]">
                         {formatWorkshopShortDateTime(workshop.starts_at)}
@@ -298,13 +239,13 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
                       <Zap className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
                       {workshop.energy_cost}
                     </span>
-                  </Link>
+                  </div>
                 </li>
               )
             })}
           </ul>
         )}
       </div>
-    </section>
+    </Link>
   )
 }

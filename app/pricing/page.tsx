@@ -29,7 +29,19 @@ import {
   PREMIUM_YEARLY_SAVE_PERCENT,
   type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
+import {
+  EARLYBIRD_DEADLINE_LABEL,
+  EARLYBIRD_SAVE_PERCENT,
+  isEarlybirdActive,
+} from "@/lib/landing-earlybird"
+import {
+  LAUNCH_20_DEADLINE_LABEL,
+  LAUNCH_20_PERCENT,
+  isLaunch20Active,
+} from "@/lib/launch-20-discount"
+import { getCampaignPriceRon, getPricingCampaign } from "@/lib/pricing-campaign"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
+import { premiumCommerceParams, tiktokPixel } from "@/lib/tiktok-pixel"
 
 function computeDiscountedPrice(priceRon: number, promo: AppliedPromo | null): number {
   if (!promo) return priceRon
@@ -49,17 +61,21 @@ const INTERVAL_OPTIONS: Array<{
   id: PremiumBillingInterval
   label: string
   shortLabel: string
-  badge?: string
 }> = [
   { id: "week", label: "Încearcă o săptămână", shortLabel: "Săptămână" },
   { id: "month", label: "Lunar", shortLabel: "Lunar" },
-  {
-    id: "year",
-    label: "Anual",
-    shortLabel: "Anual",
-    badge: `Economisești ${PREMIUM_YEARLY_SAVE_PERCENT}%`,
-  },
+  { id: "year", label: "Anual", shortLabel: "Anual" },
 ]
+
+function intervalBadge(id: PremiumBillingInterval): string | undefined {
+  if (id === "year") {
+    return isEarlybirdActive() ? "Earlybird" : `Economisești ${PREMIUM_YEARLY_SAVE_PERCENT}%`
+  }
+  if ((id === "week" || id === "month") && isLaunch20Active()) {
+    return `−${LAUNCH_20_PERCENT}%`
+  }
+  return undefined
+}
 
 function AnimatedPrice({ value }: { value: number }) {
   const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 })
@@ -181,7 +197,6 @@ function PricingIllustrationPanel() {
 type PricingCardProps = {
   billingInterval: PremiumBillingInterval
   setBillingInterval: (interval: PremiumBillingInterval) => void
-  priceRon: number
   periodLabel: string
   isCurrentPremium: boolean
   hasPaidSubscription: boolean
@@ -203,7 +218,6 @@ type PricingCardProps = {
 function PricingCard({
   billingInterval,
   setBillingInterval,
-  priceRon,
   periodLabel,
   isCurrentPremium,
   hasPaidSubscription,
@@ -221,7 +235,15 @@ function PricingCard({
   chrome = "card",
 }: PricingCardProps) {
   const isFlat = chrome === "flat"
-  const displayPriceRon = computeDiscountedPrice(priceRon, appliedPromo)
+  const listPriceRon = getPremiumPriceRon(billingInterval)
+  const campaign = getPricingCampaign(billingInterval)
+  const campaignPriceRon = getCampaignPriceRon(billingInterval)
+  const displayPriceRon = appliedPromo
+    ? computeDiscountedPrice(listPriceRon, appliedPromo)
+    : campaignPriceRon
+  const yearBadge = intervalBadge("year")
+  const showCampaignStrike =
+    !appliedPromo && campaign != null && campaignPriceRon < listPriceRon
 
   return (
     <motion.div
@@ -252,6 +274,16 @@ function PricingCard({
             <span className="rounded-full bg-[#EBE8FF] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#5B47D6]">
               Acces complet
             </span>
+            {campaign === "earlybird" ? (
+              <span className="rounded-full bg-[#FFE566] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#7A6000]">
+                Earlybird −{EARLYBIRD_SAVE_PERCENT}%
+              </span>
+            ) : null}
+            {campaign === "launch20" ? (
+              <span className="rounded-full bg-[#dcfce7] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#166534]">
+                −{LAUNCH_20_PERCENT}% până pe {LAUNCH_20_DEADLINE_LABEL}
+              </span>
+            ) : null}
             {isCurrentPremium ? (
               <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gray-600">
                 Planul tău
@@ -288,6 +320,14 @@ function PricingCard({
                   onClick={() => {
                     if (isLockedOut) return
                     setBillingInterval(option.id)
+                    tiktokPixel.trackCustomizeProduct(
+                      premiumCommerceParams(option.id, {
+                        value: appliedPromo
+                          ? computeDiscountedPrice(getPremiumPriceRon(option.id), appliedPromo)
+                          : getCampaignPriceRon(option.id),
+                        campaign: getPricingCampaign(option.id) === "earlybird" ? "earlybird" : undefined,
+                      }),
+                    )
                   }}
                   className={cn(
                     "relative flex flex-1 flex-col items-center justify-center rounded-full px-1.5 py-2 text-center transition-all lg:py-2.5",
@@ -302,19 +342,41 @@ function PricingCard({
                     <span className="sm:hidden">{option.shortLabel}</span>
                     <span className="hidden sm:inline">{option.label}</span>
                   </span>
-                  {option.badge && isActive ? (
-                    <span className="mt-0.5 hidden text-[9px] font-bold text-[#5B47D6] sm:block">
-                      {option.badge}
+                  {(() => {
+                    const badge = intervalBadge(option.id)
+                    if (!badge || !isActive) return null
+                    return (
+                    <span
+                      className={cn(
+                        "mt-0.5 hidden text-[9px] font-bold sm:block",
+                        option.id === "year" && isEarlybirdActive()
+                          ? "text-[#b45309]"
+                          : option.id !== "year" && isLaunch20Active()
+                            ? "text-[#166534]"
+                            : "text-[#5B47D6]",
+                      )}
+                    >
+                      {badge}
                     </span>
-                  ) : null}
+                    )
+                  })()}
                 </button>
               )
             })}
           </div>
 
-          {billingInterval === "year" ? (
-            <p className="mt-2 text-center text-xs font-semibold text-[#5B47D6] sm:hidden">
-              Economisești {PREMIUM_YEARLY_SAVE_PERCENT}%
+          {yearBadge && billingInterval === "year" ? (
+            <p
+              className={cn(
+                "mt-2 text-center text-xs font-semibold sm:hidden",
+                campaign === "earlybird" ? "text-[#b45309]" : "text-[#5B47D6]",
+              )}
+            >
+              {yearBadge}
+            </p>
+          ) : billingInterval !== "year" && intervalBadge(billingInterval) ? (
+            <p className="mt-2 text-center text-xs font-semibold text-[#166534] sm:hidden">
+              {intervalBadge(billingInterval)}
             </p>
           ) : null}
 
@@ -329,24 +391,40 @@ function PricingCard({
 
           {appliedPromo?.isTrial ? (
             <p className="mt-1.5 text-sm font-medium text-[#16a34a]">
-              7 zile gratuite, apoi {priceRon.toLocaleString("ro-RO")} RON/lună
+              7 zile gratuite, apoi {listPriceRon.toLocaleString("ro-RO")} RON/lună
             </p>
           ) : appliedPromo ? (
             <p className="mt-1.5 text-sm text-gray-500">
-              <span className="line-through">{priceRon.toLocaleString("ro-RO")} RON</span>
+              <span className="line-through">{listPriceRon.toLocaleString("ro-RO")} RON</span>
               <span className="mx-1.5 text-gray-300">·</span>
               <span className="font-semibold text-[#16a34a]">
                 cod {appliedPromo.code} aplicat
               </span>
             </p>
+          ) : showCampaignStrike && campaign === "earlybird" ? (
+            <p className="mt-1.5 text-sm text-gray-500">
+              <span className="line-through">{listPriceRon.toLocaleString("ro-RO")} RON</span>
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span className="font-semibold text-[#b45309]">
+                Preț earlybird până pe {EARLYBIRD_DEADLINE_LABEL}
+              </span>
+            </p>
+          ) : showCampaignStrike && campaign === "launch20" ? (
+            <p className="mt-1.5 text-sm text-gray-500">
+              <span className="line-through">{listPriceRon.toLocaleString("ro-RO")} RON</span>
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span className="font-semibold text-[#166534]">
+                Cupon −{LAUNCH_20_PERCENT}% până pe {LAUNCH_20_DEADLINE_LABEL}
+              </span>
+            </p>
           ) : null}
 
-          {billingInterval === "month" ? (
+          {!appliedPromo && billingInterval === "month" && campaign !== "launch20" ? (
             <p className="mt-1.5 text-sm font-medium text-[#5B47D6]">
               {PREMIUM_MONTHLY_VS_WEEKLY_SAVE_PERCENT}% mai ieftin decât săptămânal
             </p>
           ) : null}
-          {billingInterval === "year" ? (
+          {!appliedPromo && billingInterval === "year" && campaign !== "earlybird" ? (
             <p className="mt-1.5 text-sm text-gray-500">
               <span className="line-through">{PREMIUM_YEARLY_FULL_RON.toLocaleString("ro-RO")} RON</span>
               <span className="mx-1.5 text-gray-300">·</span>
@@ -355,7 +433,7 @@ function PricingCard({
               </span>
             </p>
           ) : null}
-          {billingInterval === "week" ? (
+          {!appliedPromo && billingInterval === "week" && campaign !== "launch20" ? (
             <p className="mt-1.5 text-sm text-gray-500">
               Ideal ca să testezi Premium fără angajament lung
             </p>
@@ -491,7 +569,9 @@ function PricingPageContent() {
   const searchParams = useSearchParams()
   const { user, subscriptionPlan, refreshProfile, isParent } = useAuth()
   const { toast } = useToast()
-  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>("month")
+  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>(
+    isEarlybirdActive() ? "year" : "month",
+  )
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
@@ -528,7 +608,6 @@ function PricingPageContent() {
     (isPurchaseDisabled && !parentNeedsChild) ||
     (isCurrentPremium && !shouldManageInPortal)
 
-  const priceRon = getPremiumPriceRon(billingInterval)
   const periodLabel = getPremiumPeriodLabel(billingInterval)
 
   useEffect(() => {
@@ -725,6 +804,8 @@ function PricingPageContent() {
         interval,
         promotionCodeId: appliedPromo?.promotionCodeId,
         shopCouponId: appliedPromo?.shopCouponId,
+        campaign:
+          !appliedPromo && interval === "year" && isEarlybirdActive() ? "earlybird" : undefined,
         ...(isParent && selectedChild ? { childId: selectedChild.child_id } : {}),
       })
 
@@ -817,6 +898,9 @@ function PricingPageContent() {
         : "Gestionează planul"
     }
     if (shouldManageInPortal) return "Upgrade din portal"
+    if (!appliedPromo && billingInterval === "year" && isEarlybirdActive()) {
+      return "Ia earlybird-ul"
+    }
     if (isParent && selectedChild) return `Cumpără Premium pentru ${selectedChild.name}`
     return "Devino Premium"
   })()
@@ -870,7 +954,6 @@ function PricingPageContent() {
   const cardProps: PricingCardProps = {
     billingInterval,
     setBillingInterval,
-    priceRon,
     periodLabel,
     isCurrentPremium,
     hasPaidSubscription: Boolean(user && hasPaidSubscription),
@@ -914,7 +997,7 @@ function PricingPageContent() {
 
       {/* Mobile: premium gradient header + white sheet */}
       <section className="relative lg:hidden">
-        <div className="relative overflow-hidden bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f4d4c8)] px-5 pb-10 pt-[max(4.25rem,calc(env(safe-area-inset-top)+2.75rem))]">
+        <div className="relative overflow-hidden bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f4d4c8)] pl-7 pr-5 pb-10 pt-[max(4.25rem,calc(env(safe-area-inset-top)+2.75rem))]">
           <Image
             src="/images/exerseaza/pregatiri-icon.png"
             alt=""

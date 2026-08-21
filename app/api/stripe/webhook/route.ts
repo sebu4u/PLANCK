@@ -12,6 +12,7 @@ import {
 } from "@/lib/stripe-subscription"
 import { markPrizeRedeemed } from "@/lib/prize-wheel/server"
 import { markShopCouponRedeemed } from "@/lib/shop/server"
+import { sendTikTokCheckoutPurchase } from "@/lib/tiktok-events-api"
 
 export const runtime = "nodejs"
 
@@ -221,6 +222,7 @@ export async function POST(req: NextRequest) {
         }
 
         await redeemCheckoutPerks(session)
+        void sendTikTokCheckoutPurchase(session)
         break
       }
       case "customer.subscription.created":

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabaseClient"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 
 export function CheckoutSuccessSync() {
   const searchParams = useSearchParams()
@@ -17,6 +18,7 @@ export function CheckoutSuccessSync() {
     const sessionId = searchParams.get("session_id")
 
     if (status === "success") {
+      tiktokPixel.trackCheckoutSuccess(sessionId)
       toast({
         title: "Plată reușită",
         description: "Abonamentul va fi activat în câteva secunde.",

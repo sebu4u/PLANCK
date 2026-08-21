@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { BookOpen, Calculator, Home, KeyRound, Library, NotebookPen, User, Users } from "lucide-react"
+import { BookOpen, Calculator, CalendarDays, Home, KeyRound, Library, NotebookPen, User, Users } from "lucide-react"
 import { isInformaticaProblemDetailRoute } from "@/lib/planckcode-shell-routes"
 
 export const MOBILE_BOTTOM_NAV_HEIGHT = "4.5rem"
@@ -334,6 +334,8 @@ export interface MobileBottomNavItem {
   imageSrc?: string
   /** Hide the text label under the icon */
   hideLabel?: boolean
+  /** Small notification-style dot over the icon */
+  showDot?: boolean
 }
 
 export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
@@ -358,10 +360,11 @@ export const MOBILE_BOTTOM_NAV_ITEMS: MobileBottomNavItem[] = [
     isActive: (pathname) => isExerseazaRoute(pathname),
   },
   {
-    href: "/classrooms",
-    label: "Clasa ta",
-    icon: Users,
-    isActive: (pathname) => isClassroomsRoute(pathname),
+    href: "/pregatire",
+    label: "Pregatiri",
+    icon: CalendarDays,
+    showDot: true,
+    isActive: (pathname) => isPregatireRoute(pathname),
   },
   {
     href: "/profil",

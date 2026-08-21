@@ -1,11 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { AlertCircle, Loader2, Pencil, Plus, Save, Trash2, Zap } from "lucide-react"
+import { AlertCircle, CalendarIcon, Loader2, Pencil, Plus, Save, Trash2, Zap } from "lucide-react"
+import { ro } from "react-day-picker/locale"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -45,6 +48,7 @@ interface AdminWorkshop {
   recording_url: string | null
   max_seats: number | null
   is_published: boolean
+  is_bac: boolean
   whiteboard_url?: string | null
   notes_markdown?: string | null
   notes_pdf_path?: string | null
@@ -53,6 +57,31 @@ interface AdminWorkshop {
   homework_pdf_url?: string | null
   homework_items?: WorkshopHomeworkItem[]
   workshop_teachers?: { id: string; name: string; icon_url: string | null } | null
+}
+
+function ymdToLocalDate(ymd: string): Date | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return undefined
+  const [year, month, day] = ymd.split("-").map(Number)
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return undefined
+  }
+  return date
+}
+
+function localDateToYmd(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function formatEventDateLabel(ymd: string): string {
+  const date = ymdToLocalDate(ymd)
+  if (!date) return ymd
+  return date.toLocaleDateString("ro-RO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
 }
 
 const EMPTY_FORM = {
@@ -69,6 +98,7 @@ const EMPTY_FORM = {
   max_seats: "",
   unlimited_seats: true,
   is_published: false,
+  is_bac: false,
 }
 
 function materialsFromWorkshop(workshop: AdminWorkshop): WorkshopMaterialsFormValue {
@@ -93,6 +123,7 @@ export function PregatireManager() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [materials, setMaterials] = useState<WorkshopMaterialsFormValue>(EMPTY_WORKSHOP_MATERIALS_FORM)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
 
   const getAccessToken = useCallback(async () => {
     const { data } = await supabase.auth.getSession()
@@ -157,6 +188,7 @@ export function PregatireManager() {
       max_seats: workshop.max_seats != null ? String(workshop.max_seats) : "",
       unlimited_seats: workshop.max_seats == null,
       is_published: workshop.is_published,
+      is_bac: Boolean(workshop.is_bac),
     })
     setMaterials(materialsFromWorkshop(workshop))
     setSuccessMessage(null)
@@ -204,6 +236,7 @@ export function PregatireManager() {
           ? null
           : Math.max(1, Number(form.max_seats) || 1),
         is_published: form.is_published,
+        is_bac: form.is_bac,
         whiteboard_url: materials.whiteboard_url.trim() || null,
         notes_markdown: materials.notes_markdown,
         notes_pdf_path: materials.notes_pdf_path || null,
@@ -366,13 +399,40 @@ export function PregatireManager() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="ws_date">Dată (Bucharest)</Label>
-              <Input
-                id="ws_date"
-                type="date"
-                value={form.event_date}
-                onChange={(e) => setForm((c) => ({ ...c, event_date: e.target.value }))}
-                className="border-white/20 bg-black/40 text-white"
-              />
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="ws_date"
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full justify-start border-white/20 bg-black/40 font-normal text-white hover:bg-white/10 hover:text-white"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-gray-300" />
+                    {form.event_date ? (
+                      <span className="capitalize">{formatEventDateLabel(form.event_date)}</span>
+                    ) : (
+                      <span className="text-gray-400">Alege data din calendar</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-auto border-white/15 bg-zinc-950 p-0 text-white"
+                >
+                  <Calendar
+                    mode="single"
+                    locale={ro}
+                    weekStartsOn={1}
+                    selected={ymdToLocalDate(form.event_date)}
+                    defaultMonth={ymdToLocalDate(form.event_date) ?? new Date()}
+                    onSelect={(date) => {
+                      if (!date) return
+                      setForm((current) => ({ ...current, event_date: localDateToYmd(date) }))
+                      setDatePickerOpen(false)
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label htmlFor="ws_time">Oră</Label>
@@ -457,6 +517,17 @@ export function PregatireManager() {
             </div>
           ) : null}
           <div className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+            <div>
+              <Label htmlFor="ws_bac">Tag BAC</Label>
+              <p className="text-xs text-gray-400">Apare pe card ca meditație pentru BAC.</p>
+            </div>
+            <Switch
+              id="ws_bac"
+              checked={form.is_bac}
+              onCheckedChange={(checked) => setForm((c) => ({ ...c, is_bac: checked }))}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
             <Label htmlFor="ws_published">Publicată</Label>
             <Switch
               id="ws_published"
@@ -518,6 +589,11 @@ export function PregatireManager() {
                       >
                         {workshop.is_published ? "Publicată" : "Draft"}
                       </span>
+                      {workshop.is_bac ? (
+                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[11px] text-amber-200">
+                          BAC
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-xs text-gray-400">
                       {formatWorkshopDateTime(workshop.starts_at)} ·{" "}

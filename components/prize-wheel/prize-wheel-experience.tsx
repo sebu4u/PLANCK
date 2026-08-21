@@ -32,6 +32,73 @@ type PrizeWheelExperienceProps = {
 }
 
 const CONFETTI_COLORS = ["#5B47D6", "#7C5CFC", "#f2b93d", "#cd83db", "#ffffff"]
+const CAMPAIGN_START_AT = new Date("2026-09-01T00:00:00+03:00")
+
+type CountdownParts = {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+  done: boolean
+}
+
+function getCountdownParts(target: Date, now = Date.now()): CountdownParts {
+  const remaining = Math.max(0, target.getTime() - now)
+  const totalSeconds = Math.floor(remaining / 1000)
+  return {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+    done: remaining <= 0,
+  }
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0")
+}
+
+function CampaignCountdown() {
+  const [parts, setParts] = useState(() => getCountdownParts(CAMPAIGN_START_AT))
+
+  useEffect(() => {
+    const tick = () => setParts(getCountdownParts(CAMPAIGN_START_AT))
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  if (parts.done) {
+    return (
+      <p className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-600">
+        Campania pornește în curând. Revino peste câteva momente.
+      </p>
+    )
+  }
+
+  const units = [
+    { label: "zile", value: parts.days },
+    { label: "ore", value: parts.hours },
+    { label: "min", value: parts.minutes },
+    { label: "sec", value: parts.seconds },
+  ]
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-[#f6f4ff] to-[#fff7e8] px-4 py-6">
+      <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#7C5CFC]">Începem pe 1 septembrie</p>
+      <div className="mt-4 grid grid-cols-4 gap-2">
+        {units.map((unit) => (
+          <div key={unit.label} className="rounded-2xl bg-white px-1 py-3 shadow-[0_8px_24px_-16px_rgba(92,71,214,0.55)]">
+            <p className="text-4xl font-black tabular-nums tracking-tight text-gray-900 sm:text-5xl">
+              {unit.label === "zile" ? unit.value : pad2(unit.value)}
+            </p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">{unit.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function fireWinConfetti() {
   const defaults = { zIndex: 4000, colors: CONFETTI_COLORS, disableForReducedMotion: true }
@@ -178,11 +245,7 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
       <div className="mt-6 space-y-3 text-center">
         {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
 
-        {!isLive ? (
-          <p className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-600">
-            Campania nu rulează acum. Revino când adminul o activează.
-          </p>
-        ) : null}
+        {!isLive ? <CampaignCountdown /> : null}
 
         {isLive && !user ? (
           <div className="space-y-2">

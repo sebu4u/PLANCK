@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { LAUNCH_20_DEADLINE_LABEL, LAUNCH_20_PERCENT } from "@/lib/launch-20-discount"
 import { cn } from "@/lib/utils"
 
 type CatalogDesktopSidebarDiscountOfferCardProps = {
@@ -30,15 +31,15 @@ export function CatalogDesktopSidebarDiscountOfferCard({
       <div className="rounded-3xl border border-[#d9d7d0] bg-gradient-to-tr from-[#e2e8f8] via-[#f8dce4] to-[#fce8d4] p-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex shrink-0 items-center rounded-full bg-gradient-to-r from-red-500 to-[#e11d48] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_4px_14px_rgba(239,68,68,0.45)]">
-            Ofertă unică −50%
+            Reducere −{LAUNCH_20_PERCENT}%
           </span>
-          <span className="font-mono text-base font-black tabular-nums leading-none tracking-tight text-[#b91c1c]">
-            {postOnboardingDiscount.remainingLabel}
+          <span className="text-[11px] font-black leading-none tracking-tight text-[#b91c1c]">
+            până pe {LAUNCH_20_DEADLINE_LABEL}
           </span>
         </div>
 
         <p className="mt-2 text-[13px] leading-snug font-extrabold tracking-tight text-[#0f0f10]">
-          Dispare curând: jumătate din preț la orice plan.
+          Reducere de {LAUNCH_20_PERCENT}% până pe {LAUNCH_20_DEADLINE_LABEL}.
         </p>
 
         <Link
@@ -46,7 +47,7 @@ export function CatalogDesktopSidebarDiscountOfferCard({
           className="dashboard-start-glow mt-3 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#8f91f1] via-[#cd83db] to-[#f2b93d] px-4 py-2 text-sm font-bold text-white shadow-[0_4px_0_#9a5aa8] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#9a5aa8] active:translate-y-1 active:shadow-[0_1px_0_#9a5aa8]"
           style={{ "--start-glow-tint": "rgba(248, 220, 228, 0.88)" } as CSSProperties}
         >
-          Vreau oferta unică
+          Vreau reducerea
         </Link>
       </div>
     </div>

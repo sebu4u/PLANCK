@@ -17,6 +17,7 @@ import {
 
 import { Footer } from "@/components/footer"
 import { useToast } from "@/hooks/use-toast"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 
 const CONTACT_EMAIL = "planck.fizica@gmail.com"
 const PHONE_DISPLAY = "0773 715 865"
@@ -88,6 +89,9 @@ export function ContactPageClient() {
 
       setSent(true)
       setForm(INITIAL_FORM)
+      await tiktokPixel.identify({ email: form.email })
+      tiktokPixel.trackContact('contact_form', 'Formular contact Planck')
+      tiktokPixel.trackSubmitForm('contact_form', 'Formular contact Planck')
       toast({
         title: "Mesaj trimis",
         description: data.message,
@@ -172,6 +176,7 @@ export function ContactPageClient() {
                     <a
                       href={`mailto:${CONTACT_EMAIL}`}
                       className="mt-1 inline-block text-[#7C5CFC] hover:underline"
+                      onClick={() => tiktokPixel.trackContact("contact_email", "Email contact Planck")}
                     >
                       {CONTACT_EMAIL}
                     </a>
@@ -194,7 +199,10 @@ export function ContactPageClient() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setPhoneRevealed(true)}
+                        onClick={() => {
+                          setPhoneRevealed(true)
+                          tiktokPixel.trackContact("contact_phone", "Telefon contact Planck")
+                        }}
                         className="mt-2 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-[#7C5CFC]/40 hover:text-[#5B47D6]"
                       >
                         <Eye className="h-4 w-4" />

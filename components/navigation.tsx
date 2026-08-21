@@ -10,7 +10,7 @@ import {
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus, ShoppingBag } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, CalendarDays, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus, ShoppingBag } from "lucide-react"
 import { BlogNotificationsDropdown } from "@/components/blog/blog-notifications-dropdown"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
@@ -29,6 +29,7 @@ import { NavbarEloDisplay } from "@/components/navbar-elo-display"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import {
   getMobileTopBarContent,
   getPracticeProblemCatalogHref,
@@ -252,6 +253,20 @@ export function Navigation() {
         setHasMore(payload.hasMore && payload.results.length > 0)
         setNextOffset(offset + payload.results.length)
         setIsSearchDialogOpen(true)
+        if (!append) {
+          tiktokPixel.trackSearchDebounced({
+            contents: [
+              {
+                content_id: "search",
+                content_type: "product_group",
+                content_name: "Căutare PLANCK",
+              },
+            ],
+            value: 0,
+            currency: "RON",
+            search_string: q,
+          })
+        }
       }
 
       if (cacheRef.current.has(cacheKey)) {
@@ -895,11 +910,11 @@ export function Navigation() {
                             <Calculator className="h-5 w-5" />
                           </Link>
                           <Link
-                            href="/classrooms"
-                            aria-label="Clasa mea"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            href="/pregatire"
+                            aria-label="Pregătiri"
+                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isPregatireRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
-                            <Users className="h-5 w-5" />
+                            <CalendarDays className="h-5 w-5" />
                           </Link>
                         </>
                       )}
@@ -1067,11 +1082,11 @@ export function Navigation() {
                     </Link>
 
                     <Link
-                      href="/classrooms"
-                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                      href="/pregatire"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPregatireRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
-                      <Users size={16} />
-                      Clasa mea
+                      <CalendarDays size={16} />
+                      Pregătiri
                     </Link>
                   </div>
                 )}

@@ -7,6 +7,7 @@ import { Mail, Send, Sparkles, Zap, Star, CheckCircle, AlertCircle } from "lucid
 import { useToast } from "@/hooks/use-toast"
 import { isValidEmail, subscribeToNewsletter } from "@/lib/newsletter"
 import { useAnalytics } from "@/lib/analytics"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 
 export function NewsletterSection() {
   const [email, setEmail] = useState("")
@@ -55,6 +56,8 @@ export function NewsletterSection() {
       
       // Track newsletter signup
       analytics.trackNewsletterSignup()
+      await tiktokPixel.identify({ email })
+      tiktokPixel.trackSubmitForm("newsletter", "Newsletter Planck")
       
       // Reset form
       setEmail("")

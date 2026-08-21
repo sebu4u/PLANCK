@@ -18,7 +18,6 @@ import {
   getPracticeSubjectLabel,
   normalizePracticeSubject,
 } from "@/lib/practice-subject"
-import { cn } from "@/lib/utils"
 import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 
 const LIVE_LOOKBACK_MS = 4 * 60 * 60 * 1000
@@ -84,7 +83,12 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
   }, [workshopSubject])
 
   return (
-    <section className="flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)]">
+    <Link
+      href="/pregatire"
+      onClick={() => setPregatireBackTarget("/dashboard")}
+      aria-label="Deschide calendarul de pregătiri"
+      className="flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-opacity active:opacity-90"
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9aa0b4]">Pregătiri</p>
@@ -92,14 +96,10 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
             Următoarele pentru {WORKSHOP_SUBJECT_LABELS[workshopSubject]}
           </p>
         </div>
-        <Link
-          href="/pregatire"
-          onClick={() => setPregatireBackTarget("/dashboard")}
-          className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity active:opacity-70"
-        >
+        <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827]">
           Calendar
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </Link>
+        </span>
       </div>
 
       {loading ? (
@@ -113,14 +113,10 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
           <p className="text-sm text-[#6b7280]">
             Nu sunt pregătiri programate pentru {subjectLabel}.
           </p>
-          <Link
-            href="/pregatire"
-            onClick={() => setPregatireBackTarget("/dashboard")}
-            className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#111827] transition-opacity active:opacity-70"
-          >
+          <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#111827]">
             Vezi calendarul
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-          </Link>
+          </span>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -128,14 +124,7 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
             const live = isWorkshopLive(workshop)
             return (
               <li key={workshop.id}>
-                <Link
-                  href={`/pregatire/${workshop.id}`}
-                  onClick={() => setPregatireBackTarget("/dashboard")}
-                  className={cn(
-                    "flex items-start justify-between gap-3 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-3 py-2.5 transition",
-                    "active:scale-[0.99] active:bg-[#f3f4f6]",
-                  )}
-                >
+                <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-3 py-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span
@@ -159,12 +148,12 @@ export function StudentPregatireCard({ preferredMaterie }: StudentPregatireCardP
                     <Zap className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
                     {workshop.energy_cost}
                   </span>
-                </Link>
+                </div>
               </li>
             )
           })}
         </ul>
       )}
-    </section>
+    </Link>
   )
 }

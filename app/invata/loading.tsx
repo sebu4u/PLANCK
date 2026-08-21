@@ -16,7 +16,11 @@ export default function InvataLoading() {
       >
         <div
           className="relative flex items-center px-4 pt-2"
-          style={{ minHeight: "max(11.5rem, calc(27rem * 682 / 1024 * 0.72))", paddingBottom: "0.75rem" }}
+          style={{
+            height: "max(11.5rem, calc(27rem * 682 / 1024 * 0.72))",
+            minHeight: "max(11.5rem, calc(27rem * 682 / 1024 * 0.72))",
+            paddingBottom: "0.75rem",
+          }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -30,7 +34,7 @@ export default function InvataLoading() {
               transform: "translateY(12%)",
             }}
           />
-          <div className="relative z-[3] ml-auto w-[55%] max-w-[220px]">
+          <div className="relative z-[3] ml-auto w-[64%] max-w-[256px]">
             <div className="aspect-video w-full animate-pulse rounded-2xl bg-black/10 ring-1 ring-black/10" />
           </div>
         </div>

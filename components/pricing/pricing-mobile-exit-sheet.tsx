@@ -9,33 +9,41 @@ import {
   PREMIUM_YEARLY_SAVE_PERCENT,
   premiumDailyPrice,
 } from "@/components/pricing/premium-pricing"
+import { isEarlybirdActive } from "@/lib/landing-earlybird"
+import { isLaunch20Active } from "@/lib/launch-20-discount"
+import { getCampaignPriceRon } from "@/lib/pricing-campaign"
 
 type BillingInterval = "year" | "month"
 
-const PLAN_OPTIONS: Array<{
-  interval: BillingInterval
-  label: string
-  paidLabel: string
-  totalRon: number
-  dailyRon: string
-  badge?: string
-}> = [
-  {
-    interval: "year",
-    label: "Anual",
-    paidLabel: `Plătit ${PREMIUM_YEARLY_RON.toLocaleString("ro-RO")} RON anual`,
-    totalRon: PREMIUM_YEARLY_RON,
-    dailyRon: premiumDailyPrice(PREMIUM_YEARLY_RON, 365),
-    badge: `Economisești ${PREMIUM_YEARLY_SAVE_PERCENT}%`,
-  },
-  {
-    interval: "month",
-    label: "Lunar",
-    paidLabel: `Plătit ${PREMIUM_MONTHLY_RON} RON lunar`,
-    totalRon: PREMIUM_MONTHLY_RON,
-    dailyRon: premiumDailyPrice(PREMIUM_MONTHLY_RON, 30),
-  },
-]
+function planOptions() {
+  const yearlyRon = getCampaignPriceRon("year")
+  const monthlyRon = getCampaignPriceRon("month")
+  const earlybird = isEarlybirdActive()
+  const launch20 = isLaunch20Active()
+
+  return [
+    {
+      interval: "year" as const,
+      label: "Anual",
+      paidLabel: earlybird
+        ? `Earlybird ${yearlyRon.toLocaleString("ro-RO")} RON/an (în loc de ${PREMIUM_YEARLY_RON.toLocaleString("ro-RO")})`
+        : `Plătit ${yearlyRon.toLocaleString("ro-RO")} RON anual`,
+      totalRon: yearlyRon,
+      dailyRon: premiumDailyPrice(yearlyRon, 365),
+      badge: earlybird ? "Earlybird" : `Economisești ${PREMIUM_YEARLY_SAVE_PERCENT}%`,
+    },
+    {
+      interval: "month" as const,
+      label: "Lunar",
+      paidLabel: launch20
+        ? `${monthlyRon} RON/lună cu −20% (în loc de ${PREMIUM_MONTHLY_RON})`
+        : `Plătit ${monthlyRon} RON lunar`,
+      totalRon: monthlyRon,
+      dailyRon: premiumDailyPrice(monthlyRon, 30),
+      badge: launch20 ? "−20%" : undefined,
+    },
+  ]
+}
 
 function PlanRadioIndicator({ selected }: { selected: boolean }) {
   return (
@@ -64,7 +72,9 @@ export function PricingMobileExitSheet({
   onCheckout,
   onDismiss,
 }: PricingMobileExitSheetProps) {
-  const [selectedInterval, setSelectedInterval] = useState<BillingInterval>("month")
+  const [selectedInterval, setSelectedInterval] = useState<BillingInterval>(
+    isEarlybirdActive() ? "year" : "month",
+  )
 
   return (
     <>
@@ -103,7 +113,7 @@ export function PricingMobileExitSheet({
           </p>
 
           <div className="mt-5 flex flex-col gap-3">
-            {PLAN_OPTIONS.map((option) => {
+            {planOptions().map((option) => {
               const isSelected = selectedInterval === option.interval
 
               return (

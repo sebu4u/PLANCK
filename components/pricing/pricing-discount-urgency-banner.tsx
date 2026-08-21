@@ -1,10 +1,12 @@
 "use client"
 
+import { LAUNCH_20_DEADLINE_LABEL, LAUNCH_20_PERCENT } from "@/lib/launch-20-discount"
+
 type PricingDiscountUrgencyBannerProps = {
-  remainingLabel: string
+  remainingLabel?: string
 }
 
-export function PricingDiscountUrgencyBanner({ remainingLabel }: PricingDiscountUrgencyBannerProps) {
+export function PricingDiscountUrgencyBanner(_props?: PricingDiscountUrgencyBannerProps) {
   return (
     <div
       role="status"
@@ -13,17 +15,17 @@ export function PricingDiscountUrgencyBanner({ remainingLabel }: PricingDiscount
     >
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
         <span className="inline-flex items-center rounded-full bg-gradient-to-r from-red-500 to-[#e11d48] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_4px_14px_rgba(239,68,68,0.45)] sm:text-[10px]">
-          Ofertă unică −50%
+          Reducere −{LAUNCH_20_PERCENT}%
         </span>
         <p className="text-center text-[12px] font-semibold leading-snug text-[#7f1d1d] sm:text-sm">
-          Dispare în{" "}
-          <span className="font-mono text-sm font-black tabular-nums tracking-tight text-[#b91c1c] sm:text-base">
-            {remainingLabel}
+          până pe{" "}
+          <span className="text-sm font-black tracking-tight text-[#b91c1c] sm:text-base">
+            {LAUNCH_20_DEADLINE_LABEL}
           </span>
         </p>
       </div>
       <p className="mt-1 text-center text-[11px] leading-snug text-[#9f1239]/90 sm:text-xs">
-        Jumătate din preț la orice plan — doar în această oră.
+        Reducere de {LAUNCH_20_PERCENT}% la orice plan — până pe {LAUNCH_20_DEADLINE_LABEL}.
       </p>
     </div>
   )

@@ -8,6 +8,7 @@ import { Mail, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { isValidEmail, subscribeToNewsletter } from "@/lib/newsletter"
 import { useAnalytics } from "@/lib/analytics"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 
 export default function FinalCTASection() {
   const [email, setEmail] = useState("")
@@ -45,6 +46,8 @@ export default function FinalCTASection() {
         description: result.message,
       })
       analytics.trackNewsletterSignup()
+      await tiktokPixel.identify({ email })
+      tiktokPixel.trackSubmitForm("newsletter", "Newsletter Planck")
       setEmail("")
     } catch (error) {
       console.error('Newsletter subscription error:', error)

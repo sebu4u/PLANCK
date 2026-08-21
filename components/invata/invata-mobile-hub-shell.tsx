@@ -21,6 +21,8 @@ export const INVATA_HUB_HEADER_CHARACTER_SRC = "/images/invata/header-character.
 const CHARACTER_WIDTH = "27rem"
 /** How far the image overlaps into the video card from the left. */
 const VIDEO_OVERLAP = "10.5rem"
+/** Locked header height so a larger player uses spare space instead of stretching the band. */
+const HEADER_HEIGHT = "max(11.5rem, calc(27rem * 682 / 1024 * 0.72))"
 
 interface InvataMobileHubShellProps {
   top: ReactNode
@@ -65,7 +67,8 @@ export function InvataMobileHubShell({ top, children, className }: InvataMobileH
         className="relative flex items-center px-4 pt-2"
         style={{
           zIndex: INVATA_HUB_MOBILE_HEADER_Z,
-          minHeight: `max(11.5rem, calc(${CHARACTER_WIDTH} * 682 / 1024 * 0.72))`,
+          height: HEADER_HEIGHT,
+          minHeight: HEADER_HEIGHT,
           paddingBottom: "0.75rem",
         }}
       >
@@ -85,7 +88,7 @@ export function InvataMobileHubShell({ top, children, className }: InvataMobileH
         />
 
         {/* Video + text on the right, above the image */}
-        <div className="relative z-[3] ml-auto w-[55%] max-w-[220px]">{top}</div>
+        <div className="relative z-[3] ml-auto w-[64%] max-w-[256px]">{top}</div>
       </div>
 
       <div

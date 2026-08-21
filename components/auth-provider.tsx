@@ -11,6 +11,7 @@ import {
   needsOnboarding as profileNeedsOnboarding,
   resolveIncompleteOnboardingPath,
   savePostOnboardingRedirect,
+  GUEST_DEMO_STORAGE_KEY,
 } from "@/lib/onboarding"
 import {
   GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY,
@@ -421,6 +422,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
     if (typeof window !== "undefined") {
       localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
       localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+      localStorage.removeItem(GUEST_DEMO_STORAGE_KEY)
       localStorage.removeItem(GUARDIAN_ONBOARDING_STORAGE_KEY)
       localStorage.removeItem(GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY)
     }

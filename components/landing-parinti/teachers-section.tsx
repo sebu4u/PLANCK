@@ -1,85 +1,10 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
-import Image from "next/image"
+import { useCallback, useRef } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
-import { LANDING_TEACHERS, type LandingTeacher } from "@/lib/landing-teachers"
-import { WORKSHOP_SUBJECT_LABELS, type WorkshopSubject } from "@/lib/pregatire/types"
-import { cn } from "@/lib/utils"
-
-const SUBJECT_TEXT_CLASS: Record<WorkshopSubject, string> = {
-  fizica: "text-[#7C5CFC]",
-  mate: "text-[#16a34a]",
-  info: "text-[#2563eb]",
-  biologie: "text-[#65a30d]",
-  chimie: "text-[#ea580c]",
-}
-
-function instagramHref(handle: string): string {
-  const username = handle.replace(/^@/, "").trim()
-  return `https://instagram.com/${encodeURIComponent(username)}`
-}
-
-function TeacherInitials({ name }: { name: string }) {
-  const initial = name.trim().charAt(0).toUpperCase() || "?"
-
-  return (
-    <div
-      className="flex aspect-[4/3] w-full items-center justify-center rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 text-2xl font-semibold text-gray-400"
-      aria-hidden
-    >
-      {initial}
-    </div>
-  )
-}
-
-function TeacherImage({ teacher }: { teacher: LandingTeacher }) {
-  const [failed, setFailed] = useState(false)
-
-  if (!teacher.imageSrc || failed) {
-    return <TeacherInitials name={teacher.name} />
-  }
-
-  return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-gray-100">
-      <Image
-        src={teacher.imageSrc}
-        alt={teacher.name}
-        fill
-        className="object-cover"
-        sizes="(max-width: 768px) 85vw, 280px"
-        onError={() => setFailed(true)}
-      />
-    </div>
-  )
-}
-
-function TeacherCard({ teacher }: { teacher: LandingTeacher }) {
-  return (
-    <article className="flex h-full w-[260px] flex-shrink-0 flex-col rounded-[24px] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.05)] ring-[3px] ring-black/[0.06] sm:w-[300px]">
-      <TeacherImage teacher={teacher} />
-
-      <div className="mt-4 flex min-h-0 flex-1 flex-col">
-        <h3 className="text-base font-bold leading-tight text-gray-900">{teacher.name}</h3>
-        <a
-          href={instagramHref(teacher.instagram)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-0.5 text-sm font-semibold text-[#7C5CFC] transition-opacity hover:opacity-80"
-        >
-          {teacher.instagram}
-        </a>
-
-        <p className="mt-4 flex-1 text-sm leading-relaxed text-gray-600">{teacher.description}</p>
-
-        <p className={cn("mt-4 text-sm font-bold", SUBJECT_TEXT_CLASS[teacher.subject])}>
-          {WORKSHOP_SUBJECT_LABELS[teacher.subject]}
-        </p>
-      </div>
-    </article>
-  )
-}
+import { LandingTeacherCard } from "@/components/landing/teacher-card"
+import { LANDING_TEACHERS } from "@/lib/landing-teachers"
 
 export function ParentTeachersSection() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -124,7 +49,7 @@ export function ParentTeachersSection() {
         >
           {LANDING_TEACHERS.map((teacher) => (
             <div key={teacher.id} className="flex-shrink-0 snap-center">
-              <TeacherCard teacher={teacher} />
+              <LandingTeacherCard teacher={teacher} />
             </div>
           ))}
         </div>

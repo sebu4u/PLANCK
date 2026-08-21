@@ -48,7 +48,7 @@ export async function sendWorkshopReminderEmail(input: {
               Deschide pregătirea
             </a>
           </p>
-          <p style="font-size: 13px; color: #9ca3af;">Ai deblocat această sesiune pe Planck. Link-ul Meet este disponibil pe pagină.</p>
+          <p style="font-size: 13px; color: #9ca3af;">Ai deblocat această sesiune pe Planck. Link-ul Meet apare pe pagină cu 10 minute înainte de începere.</p>
         </div>
       `,
     })

@@ -24,7 +24,10 @@ type OnboardingAccountStepProps = {
   onGoogleStart: () => void
   onGoogleResult: (result: OAuthPopupResult) => void
   onGitHubLogin: () => void
-  onTryWithoutAccount: () => void
+  onTryWithoutAccount?: () => void
+  onGoHome?: () => void
+  /** After finishing the demo path without an account: hide “try without account”. */
+  variant?: "default" | "after-demo"
   googleIcon: React.ReactNode
   githubIcon: React.ReactNode
 }
@@ -38,6 +41,8 @@ export function OnboardingAccountStep({
   onGoogleResult,
   onGitHubLogin,
   onTryWithoutAccount,
+  onGoHome,
+  variant = "default",
   googleIcon,
   githubIcon,
 }: OnboardingAccountStepProps) {
@@ -101,14 +106,25 @@ export function OnboardingAccountStep({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onTryWithoutAccount}
-        className="mt-6 w-full bg-transparent py-2 text-center text-sm font-medium text-[#5c5f68] underline-offset-4 transition-colors hover:text-[#1a1c21] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8043f0] focus-visible:ring-offset-2"
-        style={{ animation: ONBOARDING_STEP_ENTER_ANIM, animationDelay: "440ms" }}
-      >
-        Sau încearcă fără cont
-      </button>
+      {variant === "after-demo" ? (
+        <button
+          type="button"
+          onClick={onGoHome}
+          className="mt-6 w-full bg-transparent py-2 text-center text-sm font-medium text-[#5c5f68] underline-offset-4 transition-colors hover:text-[#1a1c21] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8043f0] focus-visible:ring-offset-2"
+          style={{ animation: ONBOARDING_STEP_ENTER_ANIM, animationDelay: "440ms" }}
+        >
+          Înapoi pe homepage
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onTryWithoutAccount}
+          className="mt-6 w-full bg-transparent py-2 text-center text-sm font-medium text-[#5c5f68] underline-offset-4 transition-colors hover:text-[#1a1c21] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8043f0] focus-visible:ring-offset-2"
+          style={{ animation: ONBOARDING_STEP_ENTER_ANIM, animationDelay: "440ms" }}
+        >
+          Sau încearcă fără cont
+        </button>
+      )}
     </div>
   )
 }

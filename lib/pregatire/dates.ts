@@ -128,6 +128,47 @@ export function isWorkshopPast(startsAt: string, durationMinutes: number, now = 
   return start + durationMinutes * 60_000 < now.getTime()
 }
 
+/** Meet link is withheld until this long before `starts_at`. */
+export const WORKSHOP_MEET_VISIBLE_BEFORE_MS = 10 * 60 * 1000
+
+export function workshopMeetOpensAtMs(startsAt: string): number | null {
+  const start = new Date(startsAt).getTime()
+  if (Number.isNaN(start)) return null
+  return start - WORKSHOP_MEET_VISIBLE_BEFORE_MS
+}
+
+export function isWorkshopMeetVisible(startsAt: string, now = new Date()): boolean {
+  const opensAt = workshopMeetOpensAtMs(startsAt)
+  if (opensAt == null) return false
+  return now.getTime() >= opensAt
+}
+
+export function visibleWorkshopMeetUrl(
+  startsAt: string,
+  meetUrl: string | null | undefined,
+  now = new Date(),
+): string | null {
+  if (!meetUrl) return null
+  return isWorkshopMeetVisible(startsAt, now) ? meetUrl : null
+}
+
+export function formatWorkshopMeetWait(startsAt: string, now = new Date()): string {
+  const opensAt = workshopMeetOpensAtMs(startsAt)
+  if (opensAt == null) return ""
+  const remainingMs = Math.max(0, opensAt - now.getTime())
+  const totalMinutes = Math.ceil(remainingMs / 60_000)
+  if (totalMinutes <= 1) return "în mai puțin de un minut"
+  if (totalMinutes < 60) return `în ${totalMinutes} minute`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours < 24) {
+    if (minutes === 0) return hours === 1 ? "în 1 oră" : `în ${hours} ore`
+    return `în ${hours} ${hours === 1 ? "oră" : "ore"} și ${minutes} minute`
+  }
+  const days = Math.ceil(totalMinutes / (60 * 24))
+  return days === 1 ? "în 1 zi" : `în ${days} zile`
+}
+
 /** Interpret a Bucharest local date+time as UTC ISO. */
 export function bucharestLocalToIso(dateStr: string, timeStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number)

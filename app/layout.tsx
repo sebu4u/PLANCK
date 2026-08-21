@@ -19,6 +19,7 @@ import { PersonalizedCourseGenerationProvider } from "@/components/invata/person
 import { PlanckCodeFloatingShell } from "@/components/planckcode-floating-shell"
 import { SubjectChangeCelebrationProvider } from "@/components/exerseaza/subject-change-celebration-provider"
 import { ProductGuideProvider } from "@/components/product-guide/product-guide-provider"
+import { PlanckPassSeasonIntroProvider } from "@/components/planckpass/planckpass-season-intro-gate"
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
@@ -117,7 +118,8 @@ export default function RootLayout({
           <TopLoader />
           <AuthProvider>
             <ProductGuideProvider>
-              <SubjectChangeCelebrationProvider>
+              <PlanckPassSeasonIntroProvider>
+                <SubjectChangeCelebrationProvider>
                 <GlobalLoadingOverlay />
                 <AnalyticsProvider>
                   <KatexProvider>
@@ -140,7 +142,8 @@ export default function RootLayout({
                     v1.04.52
                   </div>
                 </AnalyticsProvider>
-              </SubjectChangeCelebrationProvider>
+                </SubjectChangeCelebrationProvider>
+              </PlanckPassSeasonIntroProvider>
             </ProductGuideProvider>
           </AuthProvider>
         </ErrorBoundary>

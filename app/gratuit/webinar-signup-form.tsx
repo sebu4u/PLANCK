@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { submitWebinarLead } from "./actions"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import {
   WEBINAR_CLASA_OPTIONS,
   WEBINAR_METODA_OPTIONS,
@@ -198,6 +199,12 @@ export function WebinarSignupForm() {
         <form
           ref={formRef}
           action={formAction}
+          onSubmit={(event) => {
+            const form = event.currentTarget
+            const email = String(new FormData(form).get("email") || "")
+            const phone = String(new FormData(form).get("telefon") || "")
+            void tiktokPixel.identify({ email, phone })
+          }}
           className={cn("space-y-8", step === 2 && "w-full shrink-0")}
         >
           {state.error ? (

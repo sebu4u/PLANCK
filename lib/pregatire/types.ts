@@ -82,6 +82,7 @@ export interface WorkshopPublic {
   energy_cost: number
   max_seats: number | null
   is_published: boolean
+  is_bac: boolean
   has_recording: boolean
   unlock_count: number
   created_at?: string

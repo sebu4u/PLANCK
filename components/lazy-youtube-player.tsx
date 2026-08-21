@@ -10,6 +10,8 @@ interface LazyYouTubePlayerProps {
   locked?: boolean
   onLockedClick?: () => void
   lockedLabel?: string
+  /** Caption shown at the bottom of the thumbnail before playback. */
+  caption?: string
 }
 
 // Utility function to extract YouTube video ID from various URL formats
@@ -38,6 +40,7 @@ export function LazyYouTubePlayer({
   locked = false,
   onLockedClick,
   lockedLabel = "Disponibil cu Planck Plus+",
+  caption,
 }: LazyYouTubePlayerProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -56,22 +59,25 @@ export function LazyYouTubePlayer({
   }
 
   // Generate YouTube thumbnail URL
-  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1`
+  const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&playsinline=1`
 
   return (
     <div className={`relative w-full aspect-video rounded-lg overflow-hidden shadow-lg bg-gray-100 ${className}`}>
       {!isLoaded || locked ? (
         // Thumbnail with play button (or locked overlay)
         <div className="relative w-full h-full cursor-pointer group" onClick={handlePlayClick}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={thumbnailUrl}
             alt={title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               // Fallback to a different thumbnail quality if maxresdefault fails
               const target = e.target as HTMLImageElement
-              target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+              target.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
             }}
           />
           
@@ -90,17 +96,23 @@ export function LazyYouTubePlayer({
             </div>
           ) : (
             <>
-              {/* Play button overlay */}
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
-                <div className="bg-red-600 hover:bg-red-700 rounded-full p-4 transition-all duration-300 group-hover:scale-110 shadow-2xl">
-                  <Play className="w-8 h-8 text-white fill-white ml-1" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent to-50% transition-all duration-300 group-hover:from-black/30" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="rounded-full bg-red-600 p-4 shadow-2xl transition-all duration-300 hover:bg-red-700 group-hover:scale-110">
+                  <Play className="ml-1 h-8 w-8 fill-white text-white" />
                 </div>
               </div>
-              
-              {/* YouTube logo overlay */}
-              <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-                YouTube
-              </div>
+              {caption ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 sm:px-4 sm:pb-4">
+                  <p className="text-sm font-bold leading-snug tracking-tight text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.55)] sm:text-base">
+                    {caption}
+                  </p>
+                </div>
+              ) : (
+                <div className="absolute bottom-2 right-2 rounded bg-black bg-opacity-75 px-2 py-1 text-xs text-white">
+                  YouTube
+                </div>
+              )}
             </>
           )}
         </div>

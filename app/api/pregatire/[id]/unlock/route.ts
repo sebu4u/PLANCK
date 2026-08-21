@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAccessTokenFromRequest } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
+import { visibleWorkshopMeetUrl } from "@/lib/pregatire/dates"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 
 export async function POST(
@@ -70,10 +71,19 @@ export async function POST(
       return NextResponse.json({ error: "Nu am putut debloca pregătirea.", code }, { status: 400 })
     }
 
+    const { data: publicRow } = await supabase
+      .from("workshops_public")
+      .select("starts_at")
+      .eq("id", id)
+      .maybeSingle()
+
     return NextResponse.json({
       unlocked: true,
       already_unlocked: Boolean(result.already_unlocked),
-      meet_url: result.meet_url ?? null,
+      meet_url: visibleWorkshopMeetUrl(
+        typeof publicRow?.starts_at === "string" ? publicRow.starts_at : "",
+        result.meet_url ?? null,
+      ),
       recording_url: result.recording_url ?? null,
       balance: result.balance ?? 0,
       carryoverBalance: result.carryover_balance ?? 0,

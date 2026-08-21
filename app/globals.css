@@ -1031,6 +1031,27 @@
   animation: planckpass-claim-glow 1.6s ease-in-out infinite;
 }
 
+@keyframes planckpass-handle-glow {
+  0%,
+  100% {
+    box-shadow:
+      -2px 0 10px 2px rgba(255, 208, 0, 0.75),
+      -4px 0 22px 6px rgba(255, 180, 0, 0.5);
+  }
+
+  50% {
+    box-shadow:
+      -2px 0 16px 4px rgba(255, 220, 80, 0.95),
+      -6px 0 32px 10px rgba(255, 200, 0, 0.65);
+  }
+}
+
+.planckpass-desktop-handle-claimable {
+  background: #ffd000;
+  color: #1a0a4a;
+  animation: planckpass-handle-glow 1.6s ease-in-out infinite;
+}
+
 .planckpass-claimable-shine {
   position: absolute;
   inset: 0;
@@ -1088,6 +1109,13 @@
       0 0 0 2px #fff,
       0 0 0 5px #ffd000,
       0 0 14px 2px rgba(255, 208, 0, 0.8);
+  }
+
+  .planckpass-desktop-handle-claimable {
+    animation: none;
+    box-shadow:
+      -2px 0 12px 3px rgba(255, 208, 0, 0.85),
+      -4px 0 22px 6px rgba(255, 180, 0, 0.5);
   }
 
   .planckpass-claimable-shine::before,
@@ -1541,6 +1569,15 @@
   .hero-phone-enter.scroll-animate-slide-up.animate {
     opacity: 1;
     transform: translateY(0);
+    transition: none;
+  }
+
+  .home-platform-enter.scroll-animate-fade-left,
+  .home-platform-enter.scroll-animate-fade-left.animate,
+  .home-platform-enter.scroll-animate-fade-right,
+  .home-platform-enter.scroll-animate-fade-right.animate {
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 }
@@ -2726,6 +2763,19 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
 .generation-iris-reveal-page {
   animation: generation-iris-reveal-page 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   pointer-events: none;
+}
+
+.planckpass-intro-iris-open {
+  clip-path: circle(0% at 50% 50%);
+  animation: generation-iris-open 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: clip-path;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planckpass-intro-iris-open {
+    animation: none;
+    clip-path: none;
+  }
 }
 
 @keyframes generation-word-fade {

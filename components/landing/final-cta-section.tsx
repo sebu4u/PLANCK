@@ -23,7 +23,7 @@ export function LandingFinalCtaSection({ countdown }: { countdown?: CountdownSta
       <div className="relative mx-auto max-w-3xl px-4 text-center">
         <ScaleIn>
           <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-5xl">
-            Gata să înveți fizica altfel?
+            Gata să înveți mai simplu pentru BAC?
           </h2>
         </ScaleIn>
 
@@ -36,7 +36,7 @@ export function LandingFinalCtaSection({ countdown }: { countdown?: CountdownSta
         </FadeInUp>
 
         <FadeInUp delay={0.18} className="mt-8 flex justify-center">
-          <div className="flex items-end gap-2.5 sm:gap-4">
+          <div className="flex max-w-full flex-wrap items-end justify-center gap-2.5 sm:gap-4">
             <CountdownUnit value={days} label="zile" />
             <span className="mb-4 text-2xl font-black text-[#7C5CFC]">:</span>
             <CountdownUnit value={hours} label="ore" />

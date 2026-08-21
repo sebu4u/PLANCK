@@ -152,6 +152,18 @@ export class CookieManager {
         purpose: 'Urmărește abonarea la newsletter și comunicările',
         duration: '1 an',
         category: 'marketing'
+      },
+      {
+        name: '_ttp',
+        purpose: 'Identifică browserele unice pentru TikTok Pixel',
+        duration: '13 luni',
+        category: 'marketing'
+      },
+      {
+        name: '_tt_enable_cookie',
+        purpose: 'Permite cookie-urile TikTok Pixel după consimțământ',
+        duration: '13 luni',
+        category: 'marketing'
       }
     ]
   }

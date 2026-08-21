@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-provider"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { LAUNCH_20_DEADLINE_LABEL, LAUNCH_20_PERCENT } from "@/lib/launch-20-discount"
 import { cn } from "@/lib/utils"
 
 export const PREMIUM_UPGRADE_BANNER_SHELL_CLASS =
@@ -100,9 +101,8 @@ export function PremiumUpgradeBanner({
 
         {postOnboardingDiscount.active ? (
           <span className={cn(PREMIUM_UPGRADE_BANNER_TEXT_CLASS, "inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5")}>
-            <span>Dispare curând: jumătate din preț la orice plan.</span>
-            <span className="font-mono font-bold tabular-nums tracking-tight">
-              {postOnboardingDiscount.remainingLabel}
+            <span>
+              Reducere de {LAUNCH_20_PERCENT}% până pe {LAUNCH_20_DEADLINE_LABEL}.
             </span>
             <PremiumBannerGradientLink>Go Premium</PremiumBannerGradientLink>
           </span>

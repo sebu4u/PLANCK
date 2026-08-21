@@ -8,9 +8,9 @@ import { supabase } from "@/lib/supabaseClient"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import {
   getPremiumPeriodLabel,
-  getPremiumPriceRon,
   type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
+import { getCampaignPriceRon, getPricingCampaign } from "@/lib/pricing-campaign"
 import type { ChildProgressSnapshot } from "@/lib/parent/server"
 import { cn } from "@/lib/utils"
 
@@ -47,8 +47,9 @@ export function ChildSubscriptionCard({
   const purchasesEnabled = canPurchaseSubscriptions()
   const periodEnd = formatPeriodEnd(billing.current_period_end)
   const isBusy = checkoutLoading || portalLoading
-  const priceRon = getPremiumPriceRon(interval)
+  const priceRon = getCampaignPriceRon(interval)
   const periodLabel = getPremiumPeriodLabel(interval)
+  const campaign = getPricingCampaign(interval)
 
   const statusCopy = (() => {
     if (billing.billing_source === "parent") {
@@ -188,6 +189,16 @@ export function ChildSubscriptionCard({
                 {priceRon.toLocaleString("ro-RO")} RON
               </span>{" "}
               <span className="text-[#6b7280]">{periodLabel}</span>
+              {campaign === "earlybird" ? (
+                <span className="ml-2 rounded-full bg-[#FFE566] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#7A6000]">
+                  Earlybird
+                </span>
+              ) : null}
+              {campaign === "launch20" ? (
+                <span className="ml-2 rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#166534]">
+                  −20%
+                </span>
+              ) : null}
               {", "}doar pentru {child.name}
             </p>
             <Button

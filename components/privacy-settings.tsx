@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/components/auth-provider'
 import { useCookieManager } from '@/lib/cookie-management'
 import { useAnalytics } from '@/lib/analytics'
+import { tiktokPixel } from '@/lib/tiktok-pixel'
 import { useToast } from '@/hooks/use-toast'
 import { 
   Shield, 
@@ -146,6 +147,7 @@ export function PrivacySettings() {
         export_type: 'user_data',
         timestamp: new Date().toISOString()
       })
+      tiktokPixel.trackDownload('gdpr_export', 'Export date personale')
     } catch (error) {
       toast({
         title: 'Eroare la export',

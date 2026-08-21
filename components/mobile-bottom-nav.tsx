@@ -166,7 +166,7 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
         )}
       >
         <div className="relative flex h-[4.5rem] items-stretch">
-          {navItems.map(({ href, label, icon: Icon, isActive, elevated, imageSrc, hideLabel }) => {
+          {navItems.map(({ href, label, icon: Icon, isActive, elevated, imageSrc, hideLabel, showDot }) => {
             const active = isActive(pathname)
             const isProfileTab = href === "/profil"
             const tabClass = cn(
@@ -269,6 +269,15 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                       className={cn(
                         "shrink-0",
                         elevated ? "absolute bottom-0 h-6 w-6 -translate-y-2.5" : "h-5 w-5",
+                      )}
+                      aria-hidden
+                    />
+                  ) : null}
+                  {showDot ? (
+                    <span
+                      className={cn(
+                        "absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2",
+                        isDark ? "ring-[#181818]" : "ring-white",
                       )}
                       aria-hidden
                     />

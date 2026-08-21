@@ -23,7 +23,7 @@ export function LandingPageContent() {
   const countdown = useCountdown()
 
   return (
-    <div className="relative min-h-screen bg-white pb-16 sm:pb-0">
+    <div className="relative min-h-screen overflow-x-hidden bg-white pb-16 sm:pb-0">
       <FomoBanner days={countdown.days} />
       <div className="relative bg-[#ffffff]">
         <HomePageNavbar variant="light" />

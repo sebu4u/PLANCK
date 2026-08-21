@@ -11,10 +11,10 @@ import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { OnboardingAccountStep } from "@/components/onboarding/onboarding-account-step"
 import { OnboardingGradeSliderStep } from "@/components/onboarding/onboarding-grade-slider-step"
 import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
-import { OnboardingPostAuthSplash } from "@/components/onboarding/OnboardingPostAuthSplash"
 import { StudentTestimonialsStep } from "@/components/onboarding/student-testimonials-step"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { supabase } from "@/lib/supabaseClient"
 import {
   clampSelfGrade,
@@ -35,14 +35,19 @@ import {
   getOnboardingBlockedToast,
   isOnboardingSubjectId,
   OAUTH_ONBOARDING_PARAM,
+  GUEST_DEMO_ONBOARDING_PARAM,
   ONBOARDING_SUBJECT_OPTIONS,
   type OnboardingSubjectId,
+  type GuestDemoStatus,
+  markGuestDemoStarted,
+  clearGuestDemo,
+  getGuestDemoStatus,
 } from "@/lib/onboarding"
 
 type SubjectOption = OnboardingSubjectId
 type GradeOption = "9" | "10" | "11" | "12"
 type DailyTimeOption = "15" | "30" | "60"
-type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | "name"
+type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | "name"
 
 type OnboardingState = {
   step: RegisterStep
@@ -52,11 +57,12 @@ type OnboardingState = {
   targetGrade: number | null
   dailyTime: DailyTimeOption | null
   awaitingPostAuth: boolean
+  guestDemo: GuestDemoStatus | null
 }
 
 const PROGRESS_STEPS = 8
 const ACCOUNT_STEP = 9
-const SPLASH_STEP = 10
+const LEGACY_SPLASH_STEP = 10
 const DEFAULT_SELF_GRADE = 7
 
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
@@ -70,6 +76,7 @@ const defaultOnboardingState: OnboardingState = {
   targetGrade: null,
   dailyTime: null,
   awaitingPostAuth: false,
+  guestDemo: null,
 }
 
 const subjectHeadlines: Record<SubjectOption, string> = {
@@ -98,20 +105,21 @@ const mainCtaClassName =
 const choiceButtonClassName =
   "w-full rounded-full border px-5 py-3 text-left text-sm font-semibold transition-colors"
 
-const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 =>
+const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 =>
   typeof step === "number"
 
 const LEGACY_STEP_MAP: Record<number, RegisterStep> = {
   6: ACCOUNT_STEP,
-  7: SPLASH_STEP,
+  7: "name",
+  [LEGACY_SPLASH_STEP]: "name",
 }
 
 const sanitizeStep = (value: unknown): RegisterStep => {
   if (value === "name") return "name"
   if (value === 0 || value === "coming_soon") return 1
   if (typeof value === "number") {
-    if (value >= 1 && value <= 10) return value as RegisterStep
     if (LEGACY_STEP_MAP[value]) return LEGACY_STEP_MAP[value]
+    if (value >= 1 && value <= 9) return value as RegisterStep
   }
   return 1
 }
@@ -129,6 +137,9 @@ const sanitizeGrade = (value: unknown): GradeOption | null =>
 
 const sanitizeDailyTime = (value: unknown): DailyTimeOption | null =>
   value === "15" || value === "30" || value === "60" ? value : null
+
+const sanitizeGuestDemo = (value: unknown): GuestDemoStatus | null =>
+  value === "started" || value === "completed" ? value : null
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -276,6 +287,7 @@ function RegisterPageContent() {
 
   const shouldForcePostAuthStep = searchParams.get("onboarding") === "1"
   const shouldForceOAuthOnboarding = searchParams.get("onboarding") === OAUTH_ONBOARDING_PARAM
+  const shouldForceGuestSignup = searchParams.get("onboarding") === GUEST_DEMO_ONBOARDING_PARAM
 
   useEffect(() => {
     const referralFromUrl = searchParams.get("ref")
@@ -297,6 +309,7 @@ function RegisterPageContent() {
           targetGrade: sanitizeGradeValue(decoded.targetGrade),
           dailyTime: sanitizeDailyTime(decoded.dailyTime),
           awaitingPostAuth: Boolean(decoded.awaitingPostAuth),
+          guestDemo: sanitizeGuestDemo(decoded.guestDemo) ?? getGuestDemoStatus(),
         }
       } catch {
         parsedState = { ...defaultOnboardingState }
@@ -307,48 +320,64 @@ function RegisterPageContent() {
       const oauthFromRegister =
         localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1" ||
         parsedState.awaitingPostAuth ||
-        parsedState.step === SPLASH_STEP
+        parsedState.step === "name"
       if (oauthFromRegister) {
-        parsedState.step = SPLASH_STEP
+        parsedState.step = "name"
         parsedState.awaitingPostAuth = false
       } else {
         parsedState.step = 2
         parsedState.awaitingPostAuth = false
       }
     } else if (shouldForcePostAuthStep) {
-      parsedState.step = SPLASH_STEP
+      parsedState.step = "name"
       parsedState.awaitingPostAuth = true
     } else if (
       user &&
       (parsedState.awaitingPostAuth || localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1") &&
       parsedState.step !== "name"
     ) {
-      parsedState.step = SPLASH_STEP
+      parsedState.step = "name"
+      parsedState.awaitingPostAuth = false
+    } else if (
+      !user &&
+      (shouldForceGuestSignup || parsedState.guestDemo === "completed" || getGuestDemoStatus() === "completed")
+    ) {
+      parsedState.step = ACCOUNT_STEP
+      parsedState.guestDemo = "completed"
       parsedState.awaitingPostAuth = false
     }
 
+    const guestDemoInProgress =
+      parsedState.guestDemo === "started" || parsedState.guestDemo === "completed"
     const wasInAccountCreationFlow =
       parsedState.step === ACCOUNT_STEP ||
-      parsedState.step === SPLASH_STEP ||
       parsedState.step === "name" ||
       parsedState.awaitingPostAuth
-    if (!user && wasInAccountCreationFlow && !parsedState.awaitingPostAuth) {
+    if (!user && wasInAccountCreationFlow && !parsedState.awaitingPostAuth && !guestDemoInProgress) {
       parsedState = { ...defaultOnboardingState }
       if (typeof window !== "undefined") {
         localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
         localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+        clearGuestDemo()
       }
     }
 
     setOnboardingState(parsedState)
     setDisplayName(profile?.name ?? profile?.nickname ?? "")
     setHydrated(true)
-  }, [profile?.name, profile?.nickname, shouldForceOAuthOnboarding, shouldForcePostAuthStep, user])
+  }, [
+    profile?.name,
+    profile?.nickname,
+    shouldForceGuestSignup,
+    shouldForceOAuthOnboarding,
+    shouldForcePostAuthStep,
+    user,
+  ])
 
   useEffect(() => {
-    if (!shouldForcePostAuthStep && !shouldForceOAuthOnboarding) return
+    if (!shouldForcePostAuthStep && !shouldForceOAuthOnboarding && !shouldForceGuestSignup) return
     router.replace("/register")
-  }, [router, shouldForceOAuthOnboarding, shouldForcePostAuthStep])
+  }, [router, shouldForceGuestSignup, shouldForceOAuthOnboarding, shouldForcePostAuthStep])
 
   useEffect(() => {
     if (!hydrated) return
@@ -361,14 +390,6 @@ function RegisterPageContent() {
     const timer = window.setTimeout(() => setWelcomePhase("final"), 3000)
     return () => window.clearTimeout(timer)
   }, [onboardingState.step])
-
-  const handlePostAuthContinue = () => {
-    setOnboardingState((prev) => ({
-      ...prev,
-      step: "name",
-      awaitingPostAuth: false,
-    }))
-  }
 
   useEffect(() => {
     if (!hydrated || !user || profileSyncedUserId !== user.id) return
@@ -397,7 +418,6 @@ function RegisterPageContent() {
       shouldForcePostAuthStep ||
       onboardingState.awaitingPostAuth ||
       oauthFromRegister ||
-      onboardingState.step === SPLASH_STEP ||
       onboardingState.step === "name"
     const isAuthenticatedOnboardingStep =
       onboardingState.step === 2 ||
@@ -407,11 +427,11 @@ function RegisterPageContent() {
       onboardingState.step === 6 ||
       onboardingState.step === "name"
 
-    if (oauthFromRegister && onboardingState.step !== SPLASH_STEP && onboardingState.step !== "name") {
+    if (oauthFromRegister && onboardingState.step !== "name") {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
-        step: SPLASH_STEP,
+        step: "name",
         awaitingPostAuth: false,
       }))
       return
@@ -466,8 +486,7 @@ function RegisterPageContent() {
     !onboardingState.awaitingPostAuth &&
     onboardingState.step !== 7 &&
     onboardingState.step !== 8 &&
-    onboardingState.step !== ACCOUNT_STEP &&
-    onboardingState.step !== SPLASH_STEP
+    onboardingState.step !== ACCOUNT_STEP
 
   const progressPercent =
     isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
@@ -510,6 +529,17 @@ function RegisterPageContent() {
           return
         }
         setStep(3)
+        tiktokPixel.trackCustomizeProduct({
+          contents: [
+            {
+              content_id: onboardingState.subject,
+              content_type: "product",
+              content_name: subjectHeadlines[onboardingState.subject],
+            },
+          ],
+          value: 0,
+          currency: "RON",
+        })
         break
       case 3:
         if (!onboardingState.grade) {
@@ -635,6 +665,11 @@ function RegisterPageContent() {
   const clearOAuthFlag = () => localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
 
   const handleTryWithoutAccount = async () => {
+    markGuestDemoStarted()
+    setOnboardingState((prev) => ({
+      ...prev,
+      guestDemo: "started",
+    }))
     try {
       const target =
         guestFirstItemHref ??
@@ -654,6 +689,13 @@ function RegisterPageContent() {
       description: "Încearcă din nou peste câteva secunde.",
       variant: "destructive",
     })
+  }
+
+  const handleGoHomeFromGuestSignup = () => {
+    clearGuestDemo()
+    localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
+    localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+    router.push("/")
   }
 
   const handleOAuthLogin = async (provider: "google" | "github") => {
@@ -718,9 +760,7 @@ function RegisterPageContent() {
     setOauthLoading(null)
   }
 
-  const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
+  const completeStudentOnboarding = async () => {
     if (!user) {
       toast({
         title: "Conectează-te mai întâi",
@@ -782,6 +822,7 @@ function RegisterPageContent() {
 
     localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
     localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+    clearGuestDemo()
     try {
       localStorage.setItem(getPostOnboardingDiscountStorageKey(user.id), String(Date.now()))
     } catch {
@@ -789,12 +830,32 @@ function RegisterPageContent() {
     }
 
     await refreshProfile()
-    const postOnboardingRedirect = consumePostOnboardingRedirect()
-    const defaultLearningPathHref = await getPostOnboardingLearningPathItemHref(
-      onboardingState.subject,
-      onboardingState.grade,
+    await tiktokPixel.identify({
+      email: user.email,
+      phone: user.phone,
+      externalId: user.id,
+    })
+    tiktokPixel.trackCompleteRegistration(
+      {
+        contents: [
+          {
+            content_id: "account_elev",
+            content_type: "product",
+            content_name: "Cont elev Planck",
+          },
+        ],
+        value: 0,
+        currency: "RON",
+      },
+      user.id,
     )
-    router.push(postOnboardingRedirect ?? defaultLearningPathHref ?? "/dashboard")
+    consumePostOnboardingRedirect()
+    router.push("/dashboard")
+  }
+
+  const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    await completeStudentOnboarding()
   }
 
   const renderStepContent = () => {
@@ -1015,49 +1076,55 @@ function RegisterPageContent() {
             onGoogleResult={handleGoogleOAuthResult}
             onGitHubLogin={() => handleOAuthLogin("github")}
             onTryWithoutAccount={handleTryWithoutAccount}
+            onGoHome={handleGoHomeFromGuestSignup}
+            variant={onboardingState.guestDemo === "completed" ? "after-demo" : "default"}
             googleIcon={<GoogleIcon />}
             githubIcon={<GitHubIcon />}
           />
         )
       }
 
-      case 10:
-        return (
-          <OnboardingPostAuthSplash
-            subject={onboardingState.subject}
-            grade={onboardingState.grade}
-            onContinue={handlePostAuthContinue}
-          />
-        )
-
       case "name":
         return (
-          <div className="mx-auto w-full max-w-[420px] rounded-3xl border border-[#ececf1] bg-white p-7 shadow-[0_30px_70px_-45px_rgba(18,20,28,0.5)]">
-            <h1 className="text-3xl font-semibold text-[#0f1115]">Cum te cheamă?</h1>
-            <p className="mb-6 mt-2 text-sm text-[#666a73]">
-              Așa te vor recunoaște colegii în timp ce înveți.
-            </p>
+          <div className="mx-auto w-full max-w-[420px]">
+            <div className="rounded-3xl border border-[#ececf1] bg-white p-7 shadow-[0_30px_70px_-45px_rgba(18,20,28,0.5)]">
+              <h1 className="text-3xl font-semibold text-[#0f1115]">Cum te cheamă?</h1>
+              <p className="mb-6 mt-2 text-sm text-[#666a73]">
+                Așa te vor recunoaște colegii în timp ce înveți.
+              </p>
 
-            <form onSubmit={handleNameSubmit} className="space-y-4">
-              <Input
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Numele tău"
-                maxLength={60}
-                className="h-12 rounded-full border-[#d8dbe3] px-4 text-base text-[#101216] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
-              />
+              <form onSubmit={handleNameSubmit} className="space-y-4">
+                <Input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="Numele tău"
+                  maxLength={60}
+                  className="h-12 rounded-full border-[#d8dbe3] px-4 text-base text-[#101216] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
+                />
 
-              <button type="submit" disabled={nameSaving} className={`${mainCtaClassName} w-full`}>
-                {nameSaving ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Salvăm...
-                  </span>
-                ) : (
-                  getPostOnboardingLearningPathCtaLabel(onboardingState.subject)
-                )}
-              </button>
-            </form>
+                <button type="submit" disabled={nameSaving} className={`${mainCtaClassName} w-full`}>
+                  {nameSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Salvăm...
+                    </span>
+                  ) : onboardingState.guestDemo === "completed" ? (
+                    "Continuă"
+                  ) : (
+                    getPostOnboardingLearningPathCtaLabel(onboardingState.subject)
+                  )}
+                </button>
+              </form>
+            </div>
+
+            <button
+              type="button"
+              disabled={nameSaving}
+              onClick={() => void completeStudentOnboarding()}
+              className="mt-4 w-full text-center text-sm font-medium text-[#666a73] transition-colors hover:text-[#101216] disabled:opacity-40"
+            >
+              {"Sau mergi direct la dashboard ->"}
+            </button>
           </div>
         )
 

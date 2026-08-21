@@ -10,11 +10,19 @@ import {
   EARLYBIRD_SAVE_PERCENT,
   EARLYBIRD_YEARLY_RON,
   FULL_YEARLY_RON,
-  LANDING_MONTHLY_RON,
-  LANDING_WEEKLY_RON,
   useCountdown,
   type CountdownState,
 } from "@/lib/landing-campaign"
+import {
+  PREMIUM_MONTHLY_RON,
+  PREMIUM_WEEKLY_RON,
+} from "@/components/pricing/premium-pricing"
+import {
+  LAUNCH_20_DEADLINE_LABEL,
+  LAUNCH_20_PERCENT,
+  isLaunch20Active,
+} from "@/lib/launch-20-discount"
+import { getCampaignPriceRon } from "@/lib/pricing-campaign"
 import {
   PARENT_CTA_LABEL_ENROLL,
   PARENT_LANDING_CTA_HREF,
@@ -36,18 +44,24 @@ function priceFor(interval: Interval) {
     }
   }
   if (interval === "month") {
+    const launch20 = isLaunch20Active()
     return {
-      display: LANDING_MONTHLY_RON,
-      struck: null as number | null,
+      display: getCampaignPriceRon("month"),
+      struck: launch20 ? PREMIUM_MONTHLY_RON : null,
       unit: "RON/lună",
-      note: "Facturare lunară",
+      note: launch20
+        ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
+        : "Facturare lunară",
     }
   }
+  const launch20 = isLaunch20Active()
   return {
-    display: LANDING_WEEKLY_RON,
-    struck: null as number | null,
+    display: getCampaignPriceRon("week"),
+    struck: launch20 ? PREMIUM_WEEKLY_RON : null,
     unit: "RON/săptămână",
-    note: "Ideal ca să testezi Premium",
+    note: launch20
+      ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
+      : "Ideal ca să testezi Premium",
   }
 }
 
@@ -135,8 +149,17 @@ export function ParentPricingSection({ countdown }: { countdown?: CountdownState
                     <span className="text-sm font-medium text-gray-400 line-through">
                       {price.struck} {price.unit}
                     </span>
-                    <span className="rounded-full bg-[#FFE566] px-2 py-0.5 text-[11px] font-bold text-[#7A6000]">
-                      -{EARLYBIRD_SAVE_PERCENT}% earlybird
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                        isYear
+                          ? "bg-[#FFE566] text-[#7A6000]"
+                          : "bg-[#dcfce7] text-[#166534]",
+                      )}
+                    >
+                      {isYear
+                        ? `−${EARLYBIRD_SAVE_PERCENT}% earlybird`
+                        : `−${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`}
                     </span>
                   </div>
                 )}

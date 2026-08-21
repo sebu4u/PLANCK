@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import { PLANCK_PASS_XP_UPDATED_EVENT } from "@/lib/planckpass/award-client"
+import { PLANCK_PASS_XP_UPDATED_EVENT, notifyPlanckPassXpUpdated } from "@/lib/planckpass/award-client"
 import { unlockPlanckPassClaimAudio } from "@/lib/planckpass/claim-sounds"
 import type { PlanckPassClaimResult, PlanckPassState } from "@/lib/planckpass/types"
 
@@ -94,6 +94,7 @@ export function usePlanckPass() {
         if (!res.ok) throw new Error(json.error || "Claim eșuat.")
         setReveal(json.reward as PlanckPassClaimResult)
         await refresh()
+        notifyPlanckPassXpUpdated()
         return json.reward as PlanckPassClaimResult
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Eroare"

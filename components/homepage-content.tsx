@@ -8,10 +8,8 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { HomePageHeroRedesign } from "@/components/homepage-hero-redesign"
 import { HomePageScrollNavbar } from "@/components/homepage-scroll-navbar"
-import { AIDemoSection } from "@/components/ai-demo-section"
 import { HomePagePlatformVideoSection } from "@/components/homepage-platform-video-section"
 import { HomePageSubjectsSection } from "@/components/homepage-subjects-section"
-import { HomePagePlanckPassSection } from "@/components/homepage-planckpass-section"
 import { HomePageLearningPathPreviewSection } from "@/components/homepage-learning-path-preview-section"
 import { LandingWorkshopsCalendarSection } from "@/components/landing/workshops-calendar-section"
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
@@ -167,14 +165,6 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
       <HomePagePlatformVideoSection />
 
       <HomePageSubjectsSection />
-
-      <div className="lg:hidden">
-        <HomePagePlanckPassSection />
-      </div>
-
-      <section id="home-ai-demo" className="lg:hidden">
-        <AIDemoSection />
-      </section>
 
       <HomePageLearningPathPreviewSection />
 

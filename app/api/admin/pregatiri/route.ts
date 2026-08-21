@@ -65,6 +65,7 @@ const workshopSchema = z.object({
   recording_url: z.string().url().nullable().optional(),
   max_seats: z.number().int().min(1).max(10000).nullable().optional(),
   is_published: z.boolean().default(false),
+  is_bac: z.boolean().default(false),
   whiteboard_url: optionalUrl,
   notes_markdown: z.string().max(100_000).optional().nullable(),
   notes_pdf_path: optionalPath,
@@ -215,6 +216,7 @@ export async function POST(req: NextRequest) {
         recording_url: parsed.data.recording_url ?? null,
         max_seats: parsed.data.max_seats ?? null,
         is_published: parsed.data.is_published,
+        is_bac: parsed.data.is_bac,
         updated_at: now,
         ...materialsFields(parsed.data),
       })
@@ -288,6 +290,7 @@ export async function PUT(req: NextRequest) {
         recording_url: parsed.data.recording_url ?? null,
         max_seats: parsed.data.max_seats ?? null,
         is_published: parsed.data.is_published,
+        is_bac: parsed.data.is_bac,
         updated_at: new Date().toISOString(),
         ...nextMaterials,
       })

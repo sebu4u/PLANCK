@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabaseClient"
 import {
   formatWorkshopDateTime,
+  formatWorkshopMeetWait,
+  isWorkshopMeetVisible,
   isWorkshopPast,
 } from "@/lib/pregatire/dates"
 import {
@@ -27,6 +29,7 @@ import {
 } from "@/lib/pregatire/types"
 import { WorkshopMaterialsTabs } from "@/components/pregatire/workshop-materials-tabs"
 import { WorkshopWhiteboardCard } from "@/components/pregatire/workshop-whiteboard-card"
+import { WorkshopBacBadge } from "@/components/pregatire/workshop-bac-badge"
 import { cn } from "@/lib/utils"
 
 export function WorkshopDetailPanel({
@@ -48,12 +51,56 @@ export function WorkshopDetailPanel({
   const { toast } = useToast()
   const [workshop, setWorkshop] = useState(initial)
   const [unlocking, setUnlocking] = useState(false)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     setWorkshop(initial)
   }, [initial])
 
   const past = isWorkshopPast(workshop.starts_at, workshop.duration_minutes)
+  const waitingForMeet = workshop.unlocked && !past && !workshop.meet_url
+  const meetWindowOpen = isWorkshopMeetVisible(workshop.starts_at, new Date(nowMs))
+
+  useEffect(() => {
+    if (!waitingForMeet) return
+    const id = window.setInterval(() => {
+      if (!document.hidden) setNowMs(Date.now())
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [waitingForMeet])
+
+  useEffect(() => {
+    if (!waitingForMeet || !meetWindowOpen) return
+    let cancelled = false
+
+    const load = async () => {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token || cancelled) return
+      try {
+        const detailRes = await fetch(`/api/pregatire/${workshop.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!detailRes.ok || cancelled) return
+        const detailPayload = await detailRes.json()
+        if (detailPayload.workshop) {
+          setWorkshop(detailPayload.workshop)
+        }
+      } catch {
+        // Keep waiting; the interval retries.
+      }
+    }
+
+    void load()
+    const id = window.setInterval(() => {
+      if (!document.hidden) void load()
+    }, 15_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [waitingForMeet, meetWindowOpen, workshop.id])
+
   const full = workshop.seats_remaining === 0 && !workshop.unlocked
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
   const unlockCtaLabel = full
@@ -136,7 +183,9 @@ export function WorkshopDetailPanel({
         title: payload.already_unlocked ? "Deja deblocat" : "Pregătire deblocată",
         description: past
           ? "Poți accesa înregistrarea."
-          : "Link-ul Google Meet este disponibil.",
+          : isWorkshopMeetVisible(workshop.starts_at)
+            ? "Link-ul Google Meet este disponibil."
+            : "Link-ul Google Meet apare cu 10 minute înainte de începere.",
       })
     } catch {
       toast({
@@ -170,6 +219,7 @@ export function WorkshopDetailPanel({
             >
               {WORKSHOP_SUBJECT_LABELS[workshop.subject]}
             </span>
+            {workshop.is_bac ? <WorkshopBacBadge /> : null}
             {workshop.unlocked ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                 <CheckCircle2 className="h-3 w-3" />
@@ -252,6 +302,13 @@ export function WorkshopDetailPanel({
                   <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
               </Button>
+            ) : null}
+
+            {waitingForMeet ? (
+              <p className="rounded-xl bg-[#eff6ff] px-4 py-3 text-sm text-[#1e40af]">
+                Link-ul Google Meet apare cu 10 minute înainte de începere
+                {meetWindowOpen ? "." : ` (${formatWorkshopMeetWait(workshop.starts_at, new Date(nowMs))}).`}
+              </p>
             ) : null}
 
             {workshop.unlocked && past && workshop.recording_url ? (

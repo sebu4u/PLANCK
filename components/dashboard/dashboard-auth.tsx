@@ -53,6 +53,7 @@ import {
 } from "@/hooks/use-post-onboarding-discount-window"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { useProductGuideBlocking } from "@/components/product-guide/product-guide-blocking"
+import { usePlanckPassIntro } from "@/components/planckpass/planckpass-season-intro-gate"
 import { getDashboardPrimaryLearningPathSlug, normalizePracticeSubject } from "@/lib/practice-subject"
 import {
   SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
@@ -65,6 +66,8 @@ export function DashboardAuth() {
   const { isPaid } = useSubscriptionPlan()
   const postOnboardingDiscount = usePostOnboardingDiscountWindow(user?.id)
   const { setBlocked: setProductGuideBlocked } = useProductGuideBlocking()
+  const { isOpen: showPlanckPassIntro, isPending: planckPassIntroPending } = usePlanckPassIntro()
+  const holdDashboardOverlays = showPlanckPassIntro || planckPassIntroPending
   const [loading, setLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
   const isFetchingRef = useRef(false)
@@ -108,7 +111,8 @@ export function DashboardAuth() {
       !loading &&
       !showWelcomeBack &&
       !showMobileDiscountPromo &&
-      !showPrizeWheel,
+      !showPrizeWheel &&
+      !holdDashboardOverlays,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
 
@@ -440,7 +444,7 @@ export function DashboardAuth() {
   }, [user?.id, authLoading, router, profile?.grade])
 
   useEffect(() => {
-    if (authLoading || loading || !dashboardData || !user) return
+    if (authLoading || loading || !dashboardData || !user || holdDashboardOverlays) return
 
     try {
       const lastVisitKey = `planck_last_dashboard_visit_${user.id}`
@@ -471,11 +475,11 @@ export function DashboardAuth() {
     } catch {
       setShowWelcomeBack(false)
     }
-  }, [authLoading, loading, dashboardData, user?.id])
+  }, [authLoading, loading, dashboardData, user?.id, holdDashboardOverlays])
 
   useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || isPaid) return
-    if (showWelcomeBack || showPrizeWheel) return
+    if (holdDashboardOverlays || showWelcomeBack || showPrizeWheel) return
     if (mobileDiscountPromoCheckedRef.current) return
     mobileDiscountPromoCheckedRef.current = true
 
@@ -496,11 +500,12 @@ export function DashboardAuth() {
     isPaid,
     showWelcomeBack,
     showPrizeWheel,
+    holdDashboardOverlays,
     postOnboardingDiscount.ensureWindow,
   ])
 
   useEffect(() => {
-    if (authLoading || loading || !dashboardData || !user || !isStudent) return
+    if (authLoading || loading || !dashboardData || !user || !isStudent || holdDashboardOverlays) return
     if (prizeWheelCheckedRef.current) return
     prizeWheelCheckedRef.current = true
 
@@ -523,7 +528,7 @@ export function DashboardAuth() {
     }
 
     void loadPrizeWheel()
-  }, [authLoading, loading, dashboardData, user?.id, isStudent])
+  }, [authLoading, loading, dashboardData, user?.id, isStudent, holdDashboardOverlays])
 
   const dismissMobileDiscountPromo = () => {
     if (user) {

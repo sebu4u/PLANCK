@@ -11,6 +11,7 @@ import {
   WORKSHOP_SUBJECT_LABELS,
   type WorkshopPublic,
 } from "@/lib/pregatire/types"
+import { WorkshopBacBadge } from "@/components/pregatire/workshop-bac-badge"
 import { cn } from "@/lib/utils"
 
 export function WorkshopCard({
@@ -53,6 +54,7 @@ export function WorkshopCard({
             >
               {WORKSHOP_SUBJECT_LABELS[workshop.subject]}
             </span>
+            {workshop.is_bac ? <WorkshopBacBadge /> : null}
             {workshop.unlocked ? (
               <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                 Deblocat

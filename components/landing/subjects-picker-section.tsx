@@ -5,6 +5,8 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
 import { LANDING_SUBJECT_GROUPS } from "@/lib/landing-subjects"
+import { EARLYBIRD_YEARLY_RON } from "@/lib/landing-earlybird"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { cn } from "@/lib/utils"
 
 export function LandingSubjectsPickerSection() {
@@ -16,9 +18,14 @@ export function LandingSubjectsPickerSection() {
     <section className="bg-white py-16 sm:py-20">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <FadeInUp className="text-center">
-          <span className="inline-flex rounded-md bg-[#7C5CFC] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
-            Alege materia
-          </span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="inline-flex rounded-md bg-[#7C5CFC] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+              Alege materia
+            </span>
+            <span className="inline-flex rounded-md bg-gray-900 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+              Începem de pe 10 septembrie
+            </span>
+          </div>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
             Găsește grupa de meditații potrivită
           </h2>
@@ -44,7 +51,20 @@ export function LandingSubjectsPickerSection() {
                   type="button"
                   role="tab"
                   aria-selected={isSelected}
-                  onClick={() => setSelectedId(subject.id)}
+                  onClick={() => {
+                    setSelectedId(subject.id)
+                    tiktokPixel.trackAddToWishlist({
+                      contents: [
+                        {
+                          content_id: `workshop_${subject.id}`,
+                          content_type: "product",
+                          content_name: subject.heading,
+                        },
+                      ],
+                      value: EARLYBIRD_YEARLY_RON,
+                      currency: "RON",
+                    })
+                  }}
                   className={cn(
                     "shrink-0 rounded-lg border px-3.5 py-2 text-sm font-semibold transition-colors sm:px-4",
                     isSelected
@@ -73,6 +93,13 @@ export function LandingSubjectsPickerSection() {
             <p className="mt-2 text-sm font-medium text-gray-700">{selected.groupNote}</p>
             <Link
               href={`/rezerva?subject=${selected.id}`}
+              onClick={() =>
+                tiktokPixel.trackSchedule(
+                  `workshop_${selected.id}`,
+                  selected.heading,
+                  EARLYBIRD_YEARLY_RON,
+                )
+              }
               className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-gray-900 px-6 text-sm font-bold text-white transition-[filter] hover:brightness-110 sm:px-7"
             >
               Rezervă-ți locul

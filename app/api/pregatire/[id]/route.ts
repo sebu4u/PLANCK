@@ -8,6 +8,7 @@ import {
   loadUnlockedMaterials,
   materialsPresenceFrom,
 } from "@/lib/pregatire/materials"
+import { visibleWorkshopMeetUrl } from "@/lib/pregatire/dates"
 import { fetchTeachersByIds, mapWorkshopPublic } from "@/lib/pregatire/queries"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
@@ -90,7 +91,7 @@ export async function GET(
         teacherMap.get(row.teacher_id as string) ?? null,
         unlocked,
       ),
-      meet_url: unlocked ? meetUrl : null,
+      meet_url: unlocked ? visibleWorkshopMeetUrl(String(row.starts_at), meetUrl) : null,
       recording_url: unlocked ? recordingUrl : null,
       ...materials,
       ...presence,

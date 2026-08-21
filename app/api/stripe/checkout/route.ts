@@ -32,6 +32,8 @@ import type { ShopCouponView } from "@/lib/shop/types"
 import { logger } from "@/lib/logger"
 import { ensureEarlybirdStripeCoupon } from "@/lib/landing-earlybird-coupon"
 import { isEarlybirdActive } from "@/lib/landing-earlybird"
+import { ensureLaunch20StripeCoupon } from "@/lib/launch-20-discount-coupon"
+import { isLaunch20Active } from "@/lib/launch-20-discount"
 import {
   buildCheckoutCancelUrl,
   buildCheckoutSuccessUrl,
@@ -233,12 +235,25 @@ export async function POST(req: NextRequest) {
       ? await ensureShopStripeCoupon(shopCoupon, stripe)
       : null
 
-    const wantsEarlybird =
-      body?.campaign === "earlybird" && interval === "year" && isEarlybirdActive()
-    const earlybirdCouponId =
-      wantsEarlybird && !wheelPrize && !shopCoupon && !validPromotionCodeId
+    const canApplyCampaignCoupon = !wheelPrize && !shopCoupon && !validPromotionCodeId
+    const wantsEarlybird = interval === "year" && isEarlybirdActive()
+    const wantsLaunch20 =
+      (interval === "week" || interval === "month") && isLaunch20Active()
+    const campaignCouponId = canApplyCampaignCoupon
+      ? wantsEarlybird
         ? await ensureEarlybirdStripeCoupon(stripe)
-        : null
+        : wantsLaunch20 && (interval === "week" || interval === "month")
+          ? await ensureLaunch20StripeCoupon(interval, stripe)
+          : null
+      : null
+
+    if (wantsLaunch20 && !campaignCouponId && canApplyCampaignCoupon) {
+      logger.error("[stripe/checkout] Launch 20% coupon missing; refusing full-price checkout.")
+      return NextResponse.json(
+        { error: "Nu am putut aplica reducerea de 20%. Încearcă din nou." },
+        { status: 500 }
+      )
+    }
 
     let existingCustomerId = profile?.stripe_customer_id ?? null
     const existingStatus = profile?.stripe_subscription_status ?? null
@@ -372,13 +387,17 @@ export async function POST(req: NextRequest) {
           },
       isParentForChild ? null : wheelPrize
     )
-    const sharedMetadata = shopCoupon
-      ? {
-          ...prizeMetadata,
-          shop_coupon_id: shopCoupon.id,
-          shop_product_key: shopCoupon.productKey,
-        }
-      : prizeMetadata
+    const sharedMetadata = {
+      ...(shopCoupon
+        ? {
+            ...prizeMetadata,
+            shop_coupon_id: shopCoupon.id,
+            shop_product_key: shopCoupon.productKey,
+          }
+        : prizeMetadata),
+      ...(campaignCouponId && wantsEarlybird ? { campaign: "earlybird" } : {}),
+      ...(campaignCouponId && wantsLaunch20 ? { campaign: "launch_20" } : {}),
+    }
 
     const discountConfig = prizeDiscounts.couponId
       ? { discounts: [{ coupon: prizeDiscounts.couponId }] }
@@ -386,8 +405,8 @@ export async function POST(req: NextRequest) {
         ? { discounts: [{ coupon: shopCouponStripeId }] }
       : validPromotionCodeId
         ? { discounts: [{ promotion_code: validPromotionCodeId }] }
-        : earlybirdCouponId
-          ? { discounts: [{ coupon: earlybirdCouponId }] }
+        : campaignCouponId
+          ? { discounts: [{ coupon: campaignCouponId }] }
         : { allow_promotion_codes: true }
 
     // We only create hosted Checkout sessions here; sensitive card input stays on Stripe.

@@ -11,6 +11,7 @@ import {
 import { Download, FileImage, FileCode, Loader2 } from 'lucide-react';
 import { toast } from '@/lib/sonner';
 import { Editor } from '@tldraw/tldraw';
+import { tiktokPixel } from '@/lib/tiktok-pixel';
 
 interface ExportButtonProps {
   editor: Editor | null;
@@ -59,6 +60,7 @@ export function ExportButton({ editor, boardTitle = 'whiteboard' }: ExportButton
       URL.revokeObjectURL(url);
 
       toast.success('Tabla a fost exportată ca PNG!');
+      tiktokPixel.trackDownload('sketch_png', 'Export tablă PNG');
     } catch (error) {
       console.error('Export PNG error:', error);
       toast.error('Eroare la exportul PNG');
@@ -100,6 +102,7 @@ export function ExportButton({ editor, boardTitle = 'whiteboard' }: ExportButton
       URL.revokeObjectURL(url);
 
       toast.success('Tabla a fost exportată ca SVG!');
+      tiktokPixel.trackDownload('sketch_svg', 'Export tablă SVG');
     } catch (error) {
       console.error('Export SVG error:', error);
       toast.error('Eroare la exportul SVG');

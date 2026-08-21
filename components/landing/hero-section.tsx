@@ -1,6 +1,7 @@
 "use client"
 
 import { ArrowRight, Award, ShieldCheck, Star } from "lucide-react"
+import Link from "next/link"
 import { FadeInUp } from "@/components/scroll-animations"
 import {
   LandingHeroReviewRowsDesktop,
@@ -34,13 +35,13 @@ export function LandingHeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.2} className="mt-8">
-            <a
-              href="/rezerva"
+            <Link
+              href="/register"
               className="inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98]"
             >
               Rezervă-ți locul
               <ArrowRight className="ml-2 h-4 w-4" />
-            </a>
+            </Link>
           </FadeInUp>
 
           <FadeInUp delay={0.24}>

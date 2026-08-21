@@ -17,6 +17,7 @@ import {
   PLANCKPASS_EXPANDED_BODY_CLASS,
 } from "./planckpass-layout"
 import { PlanckPassDesktopSection } from "./planckpass-desktop-section"
+import { usePlanckPass } from "@/hooks/use-planckpass"
 
 interface PlanckPassDesktopShellProps {
   children: ReactNode
@@ -24,6 +25,8 @@ interface PlanckPassDesktopShellProps {
 }
 
 export function PlanckPassDesktopShell({ children, className }: PlanckPassDesktopShellProps) {
+  const { state } = usePlanckPass()
+  const hasClaimableReward = state.tiers.some((tier) => tier.claimable)
   const shellRef = useRef<HTMLDivElement>(null)
   const [panelPx, setPanelPx] = useState(320)
   const [collapsed, setCollapsed] = useState(() => {
@@ -153,11 +156,14 @@ export function PlanckPassDesktopShell({ children, className }: PlanckPassDeskto
           onClick={toggle}
           onKeyDown={onHandleKeyDown}
           className={cn(
-            "absolute top-1/2 z-20 flex h-28 w-7 -translate-y-1/2 flex-col items-center justify-center gap-1 border-y-2 border-l-2 border-[#1a0a4a] bg-[#5020F0] text-white shadow-md transition-colors hover:bg-[#5c2ef5]",
+            "absolute top-1/2 z-20 flex h-28 w-7 -translate-y-1/2 flex-col items-center justify-center gap-1 border-y-2 border-l-2 border-[#1a0a4a] shadow-md transition-colors",
             // Collapsed: sit on top of the 3px white right outline (m-[3px] on the card)
             collapsed
               ? "-right-[3px] rounded-l-lg border-r-0"
               : "right-0 rounded-l-lg border-r-0",
+            collapsed && hasClaimableReward
+              ? "planckpass-desktop-handle-claimable hover:bg-[#ffe566]"
+              : "bg-[#5020F0] text-white hover:bg-[#5c2ef5]",
           )}
         >
           {collapsed ? (

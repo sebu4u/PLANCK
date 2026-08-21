@@ -8,6 +8,8 @@ import {
   PRIZE_WHEEL_SEGMENTS,
 } from "@/lib/prize-wheel/types"
 
+type PrizeWheelTone = "violet" | "rose"
+
 type PrizeWheelVisualProps = {
   rotation: number
   spinning: boolean
@@ -15,6 +17,32 @@ type PrizeWheelVisualProps = {
   size?: number
   showLabels?: boolean
   showPointer?: boolean
+  tone?: PrizeWheelTone
+}
+
+const ROSE_PALETTE = {
+  prize: "#e85a8c",
+  prizeAlt: "#f07aa8",
+  spin: "#fde8f0",
+  spinText: "#9d1757",
+  hub: "#e85a8c",
+  pointer: "#e85a8c",
+} as const
+
+function segmentAppearance(
+  segment: (typeof PRIZE_WHEEL_SEGMENTS)[number],
+  tone: PrizeWheelTone,
+) {
+  if (tone !== "rose") {
+    return { fill: segment.color, text: segment.textColor }
+  }
+  if (segment.result === "spin_again") {
+    return { fill: ROSE_PALETTE.spin, text: ROSE_PALETTE.spinText }
+  }
+  return {
+    fill: segment.color === "#6E5CEB" ? ROSE_PALETTE.prizeAlt : ROSE_PALETTE.prize,
+    text: "#ffffff",
+  }
 }
 
 const VIEW = 200
@@ -55,7 +83,11 @@ export function PrizeWheelVisual({
   size = 320,
   showLabels = true,
   showPointer = true,
+  tone = "violet",
 }: PrizeWheelVisualProps) {
+  const hubFill = tone === "rose" ? ROSE_PALETTE.hub : "#5B47D6"
+  const pointerFill = tone === "rose" ? ROSE_PALETTE.pointer : "#5B47D6"
+
   return (
     <div className={cn("relative mx-auto", className)} style={{ width: size, height: size }}>
       {showPointer ? (
@@ -63,7 +95,15 @@ export function PrizeWheelVisual({
           className="absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-[2px]"
           aria-hidden
         >
-          <div className="h-0 w-0 border-l-[11px] border-r-[11px] border-t-[18px] border-l-transparent border-r-transparent border-t-[#5B47D6] drop-shadow-[0_2px_3px_rgba(91,71,214,0.35)]" />
+          <div
+            className={cn(
+              "h-0 w-0 border-l-[11px] border-r-[11px] border-t-[18px] border-l-transparent border-r-transparent",
+              tone === "rose"
+                ? "drop-shadow-[0_2px_3px_rgba(232,90,140,0.35)]"
+                : "drop-shadow-[0_2px_3px_rgba(91,71,214,0.35)]",
+            )}
+            style={{ borderTopColor: pointerFill }}
+          />
         </div>
       ) : null}
 
@@ -80,7 +120,12 @@ export function PrizeWheelVisual({
           viewBox={`0 0 ${VIEW} ${VIEW}`}
           width="100%"
           height="100%"
-          className="overflow-visible drop-shadow-[0_16px_40px_rgba(91,71,214,0.22)]"
+          className={cn(
+            "overflow-visible",
+            tone === "rose"
+              ? "drop-shadow-[0_16px_40px_rgba(232,90,140,0.22)]"
+              : "drop-shadow-[0_16px_40px_rgba(91,71,214,0.22)]",
+          )}
           role="img"
           aria-label="Roata cu premii"
         >
@@ -93,10 +138,11 @@ export function PrizeWheelVisual({
             const label = polar(LABEL_R, mid)
             const upsideDown = mid > 90 && mid < 270
             const textRotate = upsideDown ? mid + 180 : mid
+            const appearance = segmentAppearance(segment, tone)
 
             return (
               <g key={`${segment.result}-${index}`}>
-                <path d={slicePath(start, end)} fill={segment.color} />
+                <path d={slicePath(start, end)} fill={appearance.fill} />
                 {showLabels ? (
                   <g transform={`translate(${label.x} ${label.y}) rotate(${textRotate})`}>
                     {segment.lines.map((line, lineIndex) => (
@@ -104,7 +150,7 @@ export function PrizeWheelVisual({
                         key={line}
                         x={0}
                         y={lineIndex === 0 ? -6.5 : 7}
-                        fill={segment.textColor}
+                        fill={appearance.text}
                         textAnchor="middle"
                         dominantBaseline="middle"
                         style={{
@@ -143,7 +189,7 @@ export function PrizeWheelVisual({
             cx={CX}
             cy={CY}
             r={showLabels ? HUB_R - 3 : HUB_R * 0.72 - 2}
-            fill="#5B47D6"
+            fill={hubFill}
           />
           {showLabels ? (
             <text
