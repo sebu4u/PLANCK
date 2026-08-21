@@ -7,14 +7,6 @@
     {
       "path": "/api/cron/blog-publish",
       "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/cron/workshop-energy",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/workshop-reminders",
-      "schedule": "*/10 * * * *"
     }
   ]
 }

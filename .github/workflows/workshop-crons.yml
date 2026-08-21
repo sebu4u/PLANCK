@@ -1,0 +1,30 @@
+name: Workshop crons
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call workshop reminder and energy endpoints
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "CRON_SECRET is not set" >&2
+            exit 1
+          fi
+          SITE_URL="${SITE_URL:-https://planck.academy}"
+          SITE_URL="${SITE_URL%/}"
+          curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${SITE_URL}/api/cron/workshop-reminders"
+          echo
+          curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${SITE_URL}/api/cron/workshop-energy"
+          echo

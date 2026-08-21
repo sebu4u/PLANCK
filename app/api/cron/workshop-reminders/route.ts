@@ -18,14 +18,19 @@ function isAuthorized(request: NextRequest): boolean {
   return request.headers.get("authorization") === `Bearer ${cronSecret}`
 }
 
+/** Due-and-unsent windows so delayed schedulers still catch reminders. */
 function windowFor(kind: ReminderKind, now: Date) {
-  // Target: starts_at ≈ now + offset, with ±7.5 min tolerance (cron every 10 min)
-  const offsetMs = kind === "24h" ? 24 * 60 * 60_000 : 30 * 60_000
-  const toleranceMs = 7.5 * 60_000
-  const center = now.getTime() + offsetMs
+  const thirtyMinMs = 30 * 60_000
+  const twentyFourHMs = 24 * 60 * 60_000
+  if (kind === "30m") {
+    return {
+      from: now.toISOString(),
+      to: new Date(now.getTime() + thirtyMinMs).toISOString(),
+    }
+  }
   return {
-    from: new Date(center - toleranceMs).toISOString(),
-    to: new Date(center + toleranceMs).toISOString(),
+    from: new Date(now.getTime() + thirtyMinMs).toISOString(),
+    to: new Date(now.getTime() + twentyFourHMs).toISOString(),
   }
 }
 
@@ -95,7 +100,7 @@ export async function GET(request: NextRequest) {
         .from("workshops")
         .select("id, title, starts_at, is_published")
         .eq("is_published", true)
-        .gte("starts_at", from)
+        .gt("starts_at", from)
         .lte("starts_at", to)
 
       if (error) throw error
