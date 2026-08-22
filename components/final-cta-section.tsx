@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { isValidEmail, subscribeToNewsletter } from "@/lib/newsletter"
 import { useAnalytics } from "@/lib/analytics"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
+import { metaPixel } from "@/lib/meta-pixel"
 
 export default function FinalCTASection() {
   const [email, setEmail] = useState("")
@@ -48,6 +49,8 @@ export default function FinalCTASection() {
       analytics.trackNewsletterSignup()
       await tiktokPixel.identify({ email })
       tiktokPixel.trackSubmitForm("newsletter", "Newsletter Planck")
+      metaPixel.identify({ email })
+      metaPixel.trackLead("newsletter", "Newsletter Planck")
       setEmail("")
     } catch (error) {
       console.error('Newsletter subscription error:', error)

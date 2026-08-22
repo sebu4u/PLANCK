@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { EnergyBadge } from "@/components/pregatire/energy-badge"
@@ -20,6 +20,7 @@ import {
 import {
   WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_LABELS,
+  isWorkshopSubject,
   type WorkshopDetail,
   type WorkshopPublic,
   type WorkshopSubject,
@@ -41,13 +42,26 @@ function useIsMobile(breakpoint = 768) {
 export function PregatirePageClient() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const isMobile = useIsMobile()
 
   const nowParts = bucharestParts()
   const [year, setYear] = useState(nowParts.year)
   const [month, setMonth] = useState(nowParts.month)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const [subject, setSubject] = useState<WorkshopSubject | "all">("all")
+  const subjectParam = searchParams.get("subject")
+  const subject: WorkshopSubject | "all" = isWorkshopSubject(subjectParam) ? subjectParam : "all"
+
+  const setSubject = useCallback(
+    (next: WorkshopSubject | "all") => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (next === "all") params.delete("subject")
+      else params.set("subject", next)
+      const query = params.toString()
+      router.replace(query ? `/pregatire?${query}` : "/pregatire", { scroll: false })
+    },
+    [router, searchParams],
+  )
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
   const [loading, setLoading] = useState(true)
   const [energy, setEnergy] = useState<number | null>(null)
@@ -223,6 +237,14 @@ export function PregatirePageClient() {
               onMonthChange={(y, m) => {
                 setYear(y)
                 setMonth(m)
+              }}
+              weekView={isMobile}
+              weekAnchor={weekAnchor}
+              onWeekChange={(date) => {
+                setWeekAnchor(date)
+                const p = bucharestParts(date)
+                setYear(p.year)
+                setMonth(p.month)
               }}
             />
 

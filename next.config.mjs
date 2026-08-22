@@ -18,12 +18,19 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Cursor opens the git parent (`PLANCK/`), which also has a stray `app/` folder
-  // and `.pnpm-store`. Pin Turbopack to this Next app so it does not watch the parent.
+  // Cursor opens the git parent (`PLANCK/`), which historically also had a stray
+  // `app/` folder and `.pnpm-store`. Pin Turbopack to this Next app so it does
+  // not watch the parent — that watcher loop is what makes `next dev` sit on
+  // "Compiling..." after an IDE restart.
   turbopack: {
     root: __dirname,
   },
   outputFileTracingRoot: __dirname,
+  experimental: {
+    // Keep the on-disk Turbopack cache off. A stale `.next/dev` after Cursor is
+    // killed is the usual reason localhost comes back stuck compiling.
+    turbopackFileSystemCacheForDev: false,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

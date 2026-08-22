@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Check, Clock } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
@@ -9,8 +9,11 @@ import {
   EARLYBIRD_DEADLINE_LABEL,
   EARLYBIRD_SAVE_PERCENT,
   EARLYBIRD_YEARLY_RON,
+  EARLYBIRD_YEARLY_SEATS_TOTAL,
   FULL_YEARLY_RON,
   LANDING_PREMIUM_BULLETS,
+  earlybirdSeatsFomoCopy,
+  remainingEarlybirdSeats,
   useCountdown,
   type CountdownState,
 } from "@/lib/landing-campaign"
@@ -64,8 +67,14 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
   const local = useCountdown()
   const { days, hours, minutes, seconds } = countdown ?? local
   const [interval, setBillingInterval] = useState<Interval>("year")
+  const [earlybirdSeats, setEarlybirdSeats] = useState(remainingEarlybirdSeats)
   const price = priceFor(interval)
   const isYear = interval === "year"
+  const weeklyFrom = getCampaignPriceRon("week")
+
+  useEffect(() => {
+    setEarlybirdSeats(remainingEarlybirdSeats())
+  }, [])
 
   return (
     <section id="pricing" className="bg-white py-12 sm:py-16">
@@ -80,10 +89,31 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
               {EARLYBIRD_YEARLY_RON} RON
             </span>
           </h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Prețul de campanie pentru tot anul — nu {FULL_YEARLY_RON} RON. Valabil până pe{" "}
-            <strong className="text-gray-700">{EARLYBIRD_DEADLINE_LABEL}</strong>.
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            Prima meditație e gratuită. Apoi abonamentul începe de la{" "}
+            <strong className="text-gray-700">{weeklyFrom} RON/săptămână</strong>. Până pe{" "}
+            <strong className="text-gray-700">{EARLYBIRD_DEADLINE_LABEL}</strong> poți beneficia de{" "}
+            <strong className="text-gray-700">{EARLYBIRD_SAVE_PERCENT}% reducere</strong> la
+            abonamentul Premium.
           </p>
+          {earlybirdSeats > 0 ? (
+            <div className="mx-auto mt-4 max-w-sm rounded-xl border border-orange-200 bg-[#FFF7ED] px-3.5 py-2.5 text-left">
+              <p className="text-sm font-bold text-orange-800">
+                {earlybirdSeatsFomoCopy(earlybirdSeats)}
+              </p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-orange-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
+                  style={{
+                    width: `${Math.max(
+                      8,
+                      (earlybirdSeats / EARLYBIRD_YEARLY_SEATS_TOTAL) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
         </FadeInUp>
 
         <FadeInUp delay={0.08} className="mb-5 flex justify-center">

@@ -164,6 +164,18 @@ export class CookieManager {
         purpose: 'Permite cookie-urile TikTok Pixel după consimțământ',
         duration: '13 luni',
         category: 'marketing'
+      },
+      {
+        name: '_fbp',
+        purpose: 'Identifică browserele unice pentru Meta Pixel',
+        duration: '90 zile',
+        category: 'marketing'
+      },
+      {
+        name: '_fbc',
+        purpose: 'Stochează click ID-ul din reclamele Meta (Facebook/Instagram)',
+        duration: '90 zile',
+        category: 'marketing'
       }
     ]
   }

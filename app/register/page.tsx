@@ -15,6 +15,7 @@ import { StudentTestimonialsStep } from "@/components/onboarding/student-testimo
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
+import { metaPixel } from "@/lib/meta-pixel"
 import { supabase } from "@/lib/supabaseClient"
 import {
   clampSelfGrade,
@@ -835,15 +836,28 @@ function RegisterPageContent() {
       phone: user.phone,
       externalId: user.id,
     })
-    tiktokPixel.trackCompleteRegistration(
+    metaPixel.identify({
+      email: user.email,
+      phone: user.phone,
+      externalId: user.id,
+    })
+    const registrationParams = {
+      contents: [
+        {
+          content_id: "account_elev",
+          content_type: "product" as const,
+          content_name: "Cont elev Planck",
+        },
+      ],
+      value: 0,
+      currency: "RON",
+    }
+    tiktokPixel.trackCompleteRegistration(registrationParams, user.id)
+    metaPixel.trackCompleteRegistration(
       {
-        contents: [
-          {
-            content_id: "account_elev",
-            content_type: "product",
-            content_name: "Cont elev Planck",
-          },
-        ],
+        content_ids: ["account_elev"],
+        content_type: "product",
+        content_name: "Cont elev Planck",
         value: 0,
         currency: "RON",
       },

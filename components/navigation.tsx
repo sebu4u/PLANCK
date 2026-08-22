@@ -640,7 +640,7 @@ export function Navigation() {
               : isCatalogHubPage || isProfileRoute || isCastigaRoute(pathname) || isFlashcardRoute(pathname)
                 ? "shadow-none burger:shadow-md"
                 : `shadow-md ${!navDropShadowOnDesktop ? "burger:shadow-none" : ""}`
-  const showMobileAppShell = Boolean(user && isMobileAppShellRoute(pathname, true))
+  const showMobileAppShell = isMobileAppShellRoute(pathname, Boolean(user))
   // Enunț informatică pe mobil: top bar minimal (ca restul app shell). IDE /planckcode rămâne pe navbar dark.
   const showMobileAppShellNav =
     showMobileAppShell && (!isPlanckCodeRoute || isInformaticaProblemDetail)
@@ -794,11 +794,11 @@ export function Navigation() {
                     <div className="flex min-w-0 flex-1 items-center gap-1 pr-2">
                       {isPregatireHubPage ? (
                         <Link
-                          href="/dashboard"
+                          href={user ? "/dashboard" : "/"}
                           aria-label="Înapoi"
                           onClick={(e) => {
                             e.preventDefault()
-                            router.push(getPregatireBackTarget())
+                            router.push(user ? getPregatireBackTarget() : "/")
                           }}
                           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
                         >
@@ -842,8 +842,20 @@ export function Navigation() {
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <NavbarEloDisplay userElo={userElo} useLightNav />
-                      <NavbarTestBatteries useLightNav variant="pill" />
+                      {user ? (
+                        <>
+                          <NavbarEloDisplay userElo={userElo} useLightNav />
+                          <NavbarTestBatteries useLightNav variant="pill" />
+                        </>
+                      ) : (
+                        <Link
+                          href="/register"
+                          className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9]"
+                        >
+                          <span className="whitespace-nowrap">Începe gratuit</span>
+                          <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                        </Link>
+                      )}
                       {blogNotificationsBell}
                     </div>
                   </>

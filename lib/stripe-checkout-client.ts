@@ -1,4 +1,5 @@
 import type { PremiumBillingInterval } from "@/components/pricing/premium-pricing"
+import { metaPixel } from "@/lib/meta-pixel"
 import { premiumCheckoutValue, tiktokPixel, type TikTokCheckoutOffer } from "@/lib/tiktok-pixel"
 
 export type StartPremiumCheckoutInput = {
@@ -27,6 +28,7 @@ export async function startPremiumCheckout(
     campaign: input.campaign,
   }
   tiktokPixel.trackCheckoutStart(offer)
+  metaPixel.trackCheckoutStart(offer)
 
   const response = await fetch("/api/stripe/checkout", {
     method: "POST",
@@ -58,11 +60,13 @@ export async function startPremiumCheckout(
 
   if (payload?.applied) {
     tiktokPixel.trackCheckoutSuccess(`applied_${input.interval}`)
+    metaPixel.trackCheckoutSuccess(`applied_${input.interval}`)
     return { ok: true, applied: true }
   }
 
   if (payload?.url) {
     tiktokPixel.trackCheckoutPaymentInfo(offer)
+    metaPixel.trackCheckoutPaymentInfo(offer)
     return { ok: true, url: payload.url }
   }
 

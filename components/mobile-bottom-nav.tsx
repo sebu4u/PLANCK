@@ -181,6 +181,19 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
             )
 
             if (isProfileTab) {
+              if (!user) {
+                return (
+                  <Link key={href} href="/register" className={tabClass}>
+                    <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                      {Icon ? <Icon className="h-5 w-5 shrink-0" aria-hidden /> : null}
+                    </span>
+                    {hideLabel ? null : (
+                      <span className="truncate text-[10px] font-medium leading-tight">{label}</span>
+                    )}
+                  </Link>
+                )
+              }
+
               const avatarUrl =
                 cosmetics.icon?.imageUrl || (profile?.user_icon as string | undefined) || ""
               const avatarInitial = (

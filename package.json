@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --turbo",
-    "dev:turbo": "next dev --turbo",
+    "dev": "node scripts/dev.mjs",
+    "dev:turbo": "next dev --turbo -p 3000",
+    "dev:clean": "rm -rf .next && node scripts/dev.mjs",
     "lint": "next lint",
     "start": "next start"
   },

@@ -32,7 +32,7 @@ export function LandingStickyMobileCta() {
             href="/register"
             className="flex h-12 w-full items-center justify-center rounded-full bg-[#7C5CFC] text-sm font-bold text-white shadow-[0_4px_0_#5B47D6]"
           >
-            Rezervă-ți locul
+            Începe gratuit!
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </motion.div>

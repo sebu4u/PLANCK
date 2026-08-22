@@ -13,8 +13,11 @@ export {
   EARLYBIRD_DEADLINE_LABEL,
   EARLYBIRD_SAVE_PERCENT,
   EARLYBIRD_YEARLY_RON,
+  EARLYBIRD_YEARLY_SEATS_TOTAL,
   FULL_YEARLY_RON,
   LANDING_DEADLINE,
+  earlybirdSeatsFomoCopy,
+  remainingEarlybirdSeats,
 } from "@/lib/landing-earlybird"
 
 export const LANDING_WEEKLY_RON = PREMIUM_WEEKLY_RON

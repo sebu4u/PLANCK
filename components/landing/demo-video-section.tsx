@@ -23,7 +23,7 @@ export function LandingDemoVideoSection() {
             </p>
             <Link
               href="/register"
-              className="mt-8 inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110"
+              className="mt-8 hidden h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 lg:inline-flex"
             >
               Vreau prima pregătire gratuită
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -38,6 +38,13 @@ export function LandingDemoVideoSection() {
                 className="rounded-none shadow-none"
               />
             </div>
+            <Link
+              href="/register"
+              className="mt-8 inline-flex h-14 w-full items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 lg:hidden"
+            >
+              Vreau prima pregătire gratuită
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </FadeInLeft>
         </div>
       </div>

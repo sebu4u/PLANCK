@@ -325,7 +325,7 @@ export function PrivacySettings() {
                 </h4>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                Pentru newsletter și comunicări personalizate despre conținut educațional
+                Pentru newsletter, Meta Pixel, TikTok Pixel și comunicări personalizate
               </p>
             </div>
             <Switch

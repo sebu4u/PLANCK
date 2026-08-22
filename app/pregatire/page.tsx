@@ -26,7 +26,9 @@ export default function PregatirePage() {
         <Suspense fallback={null}>
           <CheckoutSuccessSync />
         </Suspense>
-        <PregatirePageClient />
+        <Suspense fallback={null}>
+          <PregatirePageClient />
+        </Suspense>
       </main>
     </>
   )

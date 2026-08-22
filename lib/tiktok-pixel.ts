@@ -285,6 +285,7 @@ class TikTokPixel {
 
   private sendServerEvent(event: string, params: TikTokCommerceParams | undefined, eventId: string): void {
     if (typeof window === 'undefined') return
+    if (process.env.NODE_ENV === 'development') return
 
     const payload = {
       event,

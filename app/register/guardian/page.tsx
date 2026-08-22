@@ -46,6 +46,7 @@ import {
   type GuardianStep,
 } from "@/lib/guardian-onboarding"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
+import { metaPixel } from "@/lib/meta-pixel"
 
 const mainCtaClassName =
   "inline-flex min-w-[200px] items-center justify-center rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#050505]"
@@ -621,15 +622,32 @@ function GuardianRegisterPageContent() {
       phone: user?.phone,
       externalId: user?.id,
     })
+    metaPixel.identify({
+      email: user?.email,
+      phone: user?.phone,
+      externalId: user?.id,
+    })
+    const accountId = onboardingState.role === "profesor" ? "account_profesor" : "account_parinte"
+    const accountName = onboardingState.role === "profesor" ? "Cont profesor Planck" : "Cont părinte Planck"
     tiktokPixel.trackCompleteRegistration(
       {
         contents: [
           {
-            content_id: onboardingState.role === "profesor" ? "account_profesor" : "account_parinte",
+            content_id: accountId,
             content_type: "product",
-            content_name: onboardingState.role === "profesor" ? "Cont profesor Planck" : "Cont părinte Planck",
+            content_name: accountName,
           },
         ],
+        value: 0,
+        currency: "RON",
+      },
+      user?.id,
+    )
+    metaPixel.trackCompleteRegistration(
+      {
+        content_ids: [accountId],
+        content_type: "product",
+        content_name: accountName,
         value: 0,
         currency: "RON",
       },

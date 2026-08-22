@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Clock, Zap } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
@@ -17,8 +17,10 @@ import {
   bucharestParts,
   formatWorkshopDateTime,
   formatWorkshopDayKey,
+  formatWorkshopTime,
 } from "@/lib/pregatire/dates"
 import {
+  WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_COLORS,
   WORKSHOP_SUBJECT_LABELS,
   type WorkshopPublic,
@@ -55,6 +57,16 @@ function dayKeyFromUtcNoon(date: Date): string {
 
 function weekdayShort(label: string): string {
   return label.replace(/\.$/, "")
+}
+
+function mondayIndexInWeek(days: CalendarDay[]): number {
+  const index = days.findIndex((day) => {
+    const [year, month, date] = day.key.split("-").map(Number)
+    if (!year || !month || !date) return false
+    const utcDay = new Date(Date.UTC(year, month - 1, date, 12, 0, 0)).getUTCDay()
+    return utcDay === 1
+  })
+  return index >= 0 ? index : 0
 }
 
 function DayCell({
@@ -106,6 +118,164 @@ function DayCell({
         {day.day}
       </span>
     </button>
+  )
+}
+
+function SubjectLegend() {
+  return (
+    <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-4 sm:mt-6">
+      {WORKSHOP_SUBJECTS.map((subject) => (
+        <li key={subject} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+          <span
+            className={cn("h-3 w-3 shrink-0 rounded-sm ring-1", SUBJECT_CELL_CLASS[subject])}
+            aria-hidden
+          />
+          {WORKSHOP_SUBJECT_LABELS[subject]}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function WorkshopDayListCard({
+  workshop,
+  onOpen,
+}: {
+  workshop: WorkshopPublic
+  onOpen: () => void
+}) {
+  const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
+  const time = formatWorkshopTime(workshop.starts_at)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full overflow-hidden rounded-2xl border border-[#EBE8FF] bg-white text-left shadow-[0_8px_24px_rgba(124,92,252,0.08)] transition active:scale-[0.99]"
+    >
+      <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
+      <div className="px-4 py-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white"
+            style={{ backgroundColor: color }}
+          >
+            {WORKSHOP_SUBJECT_LABELS[workshop.subject]}
+          </span>
+          {time ? (
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-gray-500">
+              <Clock className="h-3.5 w-3.5" />
+              {time}
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-2 text-[15px] font-black leading-snug tracking-tight text-gray-900">
+          {workshop.title}
+        </p>
+        <p className="mt-1.5 text-sm text-gray-500">
+          {workshop.teacher?.name ?? "Profesor PLANCK"}
+        </p>
+      </div>
+    </button>
+  )
+}
+
+function MobileWeekAgenda({
+  days,
+  byDay,
+  loading,
+  onOpen,
+}: {
+  days: CalendarDay[]
+  byDay: Map<string, WorkshopPublic[]>
+  loading: boolean
+  onOpen: (workshops: WorkshopPublic[]) => void
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  const syncActiveFromScroll = useCallback(() => {
+    const el = scrollerRef.current
+    if (!el || el.clientWidth === 0) return
+    const next = Math.round(el.scrollLeft / el.clientWidth)
+    setActiveIndex(Math.min(days.length - 1, Math.max(0, next)))
+  }, [days.length])
+
+  const goTo = (index: number) => {
+    const el = scrollerRef.current
+    if (!el) return
+    el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" })
+    setActiveIndex(index)
+  }
+
+  return (
+    <div className="sm:hidden">
+      <div
+        className="flex gap-1 px-4"
+        role="tablist"
+        aria-label="Zilele săptămânii"
+      >
+        {days.map((day, index) => {
+          const isActive = index === activeIndex
+          return (
+            <button
+              key={day.key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => goTo(index)}
+              className={cn(
+                "flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-2 transition-colors",
+                isActive ? "bg-gray-900 text-white" : "bg-[#F8F7FF] text-gray-600",
+              )}
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wide">
+                {weekdayShort(day.weekday)}
+              </span>
+              <span className="mt-0.5 text-sm font-black tabular-nums">{day.day}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div
+        ref={scrollerRef}
+        onScroll={syncActiveFromScroll}
+        className="mt-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {days.map((day) => {
+          const items = byDay.get(day.key) ?? []
+          return (
+            <div
+              key={day.key}
+              className="w-full shrink-0 snap-start px-4"
+              role="tabpanel"
+            >
+              {loading ? (
+                <div className="space-y-3">
+                  <div className="h-24 animate-pulse rounded-2xl bg-[#EBE8FF]/80" />
+                  <div className="h-24 animate-pulse rounded-2xl bg-[#EBE8FF]/80" />
+                </div>
+              ) : items.length > 0 ? (
+                <div className="space-y-3">
+                  {items.map((workshop) => (
+                    <WorkshopDayListCard
+                      key={workshop.id}
+                      workshop={workshop}
+                      onOpen={() => onOpen([workshop])}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl bg-[#F8F7FF] px-4 py-8 text-center text-sm leading-relaxed text-gray-500">
+                  Nu sunt meditații în această zi.
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -197,12 +367,9 @@ export function LandingWorkshopsCalendarSection() {
   }, [])
 
   const weekdayLabels = days.slice(0, COLS).map((d) => d.weekday)
-  const weeks = useMemo(() => {
-    const grouped: CalendarDay[][] = []
-    for (let i = 0; i < days.length; i += COLS) {
-      grouped.push(days.slice(i, i + COLS))
-    }
-    return grouped
+  const mobileDays = useMemo(() => {
+    const start = mondayIndexInWeek(days)
+    return days.slice(start, start + 7)
   }, [days])
 
   useEffect(() => {
@@ -258,49 +425,22 @@ export function LandingWorkshopsCalendarSection() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <FadeInUp className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-4xl lg:text-[2.5rem] lg:leading-tight">
-            Meditații zilnice, un singur abonament
+            Vezi exact ce se explică, în fiecare zi
           </h2>
           <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg">
-            Orarul de pe platformă, pe trei săptămâni: o meditație live în fiecare zi, cu profesori
-            PLANCK, la mate, fizică, informatică, chimie și biologie. Nu cauți profesor după
-            profesor — intri, vezi ce e azi, și te conectezi.
+            Alege materia, vezi ce se predă azi, și intri direct. Fără să cauți profesor după
+            profesor. Înveți de la olimpici naționali și internaționali la aceste discipline.
           </p>
         </FadeInUp>
       </div>
 
         <FadeInUp delay={0.12} className="mt-10 w-full sm:mx-auto sm:mt-12 sm:max-w-4xl sm:px-6 lg:px-8">
-          <div
-            className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pl-2 pr-3 sm:hidden"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          >
-            <div className="sticky left-0 z-10 flex w-8 shrink-0 flex-col gap-1 bg-white pr-1">
-              {weekdayLabels.map((label, index) => (
-                <div
-                  key={`${label}-${index}`}
-                  className="flex h-[6rem] items-center justify-center text-[10px] font-bold uppercase tracking-wide text-[#7C5CFC]"
-                >
-                  {weekdayShort(label)}
-                </div>
-              ))}
-            </div>
-
-            {weeks.map((week, weekIndex) => (
-              <div
-                key={week[0]?.key ?? weekIndex}
-                className="flex w-[8.75rem] shrink-0 flex-col gap-1"
-              >
-                {week.map((day) => (
-                  <DayCell
-                    key={day.key}
-                    day={day}
-                    items={byDay.get(day.key) ?? []}
-                    loading={loading}
-                    onOpen={setSelected}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+          <MobileWeekAgenda
+            days={mobileDays}
+            byDay={byDay}
+            loading={loading}
+            onOpen={setSelected}
+          />
 
           <div className="hidden overflow-hidden rounded-[24px] bg-[#F8F7FF] p-5 shadow-[0_16px_48px_rgba(124,92,252,0.12)] ring-1 ring-[#EBE8FF] sm:block">
             <div className="grid grid-cols-7 gap-1.5">
@@ -324,6 +464,8 @@ export function LandingWorkshopsCalendarSection() {
               ))}
             </div>
           </div>
+
+          <SubjectLegend />
         </FadeInUp>
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">

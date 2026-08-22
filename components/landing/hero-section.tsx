@@ -7,6 +7,7 @@ import {
   LandingHeroReviewRowsDesktop,
   LandingHeroReviewRowsMobile,
 } from "@/components/landing/hero-review-rows"
+import { HOME_HERO_HEADLINE_GRADIENT } from "@/lib/platform-marketing"
 
 export function LandingHeroSection() {
   return (
@@ -20,15 +21,19 @@ export function LandingHeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.08}>
-            <h1 className="mt-5 text-4xl font-black leading-[1.08] tracking-tight text-gray-900 sm:text-5xl lg:text-[3.25rem] xl:text-6xl">
-              Meditații zilnice, un singur abonament
+            <h1 className="mt-5 text-3xl font-black leading-[1.08] tracking-tight text-gray-900 sm:text-4xl lg:text-5xl xl:text-6xl">
+              Materia pe care nu ai{" "}
+              <br className="hidden sm:block" />
+              înțeles-o niciodată,{" "}
+              <span className="bg-gradient-to-r from-[#9a7bff] via-[#c77bff] to-[#ffb56b] bg-clip-text text-transparent">
+                {HOME_HERO_HEADLINE_GRADIENT}
+              </span>
             </h1>
           </FadeInUp>
 
           <FadeInUp delay={0.14}>
             <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg sm:leading-8">
-              Simulări și pregătiri pentru BAC, în fiecare zi! De la doar{" "}
-              <strong className="font-semibold text-gray-700">79 RON/săptămână</strong>. Peste{" "}
+              Simulări și pregătiri pentru BAC, în fiecare zi! Peste{" "}
               <strong className="font-semibold text-gray-700">10.000 de grile și exerciții</strong>{" "}
               rezolvate video complet.
             </p>
@@ -39,21 +44,21 @@ export function LandingHeroSection() {
               href="/register"
               className="inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98]"
             >
-              Rezervă-ți locul
+              Începe gratuit!
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </FadeInUp>
 
           <FadeInUp delay={0.24}>
             <p className="mt-2.5 text-sm leading-relaxed text-gray-500 sm:text-[15px]">
-              Pentru toți elevii de clasa a 9-a până la clasa a 12-a. 5 materii într-un abonament.
+              Pentru toți elevii de clasa a 9-a până la clasa a 12-a.
             </p>
           </FadeInUp>
 
           <FadeInUp delay={0.28} className="mt-4">
             <div className="rounded-xl border border-[#EBE8FF] bg-[#F8F7FF] px-4 py-2.5 text-left sm:px-5">
               <p className="text-sm font-semibold leading-snug text-gray-700">
-                De la 7 RON/meditație. Abonament săptămânal. Toate pregătirile înregistrate video.
+                5 materii de bac. Toate pregătirile înregistrate video.
               </p>
             </div>
           </FadeInUp>

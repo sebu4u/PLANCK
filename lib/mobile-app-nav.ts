@@ -177,8 +177,13 @@ export function isMobileAppShellRoute(
   pathname: string | null | undefined,
   isAuthenticated: boolean,
 ): boolean {
-  if (!isAuthenticated || !pathname) return false
+  if (!pathname) return false
   if (isLearningPathItemRoute(pathname) || isLearningPathLessonRoute(pathname)) return false
+
+  // Guests get the same mobile top + bottom bars on Pregatire (not the hamburger navbar).
+  if (!isAuthenticated) {
+    return isPregatireRoute(pathname)
+  }
 
   return (
     pathname === "/dashboard" ||

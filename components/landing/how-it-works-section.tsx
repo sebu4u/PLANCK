@@ -6,7 +6,7 @@ import { FadeInLeft, FadeInRight } from "@/components/scroll-animations"
 export function LandingHowItWorksSection() {
   return (
     <section className="overflow-x-hidden bg-[#ffffff] py-16 sm:py-20 lg:py-24">
-      <div className="mx-auto flex max-w-6xl flex-col items-start gap-8 px-4 sm:px-6 lg:flex-row lg:gap-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col-reverse items-start gap-8 px-4 sm:px-6 lg:flex-row lg:gap-6 lg:px-8">
         <FadeInRight className="w-full lg:w-[42%] lg:shrink-0">
           <div className="overflow-hidden rounded-none bg-gray-100">
             <Image

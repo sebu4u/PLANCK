@@ -92,7 +92,7 @@ export function LandingSubjectsPickerSection() {
             </p>
             <p className="mt-2 text-sm font-medium text-gray-700">{selected.groupNote}</p>
             <Link
-              href={`/rezerva?subject=${selected.id}`}
+              href={`/pregatire?subject=${selected.id}`}
               onClick={() =>
                 tiktokPixel.trackSchedule(
                   `workshop_${selected.id}`,
@@ -102,7 +102,7 @@ export function LandingSubjectsPickerSection() {
               }
               className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-gray-900 px-6 text-sm font-bold text-white transition-[filter] hover:brightness-110 sm:px-7"
             >
-              Rezervă-ți locul
+              Înscrie-te la meditație
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>

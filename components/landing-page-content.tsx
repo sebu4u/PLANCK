@@ -17,24 +17,26 @@ import { LandingPricingSection } from "@/components/landing/pricing-section"
 import { LandingFaqSection } from "@/components/landing/faq-section"
 import { LandingFinalCtaSection } from "@/components/landing/final-cta-section"
 import { LandingStickyMobileCta } from "@/components/landing/sticky-mobile-cta"
+import { LandingCtaIrisScope } from "@/components/landing/iris-transition"
 import { useCountdown } from "@/lib/landing-campaign"
 
 export function LandingPageContent() {
   const countdown = useCountdown()
 
   return (
+    <LandingCtaIrisScope>
     <div className="relative min-h-screen overflow-x-hidden bg-white pb-16 sm:pb-0">
-      <FomoBanner days={countdown.days} />
+      <FomoBanner />
       <div className="relative bg-[#ffffff]">
         <HomePageNavbar variant="light" />
         <LandingHeroSection />
       </div>
       <LandingSocialProofSection />
       <LandingSubjectsPickerSection />
+      <LandingDemoVideoSection />
       <LandingHowItWorksSection />
       <LandingWorkshopsCalendarSection />
       <LandingTeachersSection />
-      <LandingDemoVideoSection />
       <LandingPlanckPassSection />
       <LandingFounderSection />
       <LandingTestimonialsSection />
@@ -48,5 +50,6 @@ export function LandingPageContent() {
       />
       <LandingStickyMobileCta />
     </div>
+    </LandingCtaIrisScope>
   )
 }

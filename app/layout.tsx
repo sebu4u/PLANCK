@@ -23,6 +23,7 @@ import { PlanckPassSeasonIntroProvider } from "@/components/planckpass/planckpas
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
+import { IrisTransitionProvider } from "@/components/landing/iris-transition"
 import { baseMetadata } from "@/lib/metadata"
 import { organizationStructuredData, websiteStructuredData } from "@/lib/structured-data"
 import "./globals.css"
@@ -121,6 +122,7 @@ export default function RootLayout({
               <PlanckPassSeasonIntroProvider>
                 <SubjectChangeCelebrationProvider>
                 <GlobalLoadingOverlay />
+                <IrisTransitionProvider>
                 <AnalyticsProvider>
                   <KatexProvider>
                     <EngagementProvider>
@@ -142,6 +144,7 @@ export default function RootLayout({
                     v1.04.52
                   </div>
                 </AnalyticsProvider>
+                </IrisTransitionProvider>
                 </SubjectChangeCelebrationProvider>
               </PlanckPassSeasonIntroProvider>
             </ProductGuideProvider>

@@ -18,6 +18,7 @@ import {
 import { Footer } from "@/components/footer"
 import { useToast } from "@/hooks/use-toast"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
+import { metaPixel } from "@/lib/meta-pixel"
 
 const CONTACT_EMAIL = "planck.fizica@gmail.com"
 const PHONE_DISPLAY = "0773 715 865"
@@ -92,6 +93,9 @@ export function ContactPageClient() {
       await tiktokPixel.identify({ email: form.email })
       tiktokPixel.trackContact('contact_form', 'Formular contact Planck')
       tiktokPixel.trackSubmitForm('contact_form', 'Formular contact Planck')
+      metaPixel.identify({ email: form.email })
+      metaPixel.trackContact('contact_form', 'Formular contact Planck')
+      metaPixel.trackLead('contact_form', 'Formular contact Planck')
       toast({
         title: "Mesaj trimis",
         description: data.message,
