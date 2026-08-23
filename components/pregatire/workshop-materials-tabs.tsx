@@ -119,8 +119,14 @@ export function WorkshopMaterialsTabs({
     )
 
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
-      <Tabs defaultValue={defaultTab} className={compact ? "p-4" : "p-5 sm:p-6"}>
+    <div
+      className={cn(
+        compact
+          ? "mt-4 border-t border-[#e5e7eb]"
+          : "mt-4 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm",
+      )}
+    >
+      <Tabs defaultValue={defaultTab} className={compact ? "px-5 py-4" : "p-5 sm:p-6"}>
         {tabCount > 1 ? (
           <TabsList className="grid w-full grid-cols-2">
             {showNotes ? <TabsTrigger value="notes">{tabLabel("Notițe")}</TabsTrigger> : null}

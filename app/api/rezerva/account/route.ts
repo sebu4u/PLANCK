@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const admin = getServiceRoleSupabase()
-    const { error } = await admin.auth.admin.createUser({
+    const { data, error } = await admin.auth.admin.createUser({
       email: parsed.email,
       password: parsed.password,
       email_confirm: true,
@@ -47,6 +47,16 @@ export async function POST(req: NextRequest) {
     if (error && !isEmailTakenError(error)) {
       logger.error("[rezerva/account] createUser failed:", error)
       return NextResponse.json({ error: "Nu am putut crea contul. Încearcă din nou." }, { status: 500 })
+    }
+
+    if (data.user && !error) {
+      const { error: verifyError } = await admin
+        .from("profiles")
+        .update({ email_verified: true })
+        .eq("user_id", data.user.id)
+      if (verifyError) {
+        logger.error("[rezerva/account] email_verified update failed:", verifyError)
+      }
     }
 
     return NextResponse.json({ ok: true, created: !error })

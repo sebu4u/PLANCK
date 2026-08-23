@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth-provider"
+import { OnboardingEmailSignupForm } from "@/components/onboarding/onboarding-email-signup-form"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import {
   AnimatedWords,
@@ -45,6 +46,7 @@ import {
   type GuardianRole,
   type GuardianStep,
 } from "@/lib/guardian-onboarding"
+import { signUpWithEmailPassword } from "@/lib/onboarding-email-signup"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { metaPixel } from "@/lib/meta-pixel"
 import { guardianStepName } from "@/lib/funnel-analytics"
@@ -79,15 +81,6 @@ const GoogleIcon = () => (
   </svg>
 )
 
-const GitHubIcon = () => (
-  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="#181717"
-      d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.3 9.43 7.88 10.96.58.1.8-.25.8-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.35-3.88-1.35-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.97.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.71 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.62 1.59.23 2.76.12 3.05.73.8 1.17 1.82 1.17 3.08 0 4.44-2.69 5.41-5.25 5.69.42.36.78 1.07.78 2.17 0 1.56-.01 2.82-.01 3.2 0 .31.2.67.81.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
-    />
-  </svg>
-)
-
 const ROLE_ICONS = {
   parinte: Users,
   profesor: GraduationCap,
@@ -105,8 +98,6 @@ function GuardianRegisterPageContent() {
     profile,
     profileSyncedUserId,
     userType,
-    loginWithGoogle,
-    loginWithGitHub,
   } = useAuth()
 
   const [onboardingState, setOnboardingState] = useState<GuardianOnboardingState>(
@@ -117,7 +108,7 @@ function GuardianRegisterPageContent() {
   const [aiIntroReady, setAiIntroReady] = useState(false)
   const [displayName, setDisplayName] = useState("")
   const [nameSaving, setNameSaving] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null)
+  const [oauthLoading, setOauthLoading] = useState<"google" | "email" | null>(null)
 
   const shouldForceOAuthOnboarding = searchParams.get("onboarding") === OAUTH_ONBOARDING_PARAM
   const oauthStep = getGuardianOAuthStep(onboardingState.role)
@@ -438,14 +429,12 @@ function GuardianRegisterPageContent() {
 
   const clearOAuthFlag = () => localStorage.removeItem(GUARDIAN_ONBOARDING_AFTER_OAUTH_KEY)
 
-  const handleOAuthLogin = async (provider: "google" | "github") => {
-    setOauthLoading(provider)
+  const handleEmailSignup = async (email: string, password: string) => {
+    setOauthLoading("email")
     markStateForOAuthReturn()
 
-    const { error, popupBlocked } =
-      provider === "google" ? await loginWithGoogle() : await loginWithGitHub()
-
-    if (error) {
+    const result = await signUpWithEmailPassword(email, password)
+    if (!result.ok) {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
@@ -453,13 +442,8 @@ function GuardianRegisterPageContent() {
         awaitingPostAuth: false,
       }))
       toast({
-        title:
-          provider === "google"
-            ? "Eroare la autentificare cu Google"
-            : "Eroare la autentificare cu GitHub",
-        description: popupBlocked
-          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
-          : error.message,
+        title: result.alreadyRegistered ? "Ai deja un cont" : "Nu am putut crea contul",
+        description: result.message,
         variant: "destructive",
       })
     }
@@ -689,15 +673,19 @@ function GuardianRegisterPageContent() {
             Continuă cu Google
           </GoogleSignInButton>
 
-          <button
-            type="button"
-            onClick={() => handleOAuthLogin("github")}
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-px flex-1 bg-[#ececf1]" />
+            <span className="text-xs font-medium uppercase tracking-wide text-[#9aa0ad]">sau</span>
+            <div className="h-px flex-1 bg-[#ececf1]" />
+          </div>
+
+          <OnboardingEmailSignupForm
             disabled={oauthLoading !== null}
-            className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-[#d9dbe3] bg-white px-4 font-semibold text-[#111111] transition-colors hover:bg-[#f5f6fa] disabled:opacity-70"
-          >
-            {oauthLoading === "github" ? <Loader2 className="h-5 w-5 animate-spin" /> : <GitHubIcon />}
-            Continuă cu GitHub
-          </button>
+            loading={oauthLoading === "email"}
+            onSubmit={handleEmailSignup}
+            inputClassName="h-12 rounded-full border-[#d9dbe3] px-4 text-[#111111] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
+            submitClassName="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#2a2a2a] px-4 font-semibold text-[#f5f4f2] transition-colors hover:bg-[#1a1a1a] disabled:opacity-70"
+          />
         </div>
       </div>
     </div>

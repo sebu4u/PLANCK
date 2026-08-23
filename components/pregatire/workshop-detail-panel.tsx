@@ -209,9 +209,13 @@ export function WorkshopDetailPanel({
         </Button>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
-        <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
-        <div className="p-6 sm:p-8">
+      <div
+        className={cn(
+          !compact && "overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm",
+        )}
+      >
+        {!compact ? <div className="h-1.5 w-full" style={{ backgroundColor: color }} /> : null}
+        <div className={compact ? "px-5 pb-2 pt-6" : "p-6 sm:p-8"}>
           <div className="flex flex-wrap items-center gap-2">
             <span
               className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white"

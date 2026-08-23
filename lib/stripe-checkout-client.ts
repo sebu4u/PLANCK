@@ -17,7 +17,7 @@ export type StartPremiumCheckoutInput = {
 export type StartPremiumCheckoutResult =
   | { ok: true; url: string }
   | { ok: true; applied: true }
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: string }
 
 export async function startPremiumCheckout(
   input: StartPremiumCheckoutInput,
@@ -57,10 +57,11 @@ export async function startPremiumCheckout(
     error?: string
     url?: string
     applied?: boolean
+    code?: string
   } | null
 
   if (!response.ok) {
-    return { ok: false, error: payload?.error || "Nu am putut iniția checkout-ul." }
+    return { ok: false, error: payload?.error || "Nu am putut iniția checkout-ul.", code: payload?.code }
   }
 
   if (payload?.applied) {

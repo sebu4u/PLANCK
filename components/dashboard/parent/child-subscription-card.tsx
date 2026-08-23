@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Crown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { useResendConfirmationEmail } from "@/hooks/use-resend-confirmation"
+import { EMAIL_UNVERIFIED_CODE } from "@/lib/email-verification"
 import { supabase } from "@/lib/supabaseClient"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import {
@@ -39,6 +41,7 @@ export function ChildSubscriptionCard({
   onBillingChange?: () => void
 }) {
   const { toast } = useToast()
+  const { toastUnverified } = useResendConfirmationEmail()
   const [interval, setInterval] = useState<PremiumBillingInterval>("month")
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
@@ -94,6 +97,10 @@ export function ChildSubscriptionCard({
       })
       const payload = await response.json()
       if (!response.ok) {
+        if (payload?.code === EMAIL_UNVERIFIED_CODE) {
+          toastUnverified("Confirmă-ți emailul", payload?.error || "Confirmă-ți emailul ca să poți plăti.")
+          return
+        }
         throw new Error(payload?.error || "Nu am putut iniția checkout-ul.")
       }
       if (!payload?.url) {

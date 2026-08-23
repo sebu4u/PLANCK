@@ -2,6 +2,7 @@
 
 import { ExternalLink, Lock, Presentation } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export function WorkshopWhiteboardCard({
   url,
@@ -21,8 +22,14 @@ export function WorkshopWhiteboardCard({
   unlockLabel?: string
 }) {
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
-      <div className={compact ? "p-4" : "p-5 sm:p-6"}>
+    <div
+      className={cn(
+        compact
+          ? "mt-4 border-t border-[#e5e7eb]"
+          : "mt-4 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm",
+      )}
+    >
+      <div className={compact ? "px-5 py-4" : "p-5 sm:p-6"}>
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
             {locked ? <Lock className="h-5 w-5" /> : <Presentation className="h-5 w-5" />}

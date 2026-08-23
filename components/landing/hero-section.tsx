@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowRight, Award, ShieldCheck, Star } from "lucide-react"
+import { Award, ShieldCheck, Star } from "lucide-react"
 import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { FadeInUp } from "@/components/scroll-animations"
 import {
@@ -44,10 +44,9 @@ export function LandingHeroSection() {
               href="/register"
               ctaId="landing_hero_start"
               placement="landing_hero"
-              className="inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98]"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-[#7C5CFC] px-5 text-[15px] font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98] sm:h-14 sm:px-8 sm:text-base"
             >
-              Începe gratuit!
-              <ArrowRight className="ml-2 h-4 w-4" />
+              Vreau prima pregătire gratuită →
             </FunnelCtaLink>
           </FadeInUp>
 
@@ -58,8 +57,8 @@ export function LandingHeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.28} className="mt-4">
-            <div className="rounded-xl border border-[#EBE8FF] bg-[#F8F7FF] px-4 py-2.5 text-left sm:px-5">
-              <p className="text-sm font-semibold leading-snug text-gray-700">
+            <div className="mx-auto w-fit max-w-full rounded-lg border border-[#EBE8FF] bg-[#F8F7FF] px-2.5 py-1.5 text-left sm:mx-0 sm:rounded-xl sm:px-5 sm:py-2.5">
+              <p className="text-[11px] font-semibold leading-snug text-gray-700 sm:text-sm">
                 5 materii de bac. Toate pregătirile înregistrate video.
               </p>
             </div>

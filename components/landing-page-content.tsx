@@ -2,7 +2,6 @@
 
 import { HomePageNavbar } from "@/components/homepage-navbar"
 import { Footer } from "@/components/footer"
-import { FomoBanner } from "@/components/landing/fomo-banner"
 import { LandingHeroSection } from "@/components/landing/hero-section"
 import { LandingSocialProofSection } from "@/components/landing/social-proof-section"
 import { LandingSubjectsPickerSection } from "@/components/landing/subjects-picker-section"
@@ -26,7 +25,6 @@ export function LandingPageContent() {
   return (
     <LandingCtaIrisScope>
     <div className="relative min-h-screen overflow-x-hidden bg-white pb-16 sm:pb-0">
-      <FomoBanner />
       <div className="relative bg-[#ffffff]">
         <HomePageNavbar variant="light" />
         <LandingHeroSection />

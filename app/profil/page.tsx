@@ -9,6 +9,7 @@ import { Navigation } from "@/components/navigation";
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav";
 import { Pencil, Settings, Lock, Shield, Trophy, Gift, GraduationCap, Copy, Check, CreditCard, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useResendConfirmationEmail } from "@/hooks/use-resend-confirmation";
 import { UserBadges } from "@/components/user-badges";
 import { ProfilePrizeWheelCard } from "@/components/prize-wheel/profile-prize-wheel-card";
 import { CosmeticsAvatarFrame } from "@/components/planckpass/cosmetics-avatar-frame";
@@ -17,7 +18,9 @@ import {
   useEquippedCosmetics,
 } from "@/components/planckpass/planckpass-inventory";
 import { ChangePasswordModal } from "@/components/change-password-modal";
+import { isEmailVerified, EMAIL_UNVERIFIED_PASSWORD_MESSAGE } from "@/lib/email-verification";
 import { PrivacySettings } from "@/components/privacy-settings";
+import { VerifyEmailBanner } from "@/components/verify-email-banner";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
@@ -52,8 +55,9 @@ const StatsSkeleton = () => (
 );
 
 const ProfilPage = () => {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, profile: authProfile, profileSyncedUserId } = useAuth();
   const { toast } = useToast();
+  const { toastUnverified } = useResendConfirmationEmail();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [profile, setProfile] = useState<any>(null);
@@ -289,6 +293,7 @@ const ProfilPage = () => {
         <Navigation />
         <main className={cn("pt-16 px-4 md:px-6 lg:px-8 md:pt-24 animate-fade-in-up", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           <div className="max-w-7xl mx-auto">
+            <VerifyEmailBanner className="mb-6" />
             {/* Header */}
             <div className="mb-8">
               <h1 className="mb-2 text-3xl font-bold tracking-tight text-[#111111]">Profil</h1>
@@ -489,7 +494,13 @@ const ProfilPage = () => {
                             Invită prieteni & primește Plus+
                           </Button>
                           <Button
-                            onClick={() => setShowChangePasswordModal(true)}
+                            onClick={() => {
+                              if (user && profileSyncedUserId === user.id && !isEmailVerified(authProfile)) {
+                                toastUnverified("Confirmă-ți emailul", EMAIL_UNVERIFIED_PASSWORD_MESSAGE)
+                                return
+                              }
+                              setShowChangePasswordModal(true)
+                            }}
                             className="w-full rounded-full border-[#e5e5e5] bg-white text-[#191919] hover:bg-[#f7f7f7]"
                             variant="outline"
                           >

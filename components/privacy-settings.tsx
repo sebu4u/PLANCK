@@ -26,6 +26,7 @@ import {
   Mail
 } from 'lucide-react'
 import Link from 'next/link'
+import { VerifyEmailBanner } from '@/components/verify-email-banner'
 
 export function PrivacySettings() {
   const { toast } = useToast()
@@ -204,6 +205,7 @@ export function PrivacySettings() {
   if (!preferences) {
     return (
       <div className="space-y-4">
+        <VerifyEmailBanner />
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -219,6 +221,7 @@ export function PrivacySettings() {
 
   return (
     <div className="space-y-6">
+      <VerifyEmailBanner />
       {/* Status general */}
       <Card>
         <CardHeader>

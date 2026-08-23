@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Lock, CheckCircle } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth-provider"
+import { EMAIL_UNVERIFIED_PASSWORD_MESSAGE, isEmailVerified } from "@/lib/email-verification"
 
 interface ChangePasswordModalProps {
   isOpen: boolean
@@ -24,9 +26,19 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
+  const { profile, profileSyncedUserId, user } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (user && profileSyncedUserId === user.id && !isEmailVerified(profile)) {
+      toast({
+        title: "Confirmă-ți emailul",
+        description: EMAIL_UNVERIFIED_PASSWORD_MESSAGE,
+        variant: "destructive",
+      })
+      return
+    }
     
     if (newPassword !== confirmPassword) {
       toast({

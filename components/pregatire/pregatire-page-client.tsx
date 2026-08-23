@@ -335,15 +335,15 @@ export function PregatirePageClient() {
       <Sheet open={Boolean(sheetWorkshop)} onOpenChange={(open) => !open && setSheetWorkshop(null)}>
         <SheetContent
           side="bottom"
-          overlayClassName="!z-[400]"
+          overlayClassName="!z-[400] bg-black/30"
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className="!z-[401] max-h-[70dvh] overflow-y-auto rounded-t-2xl p-0 pb-[env(safe-area-inset-bottom,0px)] sm:max-w-lg sm:rounded-none"
+          className="!z-[401] max-h-[70dvh] overflow-y-auto rounded-t-[1.75rem] border-x border-t border-[#d1d5db] bg-white p-0 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] sm:max-w-lg sm:rounded-none"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>{sheetWorkshop?.title ?? "Pregătire"}</SheetTitle>
           </SheetHeader>
           {sheetWorkshop ? (
-            <div className="p-4 pb-8">
+            <div className="pb-8">
               <WorkshopDetailPanel
                 workshop={sheetWorkshop}
                 isLoggedIn={Boolean(user)}

@@ -6,6 +6,8 @@ import { motion } from "framer-motion"
 import { Check, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { useResendConfirmationEmail } from "@/hooks/use-resend-confirmation"
+import { EMAIL_UNVERIFIED_CODE } from "@/lib/email-verification"
 import { playButtonClickSound } from "@/lib/platform-sounds"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 import { supabase } from "@/lib/supabaseClient"
@@ -54,6 +56,7 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
   const router = useRouter()
   const { user } = useAuth()
   const { toast } = useToast()
+  const { toastUnverified } = useResendConfirmationEmail()
   const [now, setNow] = useState(0)
   const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>("month")
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -114,6 +117,10 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
       })
 
       if (!result.ok) {
+        if (result.code === EMAIL_UNVERIFIED_CODE) {
+          toastUnverified("Confirmă-ți emailul", result.error)
+          return
+        }
         throw new Error(result.error)
       }
 

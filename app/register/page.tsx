@@ -10,9 +10,8 @@ import { useAuth } from "@/components/auth-provider"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import { OnboardingAccountStep } from "@/components/onboarding/onboarding-account-step"
 import { OnboardingGradeSliderStep } from "@/components/onboarding/onboarding-grade-slider-step"
-import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
-import { StudentTestimonialsStep } from "@/components/onboarding/student-testimonials-step"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
+import { signUpWithEmailPassword } from "@/lib/onboarding-email-signup"
 import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { metaPixel } from "@/lib/meta-pixel"
@@ -63,10 +62,11 @@ type OnboardingState = {
   guestDemo: GuestDemoStatus | null
 }
 
-const PROGRESS_STEPS = 8
+const PROGRESS_STEPS = 5
 const ACCOUNT_STEP = 9
 const LEGACY_SPLASH_STEP = 10
 const DEFAULT_SELF_GRADE = 7
+const SKIPPED_ONBOARDING_STEPS = new Set<number>([6, 7, 8])
 
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
 const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
@@ -96,12 +96,6 @@ const gradeHeadlines: Record<GradeOption, string> = {
   "12": "Clasa a XII-a, focus pe examen.",
 }
 
-const timeHeadlines: Record<DailyTimeOption, string> = {
-  "15": "Puțin și zilnic bate maratonul.",
-  "30": "30 de minute schimbă ritmul.",
-  "60": "Ritm intens, progres accelerat.",
-}
-
 const mainCtaClassName =
   "inline-flex min-w-[200px] items-center justify-center rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#050505]"
 
@@ -111,17 +105,12 @@ const choiceButtonClassName =
 const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 =>
   typeof step === "number"
 
-const LEGACY_STEP_MAP: Record<number, RegisterStep> = {
-  6: ACCOUNT_STEP,
-  7: "name",
-  [LEGACY_SPLASH_STEP]: "name",
-}
-
 const sanitizeStep = (value: unknown): RegisterStep => {
   if (value === "name") return "name"
   if (value === 0 || value === "coming_soon") return 1
   if (typeof value === "number") {
-    if (LEGACY_STEP_MAP[value]) return LEGACY_STEP_MAP[value]
+    if (value === LEGACY_SPLASH_STEP) return "name"
+    if (SKIPPED_ONBOARDING_STEPS.has(value)) return ACCOUNT_STEP
     if (value >= 1 && value <= 9) return value as RegisterStep
   }
   return 1
@@ -161,15 +150,6 @@ const GoogleIcon = () => (
     <path
       fill="#EA4335"
       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-    />
-  </svg>
-)
-
-const GitHubIcon = () => (
-  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="#181717"
-      d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.3 9.43 7.88 10.96.58.1.8-.25.8-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.35-3.88-1.35-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.97.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.71 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.62 1.59.23 2.76.12 3.05.73.8 1.17 1.82 1.17 3.08 0 4.44-2.69 5.41-5.25 5.69.42.36.78 1.07.78 2.17 0 1.56-.01 2.82-.01 3.2 0 .31.2.67.81.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
     />
   </svg>
 )
@@ -274,7 +254,7 @@ function RegisterPageContent() {
   const [hydrated, setHydrated] = useState(false)
   const [welcomePhase, setWelcomePhase] = useState<"intro" | "final">("intro")
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(defaultOnboardingState)
-  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null)
+  const [oauthLoading, setOauthLoading] = useState<"google" | "email" | null>(null)
   const [displayName, setDisplayName] = useState("")
   const [nameSaving, setNameSaving] = useState(false)
   const [guestFirstItemHref, setGuestFirstItemHref] = useState<string | null>(null)
@@ -286,7 +266,7 @@ function RegisterPageContent() {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, profile, profileSyncedUserId, userType, loginWithGoogle, loginWithGitHub, needsOnboarding, refreshProfile } = useAuth()
+  const { user, profile, profileSyncedUserId, userType, needsOnboarding, refreshProfile } = useAuth()
 
   const { markCompleted } = useOnboardingFunnel({
     flow: "student",
@@ -438,7 +418,7 @@ function RegisterPageContent() {
       onboardingState.step === 3 ||
       onboardingState.step === 4 ||
       onboardingState.step === 5 ||
-      onboardingState.step === 6 ||
+      onboardingState.step === ACCOUNT_STEP ||
       onboardingState.step === "name"
 
     if (oauthFromRegister && onboardingState.step !== "name") {
@@ -491,30 +471,28 @@ function RegisterPageContent() {
   const showBackButton =
     isNumericStep(onboardingState.step) &&
     onboardingState.step >= 2 &&
-    onboardingState.step <= 8
+    (onboardingState.step <= 5 || onboardingState.step === ACCOUNT_STEP)
   const showBottomCta =
-    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 8
-  const isTestimonialsStep = onboardingState.step === 7
+    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 5
   const isOAuthOnboardingFlow =
     Boolean(user && needsOnboarding) &&
     !onboardingState.awaitingPostAuth &&
-    onboardingState.step !== 7 &&
-    onboardingState.step !== 8 &&
     onboardingState.step !== ACCOUNT_STEP
 
   const progressPercent =
-    isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
-      ? ((onboardingState.step - 1) / PROGRESS_STEPS) * 100
-      : 0
+    onboardingState.step === ACCOUNT_STEP
+      ? 100
+      : isNumericStep(onboardingState.step) && onboardingState.step <= 5
+        ? ((onboardingState.step - 1) / PROGRESS_STEPS) * 100
+        : 0
 
-  const continueLabel = onboardingState.step === 8 ? "Salveaza-ti progresul" : "Continua"
+  const continueLabel = "Continua"
 
   const isContinueDisabled =
     (onboardingState.step === 2 && !onboardingState.subject) ||
     (onboardingState.step === 3 && !onboardingState.grade) ||
     (onboardingState.step === 4 && onboardingState.selfGrade == null) ||
-    (onboardingState.step === 5 && onboardingState.targetGrade == null) ||
-    (onboardingState.step === 6 && !onboardingState.dailyTime)
+    (onboardingState.step === 5 && onboardingState.targetGrade == null)
 
   const setStep = (step: RegisterStep) =>
     setOnboardingState((prev) => ({
@@ -525,6 +503,10 @@ function RegisterPageContent() {
   const handleBack = () => {
     if (!isNumericStep(onboardingState.step)) return
     if (onboardingState.step <= 1) return
+    if (onboardingState.step === ACCOUNT_STEP) {
+      setStep(5)
+      return
+    }
     setStep((onboardingState.step - 1) as RegisterStep)
   }
 
@@ -593,27 +575,10 @@ function RegisterPageContent() {
           })
           return
         }
-        setStep(6)
-        break
-      case 6:
-        if (!onboardingState.dailyTime) {
-          toast({
-            title: "Alege timpul zilnic",
-            description: "Doar un interval scurt ne ajută să-ți calibrăm ritmul.",
-            variant: "destructive",
-          })
-          return
-        }
         if (isOAuthOnboardingFlow) {
           setStep("name")
           break
         }
-        setStep(7)
-        break
-      case 7:
-        setStep(8)
-        break
-      case 8:
         setStep(ACCOUNT_STEP)
         break
       default:
@@ -655,14 +620,6 @@ function RegisterPageContent() {
         prev.selfGrade != null
           ? clampTargetGrade(prev.selfGrade, targetGrade)
           : clampTargetGrade(DEFAULT_SELF_GRADE, targetGrade),
-    }))
-  }
-
-  const handleDailyTimeSelect = (dailyTime: DailyTimeOption) => {
-    playOnboardingSelectSound()
-    setOnboardingState((prev) => ({
-      ...prev,
-      dailyTime,
     }))
   }
 
@@ -712,14 +669,12 @@ function RegisterPageContent() {
     router.push("/")
   }
 
-  const handleOAuthLogin = async (provider: "google" | "github") => {
-    setOauthLoading(provider)
+  const handleEmailSignup = async (email: string, password: string) => {
+    setOauthLoading("email")
     markStateForOAuthReturn()
 
-    const { error, popupBlocked } =
-      provider === "google" ? await loginWithGoogle() : await loginWithGitHub()
-
-    if (error) {
+    const result = await signUpWithEmailPassword(email, password)
+    if (!result.ok) {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
@@ -727,13 +682,8 @@ function RegisterPageContent() {
         awaitingPostAuth: false,
       }))
       toast({
-        title:
-          provider === "google"
-            ? "Eroare la autentificare cu Google"
-            : "Eroare la autentificare cu GitHub",
-        description: popupBlocked
-          ? "Permite ferestrele pop-up pentru acest site, apoi încearcă din nou."
-          : error.message,
+        title: result.alreadyRegistered ? "Ai deja un cont" : "Nu am putut crea contul",
+        description: result.message,
         variant: "destructive",
       })
     }
@@ -1017,100 +967,24 @@ function RegisterPageContent() {
       }
 
       case 6:
-        return (
-          <div className="mx-auto w-full max-w-[520px]">
-            <StepHeadingWithIcon
-              popFromLeft={!!onboardingState.dailyTime}
-              subtitle="Nu îți cerem mult. Chiar și 15 minute pe zi fac diferența."
-            >
-              {onboardingState.dailyTime ? timeHeadlines[onboardingState.dailyTime] : "Cât timp ai zilnic?"}
-            </StepHeadingWithIcon>
-            <div className="space-y-3">
-              <button
-                type="button"
-                className={`${choiceButtonClassName} opacity-0 ${
-                  onboardingState.dailyTime === "15"
-                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
-                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
-                }`}
-                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
-                onClick={() => handleDailyTimeSelect("15")}
-              >
-                15 min
-              </button>
-              <button
-                type="button"
-                className={`${choiceButtonClassName} opacity-0 ${
-                  onboardingState.dailyTime === "30"
-                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
-                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
-                }`}
-                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "360ms" }}
-                onClick={() => handleDailyTimeSelect("30")}
-              >
-                30 min
-              </button>
-              <button
-                type="button"
-                className={`${choiceButtonClassName} opacity-0 ${
-                  onboardingState.dailyTime === "60"
-                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
-                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
-                }`}
-                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "440ms" }}
-                onClick={() => handleDailyTimeSelect("60")}
-              >
-                1h+
-              </button>
-            </div>
-          </div>
-        )
-
       case 7:
-        return <StudentTestimonialsStep />
-
-      case 8: {
-        const selectedGrade = onboardingState.grade ?? "9"
-        const simulationSubject = onboardingState.subject ?? "fizica"
-
-        return (
-          <div className="mx-auto w-full max-w-[600px]">
-            <StepHeadingWithIcon
-              className="mb-4 sm:mb-8"
-              subtitle="Experimentează interactiv o parte din ce te așteaptă."
-            >
-              Un preview pentru tine
-            </StepHeadingWithIcon>
-
-            <div
-              className="opacity-0"
-              style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
-            >
-              <OnboardingSimulationCard subject={simulationSubject} grade={selectedGrade} />
-            </div>
-          </div>
-        )
-      }
-
+      case 8:
       case 9: {
         const selfGrade = onboardingState.selfGrade ?? DEFAULT_SELF_GRADE
         const targetGrade = onboardingState.targetGrade ?? defaultTargetGrade(selfGrade)
-        const dailyTime = onboardingState.dailyTime ?? "30"
 
         return (
           <OnboardingAccountStep
             selfGrade={selfGrade}
             targetGrade={targetGrade}
-            dailyTime={dailyTime}
             oauthLoading={oauthLoading}
             onGoogleStart={handleGoogleOAuthStart}
             onGoogleResult={handleGoogleOAuthResult}
-            onGitHubLogin={() => handleOAuthLogin("github")}
+            onEmailSignup={handleEmailSignup}
             onTryWithoutAccount={handleTryWithoutAccount}
             onGoHome={handleGoHomeFromGuestSignup}
             variant={onboardingState.guestDemo === "completed" ? "after-demo" : "default"}
             googleIcon={<GoogleIcon />}
-            githubIcon={<GitHubIcon />}
           />
         )
       }
@@ -1273,20 +1147,12 @@ function RegisterPageContent() {
 
         <main
           className={`flex min-h-0 flex-1 justify-center px-4 sm:px-6 ${
-            isTestimonialsStep
-              ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-0 sm:items-center sm:overflow-visible sm:py-8"
-              : showBottomCta
-                ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-3 sm:items-center sm:overflow-visible sm:pb-28 sm:pt-8"
-                : "items-center overflow-y-auto overflow-x-hidden py-4 sm:overflow-visible sm:py-8"
+            showBottomCta
+              ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-3 sm:items-center sm:overflow-visible sm:pb-28 sm:pt-8"
+              : "items-center overflow-y-auto overflow-x-hidden py-4 sm:overflow-visible sm:py-8"
           }`}
         >
-          <div
-            className={
-              isTestimonialsStep
-                ? "flex w-full flex-1 flex-col justify-center lg:min-h-0 lg:flex-none lg:justify-start"
-                : "flex w-full flex-col justify-center sm:block"
-            }
-          >
+          <div className="flex w-full flex-col justify-center sm:block">
             {renderStepContent()}
           </div>
         </main>
