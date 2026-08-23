@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { Check, Clock } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
 import { CountdownUnit } from "@/components/landing/countdown-unit"
@@ -231,12 +232,14 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
                 ))}
               </ul>
 
-              <Link
+              <FunnelCtaLink
                 href="/pricing"
+                ctaId="landing_pricing_earlybird"
+                placement="landing_pricing"
                 className="mt-5 flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] text-sm font-bold text-white shadow-[0_3px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110"
               >
                 Ia earlybird-ul de {EARLYBIRD_YEARLY_RON} RON/an
-              </Link>
+              </FunnelCtaLink>
             </div>
           </div>
         </FadeInUp>

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { ArrowRight, Award, ShieldCheck, Star } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
 import {
@@ -47,13 +48,15 @@ export function ParentHeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.2} className="mt-8">
-            <Link
+            <FunnelCtaLink
               href={PARENT_LANDING_CTA_HREF}
+              ctaId="parinti_hero_start"
+              placement="parinti_hero"
               className="inline-flex h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98]"
             >
               {PARENT_CTA_LABEL_PRIMARY}
               <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+            </FunnelCtaLink>
           </FadeInUp>
 
           <FadeInUp delay={0.24}>

@@ -47,6 +47,8 @@ import {
 } from "@/lib/guardian-onboarding"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { metaPixel } from "@/lib/meta-pixel"
+import { guardianStepName } from "@/lib/funnel-analytics"
+import { useOnboardingFunnel } from "@/hooks/use-onboarding-funnel"
 
 const mainCtaClassName =
   "inline-flex min-w-[200px] items-center justify-center rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#050505]"
@@ -126,6 +128,14 @@ function GuardianRegisterPageContent() {
   const handleAiIntroReadyChange = useCallback((ready: boolean) => {
     setAiIntroReady(ready)
   }, [])
+
+  const { markCompleted } = useOnboardingFunnel({
+    flow: "guardian",
+    step: onboardingState.step,
+    stepName: guardianStepName(onboardingState.step, onboardingState.role),
+    extra: { role: onboardingState.role },
+    enabled: hydrated,
+  })
 
   useEffect(() => {
     let parsedState = { ...defaultGuardianOnboardingState }
@@ -629,6 +639,7 @@ function GuardianRegisterPageContent() {
     })
     const accountId = onboardingState.role === "profesor" ? "account_profesor" : "account_parinte"
     const accountName = onboardingState.role === "profesor" ? "Cont profesor Planck" : "Cont părinte Planck"
+    markCompleted({ role: onboardingState.role })
     tiktokPixel.trackCompleteRegistration(
       {
         contents: [

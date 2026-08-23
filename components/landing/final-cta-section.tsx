@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { ArrowRight } from "lucide-react"
 import { FadeInUp, ScaleIn } from "@/components/scroll-animations"
 import { CountdownUnit } from "@/components/landing/countdown-unit"
@@ -48,13 +49,15 @@ export function LandingFinalCtaSection({ countdown }: { countdown?: CountdownSta
         </FadeInUp>
 
         <FadeInUp delay={0.26} className="mt-10">
-          <Link
+          <FunnelCtaLink
             href="/register"
+            ctaId="landing_final_start"
+            placement="landing_final"
             className="inline-flex h-14 w-full max-w-sm items-center justify-center rounded-full bg-[#7C5CFC] px-10 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 sm:w-auto"
           >
             Începe gratuit acum
             <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
+          </FunnelCtaLink>
         </FadeInUp>
       </div>
     </section>

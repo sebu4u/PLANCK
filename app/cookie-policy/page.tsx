@@ -53,6 +53,18 @@ const cookieInfo = [
     duration: '24 ore',
     category: 'analytics' as const
   },
+  {
+    name: 'ph_*',
+    purpose: 'PostHog: analiză produs, funnel și session replay',
+    duration: '1 an',
+    category: 'analytics' as const
+  },
+  {
+    name: 'planck_attribution',
+    purpose: 'Păstrează sursa campaniei (UTM, click IDs) pentru funnel',
+    duration: '90 zile',
+    category: 'analytics' as const
+  },
   
   // Marketing cookies
   {

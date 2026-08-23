@@ -13,6 +13,7 @@ import {
 import { markPrizeRedeemed } from "@/lib/prize-wheel/server"
 import { markShopCouponRedeemed } from "@/lib/shop/server"
 import { sendTikTokCheckoutPurchase } from "@/lib/tiktok-events-api"
+import { capturePosthogServerEvent } from "@/lib/posthog-server"
 
 export const runtime = "nodejs"
 
@@ -223,6 +224,21 @@ export async function POST(req: NextRequest) {
 
         await redeemCheckoutPerks(session)
         void sendTikTokCheckoutPurchase(session)
+        if (userId) {
+          void capturePosthogServerEvent({
+            distinctId: userId,
+            event: "subscription_purchased",
+            properties: {
+              $insert_id: `purchase:${session.id}`,
+              session_id: session.id,
+              interval: session.metadata?.interval,
+              campaign: session.metadata?.campaign,
+              value: typeof session.amount_total === "number" ? session.amount_total / 100 : undefined,
+              currency: session.currency,
+              plan: "premium",
+            },
+          })
+        }
         break
       }
       case "customer.subscription.created":

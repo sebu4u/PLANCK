@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/components/auth-provider'
 import { useCookieManager } from '@/lib/cookie-management'
 import { useAnalytics } from '@/lib/analytics'
+import { optInPosthog, optOutPosthog } from '@/lib/posthog-client'
 import { tiktokPixel } from '@/lib/tiktok-pixel'
 import { useToast } from '@/hooks/use-toast'
 import { 
@@ -97,6 +98,7 @@ export function PrivacySettings() {
     
     // Reinitializează analytics dacă este necesar
     if (key === 'analytics' && value) {
+      optInPosthog()
       analytics.initialize()
         .then(() => {
           analytics.trackCustomEvent('analytics_consent_given', {
@@ -105,6 +107,10 @@ export function PrivacySettings() {
           })
         })
         .catch(console.error)
+    }
+
+    if (key === 'analytics' && !value) {
+      optOutPosthog()
     }
 
     toast({

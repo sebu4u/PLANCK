@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { Rocket } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
@@ -59,12 +60,14 @@ export function HomePageScrollNavbar() {
           >
             Sign in
           </Link>
-          <Link
+          <FunnelCtaLink
             href="/register"
+            ctaId="home_nav_start"
+            placement="home_scroll_nav"
             className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-5 text-sm font-semibold text-white transition-[filter] hover:brightness-110 sm:h-11 sm:px-7 sm:text-base"
           >
             Începe gratuit
-          </Link>
+          </FunnelCtaLink>
         </div>
       </div>
     </nav>,

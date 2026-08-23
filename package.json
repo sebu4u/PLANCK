@@ -84,6 +84,8 @@
     "ogl": "^1.0.11",
     "openai": "^6.7.0",
     "partysocket": "^1.1.6",
+    "posthog-js": "^1.418.10",
+    "posthog-node": "^5.50.0",
     "react": "19.2.1",
     "react-day-picker": "9.10.0",
     "react-dom": "19.2.1",

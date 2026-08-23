@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { type CSSProperties } from "react"
 import { ArrowRight, Award, ShieldCheck, Star } from "lucide-react"
 import { LiveStats } from "@/components/live-stats"
@@ -47,8 +48,10 @@ export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile
                             </div>
 
                             <div className="scroll-animate-fade-up animate-delay-400 order-2 mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-3 lg:mx-0 lg:max-w-2xl lg:flex-row lg:flex-wrap lg:items-center lg:justify-start lg:gap-4">
-                                <Link
+                                <FunnelCtaLink
                                     href="/register"
+                                    ctaId="home_hero_try_free"
+                                    placement="home_hero"
                                     className="dashboard-start-glow box-border inline-flex h-11 w-full max-w-[260px] shrink-0 items-center justify-center rounded-full bg-[#7C5CFC] px-7 text-sm font-semibold text-white shadow-[0_3px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98] lg:h-14 lg:max-w-none lg:w-auto lg:px-9 lg:text-base lg:shadow-[0_4px_0_#5B47D6]"
                                     style={{ "--start-glow-tint": "rgba(224, 215, 255, 0.88)" } as CSSProperties}
                                 >
@@ -56,14 +59,16 @@ export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile
                                         Încearcă gratuit
                                         <ArrowRight className="h-3.5 w-3.5 shrink-0 text-white lg:h-4 lg:w-4" aria-hidden />
                                     </span>
-                                </Link>
+                                </FunnelCtaLink>
 
-                                <Link
+                                <FunnelCtaLink
                                     href={GUARDIAN_ONBOARDING_PATH}
+                                    ctaId="home_hero_parents"
+                                    placement="home_hero"
                                     className="box-border inline-flex h-12 w-full max-w-[260px] shrink-0 items-center justify-center rounded-full border border-gray-300 border-b-4 border-b-[#b8bcc4] bg-white px-7 text-sm font-semibold leading-snug text-gray-900 transition-[background-color,border-color] hover:bg-gray-50 hover:border-gray-400 hover:border-b-[#a8adb6] lg:h-[62px] lg:max-w-none lg:w-auto lg:border-b-[5px] lg:px-9 lg:text-base"
                                 >
                                     Pentru părinți și profesori
-                                </Link>
+                                </FunnelCtaLink>
                             </div>
 
                             <div className="order-3 w-full max-w-2xl pt-6 sm:pt-8 lg:order-3 lg:mx-0 lg:pt-5">

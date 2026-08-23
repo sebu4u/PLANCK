@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
+import { FunnelCtaLink } from "@/components/funnel-cta-link"
 import { ArrowRight } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
@@ -28,13 +28,15 @@ export function LandingStickyMobileCta() {
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: "spring", stiffness: 380, damping: 32 }}
         >
-          <Link
+          <FunnelCtaLink
             href="/register"
+            ctaId="landing_sticky_start"
+            placement="landing_sticky"
             className="flex h-12 w-full items-center justify-center rounded-full bg-[#7C5CFC] text-sm font-bold text-white shadow-[0_4px_0_#5B47D6]"
           >
             Începe gratuit!
             <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
+          </FunnelCtaLink>
         </motion.div>
       )}
     </AnimatePresence>

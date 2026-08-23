@@ -14,6 +14,7 @@ import { InlineMath } from 'react-katex';
 import React from 'react';
 import { useAuth } from "@/components/auth-provider"
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
+import { trackFunnelEvent } from "@/lib/funnel-analytics"
 import { supabase } from "@/lib/supabaseClient"
 import confetti from 'canvas-confetti'
 import { Skeleton } from "@/components/ui/skeleton"
@@ -186,6 +187,10 @@ export default function ProblemDetailClient({
   )
   const router = useRouter()
   const [catalogBackLoading, setCatalogBackLoading] = useState(false)
+
+  useEffect(() => {
+    trackFunnelEvent("problem_started", { problem_id: problem.id })
+  }, [problem.id])
   const [wrongAnswerPenalty, setWrongAnswerPenalty] = useState<ProblemWrongAnswerPenalty | null>(null)
   const [wrongPageShake, setWrongPageShake] = useState(false)
   const [mobileAnswerMaximised, setMobileAnswerMaximised] = useState(false)

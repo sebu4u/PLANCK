@@ -16,6 +16,8 @@ import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { metaPixel } from "@/lib/meta-pixel"
+import { STUDENT_STEP_NAMES } from "@/lib/funnel-analytics"
+import { useOnboardingFunnel } from "@/hooks/use-onboarding-funnel"
 import { supabase } from "@/lib/supabaseClient"
 import {
   clampSelfGrade,
@@ -285,6 +287,17 @@ function RegisterPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, profile, profileSyncedUserId, userType, loginWithGoogle, loginWithGitHub, needsOnboarding, refreshProfile } = useAuth()
+
+  const { markCompleted } = useOnboardingFunnel({
+    flow: "student",
+    step: onboardingState.step,
+    stepName: STUDENT_STEP_NAMES[String(onboardingState.step)] ?? String(onboardingState.step),
+    extra: {
+      subject: onboardingState.subject,
+      grade: onboardingState.grade,
+    },
+    enabled: hydrated,
+  })
 
   const shouldForcePostAuthStep = searchParams.get("onboarding") === "1"
   const shouldForceOAuthOnboarding = searchParams.get("onboarding") === OAUTH_ONBOARDING_PARAM
@@ -852,6 +865,10 @@ function RegisterPageContent() {
       value: 0,
       currency: "RON",
     }
+    markCompleted({
+      subject: onboardingState.subject,
+      grade: onboardingState.grade,
+    })
     tiktokPixel.trackCompleteRegistration(registrationParams, user.id)
     metaPixel.trackCompleteRegistration(
       {
