@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Zap } from "lucide-react"
+import { ArrowRight, CheckCircle2 } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import {
   addDays,
@@ -14,13 +14,9 @@ import {
 import {
   practiceSubjectToWorkshopSubject,
   WORKSHOP_SUBJECT_COLORS,
-  WORKSHOP_SUBJECT_LABELS,
   type WorkshopPublic,
 } from "@/lib/pregatire/types"
-import {
-  getPracticeSubjectLabel,
-  normalizePracticeSubject,
-} from "@/lib/practice-subject"
+import { normalizePracticeSubject } from "@/lib/practice-subject"
 import { cn } from "@/lib/utils"
 import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
 import { WorkshopBacBadge } from "@/components/pregatire/workshop-bac-badge"
@@ -74,7 +70,6 @@ function buildNextFiveDays(workshopDayKeys: Set<string>, now = new Date()): Week
 export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireCardProps) {
   const practiceSubject = normalizePracticeSubject(preferredMaterie)
   const workshopSubject = practiceSubjectToWorkshopSubject(practiceSubject)
-  const subjectLabel = getPracticeSubjectLabel(practiceSubject)
   const accent = WORKSHOP_SUBJECT_COLORS[workshopSubject]
 
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
@@ -92,7 +87,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
 
         const from = new Date(Date.now() - LIVE_LOOKBACK_MS).toISOString()
         const params = new URLSearchParams({
-          subject: workshopSubject,
+          enrolled: "1",
           from,
         })
 
@@ -119,7 +114,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
     return () => {
       isMounted = false
     }
-  }, [workshopSubject])
+  }, [])
 
   const workshopDayKeys = useMemo(() => {
     const keys = new Set<string>()
@@ -148,7 +143,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9aa0b4]">Pregătiri</p>
           <p className="mt-0.5 truncate text-sm text-[#6b7280]">
-            Următoarele pentru {WORKSHOP_SUBJECT_LABELS[workshopSubject]}
+            Pregătirea la care ești înscris
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#111827]">
@@ -201,7 +196,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
         ) : listedWorkshops.length === 0 ? (
           <div className="rounded-2xl bg-[#f9fafb] px-3 py-3 text-center">
             <p className="text-sm text-[#6b7280]">
-              Nu sunt pregătiri programate pentru {subjectLabel}.
+              Nu ești înscris la nicio pregătire.
             </p>
             <span className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-[#111827]">
               Vezi calendarul
@@ -212,6 +207,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
           <ul className="flex flex-col gap-1.5">
             {listedWorkshops.map((workshop) => {
               const live = isWorkshopLive(workshop)
+              const workshopAccent = WORKSHOP_SUBJECT_COLORS[workshop.subject]
               return (
                 <li key={workshop.id}>
                   <div className="flex items-start justify-between gap-2 rounded-2xl border border-[#eef0f4] bg-[#fafafa] px-2.5 py-2">
@@ -219,7 +215,7 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
                       <div className="flex items-center gap-2">
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: accent }}
+                          style={{ backgroundColor: workshopAccent }}
                           aria-hidden
                         />
                         <p className="truncate text-sm font-semibold text-[#111827]">{workshop.title}</p>
@@ -235,9 +231,9 @@ export function DashboardPregatireCard({ preferredMaterie }: DashboardPregatireC
                         {workshop.teacher?.name ? ` · ${workshop.teacher.name}` : ""}
                       </p>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-0.5 pt-0.5 text-xs font-semibold tabular-nums text-amber-700">
-                      <Zap className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
-                      {workshop.energy_cost}
+                    <span className="inline-flex shrink-0 items-center gap-0.5 pt-0.5 text-xs font-semibold text-emerald-700">
+                      <CheckCircle2 className="h-3 w-3" aria-hidden />
+                      Înscris
                     </span>
                   </div>
                 </li>

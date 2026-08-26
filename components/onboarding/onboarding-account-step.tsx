@@ -21,17 +21,17 @@ const emailSubmitClassName =
   "inline-flex h-[52px] w-full items-center justify-center rounded-full bg-[#2a2a2a] px-6 text-[15px] font-bold leading-none text-[#f5f4f2] shadow-[0_5px_0_#050505] transition-[transform,box-shadow] hover:translate-y-[1px] hover:shadow-[0_4px_0_#050505] active:translate-y-[5px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-[0_5px_0_#050505]"
 
 type OnboardingAccountStepProps = {
-  selfGrade: number
-  targetGrade: number
+  selfGrade?: number
+  targetGrade?: number
   oauthLoading: "google" | "email" | null
-  onGoogleStart: () => void
-  onGoogleResult: (result: OAuthPopupResult) => void
+  onGoogleStart?: () => void
+  onGoogleResult?: (result: OAuthPopupResult) => void
   onEmailSignup: (email: string, password: string) => void | Promise<void>
   onTryWithoutAccount?: () => void
   onGoHome?: () => void
   /** After finishing the demo path without an account: hide “try without account”. */
-  variant?: "default" | "after-demo"
-  googleIcon: React.ReactNode
+  variant?: "default" | "after-demo" | "email-only"
+  googleIcon?: React.ReactNode
 }
 
 export function OnboardingAccountStep({
@@ -46,8 +46,18 @@ export function OnboardingAccountStep({
   variant = "default",
   googleIcon,
 }: OnboardingAccountStepProps) {
-  const copy = buildPlanSummaryCopy({ selfGrade, targetGrade })
+  const copy =
+    variant === "email-only"
+      ? {
+          title: "Creează-ți contul",
+          subtitle: "Email și parolă. După nume, ești pe dashboard.",
+        }
+      : buildPlanSummaryCopy({
+          selfGrade: selfGrade ?? 7,
+          targetGrade: targetGrade ?? 9,
+        })
   const busy = oauthLoading !== null
+  const emailOnly = variant === "email-only"
 
   return (
     <div className="mx-auto w-full max-w-[480px]">
@@ -77,25 +87,29 @@ export function OnboardingAccountStep({
         </div>
 
         <div className="space-y-4 pb-1">
-          <GoogleSignInButton
-            disabled={busy}
-            className={oauthButtonClassName}
-            onStart={onGoogleStart}
-            onResult={onGoogleResult}
-          >
-            {oauthLoading === "google" ? (
-              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-black" />
-            ) : (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center">{googleIcon}</span>
-            )}
-            Continuă cu Google
-          </GoogleSignInButton>
+          {emailOnly || !onGoogleResult ? null : (
+            <>
+              <GoogleSignInButton
+                disabled={busy}
+                className={oauthButtonClassName}
+                onStart={onGoogleStart}
+                onResult={onGoogleResult}
+              >
+                {oauthLoading === "google" ? (
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin text-black" />
+                ) : (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center">{googleIcon}</span>
+                )}
+                Continuă cu Google
+              </GoogleSignInButton>
 
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-[#ececf1]" />
-            <span className="text-xs font-medium uppercase tracking-wide text-[#9aa0ad]">sau</span>
-            <div className="h-px flex-1 bg-[#ececf1]" />
-          </div>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-[#ececf1]" />
+                <span className="text-xs font-medium uppercase tracking-wide text-[#9aa0ad]">sau</span>
+                <div className="h-px flex-1 bg-[#ececf1]" />
+              </div>
+            </>
+          )}
 
           <OnboardingEmailSignupForm
             disabled={busy}
@@ -107,7 +121,7 @@ export function OnboardingAccountStep({
         </div>
       </div>
 
-      {variant === "after-demo" ? (
+      {emailOnly ? null : variant === "after-demo" ? (
         <button
           type="button"
           onClick={onGoHome}

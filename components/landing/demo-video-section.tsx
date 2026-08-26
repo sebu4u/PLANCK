@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { FadeInLeft, FadeInRight } from "@/components/scroll-animations"
@@ -8,7 +9,16 @@ import { LazyYouTubePlayer } from "@/components/lazy-youtube-player"
 /** ID YouTube al rezolvării demo. Schimbă când ai clipul final. */
 const DEMO_YOUTUBE_VIDEO_ID = "QBTWRag_3Ls"
 
-export function LandingDemoVideoSection() {
+export function LandingDemoVideoSection({
+  renderCta,
+}: {
+  renderCta?: (className: string) => ReactNode
+}) {
+  const desktopCtaClassName =
+    "mt-8 hidden h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 lg:inline-flex"
+  const mobileCtaClassName =
+    "mt-8 inline-flex h-14 w-full items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 lg:hidden"
+
   return (
     <section className="overflow-x-hidden bg-white py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -21,13 +31,14 @@ export function LandingDemoVideoSection() {
               Urmărește un scurt demo video ca să vezi cum predăm. Apoi poți începe cu prima
               pregătire complet gratuită, din partea noastră.
             </p>
-            <Link
-              href="/register"
-              className="mt-8 hidden h-14 items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 lg:inline-flex"
-            >
-              Vreau prima pregătire gratuită
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+            {renderCta ? (
+              renderCta(desktopCtaClassName)
+            ) : (
+              <Link href="/register" className={desktopCtaClassName}>
+                Vreau prima pregătire gratuită
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            )}
           </FadeInRight>
 
           <FadeInLeft>
@@ -38,13 +49,14 @@ export function LandingDemoVideoSection() {
                 className="rounded-none shadow-none"
               />
             </div>
-            <Link
-              href="/register"
-              className="mt-8 inline-flex h-14 w-full items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 lg:hidden"
-            >
-              Vreau prima pregătire gratuită
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+            {renderCta ? (
+              renderCta(mobileCtaClassName)
+            ) : (
+              <Link href="/register" className={mobileCtaClassName}>
+                Vreau prima pregătire gratuită
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            )}
           </FadeInLeft>
         </div>
       </div>

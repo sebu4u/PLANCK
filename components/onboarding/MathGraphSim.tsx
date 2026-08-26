@@ -122,6 +122,12 @@ export function MathGraphSim() {
   const svgRef = useRef<SVGSVGElement>(null)
   const nextId = useRef(0)
   const dragRef = useRef<DragState | null>(null)
+  const pendingTapRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
+  const pendingDragRef = useRef<
+    | { kind: "point"; id: number; pointerId: number; x: number; y: number }
+    | { kind: "curve"; key: string; pointerId: number; x: number; y: number }
+    | null
+  >(null)
   const [points, setPoints] = useState<GraphPoint[]>([])
   const [curves, setCurves] = useState<CurveControls>({})
   const [hoveredId, setHoveredId] = useState<number | null>(null)
@@ -214,13 +220,42 @@ export function MathGraphSim() {
       if ((event.target as Element).closest("[data-graph-point], [data-curve-handle], [data-curve-segment]")) {
         return
       }
-      addPoint(event.clientX, event.clientY)
+      pendingTapRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
     },
-    [addPoint],
+    [],
   )
 
   const handleSvgPointerMove = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
+      const pending = pendingTapRef.current
+      if (pending && pending.pointerId === event.pointerId) {
+        const dx = event.clientX - pending.x
+        const dy = event.clientY - pending.y
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          pendingTapRef.current = null
+        }
+      }
+
+      const pendingDrag = pendingDragRef.current
+      if (pendingDrag && pendingDrag.pointerId === event.pointerId && !dragRef.current) {
+        const dx = event.clientX - pendingDrag.x
+        const dy = event.clientY - pendingDrag.y
+        if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) {
+          pendingDragRef.current = null
+          return
+        }
+        if (Math.hypot(dx, dy) <= 10) return
+        svgRef.current?.setPointerCapture(event.pointerId)
+        if (pendingDrag.kind === "point") {
+          dragRef.current = { kind: "point", id: pendingDrag.id, pointerId: event.pointerId }
+          setDraggingId(pendingDrag.id)
+        } else {
+          dragRef.current = { kind: "curve", key: pendingDrag.key, pointerId: event.pointerId }
+          updateCurveControl(pendingDrag.key, event.clientX, event.clientY)
+        }
+        pendingDragRef.current = null
+      }
+
       const drag = dragRef.current
       if (!drag || drag.pointerId !== event.pointerId) return
 
@@ -234,16 +269,33 @@ export function MathGraphSim() {
   )
 
   const endDrag = useCallback((event: React.PointerEvent) => {
+    const pending = pendingTapRef.current
+    if (pending && pending.pointerId === event.pointerId) {
+      addPoint(pending.x, pending.y)
+      pendingTapRef.current = null
+    }
+    pendingDragRef.current = null
+
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
 
     dragRef.current = null
     setDraggingId(null)
     svgRef.current?.releasePointerCapture(event.pointerId)
-  }, [])
+  }, [addPoint])
 
   const startPointDrag = useCallback((event: React.PointerEvent, id: number) => {
     event.stopPropagation()
+    if (event.pointerType === "touch") {
+      pendingDragRef.current = {
+        kind: "point",
+        id,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      }
+      return
+    }
     svgRef.current?.setPointerCapture(event.pointerId)
     dragRef.current = { kind: "point", id, pointerId: event.pointerId }
     setDraggingId(id)
@@ -252,6 +304,16 @@ export function MathGraphSim() {
   const startCurveDrag = useCallback(
     (event: React.PointerEvent, key: string) => {
       event.stopPropagation()
+      if (event.pointerType === "touch") {
+        pendingDragRef.current = {
+          kind: "curve",
+          key,
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+        }
+        return
+      }
       svgRef.current?.setPointerCapture(event.pointerId)
       dragRef.current = { kind: "curve", key, pointerId: event.pointerId }
       updateCurveControl(key, event.clientX, event.clientY)
@@ -288,7 +350,8 @@ export function MathGraphSim() {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${layout.w} ${layout.h}`}
-        className="h-full min-h-0 w-full flex-1 touch-none select-none rounded-lg border border-[#ebeaf3] bg-[#fafafa] sm:h-auto sm:flex-none"
+        className="h-full min-h-0 w-full flex-1 select-none rounded-lg border border-[#ebeaf3] bg-[#fafafa] sm:h-auto sm:flex-none"
+        style={{ touchAction: draggingId != null ? "none" : "pan-y" }}
         onPointerDown={handleSvgPointerDown}
         onPointerMove={handleSvgPointerMove}
         onPointerUp={endDrag}

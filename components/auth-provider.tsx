@@ -238,15 +238,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
       .single()
 
     if (data) {
-      // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
-      if (data.user_icon) {
-        const iconUrl = data.user_icon.includes('?t=')
-          ? data.user_icon
-          : `${data.user_icon}?t=${Date.now()}`
-        setProfile({ ...data, user_icon: iconUrl })
-      } else {
-        setProfile(data)
-      }
+      setProfile(data)
       if (data.plan && typeof data.plan === "string") {
         setSubscriptionPlan(data.plan)
       } else {
@@ -284,15 +276,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
         .eq("user_id", user.id)
         .single()
       if (created) {
-        // Only add timestamp if icon URL doesn't already have one (to prevent constant reloading)
-        if (created.user_icon) {
-          const iconUrl = created.user_icon.includes('?t=')
-            ? created.user_icon
-            : `${created.user_icon}?t=${Date.now()}`
-          setProfile({ ...created, user_icon: iconUrl })
-        } else {
-          setProfile(created)
-        }
+        setProfile(created)
         setSubscriptionPlan(
           typeof created.plan === "string" && created.plan.trim().length > 0
             ? created.plan

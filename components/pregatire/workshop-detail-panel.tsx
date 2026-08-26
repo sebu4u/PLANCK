@@ -11,7 +11,6 @@ import {
   Loader2,
   Users,
   Video,
-  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -106,19 +105,12 @@ export function WorkshopDetailPanel({
   const unlockCtaLabel = full
     ? "Locuri epuizate"
     : isLoggedIn
-      ? `Deblochează · ${workshop.energy_cost} energie`
-      : "Autentifică-te pentru a debloca"
+      ? "Rezervă-ți locul gratuit."
+      : "Autentifică-te pentru a rezerva"
 
   const handleUnlock = async () => {
     if (!isLoggedIn) {
       router.push(`/login?next=${encodeURIComponent(`/pregatire/${workshop.id}`)}`)
-      return
-    }
-    if (
-      !window.confirm(
-        `Deblochezi „${workshop.title}” pentru ${workshop.energy_cost} energie? Accesul rămâne permanent.`,
-      )
-    ) {
       return
     }
 
@@ -138,7 +130,7 @@ export function WorkshopDetailPanel({
       const payload = await response.json()
       if (!response.ok) {
         toast({
-          title: "Nu am putut debloca",
+          title: "Nu am putut rezerva locul",
           description: payload.error ?? "Încearcă din nou.",
           variant: "destructive",
         })
@@ -180,17 +172,15 @@ export function WorkshopDetailPanel({
         })
       }
       toast({
-        title: payload.already_unlocked ? "Deja deblocat" : "Pregătire deblocată",
+        title: payload.already_unlocked ? "Ești deja înscris" : "Te-ai înscris",
         description: past
-          ? "Poți accesa înregistrarea."
-          : isWorkshopMeetVisible(workshop.starts_at)
-            ? "Link-ul Google Meet este disponibil."
-            : "Link-ul Google Meet apare cu 10 minute înainte de începere.",
+          ? "Locul tău este rezervat. Poți accesa înregistrarea."
+          : "Locul tău a fost rezervat gratuit.",
       })
     } catch {
       toast({
         title: "Eroare",
-        description: "Nu am putut debloca pregătirea.",
+        description: "Nu am putut rezerva locul.",
         variant: "destructive",
       })
     } finally {
@@ -227,7 +217,7 @@ export function WorkshopDetailPanel({
             {workshop.unlocked ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                 <CheckCircle2 className="h-3 w-3" />
-                Deblocat
+                Înscris
               </span>
             ) : null}
           </div>
@@ -269,9 +259,8 @@ export function WorkshopDetailPanel({
               <Clock className="h-4 w-4" />
               {workshop.duration_minutes} minute
             </span>
-            <span className="inline-flex items-center gap-1.5 text-amber-700">
-              <Zap className="h-4 w-4 fill-amber-400 text-amber-500" />
-              {workshop.energy_cost} energie
+            <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              Gratuit
             </span>
             {workshop.max_seats != null ? (
               <span className="inline-flex items-center gap-1.5">
@@ -290,11 +279,7 @@ export function WorkshopDetailPanel({
                 disabled={unlocking || full}
                 onClick={() => void handleUnlock()}
               >
-                {unlocking ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Zap className="mr-2 h-4 w-4 fill-amber-300 text-amber-300" />
-                )}
+                {unlocking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {unlockCtaLabel}
               </Button>
             ) : null}

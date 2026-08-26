@@ -96,6 +96,48 @@ export function buildGradeProjection(
   return points
 }
 
+/**
+ * Projection sampled more densely and offset with a damped wave so the path
+ * has visible ups and downs. `months` represents the desired duration units.
+ */
+export function buildWavyGradeProjection(
+  currentGrade: number,
+  targetGrade: number,
+  months = 12,
+  startDate: Date = new Date(),
+): GradeProjectionPoint[] {
+  const samples = months * 8
+  const gap = targetGrade - currentGrade
+  const amplitude = Math.min(0.55, Math.max(0.22, Math.abs(gap) * 0.14))
+  const floor = Math.min(currentGrade, targetGrade) - 0.2
+  const ceil = Math.max(currentGrade, targetGrade) + 0.15
+  const points: GradeProjectionPoint[] = []
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples
+    const monthOffset = t * months
+    // The first steps feel more rewarding, then progress settles as the
+    // student approaches their target.
+    const trend = currentGrade + gap * easeOutCubic(t)
+    const envelope = Math.sin(t * Math.PI)
+    const wave =
+      Math.sin(t * Math.PI * 4.2) * 0.72 +
+      Math.sin(t * Math.PI * 7.1 + 1.15) * 0.38 +
+      Math.sin(t * Math.PI * 2.3 + 0.55) * 0.28
+    const raw = trend + amplitude * envelope * wave
+    const bounded = Math.min(ceil, Math.max(floor, raw))
+    const grade = i === 0 ? currentGrade : i === samples ? targetGrade : bounded
+
+    points.push({
+      monthIndex: monthOffset,
+      label: i === 0 ? "Azi" : monthLabelFromDate(startDate, Math.round(monthOffset)),
+      grade: clampGrade(grade),
+    })
+  }
+
+  return points
+}
+
 export function formatGrade(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }

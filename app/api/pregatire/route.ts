@@ -25,8 +25,23 @@ export async function GET(req: NextRequest) {
     const subject = searchParams.get("subject")
     const from = searchParams.get("from")
     const to = searchParams.get("to")
+    const enrolledOnly = searchParams.get("enrolled") === "1"
 
+    const userId = await optionalUserId(req)
     const supabase = getServiceRoleSupabase()
+
+    if (enrolledOnly && !userId) {
+      return NextResponse.json({ workshops: [] })
+    }
+
+    const enrolledIds = enrolledOnly && userId
+      ? await fetchUserUnlockIds(supabase, userId)
+      : null
+
+    if (enrolledIds && enrolledIds.size === 0) {
+      return NextResponse.json({ workshops: [] })
+    }
+
     let query = supabase
       .from("workshops_public")
       .select("*")
@@ -37,6 +52,7 @@ export async function GET(req: NextRequest) {
     }
     if (from) query = query.gte("starts_at", from)
     if (to) query = query.lte("starts_at", to)
+    if (enrolledIds) query = query.in("id", [...enrolledIds])
 
     const { data, error } = await query
     if (error) {
@@ -49,14 +65,15 @@ export async function GET(req: NextRequest) {
       supabase,
       rows.map((r) => r.teacher_id as string),
     )
-    const userId = await optionalUserId(req)
-    const unlockIds = userId
-      ? await fetchUserUnlockIds(
-          supabase,
-          userId,
-          rows.map((r) => r.id as string),
-        )
-      : new Set<string>()
+    const unlockIds = enrolledIds
+      ? enrolledIds
+      : userId
+        ? await fetchUserUnlockIds(
+            supabase,
+            userId,
+            rows.map((r) => r.id as string),
+          )
+        : new Set<string>()
 
     const workshops = rows.map((row) =>
       mapWorkshopPublic(

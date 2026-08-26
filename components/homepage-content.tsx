@@ -14,9 +14,10 @@ import { HomePageLearningPathPreviewSection } from "@/components/homepage-learni
 import { LandingWorkshopsCalendarSection } from "@/components/landing/workshops-calendar-section"
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
-import { ReviewsSection } from "@/components/homepage-reviews"
 import { HomepageMobileReviewsBar } from "@/components/homepage-mobile-reviews-bar"
 import { HomepageHeroTestimonials } from "@/components/landing/hero-review-rows"
+import { LandingTeachersSection } from "@/components/landing/teachers-section"
+import { Landing1LeuMariaTestimonialSection } from "@/components/landing-1leu/maria-testimonial-section"
 import { FAQSection } from "@/components/faq-section"
 
 const HOME_SECTION_IDS = [
@@ -172,9 +173,9 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
 
       <HomePageMaiEficientSection />
 
-      {/* Reviews Section */}
       <section id="home-reviews">
-        <ReviewsSection />
+        <LandingTeachersSection />
+        <Landing1LeuMariaTestimonialSection />
       </section>
 
       {/* FAQ Section */}

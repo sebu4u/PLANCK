@@ -4,15 +4,14 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { PrizeWheelVisual } from "@/components/prize-wheel/prize-wheel-visual"
 import { useCountdown } from "@/lib/landing-campaign"
-
-const CASTIGA_DEADLINE = new Date("2026-09-01T00:00:00")
+import { PRIZE_WHEEL_CAMPAIGN_START_AT } from "@/lib/prize-wheel/campaign"
 
 function pad(value: number) {
   return String(value).padStart(2, "0")
 }
 
 export function StudentPrizeWheelCard() {
-  const { days, hours, minutes, seconds } = useCountdown(CASTIGA_DEADLINE)
+  const { days, hours, minutes, seconds } = useCountdown(PRIZE_WHEEL_CAMPAIGN_START_AT)
 
   return (
     <Link

@@ -77,14 +77,14 @@ export async function fetchTeachersByIds(
 export async function fetchUserUnlockIds(
   supabase: SupabaseClient,
   userId: string,
-  workshopIds: string[],
+  workshopIds?: string[],
 ): Promise<Set<string>> {
-  if (!userId || workshopIds.length === 0) return new Set()
-  const { data } = await supabase
-    .from("workshop_unlocks")
-    .select("workshop_id")
-    .eq("user_id", userId)
-    .in("workshop_id", workshopIds)
+  if (!userId) return new Set()
+  if (workshopIds && workshopIds.length === 0) return new Set()
 
+  let query = supabase.from("workshop_unlocks").select("workshop_id").eq("user_id", userId)
+  if (workshopIds) query = query.in("workshop_id", workshopIds)
+
+  const { data } = await query
   return new Set((data ?? []).map((r) => r.workshop_id as string))
 }

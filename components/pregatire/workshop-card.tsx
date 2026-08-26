@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Clock, Loader2, Users, Video, Zap } from "lucide-react"
+import { Clock, Loader2, Users, Video } from "lucide-react"
 import {
   formatWorkshopTime,
   isWorkshopPast,
@@ -57,7 +57,7 @@ export function WorkshopCard({
             {workshop.is_bac ? <WorkshopBacBadge /> : null}
             {workshop.unlocked ? (
               <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                Deblocat
+                Înscris
               </span>
             ) : null}
             {past && workshop.has_recording ? (
@@ -95,10 +95,7 @@ export function WorkshopCard({
           <p className="text-sm font-semibold tabular-nums text-[#111827]">
             {formatWorkshopTime(workshop.starts_at)}
           </p>
-          <p className="mt-1 inline-flex items-center gap-1 text-xs text-amber-700">
-            <Zap className="h-3 w-3 fill-amber-400 text-amber-500" />
-            {workshop.energy_cost}
-          </p>
+          <p className="mt-1 text-xs font-medium text-emerald-700">Gratuit</p>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 pl-2 text-xs text-[#9ca3af]">

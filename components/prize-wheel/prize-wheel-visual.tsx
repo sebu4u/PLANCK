@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 import {
@@ -18,6 +18,8 @@ type PrizeWheelVisualProps = {
   showLabels?: boolean
   showPointer?: boolean
   tone?: PrizeWheelTone
+  /** Slow continuous rotation for locked/preview wheels. Ignored while spinning. */
+  idle?: boolean
 }
 
 const ROSE_PALETTE = {
@@ -84,7 +86,10 @@ export function PrizeWheelVisual({
   showLabels = true,
   showPointer = true,
   tone = "violet",
+  idle = false,
 }: PrizeWheelVisualProps) {
+  const reduceMotion = useReducedMotion()
+  const idleSpin = idle && !spinning && !reduceMotion
   const hubFill = tone === "rose" ? ROSE_PALETTE.hub : "#5B47D6"
   const pointerFill = tone === "rose" ? ROSE_PALETTE.pointer : "#5B47D6"
 
@@ -109,11 +114,13 @@ export function PrizeWheelVisual({
 
       <motion.div
         className="h-full w-full"
-        animate={{ rotate: rotation }}
+        animate={{ rotate: idleSpin ? 360 : rotation }}
         transition={
           spinning
             ? { duration: 4.4, ease: [0.12, 0.8, 0.16, 1] }
-            : { duration: 0 }
+            : idleSpin
+              ? { duration: 36, ease: "linear", repeat: Infinity }
+              : { duration: 0 }
         }
       >
         <svg

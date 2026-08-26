@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { ArrowRight, Clock, Zap } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
@@ -345,7 +345,15 @@ function WorkshopPreviewCard({ workshop }: { workshop: WorkshopPublic }) {
   )
 }
 
-export function LandingWorkshopsCalendarSection() {
+export function LandingWorkshopsCalendarSection({
+  title = "Vezi exact ce se explică, în fiecare zi",
+  campaignStyle = false,
+  cta,
+}: {
+  title?: string
+  campaignStyle?: boolean
+  cta?: ReactNode
+}) {
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<WorkshopPublic[] | null>(null)
@@ -423,10 +431,22 @@ export function LandingWorkshopsCalendarSection() {
   return (
     <section className="bg-white py-20 sm:py-28">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <FadeInUp className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-black tracking-tight text-gray-900 sm:text-4xl lg:text-[2.5rem] lg:leading-tight">
-            Vezi exact ce se explică, în fiecare zi
+        <FadeInUp className={campaignStyle ? "max-w-3xl text-left" : "mx-auto max-w-3xl text-center"}>
+          {campaignStyle ? (
+            <span className="inline-flex rounded-md bg-[#7C5CFC] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+              Cum funcționează?
+            </span>
+          ) : null}
+          <h2
+            className={
+              campaignStyle
+                ? "mt-5 text-2xl font-black tracking-tight text-gray-900 sm:text-3xl lg:text-4xl lg:leading-tight"
+                : "text-3xl font-black tracking-tight text-gray-900 sm:text-4xl lg:text-[2.5rem] lg:leading-tight"
+            }
+          >
+            {title}
           </h2>
+          {campaignStyle ? <div className="mt-4 h-[3px] w-16 rounded-full bg-[#A3E635]" aria-hidden /> : null}
           <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg">
             Alege materia, vezi ce se predă azi, și intri direct. Fără să cauți profesor după
             profesor. Înveți de la olimpici naționali și internaționali la aceste discipline.
@@ -470,13 +490,15 @@ export function LandingWorkshopsCalendarSection() {
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <FadeInUp delay={0.2} className="mt-8 flex justify-center sm:mt-10">
-          <Link
-            href="/register"
-            className="inline-flex h-14 w-full max-w-sm items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 sm:w-auto"
-          >
-            Vreau meditație gratuită
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
+          {cta ?? (
+            <Link
+              href="/register"
+              className="inline-flex h-14 w-full max-w-sm items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 sm:w-auto"
+            >
+              Vreau meditație gratuită
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          )}
         </FadeInUp>
       </div>
 

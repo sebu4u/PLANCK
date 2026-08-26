@@ -52,6 +52,15 @@ export function CsPathfindingSim() {
   const [isDragging, setIsDragging] = useState(false)
   const [dragMode, setDragMode] = useState<"wall" | "empty">("wall")
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const gestureRef = useRef<{
+    pointerId: number
+    x: number
+    y: number
+    r: number
+    c: number
+    painting: boolean
+    mode: "wall" | "empty" | null
+  } | null>(null)
 
   const clearVis = useCallback(() => {
     setGrid((prev) =>
@@ -92,6 +101,76 @@ export function CsPathfindingSim() {
       interact(r, c, mode)
     },
     [isRunning, grid, interact],
+  )
+
+  const onPointerDownCell = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>, r: number, c: number) => {
+      if (isRunning) return
+      if (r === START.r && c === START.c) return
+      if (r === END.r && c === END.c) return
+      if (event.pointerType === "mouse" && event.button !== 0) return
+
+      if (event.pointerType !== "touch") {
+        onDown(r, c)
+        return
+      }
+
+      gestureRef.current = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        r,
+        c,
+        painting: false,
+        mode: null,
+      }
+    },
+    [isRunning, onDown],
+  )
+
+  const onGridPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const gesture = gestureRef.current
+      if (!gesture || gesture.pointerId !== event.pointerId || isRunning) return
+
+      const dx = event.clientX - gesture.x
+      const dy = event.clientY - gesture.y
+
+      if (!gesture.painting) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) {
+          gestureRef.current = null
+          return
+        }
+        if (Math.hypot(dx, dy) <= 10) return
+        gesture.painting = true
+        const mode = grid[gesture.r][gesture.c] === "wall" ? "empty" : "wall"
+        gesture.mode = mode
+        setDragMode(mode)
+        setIsDragging(true)
+        interact(gesture.r, gesture.c, mode)
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+        return
+      }
+
+      const el = document.elementFromPoint(event.clientX, event.clientY)
+      const key = el?.getAttribute("data-cell")
+      if (!key) return
+      const [r, c] = key.split(",").map(Number)
+      interact(r, c, gesture.mode ?? dragMode)
+    },
+    [dragMode, grid, interact, isRunning],
+  )
+
+  const onGridPointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const gesture = gestureRef.current
+      if (gesture && gesture.pointerId === event.pointerId) {
+        if (!gesture.painting) onDown(gesture.r, gesture.c)
+        gestureRef.current = null
+      }
+      setIsDragging(false)
+    },
+    [onDown],
   )
 
   const onEnter = useCallback(
@@ -221,19 +300,6 @@ export function CsPathfindingSim() {
     }
   }, [])
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (!isDragging || isRunning) return
-      const touch = e.touches[0]
-      const el = document.elementFromPoint(touch.clientX, touch.clientY)
-      const key = el?.getAttribute("data-cell")
-      if (!key) return
-      const [r, c] = key.split(",").map(Number)
-      interact(r, c, dragMode)
-    },
-    [isDragging, isRunning, dragMode, interact],
-  )
-
   return (
     <div>
       <div
@@ -241,10 +307,12 @@ export function CsPathfindingSim() {
         style={{
           gridTemplateColumns: `repeat(${COLS}, 1fr)`,
           gap: 1,
-          touchAction: "none",
+          touchAction: isDragging ? "none" : "pan-y",
         }}
         onMouseLeave={() => setIsDragging(false)}
-        onTouchMove={handleTouchMove}
+        onPointerMove={onGridPointerMove}
+        onPointerUp={onGridPointerUp}
+        onPointerCancel={onGridPointerUp}
       >
         {grid.flatMap((row, r) =>
           row.map((cell, c) => (
@@ -252,9 +320,8 @@ export function CsPathfindingSim() {
               key={`${r}-${c}`}
               data-cell={`${r},${c}`}
               className={`aspect-square transition-colors duration-75 ${CELL_CLS[cell]}`}
-              onMouseDown={() => onDown(r, c)}
+              onPointerDown={(event) => onPointerDownCell(event, r, c)}
               onMouseEnter={() => onEnter(r, c)}
-              onTouchStart={() => onDown(r, c)}
             />
           )),
         )}

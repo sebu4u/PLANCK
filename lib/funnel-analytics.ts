@@ -3,7 +3,7 @@
 import { attributionAsProperties, readAttribution } from "@/lib/attribution"
 import { capturePosthogEvent } from "@/lib/posthog-client"
 
-export const LANDING_PATHS = new Set(["/", "/landing", "/parinti", "/gratuit", "/rezerva"])
+export const LANDING_PATHS = new Set(["/", "/landing", "/parinti", "/gratuit", "/rezerva", "/1leu"])
 
 export const STUDENT_STEP_NAMES: Record<string, string> = {
   "1": "welcome",

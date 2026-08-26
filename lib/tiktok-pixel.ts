@@ -459,7 +459,19 @@ class TikTokPixel {
       this.trackViewContent(premiumCommerceParams('year', { campaign: 'earlybird' }))
       return
     }
-    if (pathname === '/landing' || pathname === '/rezerva') {
+    if (pathname === '/landing' || pathname === '/rezerva' || pathname === '/1leu') {
+      if (pathname === '/1leu') {
+        this.trackViewContent({
+          contents: [{
+            content_id: 'premium_year_1leu',
+            content_type: 'product',
+            content_name: 'Planck Premium anual 1 leu',
+          }],
+          value: 1,
+          currency: TIKTOK_CURRENCY,
+        })
+        return
+      }
       this.trackViewContent(premiumCommerceParams('year', { campaign: 'earlybird' }))
       if (pathname === '/rezerva') {
         this.trackSchedule(

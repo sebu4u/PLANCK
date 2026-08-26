@@ -173,7 +173,7 @@ export function HomePageSubjectsSection() {
 
               <div className="min-w-0 max-lg:pt-1 lg:py-6 lg:pl-0 lg:pr-6">
                 <div
-                  className={`relative w-full overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white p-3 shadow-[0_12px_40px_-20px_rgba(15,23,42,0.18)] transition-[aspect-ratio] duration-300 sm:rounded-3xl sm:p-5 lg:aspect-auto lg:h-full lg:min-h-[24rem] ${MOBILE_SIM_FRAME[activeId]}`}
+                  className={`relative w-full overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white p-3 shadow-[0_12px_40px_-20px_rgba(15,23,42,0.18)] transition-[aspect-ratio] duration-300 touch-pan-y sm:rounded-3xl sm:p-5 lg:aspect-auto lg:h-full lg:min-h-[24rem] ${MOBILE_SIM_FRAME[activeId]}`}
                 >
                   <div className="flex h-full min-h-0 w-full flex-col justify-center">
                     <SubjectSimulation key={activeId} subject={activeId} />

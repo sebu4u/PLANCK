@@ -77,9 +77,15 @@ export function PhysicsPendulumSim() {
     return Math.max(-1.2, Math.min(1.2, theta))
   }, [theta0])
 
+  const pendingBobRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (running) return
+      if (e.pointerType === "touch") {
+        pendingBobRef.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
+        return
+      }
       e.preventDefault()
       setIsDragging(true)
       ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
@@ -89,7 +95,23 @@ export function PhysicsPendulumSim() {
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isDragging || running) return
+      if (running) return
+      let dragging = isDragging
+      const pending = pendingBobRef.current
+      if (pending && pending.pointerId === e.pointerId && !dragging) {
+        const dx = e.clientX - pending.x
+        const dy = e.clientY - pending.y
+        if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) {
+          pendingBobRef.current = null
+          return
+        }
+        if (Math.hypot(dx, dy) <= 10) return
+        pendingBobRef.current = null
+        dragging = true
+        setIsDragging(true)
+        ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+      }
+      if (!dragging) return
       const p = svgCoord(svgRef, e.clientX, e.clientY)
       if (!p) return
       const theta = angleFromPos(p)
@@ -105,6 +127,7 @@ export function PhysicsPendulumSim() {
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      pendingBobRef.current = null
       ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
       setIsDragging(false)
     },
@@ -167,7 +190,12 @@ export function PhysicsPendulumSim() {
   return (
     <div>
       <div className="relative">
-        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full touch-none">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full"
+          style={{ touchAction: isDragging ? "none" : "pan-y" }}
+        >
           <line
             x1={PIVOT_X - 40}
             y1={PIVOT_Y}

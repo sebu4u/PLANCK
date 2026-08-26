@@ -7,8 +7,10 @@ import { normalizeUserType, USER_TYPE_LABELS, type UserType } from "@/lib/user-t
 
 export const OAUTH_ONBOARDING_PARAM = "oauth"
 export const GUEST_DEMO_ONBOARDING_PARAM = "guest"
+export const CAMPAIGN_1LEU_ONBOARDING_PARAM = "1leu"
 export const REGISTER_ONBOARDING_PATH = `/register?onboarding=${OAUTH_ONBOARDING_PARAM}`
 export const GUEST_DEMO_SIGNUP_PATH = `/register?onboarding=${GUEST_DEMO_ONBOARDING_PARAM}`
+export const CAMPAIGN_1LEU_SIGNUP_PATH = `/register?onboarding=${CAMPAIGN_1LEU_ONBOARDING_PARAM}`
 export const ONBOARDING_REDIRECT_STORAGE_KEY = "planck_onboarding_redirect_after_complete"
 export const GUEST_DEMO_STORAGE_KEY = "planck_guest_demo_onboarding"
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
@@ -158,6 +160,15 @@ export function resolveIncompleteOnboardingPath(): string {
   if (typeof window === "undefined") return REGISTER_ONBOARDING_PATH
   if (hasGuardianOnboardingInProgress() || hasGuardianOAuthReturnPending()) {
     return GUARDIAN_ONBOARDING_PATH
+  }
+  try {
+    const raw = localStorage.getItem(REGISTER_ONBOARDING_STORAGE_KEY)
+    if (raw) {
+      const decoded = JSON.parse(raw) as { campaignSignup?: unknown }
+      if (decoded.campaignSignup === "1leu") return CAMPAIGN_1LEU_SIGNUP_PATH
+    }
+  } catch {
+    // ignore
   }
   return REGISTER_ONBOARDING_PATH
 }

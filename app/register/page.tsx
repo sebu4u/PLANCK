@@ -38,6 +38,7 @@ import {
   isOnboardingSubjectId,
   OAUTH_ONBOARDING_PARAM,
   GUEST_DEMO_ONBOARDING_PARAM,
+  CAMPAIGN_1LEU_ONBOARDING_PARAM,
   ONBOARDING_SUBJECT_OPTIONS,
   type OnboardingSubjectId,
   type GuestDemoStatus,
@@ -51,6 +52,8 @@ type GradeOption = "9" | "10" | "11" | "12"
 type DailyTimeOption = "15" | "30" | "60"
 type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | "name"
 
+type CampaignSignup = "1leu"
+
 type OnboardingState = {
   step: RegisterStep
   subject: SubjectOption | null
@@ -60,6 +63,7 @@ type OnboardingState = {
   dailyTime: DailyTimeOption | null
   awaitingPostAuth: boolean
   guestDemo: GuestDemoStatus | null
+  campaignSignup: CampaignSignup | null
 }
 
 const PROGRESS_STEPS = 5
@@ -80,6 +84,7 @@ const defaultOnboardingState: OnboardingState = {
   dailyTime: null,
   awaitingPostAuth: false,
   guestDemo: null,
+  campaignSignup: null,
 }
 
 const subjectHeadlines: Record<SubjectOption, string> = {
@@ -132,6 +137,9 @@ const sanitizeDailyTime = (value: unknown): DailyTimeOption | null =>
 
 const sanitizeGuestDemo = (value: unknown): GuestDemoStatus | null =>
   value === "started" || value === "completed" ? value : null
+
+const sanitizeCampaignSignup = (value: unknown): CampaignSignup | null =>
+  value === "1leu" ? "1leu" : null
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -253,7 +261,18 @@ function StepHeadingWithIcon({
 function RegisterPageContent() {
   const [hydrated, setHydrated] = useState(false)
   const [welcomePhase, setWelcomePhase] = useState<"intro" | "final">("intro")
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>(defaultOnboardingState)
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => {
+    if (typeof window === "undefined") return defaultOnboardingState
+    try {
+      const onboarding = new URLSearchParams(window.location.search).get("onboarding")
+      if (onboarding === CAMPAIGN_1LEU_ONBOARDING_PARAM) {
+        return { ...defaultOnboardingState, step: ACCOUNT_STEP, campaignSignup: "1leu" }
+      }
+    } catch {
+      // ignore
+    }
+    return defaultOnboardingState
+  })
   const [oauthLoading, setOauthLoading] = useState<"google" | "email" | null>(null)
   const [displayName, setDisplayName] = useState("")
   const [nameSaving, setNameSaving] = useState(false)
@@ -282,6 +301,7 @@ function RegisterPageContent() {
   const shouldForcePostAuthStep = searchParams.get("onboarding") === "1"
   const shouldForceOAuthOnboarding = searchParams.get("onboarding") === OAUTH_ONBOARDING_PARAM
   const shouldForceGuestSignup = searchParams.get("onboarding") === GUEST_DEMO_ONBOARDING_PARAM
+  const shouldForce1LeuSignup = searchParams.get("onboarding") === CAMPAIGN_1LEU_ONBOARDING_PARAM
 
   useEffect(() => {
     const referralFromUrl = searchParams.get("ref")
@@ -304,6 +324,7 @@ function RegisterPageContent() {
           dailyTime: sanitizeDailyTime(decoded.dailyTime),
           awaitingPostAuth: Boolean(decoded.awaitingPostAuth),
           guestDemo: sanitizeGuestDemo(decoded.guestDemo) ?? getGuestDemoStatus(),
+          campaignSignup: sanitizeCampaignSignup(decoded.campaignSignup),
         }
       } catch {
         parsedState = { ...defaultOnboardingState }
@@ -322,6 +343,10 @@ function RegisterPageContent() {
         parsedState.step = 2
         parsedState.awaitingPostAuth = false
       }
+    } else if (shouldForce1LeuSignup) {
+      parsedState.step = user ? "name" : ACCOUNT_STEP
+      parsedState.campaignSignup = "1leu"
+      parsedState.awaitingPostAuth = false
     } else if (shouldForcePostAuthStep) {
       parsedState.step = "name"
       parsedState.awaitingPostAuth = true
@@ -347,7 +372,13 @@ function RegisterPageContent() {
       parsedState.step === ACCOUNT_STEP ||
       parsedState.step === "name" ||
       parsedState.awaitingPostAuth
-    if (!user && wasInAccountCreationFlow && !parsedState.awaitingPostAuth && !guestDemoInProgress) {
+    if (
+      !user &&
+      wasInAccountCreationFlow &&
+      !parsedState.awaitingPostAuth &&
+      !guestDemoInProgress &&
+      parsedState.campaignSignup !== "1leu"
+    ) {
       parsedState = { ...defaultOnboardingState }
       if (typeof window !== "undefined") {
         localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
@@ -363,15 +394,29 @@ function RegisterPageContent() {
     profile?.name,
     profile?.nickname,
     shouldForceGuestSignup,
+    shouldForce1LeuSignup,
     shouldForceOAuthOnboarding,
     shouldForcePostAuthStep,
     user,
   ])
 
   useEffect(() => {
-    if (!shouldForcePostAuthStep && !shouldForceOAuthOnboarding && !shouldForceGuestSignup) return
+    if (
+      !shouldForcePostAuthStep &&
+      !shouldForceOAuthOnboarding &&
+      !shouldForceGuestSignup &&
+      !shouldForce1LeuSignup
+    ) {
+      return
+    }
     router.replace("/register")
-  }, [router, shouldForceGuestSignup, shouldForceOAuthOnboarding, shouldForcePostAuthStep])
+  }, [
+    router,
+    shouldForce1LeuSignup,
+    shouldForceGuestSignup,
+    shouldForceOAuthOnboarding,
+    shouldForcePostAuthStep,
+  ])
 
   useEffect(() => {
     if (!hydrated) return
@@ -431,6 +476,19 @@ function RegisterPageContent() {
       return
     }
 
+    if (
+      onboardingState.campaignSignup === "1leu" &&
+      onboardingState.step !== ACCOUNT_STEP &&
+      onboardingState.step !== "name"
+    ) {
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: "name",
+        awaitingPostAuth: false,
+      }))
+      return
+    }
+
     if (needsOnboarding && !isOnboardingFinalFlow && !isAuthenticatedOnboardingStep) {
       setOnboardingState((prev) => ({ ...prev, step: 2 }))
     }
@@ -438,6 +496,7 @@ function RegisterPageContent() {
     hydrated,
     needsOnboarding,
     onboardingState.awaitingPostAuth,
+    onboardingState.campaignSignup,
     onboardingState.step,
     profile,
     profileSyncedUserId,
@@ -450,6 +509,7 @@ function RegisterPageContent() {
 
   useEffect(() => {
     if (!hydrated || onboardingState.step !== ACCOUNT_STEP) return
+    if (onboardingState.campaignSignup === "1leu") return
     let cancelled = false
     void (async () => {
       try {
@@ -465,10 +525,13 @@ function RegisterPageContent() {
     return () => {
       cancelled = true
     }
-  }, [hydrated, onboardingState.step, onboardingState.subject])
+  }, [hydrated, onboardingState.campaignSignup, onboardingState.step, onboardingState.subject])
 
-  const showProgressBar = isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
+  const is1LeuSignup = onboardingState.campaignSignup === "1leu"
+  const showProgressBar =
+    !is1LeuSignup && isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
   const showBackButton =
+    !is1LeuSignup &&
     isNumericStep(onboardingState.step) &&
     onboardingState.step >= 2 &&
     (onboardingState.step <= 5 || onboardingState.step === ACCOUNT_STEP)
@@ -978,13 +1041,19 @@ function RegisterPageContent() {
             selfGrade={selfGrade}
             targetGrade={targetGrade}
             oauthLoading={oauthLoading}
-            onGoogleStart={handleGoogleOAuthStart}
-            onGoogleResult={handleGoogleOAuthResult}
+            onGoogleStart={is1LeuSignup ? undefined : handleGoogleOAuthStart}
+            onGoogleResult={is1LeuSignup ? undefined : handleGoogleOAuthResult}
             onEmailSignup={handleEmailSignup}
-            onTryWithoutAccount={handleTryWithoutAccount}
+            onTryWithoutAccount={is1LeuSignup ? undefined : handleTryWithoutAccount}
             onGoHome={handleGoHomeFromGuestSignup}
-            variant={onboardingState.guestDemo === "completed" ? "after-demo" : "default"}
-            googleIcon={<GoogleIcon />}
+            variant={
+              is1LeuSignup
+                ? "email-only"
+                : onboardingState.guestDemo === "completed"
+                  ? "after-demo"
+                  : "default"
+            }
+            googleIcon={is1LeuSignup ? undefined : <GoogleIcon />}
           />
         )
       }
@@ -1013,6 +1082,8 @@ function RegisterPageContent() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Salvăm...
                     </span>
+                  ) : is1LeuSignup ? (
+                    "Intră pe dashboard"
                   ) : onboardingState.guestDemo === "completed" ? (
                     "Continuă"
                   ) : (
@@ -1022,6 +1093,7 @@ function RegisterPageContent() {
               </form>
             </div>
 
+            {is1LeuSignup ? null : (
             <button
               type="button"
               disabled={nameSaving}
@@ -1030,6 +1102,7 @@ function RegisterPageContent() {
             >
               {"Sau mergi direct la dashboard ->"}
             </button>
+            )}
           </div>
         )
 

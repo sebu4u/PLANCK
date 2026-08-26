@@ -311,7 +311,17 @@ class MetaPixel {
       this.trackViewContent(premiumCommerceParams('year', { campaign: 'earlybird' }))
       return
     }
-    if (pathname === '/landing' || pathname === '/rezerva') {
+    if (pathname === '/landing' || pathname === '/rezerva' || pathname === '/1leu') {
+      if (pathname === '/1leu') {
+        this.trackViewContent({
+          content_ids: ['premium_year_1leu'],
+          content_type: 'product',
+          content_name: 'Planck Premium anual 1 leu',
+          value: 1,
+          currency: META_CURRENCY,
+        })
+        return
+      }
       this.trackViewContent(premiumCommerceParams('year', { campaign: 'earlybird' }))
       if (pathname === '/rezerva') {
         this.trackCommerce(

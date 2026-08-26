@@ -645,6 +645,28 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  "1leu": {
+    title: pageTitle("20 de locuri. Un an. 1 leu"),
+    description:
+      "Pe 1 septembrie, la 12:00, se deschide roata PLANCK. Primii 20 de elevi care o învârt iau un an de Premium la 1 leu. Restul câștigă premii garantate.",
+    keywords:
+      "planck 1 leu, roată premii, abonament 1 leu, 1 septembrie, premium liceu, bac, tiktok",
+    alternates: {
+      canonical: "/1leu",
+    },
+    openGraph: {
+      title: "20 de locuri. Un an de Premium. 1 leu. – PLANCK",
+      description:
+        "Roata se deschide pe 1 septembrie, la 12:00. Primii 20 iau un an de PLANCK la 1 leu. Restul tot câștigă.",
+      url: `${PLATFORM_SITE_URL}/1leu`,
+    },
+    twitter: {
+      title: "20 de locuri. Un an de Premium. 1 leu.",
+      description:
+        "Pe 1 septembrie, la 12:00, primii 20 de elevi iau un an de PLANCK la 1 leu.",
+    },
+  },
+
   shop: {
     title: pageTitle("Magazin PLANCKPASS"),
     description:

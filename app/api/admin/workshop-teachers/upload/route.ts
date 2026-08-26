@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAccessTokenFromRequest, isAdminFromDB } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
+import { optimizeImage } from "@/lib/media/optimize-image"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
+
+export const runtime = "nodejs"
+export const maxDuration = 60
 
 const MAX_BYTES = 4 * 1024 * 1024
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"])
@@ -14,13 +18,6 @@ async function verifyAdmin(req: NextRequest) {
   const client = createServerClientWithToken(token)
   const { data } = await client.auth.getUser()
   return data.user && (await isAdminFromDB(client, data.user)) ? data.user : null
-}
-
-function extensionFor(file: File) {
-  if (file.type === "image/png") return "png"
-  if (file.type === "image/webp") return "webp"
-  if (file.type === "image/gif") return "gif"
-  return "jpg"
 }
 
 export async function POST(req: NextRequest) {
@@ -40,11 +37,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const path = `icons/${user.id}/${crypto.randomUUID()}.${extensionFor(file)}`
+    const optimized = await optimizeImage(
+      Buffer.from(await file.arrayBuffer()),
+      file.type,
+      "teacher",
+    )
+    const path = `icons/${user.id}/${crypto.randomUUID()}.${optimized.extension}`
     const supabase = getServiceRoleSupabase()
-    const { error } = await supabase.storage.from("workshop-teachers").upload(path, file, {
-      cacheControl: "31536000",
-      contentType: file.type,
+    const { error } = await supabase.storage.from("workshop-teachers").upload(path, optimized.bytes, {
+      cacheControl: "31536000, immutable",
+      contentType: optimized.contentType,
       upsert: false,
     })
     if (error) throw error

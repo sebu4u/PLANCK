@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { buildGradeProjection, formatGrade, MAX_GRADE, MIN_GRADE } from "@/lib/parent/grade-estimate"
+import { buildWavyGradeProjection, formatGrade, MAX_GRADE, MIN_GRADE } from "@/lib/parent/grade-estimate"
 import { cn } from "@/lib/utils"
 
 interface StudentGradeGoalCardProps {
@@ -15,6 +15,36 @@ interface StudentGradeGoalCardProps {
 const CHART_WIDTH = 520
 const CHART_HEIGHT = 180
 const PADDING = { top: 16, right: 16, bottom: 28, left: 32 }
+const DEFAULT_UNSET_TARGET_GRADE = 9.5
+
+function resolveDisplayedTargetGrade(currentGrade: number, targetGrade: number | null): number {
+  if (targetGrade != null) return targetGrade
+  if (currentGrade < DEFAULT_UNSET_TARGET_GRADE) return DEFAULT_UNSET_TARGET_GRADE
+  return MAX_GRADE
+}
+
+function pointsToSmoothPath(points: Array<{ x: number; y: number }>): string {
+  if (points.length === 0) return ""
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+
+  let d = `M ${points[0].x} ${points[0].y}`
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] ?? points[i]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[i + 2] ?? p2
+    const c1x = p1.x + (p2.x - p0.x) / 6
+    const c1y = p1.y + (p2.y - p0.y) / 6
+    const c2x = p2.x - (p3.x - p1.x) / 6
+    const c2y = p2.y - (p3.y - p1.y) / 6
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`
+  }
+  return d
+}
+
+function formatWeekLabel(week: number): string {
+  return week === 0 ? "Azi" : `Săpt. ${week}`
+}
 
 /**
  * Read-only variant of the parent dashboard's grade chart, adapted for the
@@ -26,10 +56,10 @@ export function StudentGradeGoalCard({
   compact = false,
   className,
 }: StudentGradeGoalCardProps) {
-  const resolvedTarget = targetGrade ?? Math.min(MAX_GRADE, currentGrade + 1)
+  const resolvedTarget = resolveDisplayedTargetGrade(currentGrade, targetGrade)
 
   const projection = useMemo(
-    () => buildGradeProjection(currentGrade, resolvedTarget, 12),
+    () => buildWavyGradeProjection(currentGrade, resolvedTarget, 4),
     [currentGrade, resolvedTarget],
   )
 
@@ -39,8 +69,9 @@ export function StudentGradeGoalCard({
     const minY = MIN_GRADE
     const maxY = MAX_GRADE
     const yRange = maxY - minY
+    const lastIndex = Math.max(1, projection.length - 1)
 
-    const toX = (index: number) => PADDING.left + (index / (projection.length - 1)) * plotWidth
+    const toX = (index: number) => PADDING.left + (index / lastIndex) * plotWidth
     const toY = (grade: number) => PADDING.top + plotHeight - ((grade - minY) / yRange) * plotHeight
 
     const linePoints = projection.map((point, index) => ({
@@ -48,18 +79,31 @@ export function StudentGradeGoalCard({
       y: toY(point.grade),
       label: point.label,
       grade: point.grade,
+      monthIndex: point.monthIndex,
     }))
 
-    const areaPath = [
-      `M ${linePoints[0]?.x ?? 0} ${PADDING.top + plotHeight}`,
-      ...linePoints.map((point) => `L ${point.x} ${point.y}`),
-      `L ${linePoints[linePoints.length - 1]?.x ?? 0} ${PADDING.top + plotHeight}`,
-      "Z",
-    ].join(" ")
-
-    const linePath = linePoints.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
+    const linePath = pointsToSmoothPath(linePoints)
+    const first = linePoints[0]
+    const last = linePoints[linePoints.length - 1]
+    const baselineY = PADDING.top + plotHeight
+    const curveRest = linePath.replace(/^M [-\d.]+ [-\d.]+/, "").trim()
+    const areaPath =
+      first && last
+        ? `M ${first.x} ${baselineY} L ${first.x} ${first.y} ${curveRest} L ${last.x} ${baselineY} Z`
+        : ""
     const targetY = toY(resolvedTarget)
-    const xLabelIndices = [0, 3, 6, 9, 12]
+    const xLabelIndices = [0, 1, 2, 3, 4].map((week) => {
+      let bestIndex = 0
+      let bestDist = Number.POSITIVE_INFINITY
+      linePoints.forEach((point, index) => {
+        const dist = Math.abs(point.monthIndex - week)
+        if (dist < bestDist) {
+          bestIndex = index
+          bestDist = dist
+        }
+      })
+      return bestIndex
+    })
 
     return { areaPath, linePath, linePoints, targetY, xLabelIndices }
   }, [projection, resolvedTarget])
@@ -132,10 +176,17 @@ export function StudentGradeGoalCard({
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           className={cn("w-full", compact ? "h-[170px]" : "h-[150px] min-w-[300px]")}
           role="img"
-          aria-label="Proiecție notă estimată pe 12 luni"
+          aria-label="Proiecție notă estimată pe patru săptămâni"
         >
           <path d={chartData.areaPath} fill="rgba(110, 78, 242, 0.12)" />
-          <path d={chartData.linePath} fill="none" stroke="#6e4ef2" strokeWidth={2.5} strokeDasharray="6 4" />
+          <path
+            d={chartData.linePath}
+            fill="none"
+            stroke="#6e4ef2"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
 
           <line
             x1={PADDING.left}
@@ -146,24 +197,36 @@ export function StudentGradeGoalCard({
             strokeWidth={2}
           />
 
-          {chartData.linePoints.map((point, index) => (
-            <g key={`${point.label}-${index}`}>
-              {index === 0 ? <circle cx={point.x} cy={point.y} r={5} fill="#6e4ef2" /> : null}
-              {chartData.xLabelIndices.includes(index) ? (
-                <text
-                  x={point.x}
-                  y={CHART_HEIGHT - 10}
-                  textAnchor="middle"
-                  className={cn(
-                    "fill-[#6b7280] text-[10px]",
-                    index === 0 && "font-semibold text-[#6e4ef2]",
-                  )}
-                >
-                  {point.label}
-                </text>
-              ) : null}
-            </g>
-          ))}
+          {chartData.linePoints[0] ? (
+            <circle cx={chartData.linePoints[0].x} cy={chartData.linePoints[0].y} r={5} fill="#6e4ef2" />
+          ) : null}
+          {chartData.linePoints.length > 1 ? (
+            <circle
+              cx={chartData.linePoints[chartData.linePoints.length - 1]?.x}
+              cy={chartData.linePoints[chartData.linePoints.length - 1]?.y}
+              r={5}
+              fill="#f59e0b"
+            />
+          ) : null}
+
+          {chartData.xLabelIndices.map((index) => {
+            const point = chartData.linePoints[index]
+            if (!point) return null
+            return (
+              <text
+                key={`label-${index}`}
+                x={point.x}
+                y={CHART_HEIGHT - 10}
+                textAnchor="middle"
+                className={cn(
+                  "fill-[#6b7280] text-[10px]",
+                  index === 0 && "font-semibold text-[#6e4ef2]",
+                )}
+              >
+                {formatWeekLabel(Math.round(point.monthIndex))}
+              </text>
+            )
+          })}
         </svg>
       </div>
     </section>

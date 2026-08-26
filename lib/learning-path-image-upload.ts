@@ -1,6 +1,7 @@
 import "server-only"
 
 import { z } from "zod"
+import { optimizeImage, type ImagePreset } from "@/lib/media/optimize-image"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 
 export const LEARNING_PATH_IMAGES_BUCKET = "lesson-images"
@@ -89,6 +90,19 @@ export async function readAndValidateLearningPathImage(file: File): Promise<Vali
   return { ...meta, bytes: buf }
 }
 
+export async function optimizeValidatedLearningPathImage(
+  image: ValidatedImage,
+  kind: "chapter" | "lesson" | "item",
+): Promise<ValidatedImage> {
+  const preset: ImagePreset = kind
+  const optimized = await optimizeImage(image.bytes, image.contentType, preset)
+  return {
+    bytes: optimized.bytes,
+    contentType: optimized.contentType,
+    extension: optimized.extension,
+  }
+}
+
 export function buildChapterCoverPath(chapterId: string, extension: string): string {
   return `${OFFICIAL_PREFIX}${chapterId}/cover.${extension}`
 }
@@ -168,7 +182,7 @@ export function extractStoragePathFromPublicUrl(
     const marker = `/storage/v1/object/public/${bucket}/`
     const idx = publicUrl.indexOf(marker)
     if (idx === -1) return null
-    return publicUrl.slice(idx + marker.length)
+    return decodeURIComponent(publicUrl.slice(idx + marker.length).split("?")[0].split("#")[0])
   } catch {
     return null
   }

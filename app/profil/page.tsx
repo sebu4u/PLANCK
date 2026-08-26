@@ -130,11 +130,7 @@ const ProfilPage = () => {
       if (data) {
         setProfile(data);
         setBio(data.bio || "");
-        if (data.user_icon) {
-          setAvatarUrl(`${data.user_icon}?t=${Date.now()}`);
-        } else {
-          setAvatarUrl("");
-        }
+        setAvatarUrl(data.user_icon || "");
         setNickname(data.nickname || "");
       }
       setProfileLoading(false);
@@ -239,33 +235,37 @@ const ProfilPage = () => {
     const file = e.target.files[0];
     setUploadingAvatar(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `avatars/${user.id}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true, contentType: file.type });
-      if (uploadError) {
-        toast({ title: 'Eroare la upload imagine', description: uploadError.message, variant: 'destructive' });
-        setUploadingAvatar(false);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        toast({ title: 'Sesiune expirată.', variant: 'destructive' });
         return;
       }
-      const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      let publicUrl = publicUrlData?.publicUrl;
-      if (!publicUrl) {
-        toast({ title: 'Nu s-a putut obține URL-ul public pentru imagine.', variant: 'destructive' });
-        setUploadingAvatar(false);
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: 'Eroare la upload imagine',
+          description: typeof json.error === "string" ? json.error : undefined,
+          variant: 'destructive',
+        });
         return;
       }
-      await supabase.from('profiles').update({ user_icon: publicUrl }).eq('user_id', user.id);
+      const publicUrl = typeof json.url === "string" ? json.url : "";
       const { data } = await supabase
         .from("profiles")
         .select("name, bio, user_icon, nickname")
         .eq("user_id", user.id)
         .single();
       if (data) {
-        const cacheBustedUrl = data.user_icon ? `${data.user_icon}?t=${Date.now()}` : '';
         setProfile(data);
-        setAvatarUrl(cacheBustedUrl);
+        setAvatarUrl(data.user_icon || publicUrl);
         toast({ title: 'Poza de profil a fost actualizată!' });
       }
     } catch (err: any) {

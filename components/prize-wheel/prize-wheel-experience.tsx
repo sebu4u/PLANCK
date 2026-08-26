@@ -17,6 +17,7 @@ import {
   type PrizeWheelSpinResponse,
   type PrizeWheelStatusResponse,
 } from "@/lib/prize-wheel/types"
+import { PRIZE_WHEEL_CAMPAIGN_START_AT } from "@/lib/prize-wheel/campaign"
 import { PrizeWheelVisual } from "@/components/prize-wheel/prize-wheel-visual"
 
 export type PrizeWheelCloseInfo = {
@@ -32,7 +33,6 @@ type PrizeWheelExperienceProps = {
 }
 
 const CONFETTI_COLORS = ["#5B47D6", "#7C5CFC", "#f2b93d", "#cd83db", "#ffffff"]
-const CAMPAIGN_START_AT = new Date("2026-09-01T00:00:00+03:00")
 
 type CountdownParts = {
   days: number
@@ -59,10 +59,10 @@ function pad2(value: number) {
 }
 
 function CampaignCountdown() {
-  const [parts, setParts] = useState(() => getCountdownParts(CAMPAIGN_START_AT))
+  const [parts, setParts] = useState(() => getCountdownParts(PRIZE_WHEEL_CAMPAIGN_START_AT))
 
   useEffect(() => {
-    const tick = () => setParts(getCountdownParts(CAMPAIGN_START_AT))
+    const tick = () => setParts(getCountdownParts(PRIZE_WHEEL_CAMPAIGN_START_AT))
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
@@ -85,7 +85,7 @@ function CampaignCountdown() {
 
   return (
     <div className="rounded-2xl bg-gradient-to-br from-[#f6f4ff] to-[#fff7e8] px-4 py-6">
-      <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#7C5CFC]">Începem pe 1 septembrie</p>
+      <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#7C5CFC]">Se deschide 1 septembrie, 12:00</p>
       <div className="mt-4 grid grid-cols-4 gap-2">
         {units.map((unit) => (
           <div key={unit.label} className="rounded-2xl bg-white px-1 py-3 shadow-[0_8px_24px_-16px_rgba(92,71,214,0.55)]">

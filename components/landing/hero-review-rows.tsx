@@ -191,6 +191,30 @@ export function HomepageHeroTestimonials() {
   )
 }
 
+/** A single auto-scrolling row for campaign landings. */
+export function LandingHeroTestimonialsRow() {
+  const [row1] = LANDING_HERO_REVIEW_ROWS
+
+  return (
+    <section
+      className="relative overflow-hidden bg-white py-6 sm:py-8"
+      aria-label="Recenzii elevi Planck"
+    >
+      <div className="relative mx-auto w-full max-w-[1116px]">
+        <MarqueeRow reviews={row1} direction="right" duration="36s" />
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-white to-transparent sm:w-16 lg:w-24"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-white to-transparent sm:w-16 lg:w-24"
+          aria-hidden
+        />
+      </div>
+    </section>
+  )
+}
+
 export function LandingHeroReviewRowsMobile() {
   const [row1, row2] = LANDING_HERO_REVIEW_ROWS
 

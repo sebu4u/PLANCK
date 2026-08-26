@@ -468,11 +468,21 @@ export function DashboardLearningPathsCarousel({
                     marginRight: gapAfterRem > 0 ? `${gapAfterRem}rem` : undefined,
                   }}
                 >
-                  {chapter.icon_url ? (
+                  {chapter.icon_url && Math.abs(index - activeIndex) <= 1 ? (
                     <MobileAspectImage
                       src={chapter.icon_url}
                       alt={chapter.title}
                       frameClassName={cn(
+                        isFocused
+                          ? MOBILE_CHAPTER_ICON_FOCUSED_CLASS
+                          : cn(MOBILE_CHAPTER_ICON_PEEK_CLASS, "opacity-40 transition-opacity duration-200")
+                      )}
+                    />
+                  ) : chapter.icon_url ? (
+                    <div
+                      aria-hidden
+                      className={cn(
+                        "relative aspect-square",
                         isFocused
                           ? MOBILE_CHAPTER_ICON_FOCUSED_CLASS
                           : cn(MOBILE_CHAPTER_ICON_PEEK_CLASS, "opacity-40 transition-opacity duration-200")
@@ -600,7 +610,7 @@ export function DashboardLearningPathsCarousel({
               </p>
 
               <div className="mt-4 flex justify-center">
-                {chapter.icon_url ? (
+                {chapter.icon_url && absOffset <= 1 ? (
                   <img
                     src={chapter.icon_url}
                     alt={chapter.title}
@@ -608,6 +618,8 @@ export function DashboardLearningPathsCarousel({
                     loading="lazy"
                     draggable={false}
                   />
+                ) : chapter.icon_url ? (
+                  <div aria-hidden className="h-40 w-40" />
                 ) : (
                   <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-[#f3f3f3] text-[#737373]">
                     <BookOpen className="h-14 w-14" />

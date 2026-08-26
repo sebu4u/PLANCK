@@ -31,7 +31,7 @@ export async function POST(
 
     if (error) {
       logger.error("[pregatire/unlock] RPC failed:", error)
-      return NextResponse.json({ error: "Nu am putut debloca pregătirea." }, { status: 500 })
+      return NextResponse.json({ error: "Nu am putut rezerva locul." }, { status: 500 })
     }
 
     const result = data as {
@@ -50,7 +50,7 @@ export async function POST(
       if (code === "insufficient_energy") {
         return NextResponse.json(
           {
-            error: "Nu ai suficientă energie.",
+            error: "Nu am putut rezerva locul.",
             code,
             balance: result.balance,
             carryoverBalance: result.carryover_balance ?? 0,
@@ -68,7 +68,7 @@ export async function POST(
       if (code === "not_found") {
         return NextResponse.json({ error: "Pregătirea nu a fost găsită.", code }, { status: 404 })
       }
-      return NextResponse.json({ error: "Nu am putut debloca pregătirea.", code }, { status: 400 })
+      return NextResponse.json({ error: "Nu am putut rezerva locul.", code }, { status: 400 })
     }
 
     const { data: publicRow } = await supabase

@@ -12,6 +12,7 @@ import {
   isOfficialPath,
   learningPathImageDeleteSchema,
   learningPathImageUploadSchema,
+  optimizeValidatedLearningPathImage,
   readAndValidateLearningPathImage,
   uploadLearningPathImage,
 } from "@/lib/learning-path-image-upload"
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     let validated
     try {
       validated = await readAndValidateLearningPathImage(file)
+      validated = await optimizeValidatedLearningPathImage(validated, kind)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Fișier invalid."
       return NextResponse.json({ error: message }, { status: 400 })
