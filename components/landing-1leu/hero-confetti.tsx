@@ -1,11 +1,11 @@
 "use client"
 
 const PIECES = [
-  { left: "11%", delay: "0s", duration: "20s", color: "#7C5CFC", width: 8, height: 11, drift: "18px", spin: "220deg" },
-  { left: "31%", delay: "5.5s", duration: "23s", color: "#7dd3fc", width: 9, height: 7, drift: "-22px", spin: "-190deg" },
-  { left: "52%", delay: "2s", duration: "18s", color: "#A3E635", width: 7, height: 10, drift: "14px", spin: "160deg" },
-  { left: "71%", delay: "9s", duration: "21s", color: "#c77bff", width: 10, height: 8, drift: "-16px", spin: "-240deg" },
-  { left: "88%", delay: "13s", duration: "24s", color: "#ffb56b", width: 8, height: 8, drift: "20px", spin: "200deg" },
+  { left: "11%", delay: "-4s", duration: "20s", color: "#7C5CFC", width: 8, height: 11, drift: "18px", spin: "220deg" },
+  { left: "31%", delay: "-11s", duration: "23s", color: "#7dd3fc", width: 9, height: 7, drift: "-22px", spin: "-190deg" },
+  { left: "52%", delay: "-7s", duration: "18s", color: "#A3E635", width: 7, height: 10, drift: "14px", spin: "160deg" },
+  { left: "71%", delay: "-16s", duration: "21s", color: "#c77bff", width: 10, height: 8, drift: "-16px", spin: "-240deg" },
+  { left: "88%", delay: "-3s", duration: "24s", color: "#ffb56b", width: 8, height: 8, drift: "20px", spin: "200deg" },
 ] as const
 
 export function Landing1LeuHeroConfetti() {
@@ -25,9 +25,11 @@ export function Landing1LeuHeroConfetti() {
           }
         }
         .leu-confetti-piece {
+          opacity: 0;
           animation-name: leuConfettiFall;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+          animation-fill-mode: both;
         }
         @media (prefers-reduced-motion: reduce) {
           .leu-confetti-piece { animation: none; display: none; }

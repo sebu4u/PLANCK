@@ -1,11 +1,18 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { AlertCircle, CalendarIcon, Loader2, Pencil, Plus, Save, Trash2, Zap } from "lucide-react"
+import { AlertCircle, CalendarIcon, Loader2, Pencil, Plus, Save, Search, Trash2, Users, Zap } from "lucide-react"
 import { ro } from "react-day-picker/locale"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -28,6 +35,7 @@ import {
   WORKSHOP_DEFAULT_ENERGY_COST,
   WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_LABELS,
+  WORKSHOP_TZ,
   type WorkshopHomeworkItem,
   type WorkshopSubject,
   type WorkshopTeacher,
@@ -57,6 +65,14 @@ interface AdminWorkshop {
   homework_pdf_url?: string | null
   homework_items?: WorkshopHomeworkItem[]
   workshop_teachers?: { id: string; name: string; icon_url: string | null } | null
+  unlock_count?: number
+}
+
+interface WorkshopEnrollment {
+  user_id: string
+  name: string
+  email: string | null
+  enrolled_at: string
 }
 
 function ymdToLocalDate(ymd: string): Date | undefined {
@@ -71,6 +87,23 @@ function ymdToLocalDate(ymd: string): Date | undefined {
 
 function localDateToYmd(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function formatEnrollmentDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleString("ro-RO", {
+    timeZone: WORKSHOP_TZ,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function enrolledCountLabel(count: number): string {
+  return count === 1 ? "1 elev înscris" : `${count} elevi înscriși`
 }
 
 function formatEventDateLabel(ymd: string): string {
@@ -124,6 +157,11 @@ export function PregatireManager() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [materials, setMaterials] = useState<WorkshopMaterialsFormValue>(EMPTY_WORKSHOP_MATERIALS_FORM)
   const [datePickerOpen, setDatePickerOpen] = useState(false)
+  const [enrollmentsWorkshop, setEnrollmentsWorkshop] = useState<AdminWorkshop | null>(null)
+  const [enrollments, setEnrollments] = useState<WorkshopEnrollment[]>([])
+  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false)
+  const [enrollmentsError, setEnrollmentsError] = useState<string | null>(null)
+  const [enrollmentsQuery, setEnrollmentsQuery] = useState("")
 
   const getAccessToken = useCallback(async () => {
     const { data } = await supabase.auth.getSession()
@@ -151,6 +189,48 @@ export function PregatireManager() {
     setWorkshops(workshopsData.workshops ?? [])
     setTeachers(teachersData.teachers ?? [])
   }, [getAccessToken])
+
+  const openEnrollments = useCallback(
+    async (workshop: AdminWorkshop) => {
+      setEnrollmentsWorkshop(workshop)
+      setEnrollments([])
+      setEnrollmentsQuery("")
+      setEnrollmentsError(null)
+      setEnrollmentsLoading(true)
+      try {
+        const accessToken = await getAccessToken()
+        if (!accessToken) {
+          setEnrollmentsError("Sesiune invalidă.")
+          return
+        }
+        const response = await fetch(
+          `/api/admin/pregatiri/${encodeURIComponent(workshop.id)}/enrollments`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        )
+        const data = await response.json()
+        if (!response.ok) {
+          setEnrollmentsError(data.error ?? "Nu am putut încărca înscrierile.")
+          return
+        }
+        setEnrollments(Array.isArray(data.enrollments) ? data.enrollments : [])
+      } catch {
+        setEnrollmentsError("Eroare la încărcarea înscrierilor.")
+      } finally {
+        setEnrollmentsLoading(false)
+      }
+    },
+    [getAccessToken],
+  )
+
+  const filteredEnrollments = useMemo(() => {
+    const query = enrollmentsQuery.trim().toLowerCase()
+    if (!query) return enrollments
+    return enrollments.filter((row) => {
+      const name = row.name.toLowerCase()
+      const email = (row.email ?? "").toLowerCase()
+      return name.includes(query) || email.includes(query)
+    })
+  }, [enrollments, enrollmentsQuery])
 
   useEffect(() => {
     void (async () => {
@@ -600,6 +680,14 @@ export function PregatireManager() {
                       {workshop.workshop_teachers?.name ?? "—"} · {workshop.energy_cost} energie
                       {workshop.max_seats != null ? ` · max ${workshop.max_seats}` : ""}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => void openEnrollments(workshop)}
+                      className="mt-2 inline-flex items-center gap-1.5 text-xs text-sky-300 hover:text-sky-200"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      {enrolledCountLabel(workshop.unlock_count ?? 0)}
+                    </button>
                   </div>
                   <Button
                     type="button"
@@ -607,6 +695,7 @@ export function PregatireManager() {
                     variant="ghost"
                     className="text-gray-300"
                     onClick={() => handleEdit(workshop)}
+                    aria-label="Editează pregătirea"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -616,6 +705,7 @@ export function PregatireManager() {
                     variant="ghost"
                     className="text-red-300"
                     onClick={() => void handleDelete(workshop.id)}
+                    aria-label="Șterge pregătirea"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -625,6 +715,83 @@ export function PregatireManager() {
           )}
         </div>
       </section>
+
+      <Dialog
+        open={enrollmentsWorkshop != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEnrollmentsWorkshop(null)
+            setEnrollments([])
+            setEnrollmentsError(null)
+            setEnrollmentsQuery("")
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-hidden border-white/15 bg-[#111111] text-white sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Elevi înscriși</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {enrollmentsWorkshop
+                ? `${enrollmentsWorkshop.title} · ${enrolledCountLabel(
+                    enrollmentsLoading
+                      ? (enrollmentsWorkshop.unlock_count ?? 0)
+                      : enrollments.length,
+                  )}`
+                : "Lista elevilor care au rezervat locul."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+            <Input
+              value={enrollmentsQuery}
+              onChange={(event) => setEnrollmentsQuery(event.target.value)}
+              placeholder="Caută după nume sau email"
+              className="border-white/20 bg-black/40 pl-9 text-white"
+            />
+          </div>
+
+          {enrollmentsLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : enrollmentsError ? (
+            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {enrollmentsError}
+            </div>
+          ) : filteredEnrollments.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">
+              {enrollments.length === 0
+                ? "Niciun elev înscris încă."
+                : "Niciun elev nu corespunde căutării."}
+            </p>
+          ) : (
+            <div className="max-h-[50vh] overflow-auto rounded-lg border border-white/10">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead className="sticky top-0 bg-[#1a1a1a] text-xs uppercase tracking-wide text-gray-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Nume</th>
+                    <th className="px-3 py-2 font-medium">Email</th>
+                    <th className="px-3 py-2 font-medium">Data înscrierii</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEnrollments.map((row) => (
+                    <tr key={row.user_id} className="border-t border-white/10">
+                      <td className="px-3 py-2 text-white">{row.name}</td>
+                      <td className="px-3 py-2 text-gray-300">{row.email ?? "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-300">
+                        {formatEnrollmentDate(row.enrolled_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

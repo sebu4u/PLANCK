@@ -86,7 +86,7 @@ export default function AdminPregatirePage() {
         </Button>
         <h1 className="text-3xl font-bold">Pregătire</h1>
         <p className="mt-2 text-gray-400">
-          Gestionează workshop-urile live, profesorii CMS și costurile de energie.
+          Gestionează workshop-urile live, profesorii CMS și vezi elevii înscriși la fiecare pregătire.
         </p>
         <Tabs defaultValue="workshops" className="mt-7">
           <TabsList className="bg-white/10">

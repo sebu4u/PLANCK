@@ -43,9 +43,9 @@ export function Landing1LeuHeroSection() {
               </p>
             </FadeInUp>
 
-            <FadeInUp delay={0.2} className="mt-8 hidden lg:block">
+            <div className="mt-8 hidden lg:block">
               <HeroCtaBlock days={days} hours={hours} minutes={minutes} seconds={seconds} isLive={isLive} />
-            </FadeInUp>
+            </div>
           </div>
 
           <FadeInUp delay={0.1} className="flex flex-col items-center">
@@ -63,9 +63,9 @@ export function Landing1LeuHeroSection() {
             </div>
           </FadeInUp>
 
-          <FadeInUp delay={0.18} className="lg:hidden">
+          <div className="lg:hidden">
             <HeroCtaBlock days={days} hours={hours} minutes={minutes} seconds={seconds} isLive={isLive} />
-          </FadeInUp>
+          </div>
         </div>
       </div>
     </section>

@@ -150,17 +150,39 @@ export async function GET(req: NextRequest) {
     if ("error" in auth) return auth.error
 
     const supabase = getServiceRoleSupabase()
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("workshops")
-      .select("*, workshop_teachers(id, name, icon_url, is_active)")
+      .select("*, workshop_teachers(id, name, icon_url, is_active), workshop_unlocks(count)")
       .order("starts_at", { ascending: false })
+
+    if (error) {
+      logger.warn("[admin/pregatiri] nested unlock count failed, retrying:", error)
+      const retry = await supabase
+        .from("workshops")
+        .select("*, workshop_teachers(id, name, icon_url, is_active)")
+        .order("starts_at", { ascending: false })
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       logger.error("[admin/pregatiri] GET failed:", error)
       return NextResponse.json({ error: "Nu am putut încărca pregătirile." }, { status: 500 })
     }
 
-    const workshops = await attachMaterials(data ?? [])
+    const workshops = await attachMaterials(
+      (data ?? []).map((row) => {
+        const { workshop_unlocks: unlockRows, ...workshop } = row as typeof row & {
+          workshop_unlocks?: { count?: number | string }[] | null
+        }
+        const rawCount = unlockRows?.[0]?.count
+        const unlockCount = Number(rawCount)
+        return {
+          ...workshop,
+          unlock_count: Number.isFinite(unlockCount) ? unlockCount : 0,
+        }
+      }),
+    )
     return NextResponse.json({ workshops })
   } catch (err) {
     logger.error("[admin/pregatiri] GET error:", err)

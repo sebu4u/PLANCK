@@ -337,30 +337,28 @@ export function PregatirePageClient() {
           side="bottom"
           overlayClassName="!z-[400] bg-black/30"
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className="!z-[401] max-h-[70dvh] overflow-y-auto rounded-t-[1.75rem] border-x border-t border-[#d1d5db] bg-white p-0 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] sm:max-w-lg sm:rounded-none"
+          className="!z-[401] flex h-[70dvh] flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x border-t border-[#d1d5db] bg-white p-0 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] sm:max-w-lg sm:rounded-none"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>{sheetWorkshop?.title ?? "Pregătire"}</SheetTitle>
           </SheetHeader>
           {sheetWorkshop ? (
-            <div className="pb-8">
-              <WorkshopDetailPanel
-                workshop={sheetWorkshop}
-                isLoggedIn={Boolean(user)}
-                showBack={false}
-                compact
-                onBalanceChange={(next) => {
-                  setEnergy(next.balance)
-                  setCarryoverEnergy(next.carryoverBalance)
-                }}
-                onUnlocked={(next) => {
-                  setSheetWorkshop(next)
-                  setWorkshops((list) =>
-                    list.map((w) => (w.id === next.id ? { ...w, unlocked: true } : w)),
-                  )
-                }}
-              />
-            </div>
+            <WorkshopDetailPanel
+              workshop={sheetWorkshop}
+              isLoggedIn={Boolean(user)}
+              showBack={false}
+              compact
+              onBalanceChange={(next) => {
+                setEnergy(next.balance)
+                setCarryoverEnergy(next.carryoverBalance)
+              }}
+              onUnlocked={(next) => {
+                setSheetWorkshop(next)
+                setWorkshops((list) =>
+                  list.map((w) => (w.id === next.id ? { ...w, unlocked: true } : w)),
+                )
+              }}
+            />
           ) : null}
         </SheetContent>
       </Sheet>

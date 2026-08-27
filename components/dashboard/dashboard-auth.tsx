@@ -446,6 +446,11 @@ export function DashboardAuth() {
   useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || holdDashboardOverlays) return
 
+    if (!isPaid) {
+      setShowWelcomeBack(false)
+      return
+    }
+
     try {
       const lastVisitKey = `planck_last_dashboard_visit_${user.id}`
       const activityAckKey = `welcome_back_ack_activity_${user.id}`
@@ -475,7 +480,7 @@ export function DashboardAuth() {
     } catch {
       setShowWelcomeBack(false)
     }
-  }, [authLoading, loading, dashboardData, user?.id, holdDashboardOverlays])
+  }, [authLoading, loading, dashboardData, user?.id, holdDashboardOverlays, isPaid])
 
   useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || isPaid) return
@@ -760,14 +765,14 @@ export function DashboardAuth() {
         </div>
       ) : null}
 
-      {showWelcomeBack && (
+      {showWelcomeBack && isPaid ? (
         <WelcomeBackOverlay
           username={userData.username}
           onBackdropClick={dismissWelcomeBack}
           onCtaClick={handleWelcomeCtaClick}
           ctaLoading={welcomeCtaLoading}
         />
-      )}
+      ) : null}
 
     </DashboardSidebarProvider>
   )
