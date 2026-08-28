@@ -2,8 +2,6 @@ export const EMAIL_UNVERIFIED_CODE = "email_unverified"
 export const EMAIL_CONFIRMATION_RATE_LIMIT_SECONDS = 60
 export const MIN_SIGNUP_PASSWORD_LENGTH = 6
 
-export const EMAIL_UNVERIFIED_CHECKOUT_MESSAGE =
-  "Confirmă-ți emailul ca să poți plăti."
 export const EMAIL_UNVERIFIED_PASSWORD_MESSAGE =
   "Confirmă-ți emailul ca să poți schimba parola."
 

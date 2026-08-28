@@ -25,7 +25,6 @@ import {
   getOnboardingBlockedToast,
   OAUTH_ONBOARDING_PARAM,
   ONBOARDING_SUBJECT_OPTIONS,
-  type OnboardingSubjectId,
 } from "@/lib/onboarding"
 import {
   defaultGuardianOnboardingState,
@@ -45,6 +44,7 @@ import {
   type GuardianOnboardingState,
   type GuardianRole,
   type GuardianStep,
+  type GuardianTeachingMaterie,
 } from "@/lib/guardian-onboarding"
 import { signUpWithEmailPassword } from "@/lib/onboarding-email-signup"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
@@ -405,7 +405,7 @@ function GuardianRegisterPageContent() {
     setOnboardingState((prev) => ({ ...prev, dailyTime }))
   }
 
-  const handleSubjectSelect = (subject: OnboardingSubjectId) => {
+  const handleSubjectSelect = (subject: GuardianTeachingMaterie) => {
     playOnboardingSelectSound()
     setOnboardingState((prev) => ({ ...prev, teachingMaterie: subject }))
   }

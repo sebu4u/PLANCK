@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { ChevronLeft, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
@@ -39,6 +39,7 @@ import {
   OAUTH_ONBOARDING_PARAM,
   GUEST_DEMO_ONBOARDING_PARAM,
   CAMPAIGN_1LEU_ONBOARDING_PARAM,
+  CAMPAIGN_1LEU_SUBJECT_OPTIONS,
   ONBOARDING_SUBJECT_OPTIONS,
   type OnboardingSubjectId,
   type GuestDemoStatus,
@@ -50,7 +51,8 @@ import {
 type SubjectOption = OnboardingSubjectId
 type GradeOption = "9" | "10" | "11" | "12"
 type DailyTimeOption = "15" | "30" | "60"
-type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | "name"
+type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | "name" | "lesson_choice"
+type OnboardingDestination = "dashboard" | "lesson"
 
 type CampaignSignup = "1leu"
 
@@ -61,6 +63,7 @@ type OnboardingState = {
   selfGrade: number | null
   targetGrade: number | null
   dailyTime: DailyTimeOption | null
+  displayName: string
   awaitingPostAuth: boolean
   guestDemo: GuestDemoStatus | null
   campaignSignup: CampaignSignup | null
@@ -82,16 +85,20 @@ const defaultOnboardingState: OnboardingState = {
   selfGrade: null,
   targetGrade: null,
   dailyTime: null,
+  displayName: "",
   awaitingPostAuth: false,
   guestDemo: null,
   campaignSignup: null,
 }
+
+const ONE_LEU_ALLOWED_STEPS = new Set<RegisterStep>([ACCOUNT_STEP, "name", 2, "lesson_choice"])
 
 const subjectHeadlines: Record<SubjectOption, string> = {
   matematica: "Excelent, construim raționament matematic pas cu pas.",
   fizica: "Perfect, facem fizica mai clară împreună.",
   informatica: "Excelent, construim logică de programator.",
   biologie: "Super, explorăm lumea vie împreună.",
+  chimie: "Super, facem chimia mai clară împreună.",
 }
 
 const gradeHeadlines: Record<GradeOption, string> = {
@@ -112,6 +119,7 @@ const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 | 
 
 const sanitizeStep = (value: unknown): RegisterStep => {
   if (value === "name") return "name"
+  if (value === "lesson_choice") return "lesson_choice"
   if (value === 0 || value === "coming_soon") return 1
   if (typeof value === "number") {
     if (value === LEGACY_SPLASH_STEP) return "name"
@@ -140,6 +148,13 @@ const sanitizeGuestDemo = (value: unknown): GuestDemoStatus | null =>
 
 const sanitizeCampaignSignup = (value: unknown): CampaignSignup | null =>
   value === "1leu" ? "1leu" : null
+
+const sanitizeDisplayName = (value: unknown): string => {
+  if (typeof value !== "string") return ""
+  return value.trim().slice(0, 60)
+}
+
+const is1LeuAllowedStep = (step: RegisterStep) => ONE_LEU_ALLOWED_STEPS.has(step)
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -198,6 +213,8 @@ const STEP_ENTER_ANIM = "registerStepEnter 500ms ease-out forwards"
 const STEP_POP_FROM_LEFT_ANIM = "registerStepPopFromLeft 420ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards"
 const STEP_IMAGE_ANIM = "registerStepImageEnter 450ms ease-out forwards"
 const STEP_BUTTON_ANIM = "registerStepButtonEnter 400ms ease-out forwards"
+const LESSON_CHOICE_IMAGE_ANIM =
+  "registerLessonChoiceImageEnter 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards"
 
 function StepHeadingWithIcon({
   children,
@@ -281,6 +298,7 @@ function RegisterPageContent() {
   // navigate away: masks the brief "onboarding restarts" flash caused by the hydration effect
   // re-running (it clears onboardingState back to step 1) once `profile` refreshes with the new name.
   const [isFinalizing, setIsFinalizing] = useState(false)
+  const leavingToLessonRef = useRef(false)
 
   const { toast } = useToast()
   const router = useRouter()
@@ -322,6 +340,7 @@ function RegisterPageContent() {
           selfGrade: sanitizeGradeValue(decoded.selfGrade),
           targetGrade: sanitizeGradeValue(decoded.targetGrade),
           dailyTime: sanitizeDailyTime(decoded.dailyTime),
+          displayName: sanitizeDisplayName(decoded.displayName),
           awaitingPostAuth: Boolean(decoded.awaitingPostAuth),
           guestDemo: sanitizeGuestDemo(decoded.guestDemo) ?? getGuestDemoStatus(),
           campaignSignup: sanitizeCampaignSignup(decoded.campaignSignup),
@@ -343,10 +362,20 @@ function RegisterPageContent() {
         parsedState.step = 2
         parsedState.awaitingPostAuth = false
       }
-    } else if (shouldForce1LeuSignup) {
-      parsedState.step = user ? "name" : ACCOUNT_STEP
+    } else if (shouldForce1LeuSignup || parsedState.campaignSignup === "1leu") {
       parsedState.campaignSignup = "1leu"
       parsedState.awaitingPostAuth = false
+      if (!user) {
+        parsedState.step = ACCOUNT_STEP
+      } else if (!is1LeuAllowedStep(parsedState.step) || parsedState.step === ACCOUNT_STEP) {
+        parsedState.step = "name"
+      }
+      if (
+        parsedState.subject &&
+        !CAMPAIGN_1LEU_SUBJECT_OPTIONS.some((option) => option.id === parsedState.subject)
+      ) {
+        parsedState.subject = null
+      }
     } else if (shouldForcePostAuthStep) {
       parsedState.step = "name"
       parsedState.awaitingPostAuth = true
@@ -388,7 +417,7 @@ function RegisterPageContent() {
     }
 
     setOnboardingState(parsedState)
-    setDisplayName(profile?.name ?? profile?.nickname ?? "")
+    setDisplayName(parsedState.displayName || profile?.name || profile?.nickname || "")
     setHydrated(true)
   }, [
     profile?.name,
@@ -434,7 +463,9 @@ function RegisterPageContent() {
     if (!hydrated || !user || profileSyncedUserId !== user.id) return
 
     if (!needsOnboarding) {
-      router.replace(getDashboardPathForUserType(userType))
+      if (!leavingToLessonRef.current && !isFinalizing) {
+        router.replace(getDashboardPathForUserType(userType))
+      }
       return
     }
 
@@ -457,14 +488,16 @@ function RegisterPageContent() {
       shouldForcePostAuthStep ||
       onboardingState.awaitingPostAuth ||
       oauthFromRegister ||
-      onboardingState.step === "name"
+      onboardingState.step === "name" ||
+      onboardingState.step === "lesson_choice"
     const isAuthenticatedOnboardingStep =
       onboardingState.step === 2 ||
       onboardingState.step === 3 ||
       onboardingState.step === 4 ||
       onboardingState.step === 5 ||
       onboardingState.step === ACCOUNT_STEP ||
-      onboardingState.step === "name"
+      onboardingState.step === "name" ||
+      onboardingState.step === "lesson_choice"
 
     if (oauthFromRegister && onboardingState.step !== "name") {
       clearOAuthFlag()
@@ -478,8 +511,7 @@ function RegisterPageContent() {
 
     if (
       onboardingState.campaignSignup === "1leu" &&
-      onboardingState.step !== ACCOUNT_STEP &&
-      onboardingState.step !== "name"
+      !is1LeuAllowedStep(onboardingState.step)
     ) {
       setOnboardingState((prev) => ({
         ...prev,
@@ -494,6 +526,7 @@ function RegisterPageContent() {
     }
   }, [
     hydrated,
+    isFinalizing,
     needsOnboarding,
     onboardingState.awaitingPostAuth,
     onboardingState.campaignSignup,
@@ -508,8 +541,11 @@ function RegisterPageContent() {
   ])
 
   useEffect(() => {
-    if (!hydrated || onboardingState.step !== ACCOUNT_STEP) return
-    if (onboardingState.campaignSignup === "1leu") return
+    if (!hydrated) return
+    const prefetchForGuestAccount =
+      onboardingState.step === ACCOUNT_STEP && onboardingState.campaignSignup !== "1leu"
+    const prefetchForLessonChoice = onboardingState.step === "lesson_choice"
+    if (!prefetchForGuestAccount && !prefetchForLessonChoice) return
     let cancelled = false
     void (async () => {
       try {
@@ -517,7 +553,10 @@ function RegisterPageContent() {
           onboardingState.subject,
           onboardingState.grade,
         )
-        if (!cancelled) setGuestFirstItemHref(href)
+        if (!cancelled) {
+          setGuestFirstItemHref(href)
+          if (href) router.prefetch(href)
+        }
       } catch {
         if (!cancelled) setGuestFirstItemHref(null)
       }
@@ -525,16 +564,26 @@ function RegisterPageContent() {
     return () => {
       cancelled = true
     }
-  }, [hydrated, onboardingState.campaignSignup, onboardingState.step, onboardingState.subject])
+  }, [
+    hydrated,
+    onboardingState.campaignSignup,
+    onboardingState.grade,
+    onboardingState.step,
+    onboardingState.subject,
+    router,
+  ])
 
   const is1LeuSignup = onboardingState.campaignSignup === "1leu"
   const showProgressBar =
     !is1LeuSignup && isNumericStep(onboardingState.step) && onboardingState.step <= ACCOUNT_STEP
+  const show1LeuBack =
+    is1LeuSignup && (onboardingState.step === 2 || onboardingState.step === "lesson_choice")
   const showBackButton =
-    !is1LeuSignup &&
-    isNumericStep(onboardingState.step) &&
-    onboardingState.step >= 2 &&
-    (onboardingState.step <= 5 || onboardingState.step === ACCOUNT_STEP)
+    show1LeuBack ||
+    (!is1LeuSignup &&
+      isNumericStep(onboardingState.step) &&
+      onboardingState.step >= 2 &&
+      (onboardingState.step <= 5 || onboardingState.step === ACCOUNT_STEP))
   const showBottomCta =
     isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 5
   const isOAuthOnboardingFlow =
@@ -564,6 +613,17 @@ function RegisterPageContent() {
     }))
 
   const handleBack = () => {
+    if (nameSaving) return
+    if (is1LeuSignup) {
+      if (onboardingState.step === "lesson_choice") {
+        setStep(2)
+        return
+      }
+      if (onboardingState.step === 2) {
+        setStep("name")
+      }
+      return
+    }
     if (!isNumericStep(onboardingState.step)) return
     if (onboardingState.step <= 1) return
     if (onboardingState.step === ACCOUNT_STEP) {
@@ -587,7 +647,6 @@ function RegisterPageContent() {
           })
           return
         }
-        setStep(3)
         tiktokPixel.trackCustomizeProduct({
           contents: [
             {
@@ -599,6 +658,11 @@ function RegisterPageContent() {
           value: 0,
           currency: "RON",
         })
+        if (is1LeuSignup) {
+          setStep("lesson_choice")
+          break
+        }
+        setStep(3)
         break
       case 3:
         if (!onboardingState.grade) {
@@ -787,7 +851,7 @@ function RegisterPageContent() {
     setOauthLoading(null)
   }
 
-  const completeStudentOnboarding = async () => {
+  const completeStudentOnboarding = async (destination: OnboardingDestination = "dashboard") => {
     if (!user) {
       toast({
         title: "Conectează-te mai întâi",
@@ -809,7 +873,7 @@ function RegisterPageContent() {
       return
     }
 
-    const cleanName = displayName.trim()
+    const cleanName = displayName.trim() || onboardingState.displayName.trim()
     if (cleanName.length < 2) {
       toast({
         title: "Nume prea scurt",
@@ -841,6 +905,90 @@ function RegisterPageContent() {
       return
     }
 
+    const trackRegistration = () => {
+      markCompleted({
+        subject: onboardingState.subject,
+        grade: onboardingState.grade,
+      })
+      const registrationParams = {
+        contents: [
+          {
+            content_id: "account_elev",
+            content_type: "product" as const,
+            content_name: "Cont elev Planck",
+          },
+        ],
+        value: 0,
+        currency: "RON",
+      }
+      tiktokPixel.trackCompleteRegistration(registrationParams, user.id)
+      metaPixel.trackCompleteRegistration(
+        {
+          content_ids: ["account_elev"],
+          content_type: "product",
+          content_name: "Cont elev Planck",
+          value: 0,
+          currency: "RON",
+        },
+        user.id,
+      )
+    }
+
+    const persistCompletionLocally = () => {
+      try {
+        localStorage.setItem(getPostOnboardingDiscountStorageKey(user.id), String(Date.now()))
+      } catch {
+        // ignore
+      }
+    }
+
+    const identifyPixels = async () => {
+      await tiktokPixel.identify({
+        email: user.email,
+        phone: user.phone,
+        externalId: user.id,
+      })
+      metaPixel.identify({
+        email: user.email,
+        phone: user.phone,
+        externalId: user.id,
+      })
+    }
+
+    if (destination === "lesson") {
+      let target: string | null = guestFirstItemHref
+      try {
+        target =
+          target ??
+          (await getPostOnboardingLearningPathItemHref(
+            onboardingState.subject,
+            onboardingState.grade,
+          ))
+      } catch {
+        target = null
+      }
+
+      if (target) {
+        leavingToLessonRef.current = true
+        persistCompletionLocally()
+        await identifyPixels()
+        trackRegistration()
+        consumePostOnboardingRedirect()
+        await refreshProfile()
+        router.push(target)
+        localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
+        localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
+        clearGuestDemo()
+        return
+      }
+
+      toast({
+        title: "Nu am putut deschide lecția",
+        description: "Te ducem pe dashboard. Poți începe de acolo.",
+        variant: "destructive",
+      })
+    }
+
     // From here on we're committed to leaving this page: show the same loading screen as the
     // dashboard instead of the onboarding wizard while we refresh the profile and resolve the
     // redirect target (refreshProfile() below re-triggers the localStorage-hydration effect,
@@ -850,55 +998,34 @@ function RegisterPageContent() {
     localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
     localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
     clearGuestDemo()
-    try {
-      localStorage.setItem(getPostOnboardingDiscountStorageKey(user.id), String(Date.now()))
-    } catch {
-      // ignore
-    }
+    persistCompletionLocally()
 
     await refreshProfile()
-    await tiktokPixel.identify({
-      email: user.email,
-      phone: user.phone,
-      externalId: user.id,
-    })
-    metaPixel.identify({
-      email: user.email,
-      phone: user.phone,
-      externalId: user.id,
-    })
-    const registrationParams = {
-      contents: [
-        {
-          content_id: "account_elev",
-          content_type: "product" as const,
-          content_name: "Cont elev Planck",
-        },
-      ],
-      value: 0,
-      currency: "RON",
-    }
-    markCompleted({
-      subject: onboardingState.subject,
-      grade: onboardingState.grade,
-    })
-    tiktokPixel.trackCompleteRegistration(registrationParams, user.id)
-    metaPixel.trackCompleteRegistration(
-      {
-        content_ids: ["account_elev"],
-        content_type: "product",
-        content_name: "Cont elev Planck",
-        value: 0,
-        currency: "RON",
-      },
-      user.id,
-    )
+    await identifyPixels()
+    trackRegistration()
     consumePostOnboardingRedirect()
     router.push("/dashboard")
   }
 
   const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const cleanName = displayName.trim()
+    if (cleanName.length < 2) {
+      toast({
+        title: "Nume prea scurt",
+        description: "Introdu un nume de cel puțin 2 caractere.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (is1LeuSignup) {
+      setOnboardingState((prev) => ({
+        ...prev,
+        displayName: cleanName,
+        step: 2,
+      }))
+      return
+    }
     await completeStudentOnboarding()
   }
 
@@ -936,14 +1063,15 @@ function RegisterPageContent() {
           </div>
         )
 
-      case 2:
+      case 2: {
+        const subjectOptions = is1LeuSignup ? CAMPAIGN_1LEU_SUBJECT_OPTIONS : ONBOARDING_SUBJECT_OPTIONS
         return (
           <div className="mx-auto w-full max-w-[520px]">
             <StepHeadingWithIcon popFromLeft={!!onboardingState.subject}>
               {onboardingState.subject ? subjectHeadlines[onboardingState.subject] : "Ce te-a adus aici?"}
             </StepHeadingWithIcon>
             <div className="space-y-3">
-              {ONBOARDING_SUBJECT_OPTIONS.map((option, idx) => (
+              {subjectOptions.map((option, idx) => (
                 <button
                   key={option.id}
                   type="button"
@@ -961,6 +1089,7 @@ function RegisterPageContent() {
             </div>
           </div>
         )
+      }
 
       case 3:
         return (
@@ -1083,7 +1212,7 @@ function RegisterPageContent() {
                       Salvăm...
                     </span>
                   ) : is1LeuSignup ? (
-                    "Intră pe dashboard"
+                    "Continuă"
                   ) : onboardingState.guestDemo === "completed" ? (
                     "Continuă"
                   ) : (
@@ -1103,6 +1232,57 @@ function RegisterPageContent() {
               {"Sau mergi direct la dashboard ->"}
             </button>
             )}
+          </div>
+        )
+
+      case "lesson_choice":
+        return (
+          <div className="mx-auto mt-16 w-full max-w-[420px] sm:mt-24">
+            <div className="relative">
+              <Image
+                src="/images/exerseaza/pregatiri-icon.png"
+                alt=""
+                width={360}
+                height={360}
+                className="pointer-events-none absolute -top-[12rem] -right-4 z-0 h-72 w-72 select-none object-contain opacity-0 sm:-top-[14.5rem] sm:-right-8 sm:h-96 sm:w-96"
+                style={{ animation: LESSON_CHOICE_IMAGE_ANIM, animationDelay: "520ms" }}
+              />
+              <div
+                className="relative z-10 rounded-3xl border border-[#ececf1] bg-white p-7 opacity-0 shadow-[0_30px_70px_-45px_rgba(18,20,28,0.5)]"
+                style={{ animation: STEP_ENTER_ANIM, animationDelay: "0ms" }}
+              >
+                <h1 className="text-3xl font-semibold text-[#0f1115]">Vrei să începi să înveți?</h1>
+                <p className="mb-6 mt-2 text-sm text-[#666a73]">
+                  Poți face primul traseu demo în aproximativ 2 minute, sau poți merge direct pe dashboard.
+                </p>
+
+                <button
+                  type="button"
+                  disabled={nameSaving}
+                  onClick={() => void completeStudentOnboarding("lesson")}
+                  className={`${mainCtaClassName} w-full`}
+                >
+                  {nameSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Salvăm...
+                    </span>
+                  ) : (
+                    "Începe lecția demo (~2 min)"
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={nameSaving}
+              onClick={() => void completeStudentOnboarding("dashboard")}
+              className="mt-4 w-full text-center text-sm font-medium text-[#666a73] opacity-0 transition-colors hover:text-[#101216] disabled:opacity-40"
+              style={{ animation: STEP_BUTTON_ANIM, animationDelay: "160ms" }}
+            >
+              {"Sau mergi direct la dashboard ->"}
+            </button>
           </div>
         )
 
@@ -1172,10 +1352,21 @@ function RegisterPageContent() {
             transform: translateX(0) scale(1);
           }
         }
+
+        @keyframes registerLessonChoiceImageEnter {
+          0% {
+            opacity: 0;
+            transform: translateY(36px) scale(0.88);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
       `}</style>
 
       <div className="mx-auto flex h-full w-full max-w-[1100px] flex-col sm:min-h-screen sm:h-auto">
-        {showProgressBar && (
+        {(showProgressBar || show1LeuBack) && (
           <header className="w-full px-4 pb-1 pt-4 sm:px-8 sm:pt-7">
             <div className="mx-auto hidden w-full max-w-[520px] items-center gap-4 sm:flex">
               <div className="w-6">
@@ -1183,37 +1374,45 @@ function RegisterPageContent() {
                   <button
                     type="button"
                     onClick={handleBack}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[#16181d] transition-colors hover:bg-[#f0f1f5]"
+                    disabled={nameSaving}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[#16181d] transition-colors hover:bg-[#f0f1f5] disabled:opacity-40"
                     aria-label="Înapoi"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                 ) : null}
               </div>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ebebef]">
-                <div
-                  className="h-full rounded-full bg-[#8043f0] transition-[width] duration-500 ease-out"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+              {showProgressBar ? (
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ebebef]">
+                  <div
+                    className="h-full rounded-full bg-[#8043f0] transition-[width] duration-500 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
             </div>
             <div className="relative mx-auto flex w-full max-w-[520px] items-center justify-center sm:hidden">
               {showBackButton ? (
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="absolute left-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[#16181d] transition-colors active:bg-[#f0f1f5]"
+                  disabled={nameSaving}
+                  className="absolute left-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[#16181d] transition-colors active:bg-[#f0f1f5] disabled:opacity-40"
                   aria-label="Înapoi"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
               ) : null}
-              <div className="h-1.5 w-[78%] overflow-hidden rounded-full bg-[#ebebef]">
-                <div
-                  className="h-full rounded-full bg-[#8043f0] transition-[width] duration-500 ease-out"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+              {showProgressBar ? (
+                <div className="h-1.5 w-[78%] overflow-hidden rounded-full bg-[#ebebef]">
+                  <div
+                    className="h-full rounded-full bg-[#8043f0] transition-[width] duration-500 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              ) : null}
             </div>
           </header>
         )}

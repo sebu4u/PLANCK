@@ -26,7 +26,7 @@ const FIZICA_LESSON_SLUG_BY_GRADE: Record<string, string> = {
  * Resolve which onboarding custom lesson slug applies for a given subject + class.
  * - fizică: per-class lesson (defaults to "viteza" for an unknown/missing class).
  * - matematică / informatică: a single intro lesson regardless of class.
- * - biologie (and anything else): redirects to the fizică clasa 9 lesson ("viteza").
+ * - biologie / chimie (and anything else): redirects to the fizică clasa 9 lesson ("viteza").
  */
 export function getOnboardingCustomLessonSlug(
   subject: unknown,

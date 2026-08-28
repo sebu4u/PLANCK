@@ -14,6 +14,7 @@ const FALLBACK_BY_SUBJECT: Record<OnboardingSubjectId, Omit<OnboardingProfileSta
   fizica: { lessons: 72, problems: 1320, tests: 260 },
   informatica: { lessons: 58, problems: 1024, tests: 210 },
   biologie: { lessons: 52, problems: 880, tests: 220 },
+  chimie: { lessons: 52, problems: 880, tests: 220 },
 }
 
 const MIN_STATS_BY_SUBJECT: Record<OnboardingSubjectId, Omit<OnboardingProfileStats, "teachers">> = {
@@ -21,6 +22,7 @@ const MIN_STATS_BY_SUBJECT: Record<OnboardingSubjectId, Omit<OnboardingProfileSt
   fizica: { lessons: 60, problems: 1100, tests: 240 },
   informatica: { lessons: 52, problems: 960, tests: 200 },
   biologie: { lessons: 48, problems: 820, tests: 210 },
+  chimie: { lessons: 48, problems: 820, tests: 210 },
 }
 
 function teachersForGrade(grade: string): number {
@@ -143,11 +145,7 @@ async function countTests(
   }
 
   let chapterQuery = client.from("learning_path_chapters").select("id").eq("is_active", true)
-  if (subject === "fizica") {
-    chapterQuery = chapterQuery.or("materie.eq.fizica,materie.is.null")
-  } else {
-    chapterQuery = chapterQuery.eq("materie", subject)
-  }
+  chapterQuery = chapterQuery.eq("materie", subject)
 
   const { data: chapters } = await chapterQuery
   if (!chapters?.length) return 0

@@ -50,7 +50,7 @@ export function OnboardingAccountStep({
     variant === "email-only"
       ? {
           title: "Creează-ți contul",
-          subtitle: "Email și parolă. După nume, ești pe dashboard.",
+          subtitle: "Email și parolă. Apoi îți alegi materia.",
         }
       : buildPlanSummaryCopy({
           selfGrade: selfGrade ?? 7,

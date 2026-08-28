@@ -14,6 +14,7 @@ const SUBJECT_LABELS: Record<OnboardingSubjectId, string> = {
   fizica: "Fizică",
   informatica: "Informatică",
   biologie: "Biologie",
+  chimie: "Chimie",
 }
 
 const POP_MS = 320

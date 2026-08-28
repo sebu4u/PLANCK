@@ -10,8 +10,6 @@ import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
-import { useResendConfirmationEmail } from "@/hooks/use-resend-confirmation"
-import { EMAIL_UNVERIFIED_CODE } from "@/lib/email-verification"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import type { ChildBillingSnapshot } from "@/lib/parent/billing-types"
 import { PricingMobileExitSheet } from "@/components/pricing/pricing-mobile-exit-sheet"
@@ -571,10 +569,7 @@ function PricingPageContent() {
   const searchParams = useSearchParams()
   const { user, subscriptionPlan, refreshProfile, isParent } = useAuth()
   const { toast } = useToast()
-  const { toastUnverified } = useResendConfirmationEmail()
-  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>(
-    isEarlybirdActive() ? "year" : "month",
-  )
+  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>("week")
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
@@ -813,10 +808,6 @@ function PricingPageContent() {
       })
 
       if (!result.ok) {
-        if (result.code === EMAIL_UNVERIFIED_CODE) {
-          toastUnverified("Confirmă-ți emailul", result.error)
-          return
-        }
         throw new Error(result.error)
       }
 

@@ -39,8 +39,6 @@ import {
   buildCheckoutSuccessUrl,
   parseAllowedCheckoutPath,
 } from "@/lib/stripe-checkout-paths"
-import { EMAIL_UNVERIFIED_CHECKOUT_MESSAGE, EMAIL_UNVERIFIED_CODE } from "@/lib/email-verification"
-import { isProfileEmailVerified } from "@/lib/email-verification-server"
 
 export const runtime = "nodejs"
 
@@ -111,13 +109,6 @@ export async function POST(req: NextRequest) {
     const { data: userData, error: userErr } = await supabase.auth.getUser()
     if (userErr || !userData?.user) {
       return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
-    }
-
-    if (!(await isProfileEmailVerified(supabase, userData.user.id))) {
-      return NextResponse.json(
-        { error: EMAIL_UNVERIFIED_CHECKOUT_MESSAGE, code: EMAIL_UNVERIFIED_CODE },
-        { status: 403 },
-      )
     }
 
     let body: CheckoutBody

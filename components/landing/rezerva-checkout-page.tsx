@@ -8,8 +8,6 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import { useAuth } from "@/components/auth-provider"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { useResendConfirmationEmail } from "@/hooks/use-resend-confirmation"
-import { EMAIL_UNVERIFIED_CODE } from "@/lib/email-verification"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
 import {
   getLandingSubjectGroup,
@@ -72,7 +70,6 @@ function RezervaCheckoutForm() {
   const { user, login, isParent, isTeacher, profileSyncedUserId, refreshProfile, refreshUser } =
     useAuth()
   const { toast } = useToast()
-  const { toastUnverified } = useResendConfirmationEmail()
 
   const [interval, setBillingInterval] = useState<"week" | "year">(
     searchParams.get("interval") === "week" || !earlybirdOn ? "week" : "year",
@@ -131,13 +128,6 @@ function RezervaCheckoutForm() {
       })
 
       if (!result.ok) {
-        if (result.code === EMAIL_UNVERIFIED_CODE) {
-          checkoutStartedRef.current = false
-          setBusy(null)
-          setAutoCheckout(false)
-          toastUnverified("Confirmă-ți emailul", result.error)
-          return
-        }
         throw new Error(result.error)
       }
       if ("applied" in result && result.applied) {
@@ -159,7 +149,7 @@ function RezervaCheckoutForm() {
         variant: "destructive",
       })
     }
-  }, [earlybirdOn, interval, refreshProfile, rezervaPath, subject, toast, toastUnverified])
+  }, [earlybirdOn, interval, refreshProfile, rezervaPath, subject, toast])
 
   useEffect(() => {
     if (!autoCheckout || canceled) return

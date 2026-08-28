@@ -13,6 +13,7 @@ export const STUDENT_STEP_NAMES: Record<string, string> = {
   "5": "target_grade",
   "9": "account",
   name: "name",
+  lesson_choice: "lesson_choice",
 }
 
 export function guardianStepName(

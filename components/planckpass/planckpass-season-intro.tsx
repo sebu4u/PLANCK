@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion"
 import { ArrowRight, Coins, Snowflake, Sparkles, Zap } from "lucide-react"
 import { PlanckPassBgPattern } from "@/components/dashboard/free-mobile/planckpass-bg-pattern"
 import { PLANCKPASS_INTRO_SEASON_LABEL } from "@/lib/planckpass/intro"
@@ -13,6 +13,19 @@ import {
   unlockPlanckPassIntroAudio,
 } from "@/lib/planckpass/intro-sounds"
 import { cn } from "@/lib/utils"
+
+type Step0Phase = "hero" | "placed" | "content" | "cta"
+
+const STEP0_POP_MS = 680
+const STEP0_SLIDE_MS = 500
+const STEP0_CTA_DELAY_MS = 2000
+
+const LOCKUP_LAYOUT_ID = "planckpass-intro-lockup"
+const LOCKUP_SLIDE_TRANSITION = {
+  duration: STEP0_SLIDE_MS / 1000,
+  ease: [0.22, 1, 0.36, 1] as const,
+}
+const POP_SPRING = { type: "spring" as const, stiffness: 520, damping: 18, mass: 0.7 }
 
 const STEPS = [
   {
@@ -43,18 +56,40 @@ const REWARD_PREVIEWS = [
   { id: "coins-2", label: "100 Q", Icon: Coins, tone: "text-amber-300" },
 ] as const
 
+function IntroLockup({ titleId }: { titleId?: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-yellow-300 sm:text-xs">
+        {PLANCKPASS_INTRO_SEASON_LABEL}
+      </p>
+      <h1
+        id={titleId}
+        className="title-font mt-2 text-[1.85rem] italic leading-tight text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.45)] sm:text-[2.15rem]"
+      >
+        PLANCKPASS
+      </h1>
+    </div>
+  )
+}
+
 type PlanckPassSeasonIntroProps = {
   onComplete: () => void
 }
 
 export function PlanckPassSeasonIntro({ onComplete }: PlanckPassSeasonIntroProps) {
+  const reduceMotion = useReducedMotion()
   const [step, setStep] = useState(0)
+  const [step0Phase, setStep0Phase] = useState<Step0Phase>("hero")
   const [xp, setXp] = useState(12)
   const [xpPop, setXpPop] = useState(false)
   const [reachedTier, setReachedTier] = useState(1)
   const [trackShift, setTrackShift] = useState(0)
   const isLast = step === STEPS.length - 1
   const copy = STEPS[step]
+  const isStep0 = step === 0
+  const showStep0Hero = isStep0 && step0Phase === "hero"
+  const showStep0Content = !isStep0 || step0Phase === "content" || step0Phase === "cta"
+  const showStep0Cta = !isStep0 || step0Phase === "cta"
 
   useEffect(() => {
     const previous = document.body.style.overflow
@@ -63,6 +98,30 @@ export function PlanckPassSeasonIntro({ onComplete }: PlanckPassSeasonIntroProps
       document.body.style.overflow = previous
     }
   }, [])
+
+  useEffect(() => {
+    if (!isStep0) return
+    if (reduceMotion) {
+      setStep0Phase("cta")
+      return
+    }
+
+    setStep0Phase("hero")
+    const toPlaced = window.setTimeout(() => setStep0Phase("placed"), STEP0_POP_MS)
+    const toContent = window.setTimeout(
+      () => setStep0Phase("content"),
+      STEP0_POP_MS + STEP0_SLIDE_MS,
+    )
+    const toCta = window.setTimeout(
+      () => setStep0Phase("cta"),
+      STEP0_POP_MS + STEP0_SLIDE_MS + STEP0_CTA_DELAY_MS,
+    )
+    return () => {
+      window.clearTimeout(toPlaced)
+      window.clearTimeout(toContent)
+      window.clearTimeout(toCta)
+    }
+  }, [isStep0, reduceMotion])
 
   useEffect(() => {
     if (step !== 1) {
@@ -142,11 +201,35 @@ export function PlanckPassSeasonIntro({ onComplete }: PlanckPassSeasonIntroProps
       />
       <PlanckPassBgPattern />
 
-      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
-        <div className="flex items-center justify-between gap-3">
-          <span className="rounded-full border-2 border-[#1a0a4a] bg-[#ffd000] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#1a0a4a] shadow-[0_2px_0_#1a0a4a]">
+      <LayoutGroup id="planckpass-intro-step0">
+        {showStep0Hero ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-5">
+            <motion.div
+              layoutId={LOCKUP_LAYOUT_ID}
+              initial={{ opacity: 0, scale: 0.62 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ ...POP_SPRING, delay: 0.12 }}
+              className="text-center"
+            >
+              <IntroLockup titleId="planckpass-intro-title" />
+            </motion.div>
+          </div>
+        ) : null}
+
+        <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <div className="relative z-30 flex items-center justify-between gap-3">
+          <motion.span
+            initial={false}
+            animate={
+              showStep0Hero
+                ? { opacity: 0, scale: 0.86 }
+                : { opacity: 1, scale: 1 }
+            }
+            transition={showStep0Hero ? { duration: 0 } : POP_SPRING}
+            className="rounded-full border-2 border-[#1a0a4a] bg-[#ffd000] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#1a0a4a] shadow-[0_2px_0_#1a0a4a]"
+          >
             {PLANCKPASS_INTRO_SEASON_LABEL}
-          </span>
+          </motion.span>
           <button
             type="button"
             onClick={() => {
@@ -160,30 +243,77 @@ export function PlanckPassSeasonIntro({ onComplete }: PlanckPassSeasonIntroProps
 
         <div className="flex min-h-0 flex-1 flex-col justify-center py-6">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.28, ease: "easeOut" }}
-              className="text-center"
-            >
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-yellow-300">
-                {copy.kicker}
-              </p>
-              <h1
-                id="planckpass-intro-title"
-                className="title-font mt-2 text-[1.85rem] italic leading-tight text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.45)] sm:text-[2.15rem]"
+            {isStep0 ? (
+              <motion.div
+                key="step-0"
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.28, ease: "easeOut" }}
+                className="text-center"
               >
-                {copy.title}
-              </h1>
-              <p className="mx-auto mt-3 max-w-[34rem] text-[15px] font-semibold leading-relaxed text-white/85 sm:text-base">
-                {copy.body}
-              </p>
-            </motion.div>
+                {showStep0Hero ? (
+                  <div className="invisible" aria-hidden>
+                    <IntroLockup />
+                  </div>
+                ) : (
+                  <motion.div
+                    layoutId={LOCKUP_LAYOUT_ID}
+                    className="text-center"
+                    transition={LOCKUP_SLIDE_TRANSITION}
+                  >
+                    <IntroLockup titleId="planckpass-intro-title" />
+                  </motion.div>
+                )}
+                <motion.p
+                  initial={false}
+                  animate={
+                    showStep0Content
+                      ? { opacity: 1, y: 0, scale: 1 }
+                      : { opacity: 0, y: 10, scale: 0.96 }
+                  }
+                  transition={showStep0Content ? POP_SPRING : { duration: 0 }}
+                  aria-hidden={!showStep0Content}
+                  className="mx-auto mt-3 max-w-[34rem] text-[15px] font-semibold leading-relaxed text-white/85 sm:text-base"
+                >
+                  {copy.body}
+                </motion.p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.28, ease: "easeOut" }}
+                className="text-center"
+              >
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-yellow-300">
+                  {copy.kicker}
+                </p>
+                <h1
+                  id="planckpass-intro-title"
+                  className="title-font mt-2 text-[1.85rem] italic leading-tight text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.45)] sm:text-[2.15rem]"
+                >
+                  {copy.title}
+                </h1>
+                <p className="mx-auto mt-3 max-w-[34rem] text-[15px] font-semibold leading-relaxed text-white/85 sm:text-base">
+                  {copy.body}
+                </p>
+              </motion.div>
+            )}
           </AnimatePresence>
 
-          <div className="mt-8">
+          <motion.div
+            className="mt-8"
+            initial={false}
+            animate={
+              showStep0Content
+                ? { opacity: 1, y: 0, scale: 1 }
+                : { opacity: 0, y: 22, scale: 0.86 }
+            }
+            transition={showStep0Content ? POP_SPRING : { duration: 0 }}
+            style={{ pointerEvents: showStep0Content ? "auto" : "none" }}
+            aria-hidden={!showStep0Content}
+          >
             <IntroPassStage
               step={step}
               xp={xp}
@@ -192,11 +322,17 @@ export function PlanckPassSeasonIntro({ onComplete }: PlanckPassSeasonIntroProps
               trackShift={trackShift}
               cards={highlightedCards}
             />
-          </div>
+          </motion.div>
         </div>
 
         <div className="shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          <div className="mb-4 flex items-center justify-center gap-2">
+          <motion.div
+            initial={false}
+            animate={{ opacity: showStep0Cta ? 1 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="mb-4 flex items-center justify-center gap-2"
+            aria-hidden={!showStep0Cta}
+          >
             {STEPS.map((_, index) => (
               <span
                 key={index}
@@ -206,19 +342,39 @@ export function PlanckPassSeasonIntro({ onComplete }: PlanckPassSeasonIntroProps
                 )}
               />
             ))}
-          </div>
-          <button
-            type="button"
-            onClick={goNext}
-            className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#ffd000] px-6 py-3 text-sm font-black uppercase tracking-wide text-[#1a0a4a] shadow-[0_4px_0_#8a5a00] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#8a5a00] active:translate-y-1 active:shadow-[0_1px_0_#8a5a00]"
+          </motion.div>
+          <motion.div
+            initial={false}
+            animate={
+              showStep0Cta
+                ? { opacity: 1, y: 0 }
+                : { opacity: 0, y: 10 }
+            }
+            transition={
+              showStep0Cta
+                ? { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
+                : { duration: 0 }
+            }
+            className="w-full"
+            style={{ pointerEvents: showStep0Cta ? "auto" : "none" }}
           >
-            <span className="inline-flex items-center gap-2">
-              {copy.cta}
-              <ArrowRight className="h-4 w-4" />
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!showStep0Cta}
+              aria-hidden={!showStep0Cta}
+              tabIndex={showStep0Cta ? 0 : -1}
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#ffd000] px-6 py-3 text-sm font-black uppercase tracking-wide text-[#1a0a4a] shadow-[0_4px_0_#8a5a00] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#8a5a00] active:translate-y-1 active:shadow-[0_1px_0_#8a5a00] disabled:pointer-events-none"
+            >
+              <span className="inline-flex items-center gap-2">
+                {copy.cta}
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </button>
+          </motion.div>
         </div>
       </div>
+      </LayoutGroup>
     </div>
   )
 }

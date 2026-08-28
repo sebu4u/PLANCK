@@ -84,11 +84,22 @@ export const ONBOARDING_SUBJECT_OPTIONS = [
   { id: "biologie", label: "Biologie" },
 ] as const
 
-export type OnboardingSubjectId = (typeof ONBOARDING_SUBJECT_OPTIONS)[number]["id"]
+export const CAMPAIGN_1LEU_SUBJECT_OPTIONS = [
+  { id: "matematica", label: "Matematică" },
+  { id: "fizica", label: "Fizică" },
+  { id: "informatica", label: "Informatică" },
+  { id: "chimie", label: "Chimie" },
+  { id: "biologie", label: "Biologie" },
+] as const
 
-const onboardingSubjectIds = new Set<string>(
-  ONBOARDING_SUBJECT_OPTIONS.map((option) => option.id),
-)
+export type OnboardingSubjectId =
+  | (typeof ONBOARDING_SUBJECT_OPTIONS)[number]["id"]
+  | (typeof CAMPAIGN_1LEU_SUBJECT_OPTIONS)[number]["id"]
+
+const onboardingSubjectIds = new Set<string>([
+  ...ONBOARDING_SUBJECT_OPTIONS.map((option) => option.id),
+  ...CAMPAIGN_1LEU_SUBJECT_OPTIONS.map((option) => option.id),
+])
 
 export function isOnboardingSubjectId(value: unknown): value is OnboardingSubjectId {
   return typeof value === "string" && onboardingSubjectIds.has(value)

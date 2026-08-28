@@ -1,10 +1,12 @@
 "use client"
 
+import { useCallback, useState } from "react"
 import { FadeInUp } from "@/components/scroll-animations"
 import { CountdownUnit } from "@/components/landing/countdown-unit"
 import { PrizeWheelVisual } from "@/components/prize-wheel/prize-wheel-visual"
 import { Landing1LeuCtaLink } from "@/components/landing-1leu/cta-link"
 import { Landing1LeuHeroConfetti } from "@/components/landing-1leu/hero-confetti"
+import { Landing1LeuWhatIsSheet } from "@/components/landing-1leu/what-is-planck-sheet"
 import {
   PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT,
   useLanding1LeuCampaign,
@@ -12,6 +14,9 @@ import {
 
 export function Landing1LeuHeroSection() {
   const { days, hours, minutes, seconds, isLive } = useLanding1LeuCampaign()
+  const [whatIsOpen, setWhatIsOpen] = useState(false)
+  const openWhatIs = useCallback(() => setWhatIsOpen(true), [])
+  const closeWhatIs = useCallback(() => setWhatIsOpen(false), [])
 
   return (
     <section className="relative overflow-hidden bg-[linear-gradient(to_bottom,#c8e6ff_0%,#e8f4ff_16%,#ffffff_38%)]">
@@ -44,7 +49,14 @@ export function Landing1LeuHeroSection() {
             </FadeInUp>
 
             <div className="mt-8 hidden lg:block">
-              <HeroCtaBlock days={days} hours={hours} minutes={minutes} seconds={seconds} isLive={isLive} />
+              <HeroCtaBlock
+                days={days}
+                hours={hours}
+                minutes={minutes}
+                seconds={seconds}
+                isLive={isLive}
+                onWhatIsPlanck={openWhatIs}
+              />
             </div>
           </div>
 
@@ -64,10 +76,18 @@ export function Landing1LeuHeroSection() {
           </FadeInUp>
 
           <div className="lg:hidden">
-            <HeroCtaBlock days={days} hours={hours} minutes={minutes} seconds={seconds} isLive={isLive} />
+            <HeroCtaBlock
+              days={days}
+              hours={hours}
+              minutes={minutes}
+              seconds={seconds}
+              isLive={isLive}
+              onWhatIsPlanck={openWhatIs}
+            />
           </div>
         </div>
       </div>
+      <Landing1LeuWhatIsSheet open={whatIsOpen} onClose={closeWhatIs} />
     </section>
   )
 }
@@ -78,12 +98,14 @@ function HeroCtaBlock({
   minutes,
   seconds,
   isLive,
+  onWhatIsPlanck,
 }: {
   days: number
   hours: number
   minutes: number
   seconds: number
   isLive: boolean
+  onWhatIsPlanck: () => void
 }) {
   return (
     <div className="flex flex-col items-center lg:items-start">
@@ -109,6 +131,13 @@ function HeroCtaBlock({
       <p className="mt-2.5 max-w-sm text-center text-sm leading-relaxed text-gray-500 lg:text-left">
         Cont gratuit. Fără card acum. 1 leu se plătește doar dacă prinzi locul.
       </p>
+      <button
+        type="button"
+        onClick={onWhatIsPlanck}
+        className="mt-1 inline-flex min-h-11 items-center justify-center text-sm font-semibold text-[#7C5CFC] underline-offset-4 hover:underline active:opacity-80"
+      >
+        Ce este PLANCK? →
+      </button>
     </div>
   )
 }
