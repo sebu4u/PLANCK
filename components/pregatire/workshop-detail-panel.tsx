@@ -101,11 +101,18 @@ export function WorkshopDetailPanel({
 
   const full = workshop.seats_remaining === 0 && !workshop.unlocked
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
-  const unlockCtaLabel = full
+  const seatsCountLabel =
+    workshop.max_seats != null
+      ? `${workshop.seats_remaining ?? 0}/${workshop.max_seats}`
+      : null
+  const unlockCtaBase = full
     ? "Locuri epuizate"
     : isLoggedIn
-      ? "Rezervă-ți locul gratuit."
+      ? "Rezervă-ți locul gratuit"
       : "Autentifică-te pentru a rezerva"
+  const unlockCtaLabel = seatsCountLabel
+    ? `${unlockCtaBase} · ${seatsCountLabel}`
+    : unlockCtaBase
 
   const handleUnlock = async () => {
     if (!isLoggedIn) {
@@ -198,7 +205,12 @@ export function WorkshopDetailPanel({
           onClick={() => void handleUnlock()}
         >
           {unlocking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {unlockCtaLabel}
+          {unlockCtaBase}
+          {seatsCountLabel ? (
+            <span className="ml-2 rounded-md bg-white/15 px-1.5 py-0.5 text-xs font-semibold tabular-nums">
+              {seatsCountLabel}
+            </span>
+          ) : null}
         </Button>
       ) : null}
 

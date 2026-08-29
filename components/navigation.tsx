@@ -657,7 +657,7 @@ export function Navigation() {
         isMatematicaProblemsCatalog ||
         isInformaticaProblemsCatalog),
   )
-  const mobilePracticeSubject: PracticeSubjectId = isExerseazaHub || isProblemsCatalog
+  const mobilePracticeSubject: PracticeSubjectId = isProblemsCatalog
     ? "fizica"
     : isMatematicaProblemsCatalog
       ? "matematica"
@@ -821,7 +821,6 @@ export function Navigation() {
                           currentSubject={mobilePracticeSubject}
                           size={isStudentDashboardRoute(pathname) ? "navbar-lg" : "navbar"}
                           navigateOnChange={
-                            isExerseazaHub ||
                             isProblemsCatalog ||
                             isMatematicaProblemsCatalog ||
                             isInformaticaProblemsCatalog

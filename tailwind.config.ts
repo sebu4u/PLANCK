@@ -112,6 +112,15 @@ const config: Config = {
   				'60%': { transform: 'translateX(5px)' },
   				'75%': { transform: 'translateX(-3px)' },
   				'90%': { transform: 'translateX(3px)' }
+  			},
+  			'nudge-pop': {
+  				'0%': { transform: 'scale(0.4) translateY(10px)', opacity: '0' },
+  				'70%': { transform: 'scale(1.1) translateY(-2px)', opacity: '1' },
+  				'100%': { transform: 'scale(1) translateY(0)', opacity: '1' }
+  			},
+  			'nudge-bounce': {
+  				'0%, 100%': { transform: 'translateY(0)' },
+  				'50%': { transform: 'translateY(-8px)' }
   			}
   		},
   		animation: {
@@ -120,7 +129,9 @@ const config: Config = {
   			'stats-marquee': 'stats-marquee 50s linear infinite',
   			'marquee-left': 'marquee-left 36s linear infinite',
   			'marquee-right': 'marquee-right 36s linear infinite',
-  			'grile-wrong-shake': 'grile-wrong-shake 0.48s ease-in-out both'
+    			'grile-wrong-shake': 'grile-wrong-shake 0.48s ease-in-out both',
+  			'nudge-pop': 'nudge-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both',
+  			'nudge-bounce': 'nudge-bounce 0.9s ease-in-out 0.42s infinite'
   		}
   	}
   },

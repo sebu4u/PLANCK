@@ -1,14 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { EnergyBadge } from "@/components/pregatire/energy-badge"
+import { FloatingWeekCalendar } from "@/components/pregatire/floating-week-calendar"
+import { NextWorkshopHero } from "@/components/pregatire/next-workshop-hero"
+import { PregatireHubTabBar } from "@/components/pregatire/pregatire-hub-tab-bar"
+import { PregatireIntroCard } from "@/components/pregatire/pregatire-intro-card"
 import { PregatireMonthCalendar } from "@/components/pregatire/month-calendar"
 import { PushPrompt } from "@/components/pregatire/push-prompt"
 import { WorkshopCard } from "@/components/pregatire/workshop-card"
 import { WorkshopDetailPanel } from "@/components/pregatire/workshop-detail-panel"
+import { WorkshopMaterialsFeed } from "@/components/pregatire/workshop-materials-feed"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { supabase } from "@/lib/supabaseClient"
 import {
@@ -18,17 +23,26 @@ import {
   startOfWeekMonday,
 } from "@/lib/pregatire/dates"
 import {
+  DEFAULT_PREGATIRE_HUB_TAB,
+  readStoredPregatireHubTab,
+  writeStoredPregatireHubTab,
+  type PregatireHubTab,
+} from "@/lib/pregatire-hub-tab"
+import {
   WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_LABELS,
   isWorkshopSubject,
   type WorkshopDetail,
+  type WorkshopMaterialsHubItem,
   type WorkshopPublic,
   type WorkshopSubject,
 } from "@/lib/pregatire/types"
 import { cn } from "@/lib/utils"
 
-function useIsMobile(breakpoint = 768) {
-  const [mobile, setMobile] = useState(false)
+const BURGER_BREAKPOINT = 948
+
+function useIsMobile(breakpoint = BURGER_BREAKPOINT) {
+  const [mobile, setMobile] = useState<boolean | null>(null)
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
     const update = () => setMobile(mq.matches)
@@ -39,11 +53,67 @@ function useIsMobile(breakpoint = 768) {
   return mobile
 }
 
+function usePregatireHubTab() {
+  const [tab, setTab] = useState<PregatireHubTab>(DEFAULT_PREGATIRE_HUB_TAB)
+
+  useLayoutEffect(() => {
+    setTab(readStoredPregatireHubTab())
+  }, [])
+
+  const selectTab = (next: PregatireHubTab) => {
+    setTab(next)
+    writeStoredPregatireHubTab(next)
+  }
+
+  return { tab, selectTab }
+}
+
+function SubjectChips({
+  subject,
+  onChange,
+}: {
+  subject: WorkshopSubject | "all"
+  onChange: (next: WorkshopSubject | "all") => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => onChange("all")}
+        className={cn(
+          "rounded-full px-3 py-1.5 text-sm font-medium transition",
+          subject === "all"
+            ? "bg-[#111827] text-white"
+            : "bg-white/80 text-[#4b5563] ring-1 ring-[#e5e7eb] hover:bg-white",
+        )}
+      >
+        Toate
+      </button>
+      {WORKSHOP_SUBJECTS.map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onChange(s)}
+          className={cn(
+            "rounded-full px-3 py-1.5 text-sm font-medium transition",
+            subject === s
+              ? "bg-[#111827] text-white"
+              : "bg-white/80 text-[#4b5563] ring-1 ring-[#e5e7eb] hover:bg-white",
+          )}
+        >
+          {WORKSHOP_SUBJECT_LABELS[s]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function PregatirePageClient() {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const isMobile = useIsMobile()
+  const { tab, selectTab } = usePregatireHubTab()
 
   const nowParts = bucharestParts()
   const [year, setYear] = useState(nowParts.year)
@@ -70,6 +140,8 @@ export function PregatirePageClient() {
   const [sheetWorkshop, setSheetWorkshop] = useState<WorkshopDetail | null>(null)
   const [openingKey, setOpeningKey] = useState<string | null>(null)
   const [weekAnchor, setWeekAnchor] = useState(() => startOfWeekMonday(new Date()))
+  const [materials, setMaterials] = useState<WorkshopMaterialsHubItem[] | null>(null)
+  const [materialsLoading, setMaterialsLoading] = useState(false)
 
   const authHeaders = useCallback(async (): Promise<HeadersInit> => {
     const { data } = await supabase.auth.getSession()
@@ -113,6 +185,24 @@ export function PregatirePageClient() {
     }
   }, [authHeaders, subject])
 
+  const refreshMaterials = useCallback(async () => {
+    setMaterialsLoading(true)
+    try {
+      const headers = await authHeaders()
+      const response = await fetch("/api/pregatire/materials", { headers })
+      if (response.ok) {
+        const data = (await response.json()) as { items?: WorkshopMaterialsHubItem[] }
+        setMaterials(data.items ?? [])
+      } else {
+        setMaterials([])
+      }
+    } catch {
+      setMaterials([])
+    } finally {
+      setMaterialsLoading(false)
+    }
+  }, [authHeaders])
+
   useEffect(() => {
     void refreshWorkshops()
   }, [refreshWorkshops])
@@ -120,6 +210,12 @@ export function PregatirePageClient() {
   useEffect(() => {
     void refreshEnergy()
   }, [refreshEnergy])
+
+  useEffect(() => {
+    if (tab !== "teme" && tab !== "notite") return
+    if (materials !== null) return
+    void refreshMaterials()
+  }, [tab, materials, refreshMaterials])
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -145,7 +241,10 @@ export function PregatirePageClient() {
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
   }, [workshops, weekDays])
 
-  const openWorkshop = async (workshop: WorkshopPublic, source: "week" | "list") => {
+  const openWorkshop = async (
+    workshop: WorkshopPublic,
+    source: "week" | "list" | "hero" | "materials",
+  ) => {
     const key = `${source}:${workshop.id}`
     if (openingKey) return
     setOpeningKey(key)
@@ -169,168 +268,214 @@ export function PregatirePageClient() {
     }
   }
 
+  const onMonthChange = (y: number, m: number) => {
+    setYear(y)
+    setMonth(m)
+  }
+
+  const onWeekChange = (date: Date) => {
+    setWeekAnchor(date)
+    const p = bucharestParts(date)
+    setYear(p.year)
+    setMonth(p.month)
+  }
+
+  const workshopList = (
+    <>
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-[#9ca3af]" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[#e5e7eb] bg-white/50 px-6 py-16 text-center">
+          <p className="text-sm text-[#6b7280]">Nu există pregătiri pentru filtrele alese.</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-1 xl:grid-cols-1">
+          {filtered.map((w) => (
+            <WorkshopCard
+              key={w.id}
+              workshop={w}
+              loading={openingKey === `list:${w.id}`}
+              onSelect={() => void openWorkshop(w, "list")}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  )
+
   return (
-    <div className="relative overflow-hidden">
+    <div className={cn("relative", isMobile === false && "overflow-hidden")}>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.18),_transparent_55%),radial-gradient(ellipse_at_80%_0%,_rgba(37,99,235,0.08),_transparent_45%)]"
       />
 
-      <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-6 sm:px-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-amber-700/90">Workshop-uri live</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#111827] sm:text-4xl">
-              Pregatire
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#6b7280]">
-              Sesiuni pe materii, cu profesori Planck. Folosește energia pentru a debloca Meet-ul
-              sau înregistrarea.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {user ? (
-              <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} loading={energyLoading} />
-            ) : null}
+      {isMobile === true ? (
+        <div className="relative mx-auto max-w-6xl px-4 pt-4">
+          <div className="flex justify-end">
             <PushPrompt isLoggedIn={Boolean(user)} />
           </div>
-        </header>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSubject("all")}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-sm font-medium transition",
-              subject === "all"
-                ? "bg-[#111827] text-white"
-                : "bg-white/80 text-[#4b5563] ring-1 ring-[#e5e7eb] hover:bg-white",
-            )}
-          >
-            Toate
-          </button>
-          {WORKSHOP_SUBJECTS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSubject(s)}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm font-medium transition",
-                subject === s
-                  ? "bg-[#111827] text-white"
-                  : "bg-white/80 text-[#4b5563] ring-1 ring-[#e5e7eb] hover:bg-white",
-              )}
-            >
-              {WORKSHOP_SUBJECT_LABELS[s]}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
-          <div className="space-y-6">
-            <PregatireMonthCalendar
+          <div className="mt-3">
+            <NextWorkshopHero
               workshops={workshops}
-              year={year}
-              month={month}
-              selectedDay={selectedDay}
-              onSelectDay={setSelectedDay}
-              onMonthChange={(y, m) => {
-                setYear(y)
-                setMonth(m)
-              }}
-              weekView={isMobile}
-              weekAnchor={weekAnchor}
-              onWeekChange={(date) => {
-                setWeekAnchor(date)
-                const p = bucharestParts(date)
-                setYear(p.year)
-                setMonth(p.month)
-              }}
+              loading={loading}
+              opening={openingKey?.startsWith("hero:") ?? false}
+              onSelect={(w) => void openWorkshop(w, "hero")}
             />
-
-            <div className="rounded-2xl border border-[#e5e7eb] bg-white/80 p-4 shadow-sm backdrop-blur">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[#111827]">Săptămâna asta</h3>
-                <div className="flex gap-2 text-xs">
-                  <button
-                    type="button"
-                    className="text-[#6b7280] hover:text-[#111827]"
-                    onClick={() => setWeekAnchor((d) => addDays(d, -7))}
-                  >
-                    ←
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[#6b7280] hover:text-[#111827]"
-                    onClick={() => setWeekAnchor(startOfWeekMonday(new Date()))}
-                  >
-                    Azi
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[#6b7280] hover:text-[#111827]"
-                    onClick={() => setWeekAnchor((d) => addDays(d, 7))}
-                  >
-                    →
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                {weekWorkshops.length === 0 ? (
-                  <p className="text-sm text-[#9ca3af]">Nicio pregătire în această săptămână.</p>
-                ) : (
-                  weekWorkshops.map((w) => (
-                    <WorkshopCard
-                      key={w.id}
-                      workshop={w}
-                      loading={openingKey === `week:${w.id}`}
-                      onSelect={() => void openWorkshop(w, "week")}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
           </div>
 
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#111827]">
-                {selectedDay ? "Pregătiri în ziua selectată" : "Toate pregătirile"}
-              </h2>
-              {selectedDay ? (
-                <button
-                  type="button"
-                  className="text-sm text-[#6b7280] hover:text-[#111827]"
-                  onClick={() => setSelectedDay(null)}
-                >
-                  Resetează filtrul
-                </button>
+          <PregatireHubTabBar value={tab} onChange={selectTab} className="mt-5" />
+
+          {tab === "pregatiri" ? (
+            <div className="pb-36 pt-4">
+              <SubjectChips subject={subject} onChange={setSubject} />
+              <div className="mb-3 mt-4 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-[#111827]">
+                  {selectedDay ? "Pregătiri în ziua selectată" : "Toate pregătirile"}
+                </h2>
+                {selectedDay ? (
+                  <button
+                    type="button"
+                    className="text-sm text-[#6b7280] hover:text-[#111827]"
+                    onClick={() => setSelectedDay(null)}
+                  >
+                    Resetează filtrul
+                  </button>
+                ) : null}
+              </div>
+              {workshopList}
+            </div>
+          ) : (
+            <div className="py-4">
+              <WorkshopMaterialsFeed
+                kind={tab === "notite" ? "notes" : "homework"}
+                items={materials ?? []}
+                loading={materialsLoading || materials === null}
+                openingId={
+                  openingKey?.startsWith("materials:") ? openingKey.slice("materials:".length) : null
+                }
+                onSelect={(w) => void openWorkshop(w, "materials")}
+              />
+            </div>
+          )}
+        </div>
+      ) : isMobile === false ? (
+        <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-6 sm:px-6">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-700/90">Workshop-uri live</p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#111827] sm:text-4xl">
+                Pregatire
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#6b7280]">
+                Sesiuni pe materii, cu profesori Planck. Folosește energia pentru a debloca Meet-ul
+                sau înregistrarea.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {user ? (
+                <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} loading={energyLoading} />
               ) : null}
+              <PushPrompt isLoggedIn={Boolean(user)} />
+            </div>
+          </header>
+
+          <div className="mt-6">
+            <SubjectChips subject={subject} onChange={setSubject} />
+          </div>
+
+          <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+            <div className="space-y-6">
+              <PregatireMonthCalendar
+                workshops={workshops}
+                year={year}
+                month={month}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+                onMonthChange={onMonthChange}
+                weekAnchor={weekAnchor}
+                onWeekChange={onWeekChange}
+              />
+
+              <div className="rounded-2xl border border-[#e5e7eb] bg-white/80 p-4 shadow-sm backdrop-blur">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-[#111827]">Săptămâna asta</h3>
+                  <div className="flex gap-2 text-xs">
+                    <button
+                      type="button"
+                      className="text-[#6b7280] hover:text-[#111827]"
+                      onClick={() => setWeekAnchor((d) => addDays(d, -7))}
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[#6b7280] hover:text-[#111827]"
+                      onClick={() => setWeekAnchor(startOfWeekMonday(new Date()))}
+                    >
+                      Azi
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[#6b7280] hover:text-[#111827]"
+                      onClick={() => setWeekAnchor((d) => addDays(d, 7))}
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {weekWorkshops.length === 0 ? (
+                    <p className="text-sm text-[#9ca3af]">Nicio pregătire în această săptămână.</p>
+                  ) : (
+                    weekWorkshops.map((w) => (
+                      <WorkshopCard
+                        key={w.id}
+                        workshop={w}
+                        loading={openingKey === `week:${w.id}`}
+                        onSelect={() => void openWorkshop(w, "week")}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
 
-            {loading ? (
-              <div className="flex justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-[#9ca3af]" />
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-[#111827]">
+                  {selectedDay ? "Pregătiri în ziua selectată" : "Toate pregătirile"}
+                </h2>
+                {selectedDay ? (
+                  <button
+                    type="button"
+                    className="text-sm text-[#6b7280] hover:text-[#111827]"
+                    onClick={() => setSelectedDay(null)}
+                  >
+                    Resetează filtrul
+                  </button>
+                ) : null}
               </div>
-            ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#e5e7eb] bg-white/50 px-6 py-16 text-center">
-                <p className="text-sm text-[#6b7280]">Nu există pregătiri pentru filtrele alese.</p>
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-1 xl:grid-cols-1">
-                {filtered.map((w) => (
-                  <WorkshopCard
-                    key={w.id}
-                    workshop={w}
-                    loading={openingKey === `list:${w.id}`}
-                    onSelect={() => void openWorkshop(w, "list")}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+              {workshopList}
+            </section>
+          </div>
         </div>
-      </div>
+      ) : null}
+
+      {isMobile === true ? (
+        <FloatingWeekCalendar
+          visible={tab === "pregatiri"}
+          workshops={workshops}
+          selectedDay={selectedDay}
+          onSelectDay={setSelectedDay}
+          onMonthChange={onMonthChange}
+        />
+      ) : null}
+
+      <PregatireIntroCard />
 
       <Sheet open={Boolean(sheetWorkshop)} onOpenChange={(open) => !open && setSheetWorkshop(null)}>
         <SheetContent
@@ -357,6 +502,7 @@ export function PregatirePageClient() {
                 setWorkshops((list) =>
                   list.map((w) => (w.id === next.id ? { ...w, unlocked: true } : w)),
                 )
+                void refreshMaterials()
               }}
             />
           ) : null}

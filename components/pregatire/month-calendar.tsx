@@ -19,6 +19,16 @@ import { cn } from "@/lib/utils"
 
 const WEEKDAYS = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"]
 
+const WEEKDAY_SHORT_RO: Record<string, string> = {
+  Mon: "Lu",
+  Tue: "Ma",
+  Wed: "Mi",
+  Thu: "Jo",
+  Fri: "Vi",
+  Sat: "Sâ",
+  Sun: "Du",
+}
+
 export function PregatireMonthCalendar({
   workshops,
   year,
@@ -29,6 +39,10 @@ export function PregatireMonthCalendar({
   weekView = false,
   weekAnchor,
   onWeekChange,
+  weekAlignMonday = true,
+  compact = false,
+  hideHeader = false,
+  className,
 }: {
   workshops: WorkshopPublic[]
   year: number
@@ -39,6 +53,10 @@ export function PregatireMonthCalendar({
   weekView?: boolean
   weekAnchor?: Date
   onWeekChange?: (date: Date) => void
+  weekAlignMonday?: boolean
+  compact?: boolean
+  hideHeader?: boolean
+  className?: string
 }) {
   const byDay = useMemo(() => {
     const map = new Map<string, WorkshopSubject[]>()
@@ -54,12 +72,17 @@ export function PregatireMonthCalendar({
 
   const cells = useMemo(() => {
     if (weekView && weekAnchor) {
-      const start = startOfWeekMonday(weekAnchor)
+      const start = weekAlignMonday ? startOfWeekMonday(weekAnchor) : weekAnchor
       return Array.from({ length: 7 }, (_, i) => {
         const date = addDays(start, i)
         const p = bucharestParts(date)
         const key = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`
-        return { key, day: p.day, inMonth: true }
+        return {
+          key,
+          day: p.day,
+          inMonth: true,
+          weekdayLabel: WEEKDAY_SHORT_RO[p.weekday] ?? WEEKDAYS[i] ?? "",
+        }
       })
     }
     const first = startOfMonthBucharest(year, month)
@@ -68,9 +91,14 @@ export function PregatireMonthCalendar({
       const date = addDays(start, i)
       const p = bucharestParts(date)
       const key = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`
-      return { key, day: p.day, inMonth: p.month === month && p.year === year }
+      return {
+        key,
+        day: p.day,
+        inMonth: p.month === month && p.year === year,
+        weekdayLabel: undefined as string | undefined,
+      }
     })
-  }, [year, month, weekView, weekAnchor])
+  }, [year, month, weekView, weekAnchor, weekAlignMonday])
 
   const monthTitle = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("ro-RO", {
     month: "long",
@@ -117,26 +145,60 @@ export function PregatireMonthCalendar({
   const nextLabel = weekView ? "Săptămâna următoare" : "Luna următoare"
 
   return (
-    <div className="rounded-2xl border border-[#e5e7eb] bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-base font-semibold capitalize text-[#111827]">{title}</h3>
-        <div className="flex gap-1">
-          <Button type="button" size="icon" variant="ghost" onClick={prev} aria-label={prevLabel}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button type="button" size="icon" variant="ghost" onClick={next} aria-label={nextLabel}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+    <div
+      className={cn(
+        "rounded-2xl border border-[#e5e7eb] bg-white/80 shadow-sm backdrop-blur transition-[padding] duration-300",
+        hideHeader || compact ? "p-2" : "p-4",
+        className,
+      )}
+    >
+      {hideHeader ? null : (
+        <div className={cn("flex items-center justify-between", compact ? "mb-1.5" : "mb-3")}>
+          <h3
+            className={cn(
+              "font-semibold capitalize text-[#111827] transition-[font-size] duration-300",
+              compact ? "text-sm" : "text-base",
+            )}
+          >
+            {title}
+          </h3>
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={prev}
+              aria-label={prevLabel}
+              className={cn(compact && "h-8 w-8")}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={next}
+              aria-label={nextLabel}
+              className={cn(compact && "h-8 w-8")}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-[#9ca3af]">
-        {WEEKDAYS.map((d) => (
-          <div key={d} className="py-1">
+      )}
+      <div
+        className={cn(
+          "grid grid-cols-7 gap-1 text-center font-medium text-[#9ca3af] transition-[font-size] duration-300",
+          hideHeader || compact ? "text-[10px]" : "text-[11px]",
+        )}
+      >
+        {(weekView ? cells.map((cell) => cell.weekdayLabel ?? "") : WEEKDAYS).map((d, index) => (
+          <div key={`${d}-${index}`} className={cn(hideHeader || compact ? "py-0" : "py-1")}>
             {d}
           </div>
         ))}
       </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div className="mt-0.5 grid grid-cols-7 gap-0.5">
         {cells.map((cell) => {
           const subjects = byDay.get(cell.key) ?? []
           const selected = selectedDay === cell.key
@@ -146,7 +208,8 @@ export function PregatireMonthCalendar({
               type="button"
               onClick={() => onSelectDay(selected ? null : cell.key)}
               className={cn(
-                "flex min-h-[44px] flex-col items-center rounded-lg px-1 py-1.5 text-sm transition",
+                "flex flex-col items-center rounded-lg px-1 transition-[min-height,padding,font-size] duration-300",
+                hideHeader || compact ? "min-h-[28px] py-1 text-xs" : "min-h-[44px] py-1.5 text-sm",
                 cell.inMonth ? "text-[#111827]" : "text-[#d1d5db]",
                 selected && "bg-[#111827] text-white",
                 !selected && subjects.length > 0 && "bg-[#f8fafc] hover:bg-[#f1f5f9]",

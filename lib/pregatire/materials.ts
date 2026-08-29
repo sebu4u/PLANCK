@@ -6,6 +6,8 @@ import {
   isWorkshopHomeworkItemType,
   type WorkshopHomeworkItem,
   type WorkshopMaterials,
+  type WorkshopMaterialsHubItem,
+  type WorkshopPublic,
 } from "@/lib/pregatire/types"
 
 export const WORKSHOP_MATERIALS_BUCKET = "workshop-materials"
@@ -180,4 +182,84 @@ export async function loadMaterialPresence(
     has_notes: Boolean(notesMarkdown || full?.notes_pdf_path?.trim()),
     has_homework: Boolean(full?.homework_pdf_path?.trim() || (count ?? 0) > 0),
   }
+}
+
+type WorkshopMaterialRow = {
+  id: string
+  notes_markdown: string | null
+  notes_pdf_path: string | null
+  homework_pdf_path: string | null
+}
+
+/** Batch hub payload: presence for all, content only for unlocked workshops. */
+export async function loadMaterialsHub(
+  supabase: SupabaseClient,
+  workshops: WorkshopPublic[],
+  unlockIds: Set<string>,
+): Promise<WorkshopMaterialsHubItem[]> {
+  const ids = workshops.map((w) => w.id)
+  if (ids.length === 0) return []
+
+  const unlockedIds = ids.filter((id) => unlockIds.has(id))
+
+  const [{ data: fullRows }, { data: homeworkPresenceRows }, homeworkMap] = await Promise.all([
+    supabase
+      .from("workshops")
+      .select("id, notes_markdown, notes_pdf_path, homework_pdf_path")
+      .in("id", ids),
+    supabase.from("workshop_homework_items").select("workshop_id").in("workshop_id", ids),
+    fetchHomeworkItemsByWorkshopIds(supabase, unlockedIds),
+  ])
+
+  const fullById = new Map<string, WorkshopMaterialRow>()
+  for (const row of fullRows ?? []) {
+    fullById.set(row.id as string, row as WorkshopMaterialRow)
+  }
+
+  const homeworkWorkshopIds = new Set(
+    (homeworkPresenceRows ?? []).map((row) => row.workshop_id as string),
+  )
+
+  const withPresence = workshops
+    .map((workshop) => {
+      const full = fullById.get(workshop.id)
+      const notesMarkdown =
+        typeof full?.notes_markdown === "string" ? full.notes_markdown.trim() : ""
+      const notesPath = full?.notes_pdf_path?.trim() || null
+      const homeworkPath = full?.homework_pdf_path?.trim() || null
+      const hasNotes = Boolean(notesMarkdown || notesPath)
+      const hasHomework = Boolean(homeworkPath || homeworkWorkshopIds.has(workshop.id))
+      return {
+        workshop,
+        hasNotes,
+        hasHomework,
+        notesMarkdown,
+        notesPath,
+        homeworkPath,
+      }
+    })
+    .filter((item) => item.hasNotes || item.hasHomework)
+
+  const unlocked = withPresence.filter((item) => unlockIds.has(item.workshop.id))
+  const signed = await signWorkshopPdfUrls(supabase, [
+    ...unlocked.map((item) => item.notesPath),
+    ...unlocked.map((item) => item.homeworkPath),
+  ])
+
+  return withPresence
+    .sort((a, b) => b.workshop.starts_at.localeCompare(a.workshop.starts_at))
+    .map((item) => {
+      const unlockedItem = unlockIds.has(item.workshop.id)
+      return {
+        workshop: item.workshop,
+        has_notes: item.hasNotes,
+        has_homework: item.hasHomework,
+        notes_markdown: unlockedItem ? item.notesMarkdown || null : null,
+        notes_pdf_url:
+          unlockedItem && item.notesPath ? (signed.get(item.notesPath) ?? null) : null,
+        homework_pdf_url:
+          unlockedItem && item.homeworkPath ? (signed.get(item.homeworkPath) ?? null) : null,
+        homework_items: unlockedItem ? (homeworkMap.get(item.workshop.id) ?? []) : [],
+      }
+    })
 }

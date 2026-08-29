@@ -21,12 +21,19 @@ import { ExerseazaWeekCalendar } from "@/components/exerseaza/exerseaza-week-cal
 import { ExerseazaTemePanel } from "@/components/exerseaza/exerseaza-teme-panel"
 import { ExerseazaCursuriVideoPanel } from "@/components/exerseaza/exerseaza-cursuri-video-panel"
 import {
-  EXERSEAZA_CARDS,
   formatExerseazaCount,
+  getExerseazaCards,
+  getExerseazaHubIntro,
   type ExerseazaCardConfig,
   type ExerseazaCardId,
 } from "@/lib/exerseaza-config"
-import type { ExerseazaCounts } from "@/lib/exerseaza-counts"
+import type { ExerseazaCounts, ExerseazaCountsBySubject } from "@/lib/exerseaza-counts"
+import {
+  isPracticeSubjectId,
+  normalizePracticeSubject,
+  type PracticeSubjectId,
+} from "@/lib/practice-subject"
+import { PRACTICE_SUBJECT_CHANGE_EVENT } from "@/hooks/use-practice-subject-switcher"
 import type { UserAssignmentListItem } from "@/lib/classrooms/types"
 import { fetchFlashcardDeck } from "@/lib/learning-path-flashcard-client"
 import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/catalog-desktop-sidebar-discount-offer-card"
@@ -61,7 +68,8 @@ const DESKTOP_TABS: {
 ]
 
 interface ExerseazaHubProps {
-  counts: ExerseazaCounts
+  countsBySubject: ExerseazaCountsBySubject
+  initialSubject: PracticeSubjectId
   assignments?: UserAssignmentListItem[]
 }
 
@@ -96,6 +104,8 @@ function getCardCountLabel(
   counts: ExerseazaCounts,
   flashcardCount: number | null,
 ): string {
+  if (card.comingSoon) return "În curând"
+
   switch (card.id) {
     case "exercitii":
       return formatExerseazaCount(counts.exercises, "problemă", "probleme")
@@ -303,27 +313,36 @@ function SidebarTabs({
 }
 
 function BibliotecaPanel({
+  subject,
+  onSubjectSelected,
   counts,
   flashcardCount,
 }: {
-  counts: ExerseazaCounts
+  subject: PracticeSubjectId
+  onSubjectSelected: (next: PracticeSubjectId) => void
+  counts: ExerseazaCountsBySubject[PracticeSubjectId]
   flashcardCount: number | null
 }) {
+  const cards = getExerseazaCards(subject)
+
   return (
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-2">
           <h1 className="text-3xl font-bold text-[#0b0c0f] sm:text-4xl">Exersează</h1>
-          <p className="text-sm text-[#2c2f33]/75 sm:text-base">
-            Alege cum vrei să exersezi: probleme, grile, teste sau flashcard-uri.
-          </p>
+          <p className="text-sm text-[#2c2f33]/75 sm:text-base">{getExerseazaHubIntro(subject)}</p>
         </div>
-        <PracticeSubjectSwitcher currentSubject="fizica" className="shrink-0 pt-1" />
+        <PracticeSubjectSwitcher
+          currentSubject={subject}
+          navigateOnChange={false}
+          onSelected={onSubjectSelected}
+          className="shrink-0 pt-1"
+        />
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
         <div className="grid grid-cols-2 gap-3 xl:gap-4">
-          {EXERSEAZA_CARDS.map((card) => (
+          {cards.map((card) => (
             <DesktopCard
               key={card.id}
               card={card}
@@ -341,10 +360,33 @@ function BibliotecaPanel({
   )
 }
 
-export function ExerseazaHub({ counts, assignments = [] }: ExerseazaHubProps) {
-  const { user, loading: authLoading } = useAuth()
+export function ExerseazaHub({
+  countsBySubject,
+  initialSubject,
+  assignments = [],
+}: ExerseazaHubProps) {
+  const { user, profile, loading: authLoading } = useAuth()
+  const [subject, setSubject] = useState<PracticeSubjectId>(initialSubject)
   const [flashcardCount, setFlashcardCount] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<ExerseazaDesktopTab>("biblioteca")
+
+  useEffect(() => {
+    if (profile?.preferred_materie) {
+      setSubject(normalizePracticeSubject(profile.preferred_materie))
+    }
+  }, [profile?.preferred_materie])
+
+  useEffect(() => {
+    const onSubjectChange = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail
+      if (isPracticeSubjectId(detail)) setSubject(detail)
+    }
+    window.addEventListener(PRACTICE_SUBJECT_CHANGE_EVENT, onSubjectChange)
+    return () => window.removeEventListener(PRACTICE_SUBJECT_CHANGE_EVENT, onSubjectChange)
+  }, [])
+
+  const counts = countsBySubject[subject]
+  const cards = getExerseazaCards(subject)
 
   useEffect(() => {
     if (authLoading) return
@@ -397,11 +439,22 @@ export function ExerseazaHub({ counts, assignments = [] }: ExerseazaHubProps) {
           >
             {/* Mobile layout */}
             <div className="space-y-4 px-5 pb-12 pt-5 burger:mt-0 sm:px-8 lg:hidden">
-              <h1 className="text-2xl font-bold tracking-tight text-[#2c2f33]">Exersează</h1>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-2xl font-bold tracking-tight text-[#2c2f33]">Exersează</h1>
+                {!user ? (
+                  <PracticeSubjectSwitcher
+                    currentSubject={subject}
+                    navigateOnChange={false}
+                    onSelected={setSubject}
+                    compact
+                    className="shrink-0"
+                  />
+                ) : null}
+              </div>
               <ExerseazaPregatirePromoCard />
               <ExerseazaWeekCalendar />
               <div className="flex flex-col gap-3 pt-1">
-                {EXERSEAZA_CARDS.map((card) => (
+                {cards.map((card) => (
                   <MobileCard
                     key={card.id}
                     card={card}
@@ -414,7 +467,12 @@ export function ExerseazaHub({ counts, assignments = [] }: ExerseazaHubProps) {
             {/* Desktop layout */}
             <div className="hidden px-5 pb-12 pt-0 sm:px-8 lg:block lg:px-10 lg:pt-10 xl:px-12">
               {activeTab === "biblioteca" ? (
-                <BibliotecaPanel counts={counts} flashcardCount={flashcardCount} />
+                <BibliotecaPanel
+                  subject={subject}
+                  onSubjectSelected={setSubject}
+                  counts={counts}
+                  flashcardCount={flashcardCount}
+                />
               ) : null}
               {activeTab === "teme" ? <ExerseazaTemePanel assignments={assignments} /> : null}
               {activeTab === "cursuri-video" ? <ExerseazaCursuriVideoPanel /> : null}

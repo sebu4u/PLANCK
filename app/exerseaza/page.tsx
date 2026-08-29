@@ -1,12 +1,11 @@
-import { redirect } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { ExerseazaHub } from "@/components/exerseaza/exerseaza-hub"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getAssignmentsForUser } from "@/lib/classrooms/server"
-import { fetchExerseazaCounts } from "@/lib/exerseaza-counts"
+import { fetchExerseazaCountsBySubject } from "@/lib/exerseaza-counts"
 import { generateMetadata } from "@/lib/metadata"
-import { resolveExerseazaRedirect } from "@/lib/practice-subject"
+import { normalizePracticeSubject } from "@/lib/practice-subject"
 import { createClient } from "@/lib/supabase/server"
 import type { Metadata } from "next"
 
@@ -19,19 +18,18 @@ export default async function ExerseazaPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  let preferredMaterie: string | null = null
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("preferred_materie")
       .eq("user_id", user.id)
       .maybeSingle()
-
-    const redirectPath = resolveExerseazaRedirect(profile?.preferred_materie)
-    if (redirectPath) redirect(redirectPath)
+    preferredMaterie = profile?.preferred_materie ?? null
   }
 
-  const [counts, assignments] = await Promise.all([
-    fetchExerseazaCounts(),
+  const [countsBySubject, assignments] = await Promise.all([
+    fetchExerseazaCountsBySubject(),
     user ? getAssignmentsForUser(user.id) : Promise.resolve([]),
   ])
 
@@ -40,7 +38,11 @@ export default async function ExerseazaPage() {
       <CatalogThemeBackground defaultBackgroundClass="bg-[#ffffff]">
         <Navigation />
         <div className="relative h-[100dvh] overflow-hidden bg-[#ffffff] pt-14 burger:pt-16">
-          <ExerseazaHub counts={counts} assignments={assignments} />
+          <ExerseazaHub
+            countsBySubject={countsBySubject}
+            initialSubject={normalizePracticeSubject(preferredMaterie)}
+            assignments={assignments}
+          />
         </div>
       </CatalogThemeBackground>
     </CatalogThemeProvider>

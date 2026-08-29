@@ -128,6 +128,57 @@ export function isWorkshopPast(startsAt: string, durationMinutes: number, now = 
   return start + durationMinutes * 60_000 < now.getTime()
 }
 
+export function isWorkshopLive(startsAt: string, durationMinutes: number, now = new Date()): boolean {
+  const start = new Date(startsAt).getTime()
+  if (Number.isNaN(start)) return false
+  return start <= now.getTime() && !isWorkshopPast(startsAt, durationMinutes, now)
+}
+
+/** Next upcoming session: enrolled first, else the soonest published. */
+export function pickNextWorkshop<
+  T extends { starts_at: string; duration_minutes: number; unlocked?: boolean },
+>(workshops: T[], now = new Date()): T | null {
+  const upcoming = workshops
+    .filter((w) => !isWorkshopPast(w.starts_at, w.duration_minutes, now))
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+  return upcoming.find((w) => w.unlocked) ?? upcoming[0] ?? null
+}
+
+/** Live countdown until `starts_at`, e.g. "în 2 zile și 4 ore". */
+export function formatWorkshopStartsIn(startsAt: string, now = new Date()): string {
+  const start = new Date(startsAt).getTime()
+  if (Number.isNaN(start)) return ""
+  const remainingMs = start - now.getTime()
+  if (remainingMs <= 0) return "Acum"
+  const totalMinutes = Math.ceil(remainingMs / 60_000)
+  if (totalMinutes <= 1) return "în mai puțin de un minut"
+  if (totalMinutes < 60) return `în ${totalMinutes} minute`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours < 24) {
+    if (minutes === 0) return hours === 1 ? "în 1 oră" : `în ${hours} ore`
+    return `în ${hours} ${hours === 1 ? "oră" : "ore"} și ${minutes} minute`
+  }
+  const days = Math.floor(hours / 24)
+  const remHours = hours % 24
+  if (remHours === 0) return days === 1 ? "în 1 zi" : `în ${days} zile`
+  return `${days === 1 ? "în 1 zi" : `în ${days} zile`} și ${remHours} ${remHours === 1 ? "oră" : "ore"}`
+}
+
+/** Hero date line, e.g. "marți, 2 septembrie · 18:00". */
+export function formatWorkshopHeroDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+  const day = date.toLocaleDateString("ro-RO", {
+    timeZone: WORKSHOP_TZ,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
+  const time = formatWorkshopTime(iso)
+  return time ? `${day} · ${time}` : day
+}
+
 /** Meet link is withheld until this long before `starts_at`. */
 export const WORKSHOP_MEET_VISIBLE_BEFORE_MS = 10 * 60 * 1000
 

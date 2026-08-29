@@ -12,6 +12,7 @@ interface PracticeSubjectSwitcherProps {
   size?: "default" | "navbar" | "navbar-lg"
   /** When false, only persists preferred_materie — no route change. */
   navigateOnChange?: boolean
+  onSelected?: (next: PracticeSubjectId) => void
 }
 
 export function PracticeSubjectSwitcher({
@@ -20,8 +21,12 @@ export function PracticeSubjectSwitcher({
   compact = false,
   size = "default",
   navigateOnChange = true,
+  onSelected,
 }: PracticeSubjectSwitcherProps) {
-  const { selectSubject, isSaving } = usePracticeSubjectSwitcher(currentSubject, { navigateOnChange })
+  const { selectSubject, isSaving } = usePracticeSubjectSwitcher(currentSubject, {
+    navigateOnChange,
+    onSelected,
+  })
 
   return (
     <div

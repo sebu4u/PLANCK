@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import type { PracticeSubjectId } from "@/lib/practice-subject"
 
 export interface ExerseazaCounts {
   exercises: number
@@ -6,18 +7,36 @@ export interface ExerseazaCounts {
   teste: number
 }
 
-export async function fetchExerseazaCounts(): Promise<ExerseazaCounts> {
+export type ExerseazaCountsBySubject = Record<PracticeSubjectId, ExerseazaCounts>
+
+const EMPTY_COUNTS: ExerseazaCounts = { exercises: 0, grile: 0, teste: 0 }
+
+export const EMPTY_EXERSEAZA_COUNTS_BY_SUBJECT: ExerseazaCountsBySubject = {
+  fizica: EMPTY_COUNTS,
+  matematica: EMPTY_COUNTS,
+  informatica: EMPTY_COUNTS,
+}
+
+export async function fetchExerseazaCountsBySubject(): Promise<ExerseazaCountsBySubject> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return { exercises: 0, grile: 0, teste: 0 }
+    return EMPTY_EXERSEAZA_COUNTS_BY_SUBJECT
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   try {
-    const [physicsRes, mathRes, informaticaRes, grileRes, testeRes] = await Promise.all([
+    const [
+      physicsRes,
+      mathRes,
+      informaticaRes,
+      grileFizicaRes,
+      testeFizicaRes,
+      testeMateRes,
+      testeInfoRes,
+    ] = await Promise.all([
       supabase.from("problems").select("id", { count: "exact", head: true }),
       supabase
         .from("math_problems")
@@ -27,20 +46,57 @@ export async function fetchExerseazaCounts(): Promise<ExerseazaCounts> {
         .from("coding_problems")
         .select("id", { count: "exact", head: true })
         .eq("is_active", true),
-      supabase.from("quiz_questions").select("id", { count: "exact", head: true }),
+      supabase
+        .from("quiz_questions")
+        .select("id", { count: "exact", head: true })
+        .or("materie.eq.fizica,materie.is.null"),
       supabase
         .from("practice_tests")
         .select("id", { count: "exact", head: true })
-        .eq("is_published", true),
+        .eq("is_published", true)
+        .eq("subject", "fizica"),
+      supabase
+        .from("practice_tests")
+        .select("id", { count: "exact", head: true })
+        .eq("is_published", true)
+        .eq("subject", "matematica"),
+      supabase
+        .from("practice_tests")
+        .select("id", { count: "exact", head: true })
+        .eq("is_published", true)
+        .eq("subject", "informatica"),
     ])
 
-    const exercises =
-      (physicsRes.count ?? 0) + (mathRes.count ?? 0) + (informaticaRes.count ?? 0)
-    const grile = grileRes.count ?? 0
-    const teste = testeRes.count ?? 0
-
-    return { exercises, grile, teste }
+    return {
+      fizica: {
+        exercises: physicsRes.count ?? 0,
+        grile: grileFizicaRes.count ?? 0,
+        teste: testeFizicaRes.count ?? 0,
+      },
+      matematica: {
+        exercises: mathRes.count ?? 0,
+        grile: 0,
+        teste: testeMateRes.count ?? 0,
+      },
+      informatica: {
+        exercises: informaticaRes.count ?? 0,
+        grile: 0,
+        teste: testeInfoRes.count ?? 0,
+      },
+    }
   } catch {
-    return { exercises: 0, grile: 0, teste: 0 }
+    return EMPTY_EXERSEAZA_COUNTS_BY_SUBJECT
+  }
+}
+
+export async function fetchExerseazaCounts(): Promise<ExerseazaCounts> {
+  const bySubject = await fetchExerseazaCountsBySubject()
+  return {
+    exercises:
+      bySubject.fizica.exercises +
+      bySubject.matematica.exercises +
+      bySubject.informatica.exercises,
+    grile: bySubject.fizica.grile + bySubject.matematica.grile + bySubject.informatica.grile,
+    teste: bySubject.fizica.teste + bySubject.matematica.teste + bySubject.informatica.teste,
   }
 }

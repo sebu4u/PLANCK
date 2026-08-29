@@ -14,6 +14,7 @@ import {
   MOBILE_BOTTOM_NAV_PARENT_ITEMS,
   MOBILE_BOTTOM_NAV_TEACHER_ITEMS,
 } from "@/lib/mobile-app-nav"
+import { PRODUCT_GUIDE_ANCHOR_ATTR } from "@/lib/product-guide/dom"
 import { useAuth } from "@/components/auth-provider"
 import { CosmeticsAvatarFrame } from "@/components/planckpass/cosmetics-avatar-frame"
 import { useEquippedCosmetics } from "@/components/planckpass/planckpass-inventory"
@@ -264,7 +265,14 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
             }
 
             return (
-              <Link key={href} href={href} className={tabClass}>
+              <Link
+                key={href}
+                href={href}
+                className={tabClass}
+                {...(href === "/pregatire"
+                  ? { [PRODUCT_GUIDE_ANCHOR_ATTR]: "pregatiri-nav" }
+                  : {})}
+              >
                 <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                   {imageSrc ? (
                     <Image

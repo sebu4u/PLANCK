@@ -38,6 +38,15 @@ export const WORKSHOP_SUBJECT_COLORS: Record<WorkshopSubject, string> = {
   chimie: "#ea580c",
 }
 
+/** Right-side hero art on `/pregatire` — files in `public/images/pregatire/`. */
+export const WORKSHOP_HERO_IMAGE_SRC: Record<WorkshopSubject, string> = {
+  mate: "/images/pregatire/hero-mate.png",
+  fizica: "/images/pregatire/hero-fizica.png",
+  info: "/images/pregatire/hero-info.png",
+  biologie: "/images/pregatire/hero-biologie.png",
+  chimie: "/images/pregatire/hero-chimie.png",
+}
+
 export const WORKSHOP_ENERGY_SIGNUP = 25
 export const WORKSHOP_ENERGY_PREMIUM_WEEKLY = 100
 export const WORKSHOP_ENERGY_FREE_WEEKLY = WORKSHOP_ENERGY_SIGNUP
@@ -168,6 +177,16 @@ export interface WorkshopAdmin extends Omit<WorkshopPublic, "has_recording" | "u
   notes_markdown: string
   notes_pdf_path: string | null
   homework_pdf_path: string | null
+  notes_pdf_url: string | null
+  homework_pdf_url: string | null
+  homework_items: WorkshopHomeworkItem[]
+}
+
+export interface WorkshopMaterialsHubItem {
+  workshop: WorkshopPublic
+  has_notes: boolean
+  has_homework: boolean
+  notes_markdown: string | null
   notes_pdf_url: string | null
   homework_pdf_url: string | null
   homework_items: WorkshopHomeworkItem[]

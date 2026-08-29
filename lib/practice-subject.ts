@@ -39,6 +39,7 @@ export function normalizePracticeSubject(value: unknown): PracticeSubjectId {
   return "fizica"
 }
 
+/** Catalog for a subject when already browsing problems. Hub is always `/exerseaza`. */
 export function getPracticeSubjectRoute(id: PracticeSubjectId): string {
   switch (id) {
     case "matematica":
@@ -52,13 +53,6 @@ export function getPracticeSubjectRoute(id: PracticeSubjectId): string {
 
 export function getPracticeSubjectLabel(id: PracticeSubjectId): string {
   return PRACTICE_SUBJECTS.find((subject) => subject.id === id)?.label ?? "Fizică"
-}
-
-/** Returns redirect path for /exerseaza, or null when hub should render. */
-export function resolveExerseazaRedirect(preferred: unknown): string | null {
-  if (preferred === "matematica") return "/matematica/probleme"
-  if (preferred === "informatica") return "/informatica/probleme"
-  return null
 }
 
 /** Student home dashboard only — not parent/teacher/dev sub-routes. */

@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react"
 
 import { GuideSpotlight } from "@/components/product-guide/guide-spotlight"
 import { GuideTip } from "@/components/product-guide/guide-tip"
+import { GuideNavNudge } from "@/components/product-guide/guide-nav-nudge"
 import {
   ProductGuideBlockingProvider,
 } from "@/components/product-guide/product-guide-blocking"
@@ -21,6 +22,17 @@ function ProductGuideRenderer() {
   }, [])
 
   if (!mounted || !activeStep) return null
+
+  if (activeStep.kind === "nudge" && activeStep.anchorId) {
+    return (
+      <GuideNavNudge
+        anchorId={activeStep.anchorId}
+        title={activeStep.title}
+        href={activeStep.href ?? "/pregatire"}
+        onDismiss={dismiss}
+      />
+    )
+  }
 
   if (activeStep.kind === "spotlight" && activeStep.anchorId) {
     return (

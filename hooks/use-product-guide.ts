@@ -18,6 +18,8 @@ import {
 import type { ProductGuideProgress, ProductGuideStep } from "@/lib/product-guide/types"
 import { normalizeUserType } from "@/lib/user-types"
 
+const MOBILE_SHELL_MEDIA = "(max-width: 947px)"
+
 function progressEqual(a: ProductGuideProgress, b: ProductGuideProgress): boolean {
   if (a.seen.length !== b.seen.length) return false
   if (a.seen.some((id, i) => id !== b.seen[i])) return false
@@ -31,8 +33,21 @@ export function useProductGuide() {
 
   const [progress, setProgress] = useState<ProductGuideProgress>({ seen: [], flags: {} })
   const [readyStep, setReadyStep] = useState<ProductGuideStep | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [viewportReady, setViewportReady] = useState(false)
   /** After dismissing a tip, don't show another on the same pathname until navigation. */
   const suppressPathnameRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_SHELL_MEDIA)
+    const sync = () => {
+      setIsMobile(media.matches)
+      setViewportReady(true)
+    }
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
 
   const userId = user?.id ?? null
   const profileReady = Boolean(userId && profileSyncedUserId === userId)
@@ -68,15 +83,18 @@ export function useProductGuide() {
   useEffect(() => {
     setReadyStep(null)
 
-    if (!eligible || !userId || !pathname) return
+    if (!eligible || !userId || !pathname || !viewportReady) return
     if (suppressPathnameRef.current === pathname) return
 
     const candidate = pickActiveProductGuideStep(
       normalizeUserType(userType),
       pathname,
       progress,
+      { isMobile },
     )
     if (!candidate) return
+
+    const delay = candidate.showDelayMs ?? PRODUCT_GUIDE_SHOW_DELAY_MS
 
     const timer = window.setTimeout(() => {
       if (suppressPathnameRef.current === pathname) return
@@ -86,14 +104,15 @@ export function useProductGuide() {
         normalizeUserType(userType),
         pathname,
         latest,
+        { isMobile },
       )
       if (stillActive?.id === candidate.id) {
         setReadyStep(stillActive)
       }
-    }, PRODUCT_GUIDE_SHOW_DELAY_MS)
+    }, delay)
 
     return () => window.clearTimeout(timer)
-  }, [eligible, userId, pathname, progress, userType])
+  }, [eligible, userId, pathname, progress, userType, isMobile, viewportReady])
 
   useEffect(() => {
     if (isBlocked) setReadyStep(null)
@@ -101,11 +120,17 @@ export function useProductGuide() {
 
   const dismiss = useCallback(() => {
     if (!userId || !readyStep) return
-    suppressPathnameRef.current = pathname
     const next = markProductGuideStepSeen(userId, readyStep.id)
+    const following = pickActiveProductGuideStep(
+      normalizeUserType(userType),
+      pathname ?? "",
+      next,
+      { isMobile },
+    )
+    suppressPathnameRef.current = following ? null : pathname
     setProgress(next)
     setReadyStep(null)
-  }, [userId, readyStep, pathname])
+  }, [userId, readyStep, pathname, userType, isMobile])
 
   return {
     activeStep: readyStep,

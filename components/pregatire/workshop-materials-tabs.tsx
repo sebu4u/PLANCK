@@ -11,7 +11,7 @@ import {
 } from "@/lib/pregatire/types"
 import { cn } from "@/lib/utils"
 
-function PdfFrame({ url, title, compact }: { url: string; title: string; compact?: boolean }) {
+export function PdfFrame({ url, title, compact }: { url: string; title: string; compact?: boolean }) {
   return (
     <div
       className={cn(
@@ -71,6 +71,71 @@ function LockedPlaceholder({
         ) : null}
       </div>
     </div>
+  )
+}
+
+export function WorkshopNotesBody({
+  notesMarkdown,
+  notesPdfUrl,
+  compact = false,
+}: {
+  notesMarkdown: string | null
+  notesPdfUrl: string | null
+  compact?: boolean
+}) {
+  return (
+    <>
+      {notesMarkdown?.trim() ? (
+        <div className="rounded-xl border border-[#e5e7eb] bg-[#fafafa] px-4 py-4 sm:px-5">
+          <LessonRichContent content={notesMarkdown} theme="light" />
+        </div>
+      ) : null}
+      {notesPdfUrl ? <PdfFrame url={notesPdfUrl} title="Notițe PDF" compact={compact} /> : null}
+    </>
+  )
+}
+
+export function WorkshopHomeworkBody({
+  homeworkItems,
+  homeworkPdfUrl,
+  compact = false,
+}: {
+  homeworkItems: WorkshopHomeworkItem[]
+  homeworkPdfUrl: string | null
+  compact?: boolean
+}) {
+  return (
+    <>
+      {homeworkItems.length > 0 ? (
+        <ul className="space-y-2">
+          {homeworkItems.map((item) => (
+            <li key={`${item.item_type}-${item.ref_id}`}>
+              <Link
+                href={item.href}
+                className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] px-3 py-3 transition-colors hover:border-[#d1d5db] hover:bg-white"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-[#111827]">{item.title}</p>
+                  <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-[#6b7280]">
+                    {WORKSHOP_HOMEWORK_ITEM_LABELS[item.item_type]}
+                  </p>
+                </div>
+                <ExternalLink className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {homeworkPdfUrl ? (
+        <div className="space-y-2">
+          <p className="inline-flex items-center gap-1.5 text-sm font-medium text-[#374151]">
+            <FileText className="h-4 w-4" />
+            PDF temă
+          </p>
+          <PdfFrame url={homeworkPdfUrl} title="Temă PDF" compact={compact} />
+        </div>
+      ) : null}
+    </>
   )
 }
 
@@ -151,14 +216,11 @@ export function WorkshopMaterialsTabs({
                 unlockLabel={unlockLabel}
               />
             ) : (
-              <>
-                {notesMarkdown?.trim() ? (
-                  <div className="rounded-xl border border-[#e5e7eb] bg-[#fafafa] px-4 py-4 sm:px-5">
-                    <LessonRichContent content={notesMarkdown} theme="light" />
-                  </div>
-                ) : null}
-                {notesPdfUrl ? <PdfFrame url={notesPdfUrl} title="Notițe PDF" compact={compact} /> : null}
-              </>
+              <WorkshopNotesBody
+                notesMarkdown={notesMarkdown}
+                notesPdfUrl={notesPdfUrl}
+                compact={compact}
+              />
             )}
           </TabsContent>
         ) : null}
@@ -175,37 +237,11 @@ export function WorkshopMaterialsTabs({
                 unlockLabel={unlockLabel}
               />
             ) : (
-              <>
-                {homeworkItems.length > 0 ? (
-                  <ul className="space-y-2">
-                    {homeworkItems.map((item) => (
-                      <li key={`${item.item_type}-${item.ref_id}`}>
-                        <Link
-                          href={item.href}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] px-3 py-3 transition-colors hover:border-[#d1d5db] hover:bg-white"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-[#111827]">{item.title}</p>
-                            <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-[#6b7280]">
-                              {WORKSHOP_HOMEWORK_ITEM_LABELS[item.item_type]}
-                            </p>
-                          </div>
-                          <ExternalLink className="h-4 w-4 shrink-0 text-[#9ca3af]" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {homeworkPdfUrl ? (
-                  <div className="space-y-2">
-                    <p className="inline-flex items-center gap-1.5 text-sm font-medium text-[#374151]">
-                      <FileText className="h-4 w-4" />
-                      PDF temă
-                    </p>
-                    <PdfFrame url={homeworkPdfUrl} title="Temă PDF" compact={compact} />
-                  </div>
-                ) : null}
-              </>
+              <WorkshopHomeworkBody
+                homeworkItems={homeworkItems}
+                homeworkPdfUrl={homeworkPdfUrl}
+                compact={compact}
+              />
             )}
           </TabsContent>
         ) : null}

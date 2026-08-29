@@ -1,11 +1,12 @@
 import type { UserType } from "@/lib/user-types"
 
-export type ProductGuideAnchorId = "subject-switcher" | "create-path"
+export type ProductGuideAnchorId = "subject-switcher" | "create-path" | "pregatiri-nav"
 
-export type ProductGuideTipKind = "soft" | "spotlight"
+export type ProductGuideTipKind = "soft" | "spotlight" | "nudge"
 
 export type ProductGuideStepId =
   | "elev-home-subject"
+  | "elev-pregatire-cta"
   | "elev-invata-trasee"
   | "elev-exerseaza"
   | "elev-probleme"
@@ -35,6 +36,11 @@ export type ProductGuideStep = {
   anchorId?: ProductGuideAnchorId
   title: string
   body: string
+  href?: string
+  /** Delay before showing, after the step becomes eligible. */
+  showDelayMs?: number
+  /** Skip this step when the bottom nav is not on screen (desktop). */
+  viewport?: "mobile"
   /** Ordered prerequisites that must already be in `seen`. */
   requires: ProductGuideStepId[]
   /** Extra flags that must be true before this step can show. */

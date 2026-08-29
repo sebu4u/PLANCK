@@ -45,6 +45,19 @@ export const PRODUCT_GUIDE_STEPS: ProductGuideStep[] = [
     match: (pathname) => isStudentDashboardRoute(pathname),
   },
   {
+    id: "elev-pregatire-cta",
+    userType: "elev",
+    kind: "nudge",
+    anchorId: "pregatiri-nav",
+    title: "Înscrie-te gratuit la prima pregătire",
+    body: "",
+    href: "/pregatire",
+    showDelayMs: 450,
+    viewport: "mobile",
+    requires: ["elev-home-subject"],
+    match: (pathname) => isStudentDashboardRoute(pathname),
+  },
+  {
     id: "elev-invata-trasee",
     userType: "elev",
     kind: "soft",
@@ -168,14 +181,17 @@ export function pickActiveProductGuideStep(
   userType: UserType,
   pathname: string,
   progress: ProductGuideProgress,
+  options?: { isMobile?: boolean },
 ): ProductGuideStep | null {
   const seen = new Set<ProductGuideStepId>(progress.seen)
   const steps = getProductGuideStepsForUserType(userType)
+  const isMobile = options?.isMobile ?? true
 
   for (const step of steps) {
     if (seen.has(step.id)) continue
     if (!step.requires.every((id) => seen.has(id))) continue
     if (step.requiresFlags?.some((flag) => !progress.flags[flag])) continue
+    if (step.viewport === "mobile" && !isMobile) continue
     if (!step.match(pathname)) continue
     return step
   }

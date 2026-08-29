@@ -10,6 +10,16 @@ function isStepId(value: unknown): value is ProductGuideStepId {
   return typeof value === "string" && value.length > 0
 }
 
+/** Users who already moved past the first dashboard tip should not see the new Pregătiri nudge. */
+function migrateSeen(seen: ProductGuideStepId[]): ProductGuideStepId[] {
+  if (seen.includes("elev-pregatire-cta")) return seen
+  const progressedPastFirstDashboard = seen.some((id) => id !== "elev-home-subject")
+  if (seen.includes("elev-home-subject") && progressedPastFirstDashboard) {
+    return [...seen, "elev-pregatire-cta"]
+  }
+  return seen
+}
+
 function normalizeProgress(raw: unknown): ProductGuideProgress {
   if (!raw || typeof raw !== "object") {
     return { seen: [], flags: {} }
@@ -17,7 +27,7 @@ function normalizeProgress(raw: unknown): ProductGuideProgress {
 
   const record = raw as Record<string, unknown>
   const seenRaw = Array.isArray(record.seen) ? record.seen : []
-  const seen = seenRaw.filter(isStepId)
+  const seen = migrateSeen(seenRaw.filter(isStepId))
   const flagsRaw =
     record.flags && typeof record.flags === "object"
       ? (record.flags as ProductGuideFlags)
@@ -37,7 +47,16 @@ export function readProductGuideProgress(userId: string): ProductGuideProgress {
   try {
     const raw = window.localStorage.getItem(storageKey(userId))
     if (!raw) return { seen: [], flags: {} }
-    return normalizeProgress(JSON.parse(raw) as unknown)
+    const parsed = JSON.parse(raw) as unknown
+    const normalized = normalizeProgress(parsed)
+    const rawSeenLength =
+      parsed && typeof parsed === "object" && Array.isArray((parsed as { seen?: unknown }).seen)
+        ? (parsed as { seen: unknown[] }).seen.length
+        : 0
+    if (normalized.seen.length !== rawSeenLength) {
+      writeProductGuideProgress(userId, normalized)
+    }
+    return normalized
   } catch {
     return { seen: [], flags: {} }
   }
