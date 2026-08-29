@@ -181,23 +181,34 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     return baselineCompletedIdsRef.current.has(itemId)
   }, [])
 
-  const requestLessonExit = useCallback(() => {
-    const exitHref = resolveLessonExitHref(payload)
-    if (
-      !hasMinConsecutiveSessionCompletions(
-        payload.items,
-        sessionCompletedIdsRef.current,
-        2,
-      )
-    ) {
-      if (payload.isOnboardingLesson) {
-        setIsLeavingToDashboard(true)
+  const leaveLearningPath = useCallback(
+    (exitHref: string, options?: { forceCompletion?: boolean }) => {
+      if (
+        !options?.forceCompletion &&
+        !hasMinConsecutiveSessionCompletions(
+          payload.items,
+          sessionCompletedIdsRef.current,
+          2,
+        )
+      ) {
+        if (
+          payload.isOnboardingLesson ||
+          exitHref === "/dashboard" ||
+          exitHref.startsWith("/register")
+        ) {
+          setIsLeavingToDashboard(true)
+        }
+        router.push(exitHref)
+        return
       }
-      router.push(exitHref)
-      return
-    }
-    openLessonCompletion(exitHref)
-  }, [openLessonCompletion, payload, router])
+      openLessonCompletion(exitHref)
+    },
+    [openLessonCompletion, payload.isOnboardingLesson, payload.items, router],
+  )
+
+  const requestLessonExit = useCallback(() => {
+    leaveLearningPath(resolveLessonExitHref(payload))
+  }, [leaveLearningPath, payload])
 
   useEffect(() => {
     // New lesson visit → reset session streak; keep only progress already done before entry.
@@ -478,8 +489,10 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
     setFreePlanPaywallDue(false)
     setFreePlanPaywallVisible(false)
     const returnSource = getLearningPathItemReturnSourceFromLocation()
-    router.push(getLearningPathPaywallDismissHref(payload.lessonBaseHref, returnSource))
-  }, [payload.lessonBaseHref, router])
+    leaveLearningPath(getLearningPathPaywallDismissHref(payload.lessonBaseHref, returnSource), {
+      forceCompletion: true,
+    })
+  }, [leaveLearningPath, payload.lessonBaseHref])
 
   if (isLeavingToDashboard) {
     return <LoadingVideoOverlay zIndex={500} />

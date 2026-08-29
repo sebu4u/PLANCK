@@ -92,6 +92,10 @@ const defaultOnboardingState: OnboardingState = {
 }
 
 const ONE_LEU_ALLOWED_STEPS = new Set<RegisterStep>([ACCOUNT_STEP, "name", 2, "lesson_choice"])
+const ONE_LEU_SUBJECTS_WITHOUT_DEMO = new Set<SubjectOption>(["biologie", "chimie"])
+
+const skips1LeuDemoPath = (subject: SubjectOption | null) =>
+  subject != null && ONE_LEU_SUBJECTS_WITHOUT_DEMO.has(subject)
 
 const subjectHeadlines: Record<SubjectOption, string> = {
   matematica: "Excelent, construim raționament matematic pas cu pas.",
@@ -659,6 +663,10 @@ function RegisterPageContent() {
           currency: "RON",
         })
         if (is1LeuSignup) {
+          if (skips1LeuDemoPath(onboardingState.subject)) {
+            void completeStudentOnboarding("dashboard")
+            break
+          }
           setStep("lesson_choice")
           break
         }
@@ -1007,6 +1015,22 @@ function RegisterPageContent() {
     router.push("/dashboard")
   }
 
+  useEffect(() => {
+    if (!hydrated || !user || nameSaving || isFinalizing) return
+    if (onboardingState.campaignSignup !== "1leu") return
+    if (onboardingState.step !== "lesson_choice") return
+    if (!skips1LeuDemoPath(onboardingState.subject)) return
+    void completeStudentOnboarding("dashboard")
+  }, [
+    hydrated,
+    isFinalizing,
+    nameSaving,
+    onboardingState.campaignSignup,
+    onboardingState.step,
+    onboardingState.subject,
+    user,
+  ])
+
   const handleNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const cleanName = displayName.trim()
@@ -1236,6 +1260,13 @@ function RegisterPageContent() {
         )
 
       case "lesson_choice":
+        if (skips1LeuDemoPath(onboardingState.subject)) {
+          return (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            </div>
+          )
+        }
         return (
           <div className="mx-auto mt-16 w-full max-w-[420px] sm:mt-24">
             <div className="relative">
@@ -1435,7 +1466,7 @@ function RegisterPageContent() {
               <button
                 type="button"
                 onClick={handleContinue}
-                disabled={isContinueDisabled}
+                disabled={isContinueDisabled || nameSaving}
                 className={`${mainCtaClassName} w-full sm:w-auto`}
               >
                 {continueLabel}

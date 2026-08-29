@@ -3,19 +3,15 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Check, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { playButtonClickSound } from "@/lib/platform-sounds"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 import { supabase } from "@/lib/supabaseClient"
-import { tiktokPixel, premiumCommerceParams } from "@/lib/tiktok-pixel"
-import { cn } from "@/lib/utils"
 import {
   getPremiumPeriodLabel,
   getPremiumPriceRon,
-  PREMIUM_CARD_BULLETS,
-  type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
 
 interface OnboardingLessonOfferPhaseProps {
@@ -24,15 +20,7 @@ interface OnboardingLessonOfferPhaseProps {
 
 const OFFER_WINDOW_MS = 10 * 60 * 1000
 const WELCOME_DISCOUNT_PERCENT = 20
-
-const INTERVAL_TABS: Array<{
-  id: PremiumBillingInterval
-  label: string
-}> = [
-  { id: "week", label: "Săptămânal" },
-  { id: "month", label: "Lunar" },
-  { id: "year", label: "Anual" },
-]
+const BILLING_INTERVAL = "week" as const
 
 function getWelcomeOfferStorageKey(userId: string) {
   return `planck_onboarding_welcome_offer_start_${userId}`
@@ -55,7 +43,6 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
   const { user } = useAuth()
   const { toast } = useToast()
   const [now, setNow] = useState(0)
-  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>("month")
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const startRef = useRef<number | null>(null)
 
@@ -92,9 +79,9 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
     return formatCountdown(startRef.current + OFFER_WINDOW_MS - now)
   }, [now])
 
-  const saleRon = getPremiumPriceRon(billingInterval)
+  const saleRon = getPremiumPriceRon(BILLING_INTERVAL)
   const struckRon = getStruckPriceRon(saleRon)
-  const periodLabel = getPremiumPeriodLabel(billingInterval)
+  const periodLabel = getPremiumPeriodLabel(BILLING_INTERVAL)
 
   const handleCheckout = async () => {
     if (checkoutLoading) return
@@ -110,7 +97,7 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
 
       const result = await startPremiumCheckout({
         accessToken,
-        interval: billingInterval,
+        interval: BILLING_INTERVAL,
       })
 
       if (!result.ok) {
@@ -149,96 +136,45 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
     <div className="fixed inset-0 z-[502] flex flex-col bg-[linear-gradient(180deg,#ffd6e8_0%,#fff5f8_42%,#ffffff_100%)]">
       <div className="flex flex-1 items-center justify-center overflow-y-auto px-6 py-8 pb-36">
         <motion.div
-          className="w-full max-w-md"
+          className="w-full max-w-sm text-center"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="text-center">
-            <span className="inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#be185d] shadow-[0_4px_14px_rgba(244,114,182,0.28)] ring-1 ring-pink-200/80">
-              Ofertă de bun venit −{WELCOME_DISCOUNT_PERCENT}%
-            </span>
+          <span className="inline-flex items-center rounded-full bg-[#be185d] px-4 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-white shadow-[0_6px_18px_rgba(190,24,93,0.35)] sm:text-sm">
+            Reducere de bun venit −{WELCOME_DISCOUNT_PERCENT}%
+          </span>
 
-            <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-[#111111] sm:text-3xl">
-              Treci la <span className="text-[#be185d]">PREMIUM</span>
-            </h1>
-
-            <p className="mt-3 text-sm leading-relaxed text-[#5f657b] sm:text-base">
-              Ai încheiat primul traseu. Deblochează tot PLANCK-ul la preț de bun venit — doar câteva minute.
-            </p>
-
-            <p className="mt-5 text-sm font-semibold leading-snug text-[#be185d]">
-              Oferta expiră în{" "}
-              <span className="font-mono text-lg font-black tabular-nums tracking-tight">
-                {remainingLabel}
-              </span>
-            </p>
-          </div>
-
-          <div
-            role="tablist"
-            aria-label="Perioadă de abonament"
-            className="mt-6 flex w-full gap-1 rounded-full bg-white/80 p-1 ring-1 ring-pink-100"
+          <p className="mt-8 text-[11px] font-bold uppercase tracking-[0.22em] text-[#be185d]/80">
+            Oferta expiră în 10 minute
+          </p>
+          <p
+            className="mt-1 font-mono text-7xl font-black tabular-nums leading-none tracking-tight text-[#be185d] sm:text-8xl"
+            aria-live="polite"
+            aria-label={`Timp rămas ${remainingLabel}`}
           >
-            {INTERVAL_TABS.map((tab) => {
-              const isActive = billingInterval === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => {
-                    setBillingInterval(tab.id)
-                    tiktokPixel.trackCustomizeProduct(
-                      premiumCommerceParams(tab.id, {
-                        value: getPremiumPriceRon(tab.id),
-                      }),
-                    )
-                  }}
-                  className={cn(
-                    "flex-1 rounded-full px-2 py-2 text-[12px] font-bold transition-colors sm:text-sm",
-                    isActive
-                      ? "bg-[#111111] text-white shadow-sm"
-                      : "text-[#6b7280] hover:text-[#111111]",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
+            {remainingLabel}
+          </p>
 
-          <div className="mt-5 text-center">
-            <p className="text-sm font-medium text-[#9ca3af] line-through">
+          <div className="mt-10">
+            <p className="text-base font-medium text-[#9ca3af] line-through">
               {struckRon.toLocaleString("ro-RO")} RON{periodLabel}
             </p>
-            <div className="mt-0.5 flex items-baseline justify-center gap-1.5">
-              <span className="text-4xl font-black tracking-tight text-[#111111] tabular-nums sm:text-5xl">
+            <div className="mt-1 flex items-baseline justify-center gap-1.5">
+              <span className="text-5xl font-black tracking-tight text-[#111111] tabular-nums">
                 {saleRon.toLocaleString("ro-RO")}
               </span>
-              <span className="text-base font-semibold text-[#6b7280]">RON{periodLabel}</span>
+              <span className="text-lg font-semibold text-[#6b7280]">RON{periodLabel}</span>
             </div>
-            <p className="mt-1.5 text-xs font-semibold text-[#be185d]">
-              −{WELCOME_DISCOUNT_PERCENT}% față de prețul obișnuit
+            <p className="mt-2 text-sm font-semibold text-[#be185d]">
+              −{WELCOME_DISCOUNT_PERCENT}% la abonamentul săptămânal
             </p>
           </div>
-
-          <ul className="mt-5 space-y-2">
-            {PREMIUM_CARD_BULLETS.map((feature) => (
-              <li key={feature} className="flex items-start gap-2.5 text-sm text-[#374151]">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pink-100">
-                  <Check className="h-3 w-3 text-[#be185d]" strokeWidth={3} aria-hidden />
-                </span>
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
         </motion.div>
       </div>
 
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[503] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
-        <div className="pointer-events-auto mx-auto flex w-full max-w-md flex-col items-center">
+        <div className="pointer-events-auto mx-auto flex w-full max-w-sm flex-col items-center">
           <button
             type="button"
             onClick={() => {
@@ -254,7 +190,7 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
                 Se deschide...
               </>
             ) : (
-              "Treci la Premium"
+              "Ia reducerea de bun venit"
             )}
           </button>
 
