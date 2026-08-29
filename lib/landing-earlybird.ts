@@ -1,4 +1,5 @@
 import { PREMIUM_YEARLY_RON } from "@/components/pricing/premium-pricing"
+import { isPrizeWheelCampaignOpen } from "@/lib/prize-wheel/campaign"
 
 /** Earlybird annual offer — landing + /rezerva. */
 export const LANDING_DEADLINE = new Date("2026-09-07T23:59:59")
@@ -13,6 +14,8 @@ export const EARLYBIRD_SAVE_PERCENT = Math.round(
 export const EARLYBIRD_AMOUNT_OFF_RON = FULL_YEARLY_RON - EARLYBIRD_YEARLY_RON
 
 export function isEarlybirdActive(now = new Date()): boolean {
+  // Hide until prize wheel opens (1 Sept 12:00 Bucharest) to avoid conflicting with 1 leu campaign
+  if (!isPrizeWheelCampaignOpen(now)) return false
   return now.getTime() < LANDING_DEADLINE.getTime()
 }
 

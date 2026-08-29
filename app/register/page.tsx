@@ -1246,7 +1246,16 @@ function RegisterPageContent() {
               </form>
             </div>
 
-            {is1LeuSignup ? null : (
+            {is1LeuSignup ? (
+            <button
+              type="button"
+              disabled={nameSaving}
+              onClick={() => router.push("/castiga")}
+              className="mt-4 w-full text-center text-sm font-medium text-[#666a73] transition-colors hover:text-[#101216] disabled:opacity-40"
+            >
+              {"Sau mergi direct la roată ->"}
+            </button>
+            ) : (
             <button
               type="button"
               disabled={nameSaving}
@@ -1308,11 +1317,17 @@ function RegisterPageContent() {
             <button
               type="button"
               disabled={nameSaving}
-              onClick={() => void completeStudentOnboarding("dashboard")}
+              onClick={() => {
+                if (is1LeuSignup) {
+                  router.push("/castiga")
+                } else {
+                  void completeStudentOnboarding("dashboard")
+                }
+              }}
               className="mt-4 w-full text-center text-sm font-medium text-[#666a73] opacity-0 transition-colors hover:text-[#101216] disabled:opacity-40"
               style={{ animation: STEP_BUTTON_ANIM, animationDelay: "160ms" }}
             >
-              {"Sau mergi direct la dashboard ->"}
+              {is1LeuSignup ? "Sau mergi direct la roată ->" : "Sau mergi direct la dashboard ->"}
             </button>
           </div>
         )
