@@ -3,10 +3,9 @@
 import { BookOpen, GraduationCap, Layers, Sparkles, Users } from "lucide-react"
 
 const STATS = [
-  { value: "50.000+", label: "elevi", Icon: Users },
+  { value: "1.000+", label: "elevi activi", Icon: Users },
   { value: "20+", label: "olimpici profesori", Icon: GraduationCap },
-  { value: "10.000+", label: "exerciții", Icon: BookOpen },
-  { value: "5", label: "materii", Icon: Layers },
+  { value: "800+", label: "soluții video", Icon: BookOpen },
   { value: "Tutor AI", label: null, Icon: Sparkles },
 ] as const
 
