@@ -99,7 +99,7 @@ export function PlanckPassRewardCard({
       }}
       aria-label={`Tier ${tier.tier}: ${tier.label}${tier.isFree ? " (free)" : " (premium)"}${previewable ? " — blocat" : ""}`}
       className={cn(
-        "relative shrink-0 touch-manipulation outline-none transition-transform active:scale-[0.96]",
+        "relative shrink-0 outline-none transition-transform active:scale-[0.96]",
         !interactive && "cursor-default",
         className,
       )}

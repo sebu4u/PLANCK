@@ -47,6 +47,10 @@ export function PlanckPassSection({ className, expanded = true }: PlanckPassSect
   const displayTiers = tiers.length > 0 ? tiers : []
   const skeletonCount = 6
   const rowTierCount = loading ? skeletonCount : displayTiers.length
+  const trackWidth =
+    PLANCKPASS_SIDE_PAD * 2 +
+    Math.max(rowTierCount, 1) * PLANCKPASS_CARD_WIDTH +
+    Math.max(rowTierCount - 1, 0) * PLANCKPASS_CARD_GAP
 
   useEffect(() => {
     const el = scrollRef.current
@@ -120,17 +124,12 @@ export function PlanckPassSection({ className, expanded = true }: PlanckPassSect
 
       <div
         ref={scrollRef}
-        className="scrollbar-hide relative z-10 min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        className="scrollbar-hide relative z-10 min-h-0 flex-1 overflow-x-auto overscroll-x-contain [@supports(-webkit-touch-callout:none)]:touch-pan-x [@supports(-webkit-touch-callout:none)]:[-webkit-overflow-scrolling:touch]"
         aria-busy={loading || undefined}
       >
         <div
-          className="flex h-full min-h-full flex-col justify-center"
-          style={{
-            width:
-              PLANCKPASS_SIDE_PAD * 2 +
-              Math.max(rowTierCount, 1) * PLANCKPASS_CARD_WIDTH +
-              Math.max(rowTierCount - 1, 0) * PLANCKPASS_CARD_GAP,
-          }}
+          className="flex h-full min-h-full shrink-0 flex-col justify-center"
+          style={{ width: trackWidth, minWidth: trackWidth }}
         >
           <div
             className="flex items-end"
