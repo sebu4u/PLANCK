@@ -41,16 +41,11 @@ import { PlanckPassMobileShell } from "@/components/dashboard/free-mobile/planck
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
-import { PostOnboardingDiscountPromoModal } from "@/components/dashboard/post-onboarding-discount-promo-modal"
 import { PrizeWheelDashboardOverlay } from "@/components/prize-wheel/prize-wheel-dashboard-overlay"
 import type { PrizeWheelCloseInfo } from "@/components/prize-wheel/prize-wheel-experience"
 import { PremiumUpgradeBanner } from "@/components/premium-upgrade-banner"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
-import {
-  getPostOnboardingDiscountMobilePromoSessionKey,
-  usePostOnboardingDiscountWindow,
-} from "@/hooks/use-post-onboarding-discount-window"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { useProductGuideBlocking } from "@/components/product-guide/product-guide-blocking"
 import { usePlanckPassIntro } from "@/components/planckpass/planckpass-season-intro-gate"
@@ -64,7 +59,6 @@ export function DashboardAuth() {
   const router = useRouter()
   const { user, loading: authLoading, profile, isStudent } = useAuth()
   const { isPaid } = useSubscriptionPlan()
-  const postOnboardingDiscount = usePostOnboardingDiscountWindow(user?.id)
   const { setBlocked: setProductGuideBlocked } = useProductGuideBlocking()
   const { isOpen: showPlanckPassIntro, isPending: planckPassIntroPending } = usePlanckPassIntro()
   const holdDashboardOverlays = showPlanckPassIntro || planckPassIntroPending
@@ -75,10 +69,8 @@ export function DashboardAuth() {
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
-  const [showMobileDiscountPromo, setShowMobileDiscountPromo] = useState(false)
   const [showPrizeWheel, setShowPrizeWheel] = useState(false)
   const [showPrizeWheelTeaser, setShowPrizeWheelTeaser] = useState(false)
-  const mobileDiscountPromoCheckedRef = useRef(false)
   const prizeWheelCheckedRef = useRef(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
@@ -110,7 +102,6 @@ export function DashboardAuth() {
       !authLoading &&
       !loading &&
       !showWelcomeBack &&
-      !showMobileDiscountPromo &&
       !showPrizeWheel &&
       !holdDashboardOverlays,
     solvedTotal: dashboardData?.stats.problems_solved_total,
@@ -118,19 +109,16 @@ export function DashboardAuth() {
 
   useEffect(() => {
     setProductGuideBlocked("welcome-back", showWelcomeBack)
-    setProductGuideBlocked("discount-promo", showMobileDiscountPromo)
     setProductGuideBlocked("premium-upgrade", premiumUpgradeOpen)
     setProductGuideBlocked("prize-wheel", showPrizeWheel)
     return () => {
       setProductGuideBlocked("welcome-back", false)
-      setProductGuideBlocked("discount-promo", false)
       setProductGuideBlocked("premium-upgrade", false)
       setProductGuideBlocked("prize-wheel", false)
     }
   }, [
     setProductGuideBlocked,
     showWelcomeBack,
-    showMobileDiscountPromo,
     premiumUpgradeOpen,
     showPrizeWheel,
   ])
@@ -483,33 +471,6 @@ export function DashboardAuth() {
   }, [authLoading, loading, dashboardData, user?.id, holdDashboardOverlays, isPaid])
 
   useEffect(() => {
-    if (authLoading || loading || !dashboardData || !user || isPaid) return
-    if (holdDashboardOverlays || showWelcomeBack || showPrizeWheel) return
-    if (mobileDiscountPromoCheckedRef.current) return
-    mobileDiscountPromoCheckedRef.current = true
-
-    try {
-      const dismissed = sessionStorage.getItem(getPostOnboardingDiscountMobilePromoSessionKey(user.id))
-      if (!dismissed) {
-        postOnboardingDiscount.ensureWindow()
-        setShowMobileDiscountPromo(true)
-      }
-    } catch {
-      // Ignore storage errors silently
-    }
-  }, [
-    authLoading,
-    loading,
-    dashboardData,
-    user?.id,
-    isPaid,
-    showWelcomeBack,
-    showPrizeWheel,
-    holdDashboardOverlays,
-    postOnboardingDiscount.ensureWindow,
-  ])
-
-  useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || !isStudent || holdDashboardOverlays) return
     if (prizeWheelCheckedRef.current) return
     prizeWheelCheckedRef.current = true
@@ -534,17 +495,6 @@ export function DashboardAuth() {
 
     void loadPrizeWheel()
   }, [authLoading, loading, dashboardData, user?.id, isStudent, holdDashboardOverlays])
-
-  const dismissMobileDiscountPromo = () => {
-    if (user) {
-      try {
-        sessionStorage.setItem(getPostOnboardingDiscountMobilePromoSessionKey(user.id), "1")
-      } catch {
-        // Ignore storage errors silently
-      }
-    }
-    setShowMobileDiscountPromo(false)
-  }
 
   const persistWelcomeBackDismissState = () => {
     if (!user) return
@@ -748,21 +698,6 @@ export function DashboardAuth() {
             }
           }}
         />
-      ) : null}
-
-      {showMobileDiscountPromo ? (
-        <div
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300 md:hidden"
-          role="presentation"
-        >
-          <div className="mx-auto w-full max-w-[460px]">
-            <PostOnboardingDiscountPromoModal
-              imageSrc="/dashboard-card.png"
-              remainingLabel={postOnboardingDiscount.remainingLabel}
-              onClose={dismissMobileDiscountPromo}
-            />
-          </div>
-        </div>
       ) : null}
 
       {showWelcomeBack && isPaid ? (

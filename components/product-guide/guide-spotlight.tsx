@@ -5,13 +5,14 @@ import { createPortal } from "react-dom"
 
 import { GuideTip } from "@/components/product-guide/guide-tip"
 import { findGuideAnchorElement } from "@/lib/product-guide/dom"
-import type { ProductGuideAnchorId } from "@/lib/product-guide/types"
+import type { ProductGuideAnchorId, ProductGuideStep } from "@/lib/product-guide/types"
 
 type GuideSpotlightProps = {
   anchorId: ProductGuideAnchorId
   title: string
   body: string
   onDismiss: () => void
+  tipPlacement?: ProductGuideStep["tipPlacement"]
 }
 
 type AnchorRect = {
@@ -23,12 +24,26 @@ type AnchorRect = {
 
 const PAD = 8
 
-export function GuideSpotlight({ anchorId, title, body, onDismiss }: GuideSpotlightProps) {
+const MOBILE_MAX_WIDTH_MQ = "(max-width: 767px)"
+
+export function GuideSpotlight({
+  anchorId,
+  title,
+  body,
+  onDismiss,
+  tipPlacement = "auto",
+}: GuideSpotlightProps) {
   const [rect, setRect] = useState<AnchorRect | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
+    const mq = window.matchMedia(MOBILE_MAX_WIDTH_MQ)
+    const sync = () => setIsMobile(mq.matches)
+    sync()
     setMounted(true)
+    mq.addEventListener("change", sync)
+    return () => mq.removeEventListener("change", sync)
   }, [])
 
   useEffect(() => {
@@ -75,7 +90,8 @@ export function GuideSpotlight({ anchorId, title, body, onDismiss }: GuideSpotli
 
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800
   const tipBelow = rect ? rect.top + rect.height + 14 : null
-  const placeBelow = tipBelow != null && tipBelow < viewportH - 210
+  const forceBottom = tipPlacement === "bottom" && isMobile
+  const placeBelow = !forceBottom && tipBelow != null && tipBelow < viewportH - 210
 
   return createPortal(
     <div className="fixed inset-0 z-[520]" role="presentation">

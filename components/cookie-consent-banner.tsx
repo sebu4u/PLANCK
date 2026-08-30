@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useCookieManager, type CookiePreferences } from '@/lib/cookie-management'
 
 export function CookieConsentBanner() {
+  const pathname = usePathname()
   const cookieManager = useCookieManager()
   const [mounted, setMounted] = useState(false)
 
@@ -34,7 +36,7 @@ export function CookieConsentBanner() {
   }
 
   // Avoid SSR/client mismatches caused by localStorage-backed consent state.
-  if (!mounted || cookieManager.hasConsent) return null
+  if (!mounted || cookieManager.hasConsent || pathname === "/1leu") return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 md:bottom-4 md:left-auto md:right-4 md:w-auto">

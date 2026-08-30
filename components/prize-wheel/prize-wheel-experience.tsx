@@ -9,6 +9,7 @@ import confetti from "canvas-confetti"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/components/auth-provider"
+import { CountdownUnit } from "@/components/landing/countdown-unit"
 import {
   getPrizeWheelPrizeLabel,
   nextWheelRotation,
@@ -27,9 +28,11 @@ export type PrizeWheelCloseInfo = {
 
 type PrizeWheelExperienceProps = {
   compact?: boolean
+  variant?: "card" | "page"
   onClose?: (info?: PrizeWheelCloseInfo) => void
   onStatusChange?: (info: PrizeWheelCloseInfo) => void
   onWon?: (prize: PrizeWheelPrizeView) => void
+  onAuthRequired?: () => void
 }
 
 const CONFETTI_COLORS = ["#5B47D6", "#7C5CFC", "#f2b93d", "#cd83db", "#ffffff"]
@@ -58,7 +61,7 @@ function pad2(value: number) {
   return String(value).padStart(2, "0")
 }
 
-function CampaignCountdown() {
+function CampaignCountdown({ variant = "card" }: { variant?: "card" | "page" }) {
   const [parts, setParts] = useState(() => getCountdownParts(PRIZE_WHEEL_CAMPAIGN_START_AT))
 
   useEffect(() => {
@@ -70,9 +73,28 @@ function CampaignCountdown() {
 
   if (parts.done) {
     return (
-      <p className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-600">
+      <p className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-medium text-gray-600 ring-1 ring-[#EBE8FF]">
         Campania pornește în curând. Revino peste câteva momente.
       </p>
+    )
+  }
+
+  if (variant === "page") {
+    return (
+      <div className="flex flex-col items-center">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#7C5CFC]">
+          Se deschide 1 septembrie, 12:00
+        </p>
+        <div className="mt-4 flex max-w-full flex-wrap items-end justify-center gap-2 sm:gap-3">
+          <CountdownUnit value={parts.days} label="zile" />
+          <span className="mb-4 text-2xl font-black text-[#7C5CFC]">:</span>
+          <CountdownUnit value={parts.hours} label="ore" />
+          <span className="mb-4 text-2xl font-black text-[#7C5CFC]">:</span>
+          <CountdownUnit value={parts.minutes} label="min" />
+          <span className="mb-4 text-2xl font-black text-[#7C5CFC]">:</span>
+          <CountdownUnit value={parts.seconds} label="sec" />
+        </div>
+      </div>
     )
   }
 
@@ -107,7 +129,14 @@ function fireWinConfetti() {
   confetti({ ...defaults, particleCount: 90, angle: 120, spread: 60, origin: { x: 1, y: 0.65 } })
 }
 
-export function PrizeWheelExperience({ compact = false, onClose, onStatusChange, onWon }: PrizeWheelExperienceProps) {
+export function PrizeWheelExperience({
+  compact = false,
+  variant = "card",
+  onClose,
+  onStatusChange,
+  onWon,
+  onAuthRequired,
+}: PrizeWheelExperienceProps) {
   const { user } = useAuth()
   const [status, setStatus] = useState<PrizeWheelStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,6 +186,10 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
     setError(null)
 
     if (!user) {
+      if (onAuthRequired) {
+        onAuthRequired()
+        return
+      }
       window.location.assign("/login?redirect=/castiga")
       return
     }
@@ -166,6 +199,11 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) {
+        if (onAuthRequired) {
+          setSpinning(false)
+          onAuthRequired()
+          return
+        }
         window.location.assign("/login?redirect=/castiga")
         return
       }
@@ -209,6 +247,15 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
     onStatusChange?.(closeInfo)
   }, [closeInfo.hasSpunOnce, closeInfo.hasPrize, onStatusChange])
 
+  const isPage = variant === "page"
+  const requestAuth = () => {
+    if (onAuthRequired) {
+      onAuthRequired()
+      return
+    }
+    window.location.assign("/login?redirect=/castiga")
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[280px] items-center justify-center">
@@ -218,7 +265,7 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
   }
 
   return (
-    <div className={cn("relative w-full", compact ? "max-w-[440px]" : "max-w-xl")}>
+    <div className={cn("relative w-full", compact || isPage ? "max-w-[440px]" : "max-w-xl")}>
       {onClose ? (
         <button
           type="button"
@@ -231,31 +278,57 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
       ) : null}
 
       <div className="text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#7C5CFC]">Planck Câștigă</p>
-        <h2 className="mt-2 text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">Roata cu premii</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Învârte și poți lua 7 zile Premium, reduceri sau anualul la 1 leu.
-        </p>
+        {isPage ? (
+          <>
+            <span className="inline-flex items-center rounded-xl bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(124,92,252,0.28)]">
+              1 septembrie · ora 12:00
+            </span>
+            <h1 className="mt-5 text-[2rem] font-black leading-[1.08] tracking-tight text-gray-900 sm:text-5xl">
+              Roata cu premii
+            </h1>
+            <div className="mx-auto mt-4 h-[3px] w-16 rounded-full bg-[#A3E635]" aria-hidden />
+            <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg">
+              Învârte și poți lua 7 zile Premium, reduceri sau anualul la 1 leu.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#7C5CFC]">Planck Câștigă</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">Roata cu premii</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Învârte și poți lua 7 zile Premium, reduceri sau anualul la 1 leu.
+            </p>
+          </>
+        )}
       </div>
 
-      <div className="mt-6">
-        <PrizeWheelVisual rotation={rotation} spinning={spinning} size={compact ? 280 : 320} />
+      <div className={cn("flex justify-center", isPage ? "mt-6 sm:mt-8" : "mt-6")}>
+        <PrizeWheelVisual
+          rotation={rotation}
+          spinning={spinning}
+          size={compact ? 280 : isPage ? 264 : 320}
+        />
       </div>
 
-      <div className="mt-6 space-y-3 text-center">
+      <div className={cn("space-y-3 text-center", isPage ? "mt-6 sm:mt-8" : "mt-6")}>
         {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
 
-        {!isLive ? <CampaignCountdown /> : null}
+        {!isLive ? <CampaignCountdown variant={variant} /> : null}
 
-        {isLive && !user ? (
+        {!user ? (
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">Autentifică-te ca elev ca să învârți roata.</p>
-            <Link
-              href="/login?redirect=/castiga"
-              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#7C5CFC] text-sm font-bold text-white transition hover:brightness-110"
+            <p className="text-sm text-gray-600">
+              {isLive
+                ? "Autentifică-te ca elev ca să învârți roata."
+                : "Intră în cont ca să fii gata marți, la 12:00."}
+            </p>
+            <button
+              type="button"
+              onClick={requestAuth}
+              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#7C5CFC] text-[15px] font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] hover:brightness-110 active:brightness-[0.98]"
             >
               Intră în cont
-            </Link>
+            </button>
           </div>
         ) : null}
 
@@ -270,7 +343,7 @@ export function PrizeWheelExperience({ compact = false, onClose, onStatusChange,
             type="button"
             onClick={() => void handleSpin()}
             disabled={spinning}
-            className="inline-flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#7C5CFC] via-[#cd83db] to-[#f2b93d] text-sm font-bold text-white shadow-[0_4px_0_#6d4de0] transition hover:translate-y-0.5 hover:shadow-[0_2px_0_#6d4de0] disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#7C5CFC] via-[#cd83db] to-[#f2b93d] text-sm font-bold text-white shadow-[0_4px_0_#6d4de0] transition hover:translate-y-0.5 hover:shadow-[0_2px_0_#6d4de0] disabled:cursor-not-allowed disabled:opacity-70 sm:h-14 sm:text-base"
           >
             {spinning ? (
               <span className="inline-flex items-center gap-2">

@@ -41,6 +41,7 @@ export const PRODUCT_GUIDE_STEPS: ProductGuideStep[] = [
     anchorId: "subject-switcher",
     title: "Acasă și materia ta",
     body: "Aici e dashboard-ul tău. Poți schimba materia din selectorul de sus.",
+    tipPlacement: "bottom",
     requires: [],
     match: (pathname) => isStudentDashboardRoute(pathname),
   },

@@ -55,6 +55,21 @@ export function getLearningPathItemHref(
   return `${getLearningPathLessonHref(chapter, lesson)}/${itemIndex + 1}`
 }
 
+export function parseLearningPathItemHref(
+  href: string,
+): { chapterSlug: string; lessonSlug: string; itemIndex: number } | null {
+  try {
+    const path = new URL(href, "https://planck.local").pathname
+    const parts = path.split("/").filter(Boolean)
+    if (parts.length < 4 || parts[0] !== "invata") return null
+    const itemIndex = Number.parseInt(parts[3], 10)
+    if (!Number.isFinite(itemIndex) || itemIndex < 1) return null
+    return { chapterSlug: parts[1], lessonSlug: parts[2], itemIndex }
+  } catch {
+    return null
+  }
+}
+
 export function getCanonicalLearningPathLessonPath(
   chapter: LearningPathRouteChapter,
   lesson: LearningPathRouteLesson,

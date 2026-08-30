@@ -25,7 +25,7 @@ export function landing1LeuCtaCopy(options: {
   if (options.isLive) {
     return options.short ? "Învârte roata acum" : "Roata e deschisă. Învârte acum."
   }
-  return "Îmi creez contul"
+  return "Mă înscriu pe listă"
 }
 
 export function Landing1LeuCtaLink({

@@ -29,6 +29,7 @@ import type { LearningPathSlideDirection } from "@/components/invata/learning-pa
 import { getFizicaMapHref } from "@/lib/supabase-fizica-learning-map"
 import { getSubjectMapHref } from "@/lib/subject-map/navigation"
 import { GUEST_DEMO_SIGNUP_PATH, getGuestDemoStatus, markGuestDemoCompleted } from "@/lib/onboarding"
+import { endOnboardingLessonHandoff } from "@/lib/onboarding-lesson-handoff"
 import { trackFunnelEvent } from "@/lib/funnel-analytics"
 
 interface LearningPathItemExperienceProps {
@@ -148,6 +149,19 @@ export function LearningPathItemExperience({ initialPayload }: LearningPathItemE
   const eligibleForFirstItemEntryRef = useRef(initialPayload.itemIndex === 1)
   const [firstItemEntryConsumed, setFirstItemEntryConsumed] = useState(false)
   const sessionCompletedIdsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    let inner = 0
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        endOnboardingLessonHandoff()
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(outer)
+      window.cancelAnimationFrame(inner)
+    }
+  }, [])
 
   useEffect(() => {
     trackFunnelEvent("lesson_started", {

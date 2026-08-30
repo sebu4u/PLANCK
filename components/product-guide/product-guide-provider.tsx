@@ -41,6 +41,7 @@ function ProductGuideRenderer() {
         title={activeStep.title}
         body={activeStep.body}
         onDismiss={dismiss}
+        tipPlacement={activeStep.tipPlacement}
       />
     )
   }

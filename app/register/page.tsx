@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState, useTransition } from "react"
 import { ChevronLeft, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
@@ -28,6 +28,8 @@ import { getPostOnboardingDiscountStorageKey } from "@/hooks/use-post-onboarding
 import {
   getPostOnboardingLearningPathItemHref,
 } from "@/lib/supabase-learning-paths"
+import { parseLearningPathItemHref } from "@/lib/learning-path-routes"
+import { prefetchLearningPathItem } from "@/lib/learning-path-item-client-cache"
 import { getPostOnboardingLearningPathCtaLabel } from "@/lib/practice-subject"
 import { playOnboardingSelectSound } from "@/lib/onboarding-sounds"
 import {
@@ -47,6 +49,10 @@ import {
   clearGuestDemo,
   getGuestDemoStatus,
 } from "@/lib/onboarding"
+import {
+  endOnboardingLessonHandoff,
+  startOnboardingLessonHandoff,
+} from "@/lib/onboarding-lesson-handoff"
 
 type SubjectOption = OnboardingSubjectId
 type GradeOption = "9" | "10" | "11" | "12"
@@ -96,6 +102,14 @@ const ONE_LEU_SUBJECTS_WITHOUT_DEMO = new Set<SubjectOption>(["biologie", "chimi
 
 const skips1LeuDemoPath = (subject: SubjectOption | null) =>
   subject != null && ONE_LEU_SUBJECTS_WITHOUT_DEMO.has(subject)
+
+function prefetchDemoLessonHref(href: string, prefetchRoute: (href: string) => void) {
+  prefetchRoute(href)
+  const parsed = parseLearningPathItemHref(href)
+  if (parsed) {
+    prefetchLearningPathItem(parsed.chapterSlug, parsed.lessonSlug, parsed.itemIndex)
+  }
+}
 
 const subjectHeadlines: Record<SubjectOption, string> = {
   matematica: "Excelent, construim raționament matematic pas cu pas.",
@@ -303,6 +317,7 @@ function RegisterPageContent() {
   // re-running (it clears onboardingState back to step 1) once `profile` refreshes with the new name.
   const [isFinalizing, setIsFinalizing] = useState(false)
   const leavingToLessonRef = useRef(false)
+  const [isNameStepPending, startNameStepTransition] = useTransition()
 
   const { toast } = useToast()
   const router = useRouter()
@@ -332,6 +347,7 @@ function RegisterPageContent() {
   }, [searchParams])
 
   useEffect(() => {
+    if (leavingToLessonRef.current || isFinalizing) return
     let parsedState = { ...defaultOnboardingState }
     const rawState = localStorage.getItem(REGISTER_ONBOARDING_STORAGE_KEY)
     if (rawState) {
@@ -373,6 +389,9 @@ function RegisterPageContent() {
         parsedState.step = ACCOUNT_STEP
       } else if (!is1LeuAllowedStep(parsedState.step) || parsedState.step === ACCOUNT_STEP) {
         parsedState.step = "name"
+      }
+      if (user) {
+        localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
       }
       if (
         parsedState.subject &&
@@ -424,6 +443,7 @@ function RegisterPageContent() {
     setDisplayName(parsedState.displayName || profile?.name || profile?.nickname || "")
     setHydrated(true)
   }, [
+    isFinalizing,
     profile?.name,
     profile?.nickname,
     shouldForceGuestSignup,
@@ -503,7 +523,23 @@ function RegisterPageContent() {
       onboardingState.step === "name" ||
       onboardingState.step === "lesson_choice"
 
-    if (oauthFromRegister && onboardingState.step !== "name") {
+    const canLeaveNameOn1Leu =
+      onboardingState.campaignSignup === "1leu" &&
+      (onboardingState.step === 2 || onboardingState.step === "lesson_choice")
+
+    if (oauthFromRegister && onboardingState.step === "name") {
+      clearOAuthFlag()
+      if (onboardingState.awaitingPostAuth) {
+        setOnboardingState((prev) => ({ ...prev, awaitingPostAuth: false }))
+        return
+      }
+    } else if (oauthFromRegister && canLeaveNameOn1Leu) {
+      clearOAuthFlag()
+      if (onboardingState.awaitingPostAuth) {
+        setOnboardingState((prev) => ({ ...prev, awaitingPostAuth: false }))
+        return
+      }
+    } else if (oauthFromRegister && onboardingState.step !== "name") {
       clearOAuthFlag()
       setOnboardingState((prev) => ({
         ...prev,
@@ -549,7 +585,9 @@ function RegisterPageContent() {
     const prefetchForGuestAccount =
       onboardingState.step === ACCOUNT_STEP && onboardingState.campaignSignup !== "1leu"
     const prefetchForLessonChoice = onboardingState.step === "lesson_choice"
-    if (!prefetchForGuestAccount && !prefetchForLessonChoice) return
+    const prefetchForNameStep =
+      onboardingState.step === "name" && onboardingState.campaignSignup !== "1leu"
+    if (!prefetchForGuestAccount && !prefetchForLessonChoice && !prefetchForNameStep) return
     let cancelled = false
     void (async () => {
       try {
@@ -559,7 +597,7 @@ function RegisterPageContent() {
         )
         if (!cancelled) {
           setGuestFirstItemHref(href)
-          if (href) router.prefetch(href)
+          if (href) prefetchDemoLessonHref(href, (path) => router.prefetch(path))
         }
       } catch {
         if (!cancelled) setGuestFirstItemHref(null)
@@ -617,13 +655,14 @@ function RegisterPageContent() {
     }))
 
   const handleBack = () => {
-    if (nameSaving) return
+    if (nameSaving || isNameStepPending) return
     if (is1LeuSignup) {
       if (onboardingState.step === "lesson_choice") {
         setStep(2)
         return
       }
       if (onboardingState.step === 2) {
+        setNameSaving(false)
         setStep("name")
       }
       return
@@ -892,6 +931,14 @@ function RegisterPageContent() {
     }
 
     setNameSaving(true)
+    const keepLessonChoiceVisible =
+      destination === "lesson" && onboardingState.campaignSignup === "1leu"
+    if (destination === "lesson") {
+      leavingToLessonRef.current = true
+    }
+    if (keepLessonChoiceVisible) {
+      startOnboardingLessonHandoff()
+    }
 
     const { error } = await finalizeStudentOnboarding(supabase, {
       userId: user.id,
@@ -904,6 +951,8 @@ function RegisterPageContent() {
     })
 
     if (error) {
+      leavingToLessonRef.current = false
+      if (keepLessonChoiceVisible) endOnboardingLessonHandoff()
       toast({
         title: "Nu am putut salva numele",
         description: "Mai încearcă o dată, te rog.",
@@ -977,24 +1026,26 @@ function RegisterPageContent() {
       }
 
       if (target) {
-        leavingToLessonRef.current = true
         persistCompletionLocally()
-        await identifyPixels()
         trackRegistration()
         consumePostOnboardingRedirect()
-        await refreshProfile()
-        router.push(target)
         localStorage.removeItem(REGISTER_ONBOARDING_STORAGE_KEY)
         localStorage.removeItem(ONBOARDING_AFTER_OAUTH_KEY)
         clearGuestDemo()
+        prefetchDemoLessonHref(target, (path) => router.prefetch(path))
+        void identifyPixels()
+        void refreshProfile()
+        router.push(target)
         return
       }
 
+      if (keepLessonChoiceVisible) endOnboardingLessonHandoff()
       toast({
         title: "Nu am putut deschide lecția",
         description: "Te ducem pe dashboard. Poți începe de acolo.",
         variant: "destructive",
       })
+      leavingToLessonRef.current = false
     }
 
     // From here on we're committed to leaving this page: show the same loading screen as the
@@ -1043,14 +1094,22 @@ function RegisterPageContent() {
       return
     }
     if (is1LeuSignup) {
-      setOnboardingState((prev) => ({
-        ...prev,
-        displayName: cleanName,
-        step: 2,
-      }))
+      setNameSaving(true)
+      clearOAuthFlag()
+      startNameStepTransition(() => {
+        setOnboardingState((prev) => ({
+          ...prev,
+          displayName: cleanName,
+          awaitingPostAuth: false,
+          step: 2,
+        }))
+        setNameSaving(false)
+      })
       return
     }
-    await completeStudentOnboarding()
+    await completeStudentOnboarding(
+      onboardingState.guestDemo === "completed" ? "dashboard" : "lesson",
+    )
   }
 
   const renderStepContent = () => {
@@ -1211,7 +1270,8 @@ function RegisterPageContent() {
         )
       }
 
-      case "name":
+      case "name": {
+        const isNameButtonBusy = nameSaving || isNameStepPending
         return (
           <div className="mx-auto w-full max-w-[420px]">
             <div className="rounded-3xl border border-[#ececf1] bg-white p-7 shadow-[0_30px_70px_-45px_rgba(18,20,28,0.5)]">
@@ -1226,14 +1286,15 @@ function RegisterPageContent() {
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="Numele tău"
                   maxLength={60}
+                  disabled={isNameButtonBusy}
                   className="h-12 rounded-full border-[#d8dbe3] px-4 text-base text-[#101216] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
                 />
 
-                <button type="submit" disabled={nameSaving} className={`${mainCtaClassName} w-full`}>
-                  {nameSaving ? (
+                <button type="submit" disabled={isNameButtonBusy} className={`${mainCtaClassName} w-full`}>
+                  {isNameButtonBusy ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Salvăm...
+                      {is1LeuSignup ? "Continuă" : "Salvăm..."}
                     </span>
                   ) : is1LeuSignup ? (
                     "Continuă"
@@ -1249,7 +1310,7 @@ function RegisterPageContent() {
             {is1LeuSignup ? (
             <button
               type="button"
-              disabled={nameSaving}
+              disabled={isNameButtonBusy}
               onClick={() => router.push("/castiga")}
               className="mt-4 w-full text-center text-sm font-medium text-[#666a73] transition-colors hover:text-[#101216] disabled:opacity-40"
             >
@@ -1258,8 +1319,8 @@ function RegisterPageContent() {
             ) : (
             <button
               type="button"
-              disabled={nameSaving}
-              onClick={() => void completeStudentOnboarding()}
+              disabled={isNameButtonBusy}
+              onClick={() => void completeStudentOnboarding("dashboard")}
               className="mt-4 w-full text-center text-sm font-medium text-[#666a73] transition-colors hover:text-[#101216] disabled:opacity-40"
             >
               {"Sau mergi direct la dashboard ->"}
@@ -1267,6 +1328,7 @@ function RegisterPageContent() {
             )}
           </div>
         )
+      }
 
       case "lesson_choice":
         if (skips1LeuDemoPath(onboardingState.subject)) {
@@ -1305,7 +1367,7 @@ function RegisterPageContent() {
                   {nameSaving ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Salvăm...
+                      Începe lecția demo (~2 min)
                     </span>
                   ) : (
                     "Începe lecția demo (~2 min)"

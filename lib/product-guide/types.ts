@@ -37,6 +37,8 @@ export type ProductGuideStep = {
   title: string
   body: string
   href?: string
+  /** `bottom` parks the tip above the mobile nav instead of under a top-of-screen anchor. */
+  tipPlacement?: "auto" | "bottom"
   /** Delay before showing, after the step becomes eligible. */
   showDelayMs?: number
   /** Skip this step when the bottom nav is not on screen (desktop). */

@@ -9,6 +9,7 @@ import { AnalyticsProvider } from "@/components/analytics-provider"
 import { KatexProvider } from "@/components/katex-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
+import { OnboardingLessonHandoffCover } from "@/components/onboarding/onboarding-lesson-handoff-cover"
 import { TopLoader } from "@/components/top-loader"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MobileViewportFix } from "@/components/mobile-viewport-fix"
@@ -136,6 +137,7 @@ export default function RootLayout({
                   <Toaster />
                   <EngagementNotificationToaster />
                   <CookieConsentBanner />
+                  <OnboardingLessonHandoffCover />
 
                   <div
                     className="pointer-events-none fixed bottom-2 left-2 hidden text-[10px] font-medium text-muted-foreground md:flex"
