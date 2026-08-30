@@ -39,27 +39,26 @@ export async function GET(req: NextRequest) {
       .from('insight_chat_sessions')
       .select('id, title, created_at, updated_at, last_message_at, problem_id, lesson_id')
       .eq('user_id', user.id)
-      .order('last_message_at', { ascending: false, nullsFirst: false })
-      .order('updated_at', { ascending: false });
+      .not('last_message_at', 'is', null)
 
     if (problemId) {
-      query = query.eq('problem_id', problemId);
+      query = query.eq('problem_id', problemId)
     }
     if (lessonId) {
-      query = query.eq('lesson_id', lessonId);
+      query = query.eq('lesson_id', lessonId)
     }
 
-    const { data, error } = await query;
+    const { data, error } = await query
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+      .limit(50)
 
     if (error) {
       logger.error('Failed to fetch sessions:', error);
       return NextResponse.json({ error: 'Nu am putut lista sesiunile.' }, { status: 500 });
     }
 
-    // Filter out sessions without any messages (only keep sessions with last_message_at not null)
-    const sessionsWithMessages = (data || []).filter(session => session.last_message_at !== null);
-
-    return NextResponse.json({ sessions: sessionsWithMessages });
+    return NextResponse.json({ sessions: data || [] });
   } catch (err: any) {
     logger.error('Sessions API error:', err);
     return NextResponse.json({ error: 'Eroare internă.' }, { status: 500 });

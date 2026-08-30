@@ -185,22 +185,19 @@ export function ProblemCard({ problem, solved, isLocked = false, picker, assignm
   }
 
   const assignmentViewHref = assignmentActions?.viewHref
+  const problemHref = assignmentViewHref ?? `/probleme/${problem.id}`
 
-  useEffect(() => {
-    if (!isLocked && !picker && !assignmentActions) {
-      router.prefetch(`/probleme/${problem.id}`)
-    }
-    if (assignmentActions && assignmentViewHref) {
-      router.prefetch(assignmentViewHref)
-    }
-  }, [assignmentActions, assignmentViewHref, isLocked, picker, problem.id, router])
+  const prefetchProblem = () => {
+    if (isLocked || picker) return
+    router.prefetch(problemHref)
+  }
 
   const handleLockedCardClick = () => {
     router.push("/pricing")
   }
 
   const navigateToProblem = () => {
-    const href = assignmentViewHref ?? `/probleme/${problem.id}`
+    const href = problemHref
     startTransition(() => {
       handleProblemClick()
       router.push(href)
@@ -235,6 +232,8 @@ export function ProblemCard({ problem, solved, isLocked = false, picker, assignm
   return (
     <Card
       onClick={handleCardClick}
+      onMouseEnter={prefetchProblem}
+      onFocus={prefetchProblem}
       aria-busy={isNavigating}
       className={cn(
         "group relative flex h-full w-full flex-col gap-4 rounded-2xl border border-[#0b0c0f]/10 bg-white p-5 shadow-[0px_16px_34px_-28px_rgba(11,12,15,0.65)] transition-all duration-200",
@@ -313,8 +312,10 @@ export function ProblemCard({ problem, solved, isLocked = false, picker, assignm
             </button>
 
             <Link
-              href={assignmentViewHref ?? `/probleme/${problem.id}`}
-              prefetch
+              href={problemHref}
+              prefetch={false}
+              onMouseEnter={prefetchProblem}
+              onFocus={prefetchProblem}
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
                 e.preventDefault()
@@ -359,7 +360,9 @@ export function ProblemCard({ problem, solved, isLocked = false, picker, assignm
         ) : (
           <Link
             href={`/probleme/${problem.id}`}
-            prefetch
+            prefetch={false}
+            onMouseEnter={prefetchProblem}
+            onFocus={prefetchProblem}
             onClick={(e) => {
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
               e.preventDefault()

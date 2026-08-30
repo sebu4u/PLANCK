@@ -79,3 +79,18 @@ export function xpForDifficulty(difficulty: string | null | undefined): number {
   }
   return PLANCKPASS_XP.problemEasy
 }
+
+/** Quiz catalog difficulty is 1 | 2 | 3 (Ușor / Mediu / Greu). */
+export function xpForQuizDifficulty(difficulty: string | number | null | undefined): number {
+  const d = String(difficulty ?? "").trim().toLowerCase()
+  if (d === "1" || d === "ușor" || d === "usor" || d === "easy") {
+    return PLANCKPASS_XP.problemEasy
+  }
+  if (d === "2" || d === "mediu" || d === "medium") {
+    return PLANCKPASS_XP.problemMedium
+  }
+  if (d === "3" || d === "greu" || d === "hard" || d === "avansat") {
+    return PLANCKPASS_XP.problemHard
+  }
+  return PLANCKPASS_XP.problemEasy
+}

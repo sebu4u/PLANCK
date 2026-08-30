@@ -10,7 +10,7 @@ import {
 } from "@/lib/planckpass/award-server"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 
-const SOURCES = ["problem", "lp_interactive", "lp_item", "lp_test", "coding"] as const
+const SOURCES = ["problem", "quiz", "lp_interactive", "lp_item", "lp_test", "coding"] as const
 
 const bodySchema = z.object({
   source: z.enum(SOURCES),

@@ -343,6 +343,11 @@ export default function ProblemDetailClient({
     });
   };
 
+  const awardProblemXp = async () => {
+    const { awardPlanckPassXpForProblem } = await import("@/lib/planckpass/award-client")
+    await awardPlanckPassXpForProblem(String(problem.id), problem.difficulty)
+  }
+
   const handleMarkSolved = async () => {
     if (!user) return;
     if (isSolved) return; // Prevent duplicate submissions
@@ -350,9 +355,7 @@ export default function ProblemDetailClient({
 
     if (subject === "math") {
       // Math catalog doesn't use solved_problems / ELO trigger — still grant PlanckPass XP
-      void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForProblem }) =>
-        awardPlanckPassXpForProblem(String(problem.id), problem.difficulty),
-      )
+      await awardProblemXp()
       setIsSolved(true);
       setLoadingSolved(false);
       showSolvedCelebration();
@@ -367,16 +370,14 @@ export default function ProblemDetailClient({
       solved_at: new Date().toISOString(),
     });
 
-    if (error) {
+    if (error && error.code !== "23505") {
       console.error('Error marking problem as solved:', error);
       setLoadingSolved(false);
       return;
     }
 
     // PlanckPass XP (idempotent; also attempted in SQL trigger if migration applied)
-    void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForProblem }) =>
-      awardPlanckPassXpForProblem(String(problem.id), problem.difficulty),
-    )
+    await awardProblemXp()
 
     // Verifică dacă utilizatorul a câștigat un badge nou (în ultimele 5 secunde)
     const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();

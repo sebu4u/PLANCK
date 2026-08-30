@@ -122,6 +122,9 @@ export function QuizProvider({ children }: QuizProviderProps) {
 
         if (isCorrect) {
             markQuestionAsSolved(currentQuestion.id).catch(console.error);
+            void import("@/lib/planckpass/award-client").then(({ awardPlanckPassXpForQuiz }) =>
+                awardPlanckPassXpForQuiz(currentQuestion.id, currentQuestion.difficulty),
+            )
         }
 
         setAnswers(prev => {

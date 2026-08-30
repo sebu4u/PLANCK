@@ -1,11 +1,11 @@
 import { MetadataRoute } from 'next'
 import {
   getAllGrades,
-  getChaptersByGradeId
+  getChaptersByGradeIds,
 } from '@/lib/supabase-physics'
 import {
   getLearningPathChapters,
-  getLearningPathLessonsByChapterId,
+  getLearningPathLessonsByChapterIds,
   getLearningPathLessonHref,
 } from '@/lib/supabase-learning-paths'
 import { slugify } from '@/lib/slug'
@@ -14,6 +14,8 @@ import { createClient } from '@supabase/supabase-js'
 import { PLATFORM_SITE_URL } from '@/lib/platform-marketing'
 import { getPublishedBlogCategories, getPublishedBlogPosts } from '@/lib/blog'
 import { PUBLIC_CURSURI_SUBJECT_IDS } from '@/lib/cursuri-subjects'
+
+export const revalidate = 86400
 
 async function fetchPhysicsProblemsSitemapEntries(baseUrl: string): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -71,8 +73,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Learning path lesson URLs
   const learningPathLessons: Array<{ url: string; updated_at: string }> = []
   const chapters = await getLearningPathChapters()
+  const chapterIds = chapters.map((chapter) => chapter.id)
+  const lessonsByChapter: Awaited<ReturnType<typeof getLearningPathLessonsByChapterIds>> = {}
+  for (let i = 0; i < chapterIds.length; i += 80) {
+    const batch = await getLearningPathLessonsByChapterIds(chapterIds.slice(i, i + 80))
+    Object.assign(lessonsByChapter, batch)
+  }
   for (const chapter of chapters) {
-    const lessons = await getLearningPathLessonsByChapterId(chapter.id)
+    const lessons = lessonsByChapter[chapter.id] ?? []
     for (const lesson of lessons) {
       if (!lesson.is_active) continue
       learningPathLessons.push({
@@ -82,30 +90,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  // Get all lessons for dynamic sitemap with updated_at
+  // Course lesson URLs (batched by chapter, not N+1 per chapter)
   const allLessons: Array<{ title: string; id: string; updated_at: string; subject: string }> = []
-
-  for (const subject of PUBLIC_CURSURI_SUBJECT_IDS) {
-    const grades = await getAllGrades(subject)
+  const gradesBySubject = await Promise.all(
+    PUBLIC_CURSURI_SUBJECT_IDS.map(async (subject) => ({
+      subject,
+      grades: await getAllGrades(subject),
+    }))
+  )
+  const allGradeIds = gradesBySubject.flatMap(({ grades }) => grades.map((grade) => grade.id))
+  const chaptersByGradeId = await getChaptersByGradeIds(allGradeIds)
+  const subjectByChapterId = new Map<string, string>()
+  const courseChapterIds: string[] = []
+  for (const { subject, grades } of gradesBySubject) {
     for (const grade of grades) {
-      const chapters = await getChaptersByGradeId(grade.id)
-      for (const chapter of chapters) {
-        const { data: lessons, error } = await supabase
-          .from('lessons')
-          .select('id, title, updated_at')
-          .eq('chapter_id', chapter.id)
-          .eq('is_active', true)
-          .order('order_index')
-
-        if (!error && lessons) {
-          allLessons.push(...lessons.map(l => ({
-            title: l.title,
-            id: l.id,
-            updated_at: l.updated_at || new Date().toISOString(),
-            subject,
-          })))
-        }
+      for (const chapter of chaptersByGradeId[grade.id] ?? []) {
+        courseChapterIds.push(chapter.id)
+        subjectByChapterId.set(chapter.id, subject)
       }
+    }
+  }
+  for (let i = 0; i < courseChapterIds.length; i += 80) {
+    const chunk = courseChapterIds.slice(i, i + 80)
+    const { data: lessons, error } = await supabase
+      .from('lessons')
+      .select('id, title, updated_at, chapter_id')
+      .in('chapter_id', chunk)
+      .eq('is_active', true)
+      .order('order_index')
+
+    if (error || !lessons?.length) continue
+    for (const lesson of lessons) {
+      const subject = subjectByChapterId.get(lesson.chapter_id)
+      if (!subject) continue
+      allLessons.push({
+        title: lesson.title,
+        id: lesson.id,
+        updated_at: lesson.updated_at || new Date().toISOString(),
+        subject,
+      })
     }
   }
 

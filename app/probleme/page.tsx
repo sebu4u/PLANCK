@@ -9,7 +9,6 @@ import { generateMetadata } from "@/lib/metadata"
 import { CatalogThemeProvider } from "@/components/catalog-theme-provider"
 import { CatalogThemeBackground } from "@/components/catalog-theme-background"
 import { getMonthlyFreeProblemSet } from "@/lib/monthly-free-rotation"
-import { CatalogMobileTopBanner } from "@/components/catalog/catalog-mobile-top-banner"
 import {
   fetchPhysicsCatalogSeoTitles,
   fetchPhysicsCatalogSsrSnapshot,
@@ -79,7 +78,6 @@ export default async function ProblemsPage({
             initialCatalogTotalCount={catalogTotalCount}
             initialMonthlyFreeSet={Array.from(monthlyFreeSet)}
             initialChapter={initialChapter}
-            topSlot={<CatalogMobileTopBanner />}
           />
         </div>
       </CatalogThemeBackground>

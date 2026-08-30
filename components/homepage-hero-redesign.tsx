@@ -14,7 +14,7 @@ import {
 } from "@/lib/platform-marketing"
 import { GUARDIAN_ONBOARDING_PATH } from "@/lib/onboarding"
 
-export function HomePageHeroRedesign({ isMobile: _isMobile = false }: { isMobile?: boolean }) {
+export function HomePageHeroRedesign() {
     return (
         <section
             id="hero-section"

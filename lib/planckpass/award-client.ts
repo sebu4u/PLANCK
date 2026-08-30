@@ -75,9 +75,8 @@ export async function awardPlanckPassXpSelf(input: {
       return null
     }
 
-    if (json?.awarded) {
-      notifyPlanckPassXpUpdated()
-    }
+    // Always refresh the pass UI — SQL may have granted first (awarded:false).
+    notifyPlanckPassXpUpdated()
 
     const amount = Number(json?.amount ?? 0) || input.amount
 
@@ -122,6 +121,18 @@ export async function awardPlanckPassXpForProblem(
     source: "problem",
     sourceKey: String(problemId),
     difficulty,
+  })
+}
+
+export async function awardPlanckPassXpForQuiz(
+  questionId: string,
+  difficulty: string | number | null | undefined,
+) {
+  return awardPlanckPassXpSelf({
+    amount: PLANCKPASS_XP.problemEasy, // server resolves real amount from quiz difficulty
+    source: "quiz",
+    sourceKey: String(questionId),
+    difficulty: difficulty == null ? null : String(difficulty),
   })
 }
 

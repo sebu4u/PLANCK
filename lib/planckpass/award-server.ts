@@ -1,16 +1,17 @@
 import "server-only"
 
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
-import { PLANCKPASS_XP, xpForDifficulty } from "@/lib/planckpass/xp"
+import { PLANCKPASS_XP, xpForDifficulty, xpForQuizDifficulty } from "@/lib/planckpass/xp"
 
 export type PlanckPassXpSource =
   | "problem"
+  | "quiz"
   | "lp_interactive"
   | "lp_item"
   | "lp_test"
   | "coding"
 
-const FIXED_AMOUNTS: Record<Exclude<PlanckPassXpSource, "problem" | "coding">, number> = {
+const FIXED_AMOUNTS: Record<Exclude<PlanckPassXpSource, "problem" | "coding" | "quiz">, number> = {
   lp_interactive: PLANCKPASS_XP.lpInteractive,
   lp_item: PLANCKPASS_XP.lpItem,
   lp_test: PLANCKPASS_XP.lpTest,
@@ -23,6 +24,9 @@ export function resolvePlanckPassXpAmount(
 ): number {
   if (source === "problem" || source === "coding") {
     return xpForDifficulty(difficulty)
+  }
+  if (source === "quiz") {
+    return xpForQuizDifficulty(difficulty)
   }
   return FIXED_AMOUNTS[source]
 }

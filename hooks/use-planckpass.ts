@@ -61,14 +61,24 @@ export function usePlanckPass() {
       void refresh()
     }
     window.addEventListener(PLANCK_PASS_XP_UPDATED_EVENT, onXp)
-    // Also refresh when tab becomes visible (solve happened on another page)
+    // Also refresh when the tab/window is shown again (solve happened on another page)
     const onVis = () => {
       if (document.visibilityState === "visible") void refresh()
     }
+    const onFocus = () => {
+      void refresh()
+    }
+    const onPageShow = () => {
+      void refresh()
+    }
     document.addEventListener("visibilitychange", onVis)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("pageshow", onPageShow)
     return () => {
       window.removeEventListener(PLANCK_PASS_XP_UPDATED_EVENT, onXp)
       document.removeEventListener("visibilitychange", onVis)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("pageshow", onPageShow)
     }
   }, [refresh])
 

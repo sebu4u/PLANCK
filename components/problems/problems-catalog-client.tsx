@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type CSSProperties, type ReactNode, type UIEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, Children, type CSSProperties, type ReactNode, type UIEvent } from "react"
 import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react"
 import { Problem } from "@/data/problems"
 import { supabase } from "@/lib/supabaseClient"
@@ -31,6 +31,7 @@ import {
   SidebarClassProgress,
 } from "@/components/problems/problems-catalog-sidebar"
 import { CatalogDesktopSidebarDiscountOfferCard } from "@/components/catalog/catalog-desktop-sidebar-discount-offer-card"
+import { CatalogMobileTopBanner } from "@/components/catalog/catalog-mobile-top-banner"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 
 const ProblemCard = lazy(() => import("@/components/problem-card").then((module) => ({ default: module.ProblemCard })))
@@ -897,7 +898,7 @@ export default function ProblemsCatalogClient({
               data-problems-scroll
               onScroll={handleProblemsScroll}
             >
-              {topSlot}
+              {Children.toArray(topSlot ?? (!isEmbedded ? <CatalogMobileTopBanner /> : null))}
               <div className={cn("pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px] pt-6 pb-12 space-y-6", MOBILE_BOTTOM_NAV_PADDING_CLASS, "burger:pb-12")}>
           {!catalogReady ? (
             <section className="flex min-h-[56vh] items-center justify-center py-4">

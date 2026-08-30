@@ -52,7 +52,7 @@ interface PersonalizedCourseGenerationContextValue {
   cancelActiveGeneration: () => Promise<void>
 }
 
-const POLL_INTERVAL_MS = 5000
+const POLL_INTERVALS_MS = [5000, 8000, 12000] as const
 
 const PersonalizedCourseGenerationContext = createContext<PersonalizedCourseGenerationContextValue | null>(null)
 
@@ -239,8 +239,17 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
     if (!chapterId) return
 
     let cancelled = false
+    let timeoutId = 0
+    let intervalIndex = 0
+    let lastFingerprint = ""
+    let pollGeneration = 0
 
     const poll = async () => {
+      const generation = pollGeneration
+      if (cancelled) return
+      if (typeof document !== "undefined" && document.hidden) return
+
+      let finished = false
       try {
         const res = await fetch(`/api/personalized-courses/status?chapterId=${chapterId}`, {
           credentials: "same-origin",
@@ -259,6 +268,14 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
         }
 
         if (cancelled) return
+
+        const fingerprint = `${data.status ?? ""}|${data.stage ?? ""}|${data.percent ?? ""}|${data.message ?? ""}`
+        if (fingerprint === lastFingerprint) {
+          intervalIndex = Math.min(intervalIndex + 1, POLL_INTERVALS_MS.length - 1)
+        } else {
+          intervalIndex = 0
+          lastFingerprint = fingerprint
+        }
 
         setActiveGeneration((current) => {
           if (!current || current.chapterId !== chapterId) return current
@@ -280,22 +297,46 @@ export function PersonalizedCourseGenerationProvider({ children }: { children: R
         if (!current || current.chapterId !== chapterId) return
 
         if (data.status === "ready") {
+          finished = true
           handleReady(current)
-        } else if (data.status === "failed") {
+          return
+        }
+        if (data.status === "failed") {
+          finished = true
           handleFailed(current, data.failureReason ?? data.message ?? null, {
             silent: data.stale === true,
           })
+          return
         }
       } catch {
         // network blip
+      } finally {
+        if (
+          !cancelled &&
+          !finished &&
+          generation === pollGeneration &&
+          !(typeof document !== "undefined" && document.hidden)
+        ) {
+          timeoutId = window.setTimeout(() => void poll(), POLL_INTERVALS_MS[intervalIndex])
+        }
       }
     }
 
+    const onVisibility = () => {
+      if (cancelled || document.hidden) return
+      pollGeneration += 1
+      window.clearTimeout(timeoutId)
+      intervalIndex = 0
+      void poll()
+    }
+
+    document.addEventListener("visibilitychange", onVisibility)
     void poll()
-    const interval = window.setInterval(() => void poll(), POLL_INTERVAL_MS)
+
     return () => {
       cancelled = true
-      window.clearInterval(interval)
+      window.clearTimeout(timeoutId)
+      document.removeEventListener("visibilitychange", onVisibility)
     }
   }, [activeGeneration?.chapterId, handleFailed, handleReady])
 

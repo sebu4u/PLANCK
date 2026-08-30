@@ -132,6 +132,31 @@ function compactSummary(...parts: unknown[]): string {
     .slice(0, 700)
 }
 
+/** First ~300 chars of text leaves — avoids JSON.stringify on large content_json blobs. */
+function contentJsonPreview(value: unknown, maxLength = 300): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value.slice(0, maxLength)
+
+  const strings: string[] = []
+  const walk = (node: unknown, depth: number) => {
+    if (depth > 3 || strings.join(" ").length >= maxLength) return
+    if (typeof node === "string") {
+      const trimmed = node.trim()
+      if (trimmed) strings.push(trimmed)
+      return
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1)
+      return
+    }
+    if (node && typeof node === "object") {
+      for (const child of Object.values(node as Record<string, unknown>)) walk(child, depth + 1)
+    }
+  }
+  walk(value, 0)
+  return strings.join(" ").slice(0, maxLength)
+}
+
 function candidateLimit(limit: number): number {
   return Math.max(4, Math.min(limit, 160))
 }
@@ -198,7 +223,7 @@ function addLearningPathItemCandidate(
       row.youtube_url,
       row.quiz_question_id,
       row.problem_id,
-      JSON.stringify(row.content_json ?? {}).slice(0, 300),
+      contentJsonPreview(row.content_json),
     ),
     url: null,
     metadata: {

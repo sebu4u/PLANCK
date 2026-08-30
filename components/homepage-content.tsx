@@ -142,7 +142,7 @@ function HomeSectionIndicator() {
   )
 }
 
-export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
+export function HomePageContent() {
   const { user, loading } = useAuth()
 
   // Don't render homepage content if user is logged in or still loading
@@ -158,7 +158,7 @@ export function HomePageContent({ isMobile = false }: { isMobile?: boolean }) {
 
       {/* Hero Section cu temă spațială */}
       <section id="home-hero">
-        <HomePageHeroRedesign isMobile={isMobile} />
+        <HomePageHeroRedesign />
       </section>
 
       <HomepageHeroTestimonials />

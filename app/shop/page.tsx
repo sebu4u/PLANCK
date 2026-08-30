@@ -5,7 +5,6 @@ import { ShopExperience } from "@/components/shop/shop-experience"
 import { generateMetadata } from "@/lib/metadata"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 
-export const dynamic = "force-dynamic"
 export const metadata: Metadata = generateMetadata("shop")
 
 export default function ShopPage() {

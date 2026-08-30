@@ -67,22 +67,39 @@ async function buildEmailMap(supabase: SupabaseClient): Promise<Map<string, stri
   return map
 }
 
-async function fetchSendHistory(
+async function fetchSendHistoryByUserIds(
   supabase: SupabaseClient,
-  userId: string
-): Promise<ReengagementSendRecord[]> {
-  const { data, error } = await supabase
-    .from("user_reengagement_email_sends")
-    .select("tier, sent_at, status")
-    .eq("user_id", userId)
-    .order("sent_at", { ascending: false })
+  userIds: string[]
+): Promise<Map<string, ReengagementSendRecord[]>> {
+  const map = new Map<string, ReengagementSendRecord[]>()
+  if (!userIds.length) return map
 
-  if (error) {
-    console.warn("[reengagement] Failed to load send history:", userId, error.message)
-    return []
+  const chunkSize = 100
+  for (let i = 0; i < userIds.length; i += chunkSize) {
+    const chunk = userIds.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from("user_reengagement_email_sends")
+      .select("user_id, tier, sent_at, status")
+      .in("user_id", chunk)
+      .order("sent_at", { ascending: false })
+
+    if (error) {
+      console.warn("[reengagement] Failed to load send history batch:", error.message)
+      continue
+    }
+
+    for (const row of data ?? []) {
+      const list = map.get(row.user_id) ?? []
+      list.push({
+        tier: row.tier as ReengagementSendRecord["tier"],
+        sent_at: row.sent_at,
+        status: row.status as ReengagementSendRecord["status"],
+      })
+      map.set(row.user_id, list)
+    }
   }
 
-  return (data ?? []) as ReengagementSendRecord[]
+  return map
 }
 
 async function claimSend(
@@ -179,6 +196,8 @@ export async function runReengagementJob(
       }
     }
 
+    const sendsByUser = await fetchSendHistoryByUserIds(supabase, userIds)
+
     for (const profile of profiles) {
       if (profile.marketing_emails_opt_out) {
         summary.skipped_opt_out++
@@ -210,7 +229,7 @@ export async function runReengagementJob(
 
       const lastActivityDate = new Date(lastActivityAt!)
       const daysInactive = daysInactiveSince(lastActivityDate, now)
-      const sends = await fetchSendHistory(supabase, profile.user_id)
+      const sends = sendsByUser.get(profile.user_id) ?? []
       const decision = shouldSendReengagementEmail(daysInactive, sends, now)
 
       if (!decision.send || decision.tier === null) {

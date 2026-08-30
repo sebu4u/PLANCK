@@ -59,5 +59,7 @@ export async function GET(
       ...data,
       tags: normalizeTags(data.tags),
     },
+  }, {
+    headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
   })
 }

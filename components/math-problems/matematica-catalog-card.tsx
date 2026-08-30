@@ -173,6 +173,11 @@ export function MatematicaCatalogCard({
     router.push(href)
   }
 
+  const prefetchProblem = () => {
+    if (isLocked) return
+    router.prefetch(href)
+  }
+
   if (isEditing) {
     return (
       <Card
@@ -248,6 +253,8 @@ export function MatematicaCatalogCard({
         if (!isLocked) router.push(href)
         else router.push("/pricing")
       }}
+      onMouseEnter={prefetchProblem}
+      onFocus={prefetchProblem}
       className={cn(
         "group relative flex h-full w-full cursor-pointer flex-col gap-4 rounded-2xl border border-[#0b0c0f]/10 bg-white p-5 shadow-[0px_16px_34px_-28px_rgba(11,12,15,0.65)] transition-all duration-200",
         "hover:-translate-y-0.5 hover:border-[#0b0c0f]/20 hover:shadow-[0px_20px_40px_-28px_rgba(11,12,15,0.55)]",
@@ -310,7 +317,9 @@ export function MatematicaCatalogCard({
       <div className="mt-auto flex items-center gap-2">
         <Link
           href={href}
-          prefetch
+          prefetch={false}
+          onMouseEnter={prefetchProblem}
+          onFocus={prefetchProblem}
           onClick={handleNavigate}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#2a2a2a] px-4 py-2 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] sm:w-auto"
         >

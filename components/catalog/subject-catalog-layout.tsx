@@ -1,6 +1,6 @@
 "use client"
 
-import type { CSSProperties, ReactNode, UIEvent } from "react"
+import { Children, type CSSProperties, ReactNode, UIEvent } from "react"
 import { SlidersHorizontal, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -140,7 +140,7 @@ export function SubjectCatalogLayout({
         <div className={cn("relative min-w-0 flex-1", catalogReady && "lg:ml-[300px]", "h-full")}>
           <div className="absolute inset-[3px] top-0 overflow-hidden bg-[#f5f4f2] lg:rounded-xl">
             <div className="catalog-problems-scroll h-full overflow-y-auto" data-problems-scroll onScroll={onProblemsScroll}>
-              {topSlot}
+              {Children.toArray(topSlot)}
               <div
                 className={cn(
                   "space-y-6 pb-12 pl-6 pr-[19px] sm:pl-8 sm:pr-[27px] lg:pl-10 lg:pr-[35px] xl:pl-12 xl:pr-[43px]",

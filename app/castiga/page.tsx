@@ -3,8 +3,6 @@ import { generateMetadata } from "@/lib/metadata"
 import { Navigation } from "@/components/navigation"
 import { CastigaPageContent } from "@/components/prize-wheel/castiga-page-content"
 
-export const dynamic = "force-dynamic"
-
 export const metadata: Metadata = generateMetadata("castiga")
 
 export default function CastigaPage() {

@@ -31,6 +31,21 @@ const WAYS = [
     href: "/probleme",
   },
   {
+    label: "Grile ușoare",
+    xp: PLANCKPASS_XP.problemEasy,
+    href: "/grile",
+  },
+  {
+    label: "Grile medii",
+    xp: PLANCKPASS_XP.problemMedium,
+    href: "/grile",
+  },
+  {
+    label: "Grile grele",
+    xp: PLANCKPASS_XP.problemHard,
+    href: "/grile",
+  },
+  {
     label: "Lecții pe traseu",
     xp: PLANCKPASS_XP.lpItem,
     href: "/invata",
