@@ -40,7 +40,7 @@ export function Landing1LeuCtaLink({
   const { user } = useAuth()
   const { isLive } = useLanding1LeuCampaign()
   const hasUser = Boolean(user)
-  const href = isLive || hasUser ? LANDING_1LEU_SPIN_PATH : CAMPAIGN_1LEU_SIGNUP_PATH
+  const href = isLive ? LANDING_1LEU_SPIN_PATH : hasUser ? LANDING_1LEU_SPIN_PATH : CAMPAIGN_1LEU_SIGNUP_PATH
   const label = landing1LeuCtaCopy({ isLive, short })
 
   return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Loader2, X } from "lucide-react"
 
@@ -19,6 +19,7 @@ import {
   type PrizeWheelStatusResponse,
 } from "@/lib/prize-wheel/types"
 import { PRIZE_WHEEL_CAMPAIGN_START_AT } from "@/lib/prize-wheel/campaign"
+import { CastigaInstagramBonusCard } from "@/components/prize-wheel/castiga-instagram-bonus"
 import { PrizeWheelVisual } from "@/components/prize-wheel/prize-wheel-visual"
 
 export type PrizeWheelCloseInfo = {
@@ -144,6 +145,13 @@ export function PrizeWheelExperience({
   const [rotation, setRotation] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<PrizeWheelSpinResponse | null>(null)
+  const [prizeAccepted, setPrizeAccepted] = useState(false)
+  const bonusStepRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!prizeAccepted) return
+    bonusStepRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [prizeAccepted])
 
   const loadStatus = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession()
@@ -363,22 +371,55 @@ export function PrizeWheelExperience({
         ) : null}
 
         {prize ? (
-          <div className="rounded-2xl border border-[#d9f2e0] bg-[#f2fbf5] px-4 py-4 text-left">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#16a34a]">Ai câștigat</p>
-            <p className="mt-1 text-lg font-black text-gray-900">
-              {prize.label || getPrizeWheelPrizeLabel(prize.type)}
-            </p>
-            <p className="mt-2 font-mono text-sm font-semibold tracking-wide text-gray-800">{prize.code}</p>
-            <p className="mt-1 text-xs text-gray-500">
-              Codul e salvat pe profil și se aplică automat pe pagina de prețuri.
-            </p>
-            <Link
-              href="/pricing"
-              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"
-            >
-              Folosește premiul
-            </Link>
-          </div>
+          prizeAccepted && lastResult?.prize ? (
+            <div ref={bonusStepRef} className="space-y-3">
+              <div className="rounded-2xl border border-[#d9f2e0] bg-[#f2fbf5] px-4 py-3 text-left">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#16a34a]">Premiu acceptat</p>
+                <p className="mt-1 text-base font-black text-gray-900">
+                  {prize.label || getPrizeWheelPrizeLabel(prize.type)}
+                </p>
+                <p className="mt-1 font-mono text-sm font-semibold tracking-wide text-gray-800">{prize.code}</p>
+              </div>
+              <CastigaInstagramBonusCard
+                compact
+                footer={
+                  <Link
+                    href="/pricing"
+                    className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"
+                  >
+                    Folosește premiul
+                  </Link>
+                }
+              />
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#d9f2e0] bg-[#f2fbf5] px-4 py-4 text-left">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#16a34a]">Ai câștigat</p>
+              <p className="mt-1 text-lg font-black text-gray-900">
+                {prize.label || getPrizeWheelPrizeLabel(prize.type)}
+              </p>
+              <p className="mt-2 font-mono text-sm font-semibold tracking-wide text-gray-800">{prize.code}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Codul e salvat pe profil și se aplică automat pe pagina de prețuri.
+              </p>
+              {lastResult?.prize ? (
+                <button
+                  type="button"
+                  onClick={() => setPrizeAccepted(true)}
+                  className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"
+                >
+                  Acceptă premiul
+                </button>
+              ) : (
+                <Link
+                  href="/pricing"
+                  className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"
+                >
+                  Folosește premiul
+                </Link>
+              )}
+            </div>
+          )
         ) : null}
       </div>
     </div>

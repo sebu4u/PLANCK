@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ExternalLink, FileText, Lock } from "lucide-react"
+import { Download, ExternalLink, FileText, Lock } from "lucide-react"
 import { LessonRichContent } from "@/components/lesson-rich-content"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -20,6 +20,44 @@ export function PdfFrame({ url, title, compact }: { url: string; title: string; 
       )}
     >
       <iframe src={`${url}#view=FitH`} className="h-full w-full border-0" title={title} />
+    </div>
+  )
+}
+
+function pdfDownloadHref(url: string, fileName: string) {
+  const separator = url.includes("?") ? "&" : "?"
+  return `${url}${separator}download=${encodeURIComponent(fileName)}`
+}
+
+export function PdfDownloadButton({
+  url,
+  fileName = "notite-pregatire.pdf",
+  label = "Descarcă notițele PDF",
+}: {
+  url: string
+  fileName?: string
+  label?: string
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] px-4 py-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#111827] text-white">
+        <FileText className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-[#111827]">Notițe PDF</p>
+        <p className="mt-0.5 text-xs text-[#6b7280]">Descarcă fișierul de la această pregătire.</p>
+        <Button asChild className="mt-3 bg-[#111827] text-white hover:bg-[#1f2937]" size="sm">
+          <a
+            href={pdfDownloadHref(url, fileName)}
+            download={fileName}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Download className="h-4 w-4" />
+            {label}
+          </a>
+        </Button>
+      </div>
     </div>
   )
 }
@@ -77,7 +115,6 @@ function LockedPlaceholder({
 export function WorkshopNotesBody({
   notesMarkdown,
   notesPdfUrl,
-  compact = false,
 }: {
   notesMarkdown: string | null
   notesPdfUrl: string | null
@@ -90,7 +127,7 @@ export function WorkshopNotesBody({
           <LessonRichContent content={notesMarkdown} theme="light" />
         </div>
       ) : null}
-      {notesPdfUrl ? <PdfFrame url={notesPdfUrl} title="Notițe PDF" compact={compact} /> : null}
+      {notesPdfUrl ? <PdfDownloadButton url={notesPdfUrl} /> : null}
     </>
   )
 }

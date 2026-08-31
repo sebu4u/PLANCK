@@ -29,7 +29,7 @@ const RULES = [
 
 export function CastigaRulesSection() {
   return (
-    <section className="bg-gradient-to-b from-white via-[#F8F7FF] to-[#F8F7FF] px-4 pb-28 pt-6 sm:px-6 sm:pb-24 sm:pt-12">
+    <section className="bg-gradient-to-b from-white via-[#F8F7FF] to-[#F8F7FF] px-4 pb-8 pt-6 sm:px-6 sm:pb-10 sm:pt-12">
       <div className="mx-auto w-full max-w-xl">
         <FadeInUp className="text-center">
           <h2 className="text-[1.65rem] font-black tracking-tight text-gray-900 sm:text-4xl">

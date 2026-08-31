@@ -25,26 +25,45 @@ export function Landing1LeuHeroSection() {
         <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)] lg:gap-12">
           <div className="flex flex-col text-center lg:text-left">
             <FadeInUp>
-              <span className="mx-auto inline-flex items-center rounded-xl bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(124,92,252,0.28)] lg:mx-0">
-                1 septembrie · ora 12:00
-              </span>
+              {isLive ? (
+                <span className="mx-auto inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(124,92,252,0.28)] lg:mx-0">
+                  <span className="relative flex h-2 w-2" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-[#A3E635] opacity-75 motion-safe:animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#A3E635]" />
+                  </span>
+                  Live
+                </span>
+              ) : (
+                <span className="mx-auto inline-flex items-center rounded-xl bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(124,92,252,0.28)] lg:mx-0">
+                  1 septembrie · ora 12:00
+                </span>
+              )}
             </FadeInUp>
 
             <FadeInUp delay={0.08}>
-              <h1 className="mt-5 text-[2rem] font-black leading-[1.08] tracking-tight text-gray-900 sm:text-5xl lg:text-[3.35rem]">
-                {PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} de locuri. Un an de Premium.{" "}
-                <span className="bg-gradient-to-r from-[#9a7bff] via-[#c77bff] to-[#ffb56b] bg-clip-text text-transparent">
-                  1 leu.
-                </span>
-              </h1>
+              {isLive ? (
+                <h1 className="mt-5 text-[2.15rem] font-black leading-[1.06] tracking-tight text-gray-900 min-[400px]:text-[2.55rem] sm:text-5xl sm:leading-[1.06] lg:text-[3.6rem] lg:leading-[1.05]">
+                  Roata este deschisă{" "}
+                  <span className="bg-gradient-to-r from-[#9a7bff] via-[#c77bff] to-[#ffb56b] bg-clip-text text-transparent">
+                    acum!
+                  </span>
+                </h1>
+              ) : (
+                <h1 className="mt-5 text-[2rem] font-black leading-[1.08] tracking-tight text-gray-900 sm:text-5xl lg:text-[3.35rem]">
+                  {PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} de locuri. Un an de Premium.{" "}
+                  <span className="bg-gradient-to-r from-[#9a7bff] via-[#c77bff] to-[#ffb56b] bg-clip-text text-transparent">
+                    1 leu.
+                  </span>
+                </h1>
+              )}
               <div className="mx-auto mt-4 h-[3px] w-16 rounded-full bg-[#A3E635] lg:mx-0" aria-hidden />
             </FadeInUp>
 
             <FadeInUp delay={0.14}>
               <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg sm:leading-8">
-                Roata se deschide pe 1 septembrie, la prânz. Primii {PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} care
-                o învârt iau un an întreg de PLANCK la 1 leu. Restul tot câștigă — premiile sunt
-                garantate.
+                {isLive
+                  ? `Nu mai aștepta. Învârte acum — primii ${PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} iau un an de Premium la 1 leu. Restul tot câștigă.`
+                  : `Roata se deschide pe 1 septembrie, la prânz. Primii ${PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} care o învârt iau un an întreg de PLANCK la 1 leu. Restul tot câștigă — premiile sunt garantate.`}
               </p>
             </FadeInUp>
 
@@ -120,16 +139,19 @@ function HeroCtaBlock({
           <CountdownUnit value={seconds} label="sec" />
         </div>
       ) : (
-        <p className="text-sm font-semibold text-[#5B47D6]">Roata e deschisă. Învârte cât mai sunt locuri.</p>
+        <p className="text-sm font-semibold text-[#5B47D6]">Locurile merg rapid. Învârte cât e deschisă.</p>
       )}
 
       <Landing1LeuCtaLink
+        short={isLive}
         ctaId="1leu_hero_start"
         placement="1leu_hero"
         className="mt-6 inline-flex h-12 w-full max-w-sm items-center justify-center rounded-full bg-[#7C5CFC] px-6 text-[15px] font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 active:brightness-[0.98] sm:h-14 sm:px-8 sm:text-base"
       />
       <p className="mt-2.5 max-w-sm text-center text-sm leading-relaxed text-gray-500 lg:text-left">
-        Cont gratuit. Fără card acum. 1 leu se plătește doar dacă prinzi locul.
+        {isLive
+          ? "Cont de elev. Fără card acum. 1 leu se plătește doar dacă prinzi locul."
+          : "Cont gratuit. Fără card acum. 1 leu se plătește doar dacă prinzi locul."}
       </p>
       <button
         type="button"

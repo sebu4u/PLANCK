@@ -46,6 +46,7 @@ export function Landing1LeuFinalCtaSection() {
         <FadeInUp delay={0.26} className="mt-10">
           <Landing1LeuCtaLink
             showArrow
+            short={isLive}
             ctaId="1leu_final_start"
             placement="1leu_final"
             className="inline-flex h-14 w-full max-w-sm items-center justify-center rounded-full bg-[#7C5CFC] px-10 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 sm:w-auto"

@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth-provider"
 import { Landing1LeuHeroConfetti } from "@/components/landing-1leu/hero-confetti"
 import { CastigaLoginDialog } from "@/components/prize-wheel/castiga-login-dialog"
 import { PrizeWheelExperience } from "@/components/prize-wheel/prize-wheel-experience"
+import { CastigaInstagramBonusSection } from "@/components/prize-wheel/castiga-instagram-bonus"
 import { CastigaRulesSection } from "@/components/prize-wheel/castiga-rules-section"
 import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 
@@ -29,6 +30,7 @@ export function CastigaPageContent() {
           </div>
         </section>
         <CastigaRulesSection />
+        <CastigaInstagramBonusSection />
       </main>
       <CastigaLoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </>

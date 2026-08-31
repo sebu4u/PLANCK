@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react"
 
-import { PRIZE_WHEEL_YEARLY_RON } from "@/lib/prize-wheel/types"
+import {
+  isCampaignLive,
+  PRIZE_WHEEL_YEARLY_RON,
+  type PrizeWheelPublicCampaign,
+} from "@/lib/prize-wheel/types"
 import {
   PRIZE_WHEEL_CAMPAIGN_START_AT,
   PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT,
@@ -27,15 +31,50 @@ export type Landing1LeuCountdown = {
   isLive: boolean
 }
 
-function getCountdown(now = Date.now()): Landing1LeuCountdown {
+type CampaignWindow = Pick<PrizeWheelPublicCampaign, "startsAt" | "endsAt">
+
+let cachedCampaignWindow: CampaignWindow | null = null
+let campaignWindowInflight: Promise<CampaignWindow | null> | null = null
+
+function loadCampaignWindow(): Promise<CampaignWindow | null> {
+  if (cachedCampaignWindow) return Promise.resolve(cachedCampaignWindow)
+  if (!campaignWindowInflight) {
+    campaignWindowInflight = fetch("/api/prize-wheel")
+      .then(async (response) => {
+        if (!response.ok) return null
+        const payload = (await response.json()) as { campaign?: PrizeWheelPublicCampaign }
+        const campaign = payload.campaign
+        if (!campaign) return null
+        cachedCampaignWindow = {
+          startsAt: campaign.startsAt ?? null,
+          endsAt: campaign.endsAt ?? null,
+        }
+        return cachedCampaignWindow
+      })
+      .catch(() => null)
+      .finally(() => {
+        campaignWindowInflight = null
+      })
+  }
+  return campaignWindowInflight
+}
+
+function getCountdown(
+  now = Date.now(),
+  campaignWindow: CampaignWindow | null = cachedCampaignWindow,
+): Landing1LeuCountdown {
   const remaining = Math.max(0, PRIZE_WHEEL_CAMPAIGN_START_AT.getTime() - now)
   const totalSeconds = Math.floor(remaining / 1000)
+  const isLive =
+    campaignWindow?.startsAt && campaignWindow?.endsAt
+      ? isCampaignLive(campaignWindow.startsAt, campaignWindow.endsAt, new Date(now))
+      : remaining <= 0
   return {
     days: Math.floor(totalSeconds / 86400),
     hours: Math.floor((totalSeconds % 86400) / 3600),
     minutes: Math.floor((totalSeconds % 3600) / 60),
     seconds: totalSeconds % 60,
-    isLive: remaining <= 0,
+    isLive,
   }
 }
 
@@ -43,10 +82,25 @@ export function useLanding1LeuCampaign(): Landing1LeuCountdown {
   const [state, setState] = useState(getCountdown)
 
   useEffect(() => {
-    const tick = () => setState(getCountdown())
+    let cancelled = false
+    void loadCampaignWindow().then((campaignWindow) => {
+      if (!cancelled) setState(getCountdown(Date.now(), campaignWindow))
+    })
+    const tick = () => {
+      if (document.hidden) return
+      setState(getCountdown())
+    }
+    const onVisibility = () => {
+      if (!document.hidden) tick()
+    }
     tick()
     const id = window.setInterval(tick, 1000)
-    return () => window.clearInterval(id)
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
   }, [])
 
   return state
