@@ -43,6 +43,7 @@ import { getCampaignPriceRon, getPricingCampaign } from "@/lib/pricing-campaign"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 import { premiumCommerceParams, tiktokPixel } from "@/lib/tiktok-pixel"
 import { PRIZE_WHEEL_YEAR_1_LEU_CHECKOUT_RON } from "@/lib/prize-wheel/types"
+import { isPrizeWheelCouponExpired } from "@/lib/prize-wheel/expiry"
 
 function isYear1LeuWheelPromo(promo: AppliedPromo | null): boolean {
   return (
@@ -50,6 +51,25 @@ function isYear1LeuWheelPromo(promo: AppliedPromo | null): boolean {
     promo.lockedInterval === "year" &&
     promo.amountOff != null
   )
+}
+
+function prizeWheelBenefitBullets(promo: AppliedPromo): string[] {
+  if (promo.isTrial) {
+    return [
+      "Deblochezi toată platforma pentru 7 zile",
+      "Meditații săptămânale incluse în premiu",
+    ]
+  }
+  if (promo.lockedInterval === "month") {
+    return [
+      "Deblochezi toată platforma pentru o lună",
+      "Meditații săptămânale incluse în premiu, până la BAC!",
+    ]
+  }
+  return [
+    "Deblochezi toată platforma pentru un an de zile",
+    "Meditații săptămânale incluse în premiu, până la BAC!",
+  ]
 }
 
 function computeDiscountedPrice(priceRon: number, promo: AppliedPromo | null): number {
@@ -463,10 +483,7 @@ function PricingCard({
 
           <ul className="mt-4 space-y-2 lg:mt-5 lg:space-y-2.5">
             {(appliedPromo?.source === "prize_wheel"
-              ? [
-                  "Deblochezi toată platforma pentru un an de zile",
-                  "Meditații săptămânale incluse în premiu, până la BAC!",
-                ]
+              ? prizeWheelBenefitBullets(appliedPromo)
               : PREMIUM_CARD_BULLETS
             ).map((feature) => (
               <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-700">
@@ -705,7 +722,7 @@ function PricingPageContent() {
         if (response.ok) {
           const payload = await response.json()
           const prize = payload?.user?.prize
-          if (!cancelled && prize && !prize.redeemedAt) {
+          if (!cancelled && prize && !prize.redeemedAt && !isPrizeWheelCouponExpired(prize.expiresAt)) {
             setBillingInterval(prize.interval)
             setAppliedPromo({
               promotionCodeId: `wheel:${prize.id}`,

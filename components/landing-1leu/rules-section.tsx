@@ -17,7 +17,7 @@ const STEPS = [
   {
     Icon: Clock3,
     title: `1 septembrie, 12:00: primii ${PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT}`,
-    body: `Învârți o dată. Primii ${PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} iau un an de Premium la 1 leu, nu la ${LANDING_1LEU_YEARLY_RON} RON.`,
+    body: `Ai până la două învârtiri. Primii ${PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT} iau un an de Premium la 1 leu, nu la ${LANDING_1LEU_YEARLY_RON} RON.`,
   },
   {
     Icon: Gift,

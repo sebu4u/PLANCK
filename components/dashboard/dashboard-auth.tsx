@@ -55,7 +55,11 @@ import {
   SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
   type SubjectChangeCelebrationCompleteDetail,
 } from "@/lib/subject-change-celebration"
-import { getPrizeWheelOpenDismissedStorageKey } from "@/lib/prize-wheel/campaign"
+import {
+  getPrizeWheelLiveRefreshDelay,
+  getPrizeWheelOpenDismissedStorageKey,
+  PRIZE_WHEEL_CAMPAIGN_START_AT,
+} from "@/lib/prize-wheel/campaign"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -73,7 +77,6 @@ export function DashboardAuth() {
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [showPrizeWheel, setShowPrizeWheel] = useState(false)
   const [showOpenWheelNudge, setShowOpenWheelNudge] = useState(false)
-  const prizeWheelCheckedRef = useRef(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -474,38 +477,77 @@ export function DashboardAuth() {
 
   useEffect(() => {
     if (authLoading || loading || !dashboardData || !user || !isStudent || holdDashboardOverlays) return
-    if (prizeWheelCheckedRef.current) return
-    prizeWheelCheckedRef.current = true
+
+    let cancelled = false
+    let timeoutId: number | undefined
+    const userId = user.id
+
+    const applyOpenState = (payload: {
+      campaign?: { isLive?: boolean; endsAt?: string | null }
+      user?: { isStudent?: boolean; prize?: unknown }
+    }) => {
+      const canPlay = Boolean(
+        payload?.campaign?.isLive && payload?.user?.isStudent && !payload?.user?.prize,
+      )
+      if (!canPlay) return Boolean(payload?.campaign?.isLive)
+      let dismissed = false
+      try {
+        dismissed = localStorage.getItem(getPrizeWheelOpenDismissedStorageKey(userId)) === "1"
+      } catch {
+        dismissed = false
+      }
+      if (dismissed) {
+        setShowOpenWheelNudge(true)
+      } else {
+        setShowPrizeWheel(true)
+      }
+      return true
+    }
 
     const loadPrizeWheel = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession()
         const accessToken = sessionData.session?.access_token
-        if (!accessToken) return
+        if (!accessToken) return null
         const response = await fetch("/api/prize-wheel", {
           headers: { Authorization: `Bearer ${accessToken}` },
         })
-        if (!response.ok) return
-        const payload = await response.json()
-        if (payload?.campaign?.isLive && payload?.user?.isStudent && !payload?.user?.prize) {
-          let dismissed = false
-          try {
-            dismissed = localStorage.getItem(getPrizeWheelOpenDismissedStorageKey(user.id)) === "1"
-          } catch {
-            dismissed = false
-          }
-          if (dismissed) {
-            setShowOpenWheelNudge(true)
-          } else {
-            setShowPrizeWheel(true)
-          }
-        }
+        if (!response.ok) return null
+        return await response.json()
       } catch {
-        // Ignore overlay load errors silently
+        return null
       }
     }
 
-    void loadPrizeWheel()
+    const scheduleUntilLive = async () => {
+      if (timeoutId != null) {
+        window.clearTimeout(timeoutId)
+        timeoutId = undefined
+      }
+      const payload = await loadPrizeWheel()
+      if (cancelled) return
+      if (payload && applyOpenState(payload)) return
+      const delay = getPrizeWheelLiveRefreshDelay(payload?.campaign ?? null)
+      if (delay == null) return
+      timeoutId = window.setTimeout(() => {
+        void scheduleUntilLive()
+      }, delay)
+    }
+
+    void scheduleUntilLive()
+
+    const onVisibility = () => {
+      if (document.hidden) return
+      if (Date.now() < PRIZE_WHEEL_CAMPAIGN_START_AT.getTime()) return
+      void scheduleUntilLive()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+
+    return () => {
+      cancelled = true
+      if (timeoutId != null) window.clearTimeout(timeoutId)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
   }, [authLoading, loading, dashboardData, user?.id, isStudent, holdDashboardOverlays])
 
   const persistWelcomeBackDismissState = () => {

@@ -144,6 +144,8 @@ export type PrizeWheelPrizeView = {
   label: string
   interval: PrizeWheelBillingInterval
   redeemedAt: string | null
+  createdAt: string
+  expiresAt: string
   percentOff: number | null
   amountOff: number | null
   currency: string | null

@@ -18,9 +18,15 @@ import {
   type PrizeWheelSpinResponse,
   type PrizeWheelStatusResponse,
 } from "@/lib/prize-wheel/types"
-import { PRIZE_WHEEL_CAMPAIGN_START_AT } from "@/lib/prize-wheel/campaign"
+import {
+  getPrizeWheelLiveRefreshDelay,
+  PRIZE_WHEEL_CAMPAIGN_START_AT,
+} from "@/lib/prize-wheel/campaign"
 import { CastigaInstagramBonusCard } from "@/components/prize-wheel/castiga-instagram-bonus"
+import { PrizeCouponExpiryTimer } from "@/components/prize-wheel/prize-coupon-expiry"
 import { PrizeWheelVisual } from "@/components/prize-wheel/prize-wheel-visual"
+import { PRIZE_WHEEL_COUPON_TTL_DAYS } from "@/lib/prize-wheel/expiry"
+import { usePrizeCouponCountdown } from "@/hooks/use-prize-coupon-countdown"
 
 export type PrizeWheelCloseInfo = {
   hasSpunOnce: boolean
@@ -75,7 +81,7 @@ function CampaignCountdown({ variant = "card" }: { variant?: "card" | "page" }) 
   if (parts.done) {
     return (
       <p className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-medium text-gray-600 ring-1 ring-[#EBE8FF]">
-        Campania pornește în curând. Revino peste câteva momente.
+        Se deschide acum…
       </p>
     )
   }
@@ -189,6 +195,52 @@ export function PrizeWheelExperience({
     }
   }, [loadStatus, user?.id])
 
+  const isLive = Boolean(status?.campaign?.isLive)
+  const campaignEndsAt = status?.campaign?.endsAt ?? null
+
+  useEffect(() => {
+    if (loading || isLive) return
+
+    let cancelled = false
+    let timeoutId: number | undefined
+
+    const schedule = (delay: number) => {
+      timeoutId = window.setTimeout(() => {
+        void tick()
+      }, delay)
+    }
+
+    const tick = async () => {
+      if (cancelled) return
+      try {
+        const payload = await loadStatus()
+        if (cancelled) return
+        const delay = getPrizeWheelLiveRefreshDelay(payload.campaign)
+        if (delay != null) schedule(delay)
+      } catch {
+        if (cancelled) return
+        const delay = getPrizeWheelLiveRefreshDelay({ isLive: false, endsAt: campaignEndsAt })
+        if (delay != null) schedule(delay)
+      }
+    }
+
+    const delay = getPrizeWheelLiveRefreshDelay({ isLive: false, endsAt: campaignEndsAt })
+    if (delay != null) schedule(delay)
+
+    const onVisibility = () => {
+      if (document.hidden) return
+      if (Date.now() < PRIZE_WHEEL_CAMPAIGN_START_AT.getTime()) return
+      void loadStatus()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+
+    return () => {
+      cancelled = true
+      if (timeoutId != null) window.clearTimeout(timeoutId)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
+  }, [campaignEndsAt, isLive, loadStatus, loading])
+
   const handleSpin = async () => {
     if (spinning) return
     setError(null)
@@ -242,10 +294,10 @@ export function PrizeWheelExperience({
     }
   }
 
-  const campaign = status?.campaign
   const userState = status?.user
   const prize = lastResult?.prize ?? userState?.prize ?? null
-  const isLive = Boolean(campaign?.isLive)
+  const couponCountdown = usePrizeCouponCountdown(prize?.expiresAt)
+  const couponExpired = Boolean(prize && !prize.redeemedAt && couponCountdown.expired)
   const closeInfo = {
     hasSpunOnce: Boolean(userState?.hasSpunOnce || lastResult),
     hasPrize: Boolean(prize),
@@ -379,16 +431,23 @@ export function PrizeWheelExperience({
                   {prize.label || getPrizeWheelPrizeLabel(prize.type)}
                 </p>
                 <p className="mt-1 font-mono text-sm font-semibold tracking-wide text-gray-800">{prize.code}</p>
+                <PrizeCouponExpiryTimer
+                  expiresAt={prize.expiresAt}
+                  redeemedAt={prize.redeemedAt}
+                  className="mt-2"
+                />
               </div>
               <CastigaInstagramBonusCard
                 compact
                 footer={
-                  <Link
-                    href="/pricing"
-                    className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"
-                  >
-                    Folosește premiul
-                  </Link>
+                  couponExpired ? null : (
+                    <Link
+                      href="/pricing"
+                      className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"
+                    >
+                      Folosește premiul
+                    </Link>
+                  )
                 }
               />
             </div>
@@ -400,8 +459,14 @@ export function PrizeWheelExperience({
               </p>
               <p className="mt-2 font-mono text-sm font-semibold tracking-wide text-gray-800">{prize.code}</p>
               <p className="mt-1 text-xs text-gray-500">
-                Codul e salvat pe profil și se aplică automat pe pagina de prețuri.
+                Codul e salvat pe profil și se aplică automat pe pagina de prețuri. Ai{" "}
+                {PRIZE_WHEEL_COUPON_TTL_DAYS} zile să-l folosești.
               </p>
+              <PrizeCouponExpiryTimer
+                expiresAt={prize.expiresAt}
+                redeemedAt={prize.redeemedAt}
+                className="mt-2"
+              />
               {lastResult?.prize ? (
                 <button
                   type="button"
@@ -410,7 +475,7 @@ export function PrizeWheelExperience({
                 >
                   Acceptă premiul
                 </button>
-              ) : (
+              ) : couponExpired ? null : (
                 <Link
                   href="/pricing"
                   className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#16a34a] text-sm font-bold text-white transition hover:brightness-110"

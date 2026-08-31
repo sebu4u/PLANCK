@@ -6,12 +6,15 @@ import { Check, Copy, Gift } from "lucide-react"
 
 import { supabase } from "@/lib/supabaseClient"
 import { useToast } from "@/hooks/use-toast"
+import { PrizeCouponExpiryTimer } from "@/components/prize-wheel/prize-coupon-expiry"
+import { usePrizeCouponCountdown } from "@/hooks/use-prize-coupon-countdown"
 import type { PrizeWheelPrizeView } from "@/lib/prize-wheel/types"
 
 export function ProfilePrizeWheelCard() {
   const { toast } = useToast()
   const [prize, setPrize] = useState<PrizeWheelPrizeView | null>(null)
   const [copied, setCopied] = useState(false)
+  const { expired } = usePrizeCouponCountdown(prize?.expiresAt)
 
   useEffect(() => {
     let cancelled = false
@@ -67,10 +70,19 @@ export function ProfilePrizeWheelCard() {
               {copied ? <Check className="h-4 w-4 text-[#16a34a]" /> : <Copy className="h-4 w-4" />}
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            {prize.redeemedAt ? "Premiul a fost folosit." : "Se aplică automat pe pagina de prețuri."}
-          </p>
+          {prize.redeemedAt ? (
+            <p className="mt-2 text-xs text-gray-500">Premiul a fost folosit.</p>
+          ) : expired ? null : (
+            <p className="mt-2 text-xs text-gray-500">Se aplică automat pe pagina de prețuri.</p>
+          )}
           {prize.redeemedAt ? null : (
+            <PrizeCouponExpiryTimer
+              expiresAt={prize.expiresAt}
+              redeemedAt={prize.redeemedAt}
+              className="mt-1.5"
+            />
+          )}
+          {prize.redeemedAt || expired ? null : (
             <Link
               href="/pricing"
               className="mt-3 inline-flex text-sm font-semibold text-[#16a34a] hover:underline"

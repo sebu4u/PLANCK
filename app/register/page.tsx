@@ -1042,7 +1042,10 @@ function RegisterPageContent() {
       if (keepLessonChoiceVisible) endOnboardingLessonHandoff()
       toast({
         title: "Nu am putut deschide lecția",
-        description: "Te ducem pe dashboard. Poți începe de acolo.",
+        description:
+          onboardingState.campaignSignup === "1leu"
+            ? "Te ducem la roată. Poți învârti de acolo."
+            : "Te ducem pe dashboard. Poți începe de acolo.",
         variant: "destructive",
       })
       leavingToLessonRef.current = false
@@ -1063,7 +1066,7 @@ function RegisterPageContent() {
     await identifyPixels()
     trackRegistration()
     consumePostOnboardingRedirect()
-    router.push("/dashboard")
+    router.push(onboardingState.campaignSignup === "1leu" ? "/castiga" : "/dashboard")
   }
 
   useEffect(() => {

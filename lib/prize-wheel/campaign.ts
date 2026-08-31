@@ -11,6 +11,23 @@ export function isPrizeWheelCampaignOpen(now = new Date()): boolean {
   return now.getTime() >= PRIZE_WHEEL_CAMPAIGN_START_AT.getTime()
 }
 
+/** Delay until the next status refetch while waiting for the wheel to go live. `null` = stop. */
+export function getPrizeWheelLiveRefreshDelay(
+  campaign: { isLive?: boolean; endsAt?: string | null } | null | undefined,
+  now = Date.now(),
+): number | null {
+  if (campaign?.isLive) return null
+  if (campaign?.endsAt) {
+    const end = new Date(campaign.endsAt).getTime()
+    if (!Number.isNaN(end) && now >= end) return null
+  }
+  const fallbackEnd = PRIZE_WHEEL_CAMPAIGN_START_AT.getTime() + 14 * 60 * 60 * 1000
+  if (now >= fallbackEnd) return null
+  const untilStart = PRIZE_WHEEL_CAMPAIGN_START_AT.getTime() - now
+  if (untilStart > 0) return untilStart + 400
+  return 2000
+}
+
 export function getPrizeWheelOpenDismissedStorageKey(userId: string) {
   return `planck_wheel_open_dismissed_${userId}`
 }

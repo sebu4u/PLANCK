@@ -3,6 +3,7 @@
 import { BadgeCheck, Clock3, Gift, UserPlus } from "lucide-react"
 
 import { FadeInUp } from "@/components/scroll-animations"
+import { PRIZE_WHEEL_COUPON_TTL_DAYS } from "@/lib/prize-wheel/expiry"
 
 const RULES = [
   {
@@ -12,13 +13,13 @@ const RULES = [
   },
   {
     Icon: Clock3,
-    title: "O singură învârtire",
-    body: "Roata poate fi învârtită o singură dată, marți 1 septembrie, la ora 12:00.",
+    title: "Până la două învârtiri",
+    body: "Marți 1 septembrie, de la ora 12:00, poți învârti de până la două ori. Dacă pici pe „Învârte din nou”, mai ai o șansă la premiu.",
   },
   {
     Icon: Gift,
     title: "Premiul e cupon pe profil",
-    body: "Premiul este salvat sub formă de cupon în profilul tău și îl poți folosi oricând.",
+    body: `Premiul este salvat ca un cupon pe profil. Ai ${PRIZE_WHEEL_COUPON_TTL_DAYS} zile să-l folosești, din momentul în care l-ai câștigat.`,
   },
   {
     Icon: BadgeCheck,

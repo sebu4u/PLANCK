@@ -5,6 +5,10 @@ import { hasEntitledSubscriptionStatus } from "@/lib/stripe-subscription"
 import { normalizeSubscriptionPlan } from "@/lib/subscription-plan"
 import { normalizeUserType } from "@/lib/user-types"
 import {
+  getPrizeWheelCouponExpiresAt,
+  isPrizeWheelCouponExpired,
+} from "@/lib/prize-wheel/expiry"
+import {
   getPrizeWheelDisplayPromo,
   getPrizeWheelInterval,
   getPrizeWheelPrizeLabel,
@@ -37,9 +41,12 @@ export type PrizeWheelPrizeRow = {
   created_at: string
 }
 
-export function toPrizeView(row: Pick<PrizeWheelPrizeRow, "id" | "prize_type" | "code" | "redeemed_at">): PrizeWheelPrizeView | null {
+export function toPrizeView(
+  row: Pick<PrizeWheelPrizeRow, "id" | "prize_type" | "code" | "redeemed_at" | "created_at">
+): PrizeWheelPrizeView | null {
   if (!isPrizeWheelPrizeType(row.prize_type)) return null
   const display = getPrizeWheelDisplayPromo(row.prize_type)
+  const createdAt = row.created_at
   return {
     id: row.id,
     type: row.prize_type,
@@ -47,6 +54,8 @@ export function toPrizeView(row: Pick<PrizeWheelPrizeRow, "id" | "prize_type" | 
     label: getPrizeWheelPrizeLabel(row.prize_type),
     interval: getPrizeWheelInterval(row.prize_type),
     redeemedAt: row.redeemed_at,
+    createdAt,
+    expiresAt: getPrizeWheelCouponExpiresAt(createdAt),
     percentOff: display.percentOff,
     amountOff: display.amountOff,
     currency: display.currency,
@@ -114,7 +123,9 @@ export async function getUnusedPrizeForUser(userId: string): Promise<PrizeWheelP
   if (!campaign) return null
   const prize = await getUserPrizeForCampaign(userId, campaign.id)
   if (!prize || prize.redeemed_at) return null
-  return toPrizeView(prize)
+  const view = toPrizeView(prize)
+  if (!view || isPrizeWheelCouponExpired(view.expiresAt)) return null
+  return view
 }
 
 export async function getPrizeByCodeForUser(
@@ -133,7 +144,9 @@ export async function getPrizeByCodeForUser(
 
   if (error) throw error
   if (!data || data.redeemed_at) return null
-  return toPrizeView(data)
+  const view = toPrizeView(data)
+  if (!view || isPrizeWheelCouponExpired(view.expiresAt)) return null
+  return view
 }
 
 export async function countUserSpins(userId: string, campaignId: string): Promise<number> {

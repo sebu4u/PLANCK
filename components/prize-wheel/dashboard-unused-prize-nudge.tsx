@@ -6,6 +6,9 @@ import { Gift } from "lucide-react"
 
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabaseClient"
+import { PrizeCouponExpiryTimer } from "@/components/prize-wheel/prize-coupon-expiry"
+import { isPrizeWheelCouponExpired } from "@/lib/prize-wheel/expiry"
+import { usePrizeCouponCountdown } from "@/hooks/use-prize-coupon-countdown"
 import type { PrizeWheelPrizeView } from "@/lib/prize-wheel/types"
 import { cn } from "@/lib/utils"
 
@@ -18,6 +21,7 @@ export function DashboardUnusedPrizeNudge({ hidden = false }: DashboardUnusedPri
   const userId = user?.id ?? null
   const isHidden = hidden === true
   const [prize, setPrize] = useState<PrizeWheelPrizeView | null>(null)
+  const { expired } = usePrizeCouponCountdown(prize?.expiresAt)
 
   useEffect(() => {
     if (!userId || isHidden) {
@@ -37,7 +41,9 @@ export function DashboardUnusedPrizeNudge({ hidden = false }: DashboardUnusedPri
       const payload = await response.json()
       const next = payload?.user?.prize as PrizeWheelPrizeView | null
       if (!cancelled) {
-        setPrize(next && !next.redeemedAt ? next : null)
+        setPrize(
+          next && !next.redeemedAt && !isPrizeWheelCouponExpired(next.expiresAt) ? next : null,
+        )
       }
     }
     void load()
@@ -46,7 +52,7 @@ export function DashboardUnusedPrizeNudge({ hidden = false }: DashboardUnusedPri
     }
   }, [userId, isHidden])
 
-  if (hidden || !prize) return null
+  if (hidden || !prize || expired) return null
 
   return (
     <div
@@ -70,6 +76,12 @@ export function DashboardUnusedPrizeNudge({ hidden = false }: DashboardUnusedPri
           <span className="mt-0.5 block truncate text-sm font-semibold text-gray-900">
             Folosește premiul câștigat
           </span>
+          <PrizeCouponExpiryTimer
+            expiresAt={prize.expiresAt}
+            redeemedAt={prize.redeemedAt}
+            compact
+            className="mt-1"
+          />
         </span>
         <span className="inline-flex h-9 shrink-0 items-center rounded-full bg-[#16a34a] px-3.5 text-sm font-bold text-white">
           Folosește

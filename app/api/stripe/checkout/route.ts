@@ -203,6 +203,12 @@ export async function POST(req: NextRequest) {
     let validPromotionCodeId: string | null = null
     const requestedPromotionCodeId =
       typeof body?.promotionCodeId === "string" ? body.promotionCodeId.trim() : ""
+    if (!childId && requestedPromotionCodeId.startsWith("wheel:") && !wheelPrize) {
+      return NextResponse.json(
+        { error: "Cuponul de la roată a expirat sau a fost folosit." },
+        { status: 400 },
+      )
+    }
     const hasPersonalDiscount =
       requestedPromotionCodeId.startsWith("wheel:") ||
       requestedPromotionCodeId.startsWith("shop:") ||
