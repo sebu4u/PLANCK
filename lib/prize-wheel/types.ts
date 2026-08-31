@@ -2,9 +2,12 @@ export type PrizeWheelBillingInterval = "week" | "month" | "year"
 
 /** Keep in sync with PREMIUM_YEARLY_RON on the pricing page. */
 export const PRIZE_WHEEL_YEARLY_RON = 1199
+/** Marketing copy for the prize. Stripe cannot charge this amount. */
 export const PRIZE_WHEEL_YEAR_1_LEU_PAY_RON = 1
+/** Actual first-year charge: Stripe's RON minimum. */
+export const PRIZE_WHEEL_YEAR_1_LEU_CHECKOUT_RON = 2
 export const YEAR_1_LEU_AMOUNT_OFF_BANI =
-  (PRIZE_WHEEL_YEARLY_RON - PRIZE_WHEEL_YEAR_1_LEU_PAY_RON) * 100
+  (PRIZE_WHEEL_YEARLY_RON - PRIZE_WHEEL_YEAR_1_LEU_CHECKOUT_RON) * 100
 
 export const PRIZE_WHEEL_PRIZE_TYPES = [
   "trial_7_days",

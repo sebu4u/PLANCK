@@ -1,9 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import Link from "next/link"
 import { useCallback, useState, type ReactNode } from "react"
-import { PrizeWheelVisual } from "@/components/prize-wheel/prize-wheel-visual"
 import { useAuth } from "@/components/auth-provider"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { usePostOnboardingDiscountWindow } from "@/hooks/use-post-onboarding-discount-window"
@@ -29,14 +27,12 @@ interface PremiumUpgradeBannerProps {
   defaultMessage?: ReactNode
   className?: string
   showIcon?: boolean
-  prizeWheelTeaser?: boolean
 }
 
 export function PremiumUpgradeBanner({
   defaultMessage,
   className,
   showIcon = true,
-  prizeWheelTeaser = false,
 }: PremiumUpgradeBannerProps) {
   const { user } = useAuth()
   const { isPaid } = useSubscriptionPlan()
@@ -45,30 +41,6 @@ export function PremiumUpgradeBanner({
 
   const handleOpen = useCallback(() => setPremiumUpgradeOpen(true), [])
   const handleClose = useCallback(() => setPremiumUpgradeOpen(false), [])
-
-  if (prizeWheelTeaser) {
-    return (
-      <Link
-        href="/castiga"
-        className={cn("burger:hidden", PREMIUM_UPGRADE_BANNER_SHELL_CLASS, className)}
-      >
-        <span className="relative h-9 w-9 flex-shrink-0">
-          <PrizeWheelVisual
-            rotation={18}
-            spinning={false}
-            size={36}
-            showLabels={false}
-            showPointer={false}
-            className="mx-0"
-          />
-        </span>
-        <span className={cn(PREMIUM_UPGRADE_BANNER_TEXT_CLASS, "inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5")}>
-          <span>Roata cu premii te așteaptă — învârte și poți câștiga.</span>
-          <PremiumBannerGradientLink>Învârte roata</PremiumBannerGradientLink>
-        </span>
-      </Link>
-    )
-  }
 
   if (isPaid) return null
 

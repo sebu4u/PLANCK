@@ -110,9 +110,9 @@ export function PricingCreatorCodeCard({
             <p className="truncate text-sm font-semibold text-gray-900">{appliedPromo.code}</p>
             <p className="text-xs font-medium text-[#16a34a]">
               {appliedPromo.isTrial
-                ? "7 zile gratuite, apoi prețul lunar"
+                ? "7 zile gratuite"
                 : appliedPromo.source === "prize_wheel"
-                  ? `${discountLabel} din roata cu premii`
+                  ? "Premiu de la roată"
                   : appliedPromo.source === "shop"
                     ? `${discountLabel} din magazinul PLANCKPASS`
                   : `${discountLabel} reducere aplicată`}

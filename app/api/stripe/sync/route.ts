@@ -10,6 +10,7 @@ import {
   parseStripePurchaseMetadata,
   resolveCustomerId,
 } from "@/lib/stripe-subscription"
+import { redeemPrizeFromCheckoutSession } from "@/lib/prize-wheel/checkout"
 
 export const runtime = "nodejs"
 
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
     const customerId = resolveCustomerId(session.customer)
     const stripeMode = resolveStripeModeFromLivemode(session.livemode)
     await applyStripeSubscription(subscription, customerId, userId, stripeMode)
+    await redeemPrizeFromCheckoutSession(session)
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {

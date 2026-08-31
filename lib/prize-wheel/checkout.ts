@@ -73,3 +73,23 @@ export function withPrizeMetadata(
     prize_wheel_prize_type: prize.type,
   }
 }
+
+export async function redeemPrizeFromCheckoutSession(session: {
+  id: string
+  status?: string | null
+  payment_status?: string | null
+  metadata?: Stripe.Metadata | null
+}): Promise<void> {
+  if (session.status && session.status !== "complete") return
+  if (
+    session.payment_status &&
+    session.payment_status !== "paid" &&
+    session.payment_status !== "no_payment_required"
+  ) {
+    return
+  }
+
+  const prizeId = session.metadata?.prize_wheel_prize_id?.trim()
+  if (!prizeId) return
+  await markPrizeRedeemed({ prizeId, sessionId: session.id })
+}

@@ -42,6 +42,15 @@ import {
 import { getCampaignPriceRon, getPricingCampaign } from "@/lib/pricing-campaign"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 import { premiumCommerceParams, tiktokPixel } from "@/lib/tiktok-pixel"
+import { PRIZE_WHEEL_YEAR_1_LEU_CHECKOUT_RON } from "@/lib/prize-wheel/types"
+
+function isYear1LeuWheelPromo(promo: AppliedPromo | null): boolean {
+  return (
+    promo?.source === "prize_wheel" &&
+    promo.lockedInterval === "year" &&
+    promo.amountOff != null
+  )
+}
 
 function computeDiscountedPrice(priceRon: number, promo: AppliedPromo | null): number {
   if (!promo) return priceRon
@@ -343,6 +352,7 @@ function PricingCard({
                     <span className="hidden sm:inline">{option.label}</span>
                   </span>
                   {(() => {
+                    if (appliedPromo?.source === "prize_wheel") return null
                     const badge = intervalBadge(option.id)
                     if (!badge || !isActive) return null
                     return (
@@ -365,7 +375,7 @@ function PricingCard({
             })}
           </div>
 
-          {yearBadge && billingInterval === "year" ? (
+          {appliedPromo?.source !== "prize_wheel" && yearBadge && billingInterval === "year" ? (
             <p
               className={cn(
                 "mt-2 text-center text-xs font-semibold sm:hidden",
@@ -389,9 +399,21 @@ function PricingCard({
             </span>
           </div>
 
+          {isYear1LeuWheelPromo(appliedPromo) ? (
+            <p className="mt-1.5 text-xs text-gray-500">
+              Minimul Stripe e {PRIZE_WHEEL_YEAR_1_LEU_CHECKOUT_RON} RON — atât plătești azi.
+            </p>
+          ) : null}
+
           {appliedPromo?.isTrial ? (
             <p className="mt-1.5 text-sm font-medium text-[#16a34a]">
               7 zile gratuite, apoi {listPriceRon.toLocaleString("ro-RO")} RON/lună
+            </p>
+          ) : appliedPromo?.source === "prize_wheel" ? (
+            <p className="mt-1.5 text-sm text-gray-500">
+              <span className="line-through">{listPriceRon.toLocaleString("ro-RO")} RON</span>
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span className="font-semibold text-[#16a34a]">premiu aplicat</span>
             </p>
           ) : appliedPromo ? (
             <p className="mt-1.5 text-sm text-gray-500">
@@ -440,7 +462,13 @@ function PricingCard({
           ) : null}
 
           <ul className="mt-4 space-y-2 lg:mt-5 lg:space-y-2.5">
-            {PREMIUM_CARD_BULLETS.map((feature) => (
+            {(appliedPromo?.source === "prize_wheel"
+              ? [
+                  "Deblochezi toată platforma pentru un an de zile",
+                  "Meditații săptămânale incluse în premiu, până la BAC!",
+                ]
+              : PREMIUM_CARD_BULLETS
+            ).map((feature) => (
               <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-700">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EBE8FF]">
                   <Check className="h-3 w-3 text-[#5B47D6]" strokeWidth={3} aria-hidden />
@@ -664,6 +692,10 @@ function PricingPageContent() {
     let cancelled = false
     const loadPersonalPromo = async () => {
       try {
+        if (searchParams?.get("checkout") === "success") {
+          if (!cancelled) setAppliedPromo(null)
+          return
+        }
         const { data: sessionData } = await supabase.auth.getSession()
         const accessToken = sessionData.session?.access_token
         if (!accessToken) return
@@ -766,6 +798,7 @@ function PricingPageContent() {
         }
 
         await refreshProfile()
+        setAppliedPromo(null)
       } catch (error: any) {
         toast({
           title: "Sincronizare eșuată",
@@ -885,10 +918,7 @@ function PricingPageContent() {
     if (parentCannotAct) return "Are deja Premium"
     if (isPurchaseDisabled) return "Indisponibil momentan"
     if (appliedPromo?.isTrial) return "Începe 7 zile gratuite"
-    if (appliedPromo?.source === "prize_wheel" && appliedPromo.lockedInterval === "year") {
-      return "Ia anualul cu reducerea ta"
-    }
-    if (appliedPromo?.source === "prize_wheel") return "Aplică reducerea"
+    if (appliedPromo?.source === "prize_wheel") return "Folosește premiul"
     if (appliedPromo?.source === "shop") return "Folosește cuponul din magazin"
     if (shouldManageInPortal && isCurrentPremium) {
       return isParent && selectedChild

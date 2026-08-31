@@ -7,3 +7,7 @@ export const PRIZE_WHEEL_GUARANTEED_1LEU_LIMIT = 20
 export function isPrizeWheelCampaignOpen(now = new Date()): boolean {
   return now.getTime() >= PRIZE_WHEEL_CAMPAIGN_START_AT.getTime()
 }
+
+export function getPrizeWheelOpenDismissedStorageKey(userId: string) {
+  return `planck_wheel_open_dismissed_${userId}`
+}

@@ -42,7 +42,8 @@ import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-c
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
 import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
 import { PrizeWheelDashboardOverlay } from "@/components/prize-wheel/prize-wheel-dashboard-overlay"
-import type { PrizeWheelCloseInfo } from "@/components/prize-wheel/prize-wheel-experience"
+import { DashboardUnusedPrizeNudge } from "@/components/prize-wheel/dashboard-unused-prize-nudge"
+import { DashboardOpenWheelNudge } from "@/components/prize-wheel/dashboard-open-wheel-nudge"
 import { PremiumUpgradeBanner } from "@/components/premium-upgrade-banner"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
@@ -54,6 +55,7 @@ import {
   SUBJECT_CHANGE_CELEBRATION_COMPLETE_EVENT,
   type SubjectChangeCelebrationCompleteDetail,
 } from "@/lib/subject-change-celebration"
+import { getPrizeWheelOpenDismissedStorageKey } from "@/lib/prize-wheel/campaign"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -70,7 +72,7 @@ export function DashboardAuth() {
   const [welcomeCtaLoading, setWelcomeCtaLoading] = useState(false)
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [showPrizeWheel, setShowPrizeWheel] = useState(false)
-  const [showPrizeWheelTeaser, setShowPrizeWheelTeaser] = useState(false)
+  const [showOpenWheelNudge, setShowOpenWheelNudge] = useState(false)
   const prizeWheelCheckedRef = useRef(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
@@ -486,7 +488,17 @@ export function DashboardAuth() {
         if (!response.ok) return
         const payload = await response.json()
         if (payload?.campaign?.isLive && payload?.user?.isStudent && !payload?.user?.prize) {
-          setShowPrizeWheel(true)
+          let dismissed = false
+          try {
+            dismissed = localStorage.getItem(getPrizeWheelOpenDismissedStorageKey(user.id)) === "1"
+          } catch {
+            dismissed = false
+          }
+          if (dismissed) {
+            setShowOpenWheelNudge(true)
+          } else {
+            setShowPrizeWheel(true)
+          }
         }
       } catch {
         // Ignore overlay load errors silently
@@ -630,10 +642,9 @@ export function DashboardAuth() {
           {/* Desktop — PlanckPass right panel (free + paid) */}
           <PlanckPassDesktopShell className="hidden md:flex flex-1 min-h-0 w-full">
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-none dashboard-scrollbar bg-white">
-              {!isPaid || showPrizeWheelTeaser ? (
+              {!isPaid ? (
                 <PremiumUpgradeBanner
                   className="burger:flex"
-                  prizeWheelTeaser={showPrizeWheelTeaser}
                 />
               ) : null}
               <main className="block h-auto overflow-visible p-8 lg:p-10 animate-fade-in-up">
@@ -691,14 +702,26 @@ export function DashboardAuth() {
 
       {showPrizeWheel ? (
         <PrizeWheelDashboardOverlay
-          onClose={(info?: PrizeWheelCloseInfo) => {
+          onClose={() => {
             setShowPrizeWheel(false)
-            if (!info?.hasSpunOnce && !info?.hasPrize) {
-              setShowPrizeWheelTeaser(true)
+            setShowOpenWheelNudge(true)
+            if (user?.id) {
+              try {
+                localStorage.setItem(getPrizeWheelOpenDismissedStorageKey(user.id), "1")
+              } catch {
+                // ignore
+              }
             }
           }}
         />
       ) : null}
+
+      {showOpenWheelNudge && !showPrizeWheel ? <DashboardOpenWheelNudge /> : null}
+
+      <DashboardUnusedPrizeNudge
+        key={showPrizeWheel ? "hidden" : "visible"}
+        hidden={showPrizeWheel || showOpenWheelNudge}
+      />
 
       {showWelcomeBack && isPaid ? (
         <WelcomeBackOverlay

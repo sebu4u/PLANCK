@@ -10,7 +10,7 @@ import {
   isStripeMissingResourceError,
   resolveCustomerId,
 } from "@/lib/stripe-subscription"
-import { markPrizeRedeemed } from "@/lib/prize-wheel/server"
+import { redeemPrizeFromCheckoutSession } from "@/lib/prize-wheel/checkout"
 import { markShopCouponRedeemed } from "@/lib/shop/server"
 import { sendTikTokCheckoutPurchase } from "@/lib/tiktok-events-api"
 import { capturePosthogServerEvent } from "@/lib/posthog-server"
@@ -114,10 +114,7 @@ const redeemCheckoutPerks = async (session: Stripe.Checkout.Session) => {
   const prizeId = session.metadata?.prize_wheel_prize_id?.trim() || null
   if (prizeId) {
     try {
-      await markPrizeRedeemed({
-        prizeId,
-        sessionId: session.id,
-      })
+      await redeemPrizeFromCheckoutSession(session)
     } catch (error) {
       if (!isSchemaMissingError(error)) throw error
       console.warn("[stripe/webhook] prize_wheel_prizes table missing; skipping prize redemption.")
