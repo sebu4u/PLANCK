@@ -1,4 +1,4 @@
-export const PRIZE_WHEEL_COUPON_TTL_DAYS = 3
+export const PRIZE_WHEEL_COUPON_TTL_DAYS = 5
 export const PRIZE_WHEEL_COUPON_TTL_MS = PRIZE_WHEEL_COUPON_TTL_DAYS * 24 * 60 * 60 * 1000
 
 export type PrizeCouponCountdown = {

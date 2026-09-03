@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { getActiveAnswerEntries } from "@/lib/quiz-question-utils"
+import { getActiveAnswerEntries, getCorrectAnswerKeys } from "@/lib/quiz-question-utils"
 import {
   formatLessonExerciseDifficulty,
   getLessonExerciseHref,
@@ -105,7 +105,9 @@ export async function GET(
       grilaIds.length
         ? supabase
             .from("quiz_questions")
-            .select("id, title, question_id, statement, difficulty, answers, image_url, materie")
+            .select(
+              "id, title, question_id, statement, difficulty, answers, image_url, materie, correct_answer, correct_answers",
+            )
             .in("id", grilaIds)
         : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
     ])
@@ -205,6 +207,10 @@ export async function GET(
         key,
         text,
       }))
+      const correctAnswers = getCorrectAnswerKeys({
+        correct_answer: typeof item.correct_answer === "string" ? item.correct_answer : null,
+        correct_answers: Array.isArray(item.correct_answers) ? item.correct_answers : null,
+      })
       const title =
         (typeof item.title === "string" && item.title.trim()) ||
         (typeof item.question_id === "string" && item.question_id.trim()) ||
@@ -221,6 +227,7 @@ export async function GET(
         href,
         kindLabel: getLessonExerciseKindLabel("grila"),
         answers,
+        correctAnswers,
       })
     }
 

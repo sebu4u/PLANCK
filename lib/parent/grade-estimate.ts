@@ -142,6 +142,203 @@ export function formatGrade(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
+const MS_PER_DAY = 86_400_000
+const BAC_MONTH = 5
+const BAC_DAY = 16
+const SCHOOL_START_MONTH = 8
+const SCHOOL_START_DAY = 1
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
+}
+
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / MS_PER_DAY)
+}
+
+/** School-year window for the student dashboard chart: 1 Sept → 16 June BAC. */
+export function getStudentGradeChartRange(now: Date = new Date()): {
+  start: Date
+  exam: Date
+  today: Date
+} {
+  const today = startOfDay(now)
+  const thisYearExam = startOfDay(new Date(today.getFullYear(), BAC_MONTH, BAC_DAY))
+
+  let exam: Date
+  let start: Date
+
+  if (today.getTime() > thisYearExam.getTime()) {
+    exam = startOfDay(new Date(today.getFullYear() + 1, BAC_MONTH, BAC_DAY))
+    start = startOfDay(new Date(today.getFullYear(), SCHOOL_START_MONTH, SCHOOL_START_DAY))
+  } else {
+    exam = thisYearExam
+    start = startOfDay(new Date(today.getFullYear() - 1, SCHOOL_START_MONTH, SCHOOL_START_DAY))
+  }
+
+  if (start.getTime() > today.getTime()) {
+    start = today
+  }
+
+  return { start, exam, today }
+}
+
+export function formatShortDate(date: Date): string {
+  return `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`
+}
+
+export function formatMonthTick(date: Date): string {
+  return MONTH_LABELS[date.getMonth()] ?? "—"
+}
+
+export function pickChartMonthTicks(start: Date, exam: Date, count = 4): Date[] {
+  const result: Date[] = []
+  const seen = new Set<string>()
+  const steps = Math.max(2, count)
+
+  for (let i = 0; i < steps; i += 1) {
+    const t = i / (steps - 1)
+    const ms = start.getTime() + t * (exam.getTime() - start.getTime())
+    const d = new Date(ms)
+    const monthDate = i === steps - 1 ? exam : new Date(d.getFullYear(), d.getMonth(), 1)
+    const key = `${monthDate.getFullYear()}-${monthDate.getMonth()}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(monthDate)
+  }
+
+  return result
+}
+
+export interface StudentGradeChartPoint {
+  date: Date
+  grade: number
+  bandLow: number
+  bandHigh: number
+  isToday: boolean
+  isFuture: boolean
+}
+
+function exponentialProjectedGrade(
+  t: number,
+  current: number,
+  target: number,
+  isLast: boolean,
+): { grade: number; bandLow: number; bandHigh: number } {
+  const gap = target - current
+  // Ease-in exponential: slow at first, then steepens toward the exam.
+  const k = 2.6
+  const expT = (Math.exp(k * t) - 1) / (Math.exp(k) - 1)
+  const grade = isLast ? target : clampGrade(current + gap * expT)
+  const envelope = Math.sin(t * Math.PI)
+  const bandPad = 0.12 + envelope * 0.32
+
+  return {
+    grade,
+    bandLow: clampGrade(grade - bandPad),
+    bandHigh: clampGrade(grade + bandPad),
+  }
+}
+
+/**
+ * Flat history at the current grade from 1 Sept until today, then an
+ * exponential projection from today until the conventional BAC date (16 June).
+ */
+export function buildStudentDashboardGradeSeries(
+  currentGrade: number,
+  targetGrade: number,
+  now: Date = new Date(),
+): StudentGradeChartPoint[] {
+  const { start, exam, today } = getStudentGradeChartRange(now)
+  const current = clampGrade(currentGrade)
+  const target = clampGrade(targetGrade)
+  const alreadyReached = current >= target
+  const points: StudentGradeChartPoint[] = []
+
+  const pastDays = Math.max(0, daysBetween(start, today))
+  const futureDays = Math.max(1, daysBetween(today, exam))
+  const pastStep = Math.max(1, Math.ceil(pastDays / 16))
+
+  for (let d = 0; d < pastDays; d += pastStep) {
+    points.push({
+      date: addDays(start, d),
+      grade: current,
+      bandLow: current,
+      bandHigh: current,
+      isToday: false,
+      isFuture: false,
+    })
+  }
+
+  points.push({
+    date: today,
+    grade: current,
+    bandLow: current,
+    bandHigh: current,
+    isToday: true,
+    isFuture: false,
+  })
+
+  const futureSamples = Math.max(16, Math.ceil(futureDays / 3))
+
+  for (let i = 1; i <= futureSamples; i += 1) {
+    const t = i / futureSamples
+    const isLast = i === futureSamples
+    const date = isLast ? exam : addDays(today, Math.round(t * futureDays))
+
+    if (alreadyReached) {
+      points.push({
+        date,
+        grade: current,
+        bandLow: current,
+        bandHigh: current,
+        isToday: false,
+        isFuture: true,
+      })
+      continue
+    }
+
+    const projected = exponentialProjectedGrade(t, current, target, isLast)
+    points.push({
+      date,
+      grade: projected.grade,
+      bandLow: projected.bandLow,
+      bandHigh: projected.bandHigh,
+      isToday: false,
+      isFuture: true,
+    })
+  }
+
+  return points
+}
+
+export function findGoalReachedIndex(
+  points: StudentGradeChartPoint[],
+  targetGrade: number,
+): number {
+  const target = clampGrade(targetGrade)
+  const idx = points.findIndex(
+    (point) => (point.isToday || point.isFuture) && point.grade + 0.05 >= target,
+  )
+  return idx === -1 ? Math.max(0, points.length - 1) : idx
+}
+
+export function growthPercent(pointGrade: number, currentGrade: number): number {
+  if (currentGrade <= 0) return 0
+  return ((pointGrade - currentGrade) / currentGrade) * 100
+}
+
+export function formatGrowthPercent(value: number): string {
+  const rounded = Math.abs(value) < 10 ? Math.round(value * 10) / 10 : Math.round(value)
+  const sign = rounded < 0 ? "" : "+"
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+  return `${sign}${text}%`
+}
+
 /** Inverse of estimateGradeFromElo — binary search with 0.05 tolerance.
  *
  * NOTE: this spans the full competitive ELO scale (0–25000+, up through

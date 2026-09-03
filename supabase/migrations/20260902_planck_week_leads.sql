@@ -26,3 +26,6 @@ create policy "planck_week_leads_insert_public"
   for insert
   to anon, authenticated
   with check (true);
+
+grant insert on table public.planck_week_leads to anon, authenticated;
+grant all on table public.planck_week_leads to service_role;

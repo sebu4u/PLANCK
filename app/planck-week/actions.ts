@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { upsertSubscriber } from "@/lib/mailerlite/client"
+import { logger } from "@/lib/logger"
 import { isWorkshopSubject, WORKSHOP_SUBJECTS } from "@/lib/pregatire/types"
 import { createClient } from "@/lib/supabase/server"
 
@@ -83,6 +84,7 @@ export async function submitPlanckWeekLead(
   })
 
   if (error) {
+    logger.error("[planck-week] lead insert failed:", error.message)
     return {
       error:
         "Nu am putut rezerva locul. Încearcă din nou peste câteva minute sau scrie-ne la contact@planck.academy.",

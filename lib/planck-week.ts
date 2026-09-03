@@ -33,6 +33,17 @@ export const PLANCK_WEEK_FINAL_SCARCITY =
 
 export const PLANCK_WEEK_PREGATIRE_PATH = "/pregatire?from=planck-week"
 
+/** Inclusive end of Planck Week in Bucharest (promo overlay stays up through this day). */
+const PLANCK_WEEK_PROMO_ENDS_AT = new Date("2026-09-15T00:00:00+03:00")
+
+export function getPlanckWeekDashboardPromoSessionKey(userId: string) {
+  return `planck_week_dashboard_promo_session_${userId}`
+}
+
+export function isPlanckWeekDashboardPromoActive(now = new Date()) {
+  return now.getTime() < PLANCK_WEEK_PROMO_ENDS_AT.getTime()
+}
+
 export const PLANCK_WEEK_STATS = [
   { value: PLATFORM_STATS.activeUsers, label: "elevi pregătiți" },
   { value: "4,8/5", label: `${TESTIMONIALS_COUNT} recenzii` },

@@ -31,6 +31,8 @@ export interface LessonExercisePublic {
   href: string
   kindLabel: LessonExerciseKindLabel
   answers?: LessonExerciseAnswer[]
+  /** Keys of correct options; present for grile so the user can verify a choice. */
+  correctAnswers?: string[]
 }
 
 export interface LessonExerciseAdminItem {

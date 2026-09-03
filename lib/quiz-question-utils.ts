@@ -8,14 +8,16 @@ export function getActiveAnswerEntries(answers: QuizAnswers): [AnswerKey, string
   )
 }
 
-export function getCorrectAnswerKeys(question: QuizQuestion): AnswerKey[] {
-  if (question.correct_answers?.length) {
-    return question.correct_answers.filter((key): key is AnswerKey =>
-      ANSWER_KEYS.includes(key as AnswerKey),
-    )
-  }
-  if (question.correct_answer) {
-    return [question.correct_answer]
+export function getCorrectAnswerKeys(question: {
+  correct_answers?: readonly string[] | null
+  correct_answer?: string | null
+}): AnswerKey[] {
+  const listed = (question.correct_answers ?? []).filter((key): key is AnswerKey =>
+    ANSWER_KEYS.includes(key as AnswerKey),
+  )
+  if (listed.length) return listed
+  if (question.correct_answer && ANSWER_KEYS.includes(question.correct_answer as AnswerKey)) {
+    return [question.correct_answer as AnswerKey]
   }
   return []
 }

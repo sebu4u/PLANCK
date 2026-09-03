@@ -40,6 +40,7 @@ import { PlanckPassDesktopShell } from "@/components/dashboard/free-mobile/planc
 import { PlanckPassMobileShell } from "@/components/dashboard/free-mobile/planckpass-sheet"
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
+import { PlanckWeekDashboardPromo } from "@/components/dashboard/planck-week-dashboard-promo"
 import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
 import { PrizeWheelDashboardOverlay } from "@/components/prize-wheel/prize-wheel-dashboard-overlay"
 import { DashboardUnusedPrizeNudge } from "@/components/prize-wheel/dashboard-unused-prize-nudge"
@@ -60,6 +61,10 @@ import {
   getPrizeWheelOpenDismissedStorageKey,
   PRIZE_WHEEL_CAMPAIGN_START_AT,
 } from "@/lib/prize-wheel/campaign"
+import {
+  getPlanckWeekDashboardPromoSessionKey,
+  isPlanckWeekDashboardPromoActive,
+} from "@/lib/planck-week"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -77,6 +82,8 @@ export function DashboardAuth() {
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [showPrizeWheel, setShowPrizeWheel] = useState(false)
   const [showOpenWheelNudge, setShowOpenWheelNudge] = useState(false)
+  const [prizeWheelDecisionReady, setPrizeWheelDecisionReady] = useState(false)
+  const [showPlanckWeekPromo, setShowPlanckWeekPromo] = useState(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -108,6 +115,7 @@ export function DashboardAuth() {
       !loading &&
       !showWelcomeBack &&
       !showPrizeWheel &&
+      !showPlanckWeekPromo &&
       !holdDashboardOverlays,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
@@ -116,16 +124,19 @@ export function DashboardAuth() {
     setProductGuideBlocked("welcome-back", showWelcomeBack)
     setProductGuideBlocked("premium-upgrade", premiumUpgradeOpen)
     setProductGuideBlocked("prize-wheel", showPrizeWheel)
+    setProductGuideBlocked("planck-week-promo", showPlanckWeekPromo)
     return () => {
       setProductGuideBlocked("welcome-back", false)
       setProductGuideBlocked("premium-upgrade", false)
       setProductGuideBlocked("prize-wheel", false)
+      setProductGuideBlocked("planck-week-promo", false)
     }
   }, [
     setProductGuideBlocked,
     showWelcomeBack,
     premiumUpgradeOpen,
     showPrizeWheel,
+    showPlanckWeekPromo,
   ])
 
   const refreshDashboardLearningPaths = useCallback(
@@ -476,7 +487,12 @@ export function DashboardAuth() {
   }, [authLoading, loading, dashboardData, user?.id, holdDashboardOverlays, isPaid])
 
   useEffect(() => {
-    if (authLoading || loading || !dashboardData || !user || !isStudent || holdDashboardOverlays) return
+    if (authLoading || loading || !dashboardData || !user || holdDashboardOverlays) return
+
+    if (!isStudent) {
+      setPrizeWheelDecisionReady(true)
+      return
+    }
 
     let cancelled = false
     let timeoutId: number | undefined
@@ -526,6 +542,7 @@ export function DashboardAuth() {
       }
       const payload = await loadPrizeWheel()
       if (cancelled) return
+      setPrizeWheelDecisionReady(true)
       if (payload && applyOpenState(payload)) return
       const delay = getPrizeWheelLiveRefreshDelay(payload?.campaign ?? null)
       if (delay == null) return
@@ -549,6 +566,61 @@ export function DashboardAuth() {
       document.removeEventListener("visibilitychange", onVisibility)
     }
   }, [authLoading, loading, dashboardData, user?.id, isStudent, holdDashboardOverlays])
+
+  useEffect(() => {
+    if (authLoading || loading || !dashboardData || !user) return
+    if (holdDashboardOverlays || showWelcomeBack || showPrizeWheel || premiumUpgradeOpen) {
+      setShowPlanckWeekPromo(false)
+      return
+    }
+    if (!prizeWheelDecisionReady) return
+    if (!isPlanckWeekDashboardPromoActive()) {
+      setShowPlanckWeekPromo(false)
+      return
+    }
+
+    try {
+      if (sessionStorage.getItem(getPlanckWeekDashboardPromoSessionKey(user.id)) === "1") {
+        setShowPlanckWeekPromo(false)
+        return
+      }
+    } catch {
+      // ignore
+    }
+
+    setShowPlanckWeekPromo(true)
+
+    const persistTimer = window.setTimeout(() => {
+      try {
+        sessionStorage.setItem(getPlanckWeekDashboardPromoSessionKey(user.id), "1")
+      } catch {
+        // ignore
+      }
+    }, 400)
+
+    return () => window.clearTimeout(persistTimer)
+  }, [
+    authLoading,
+    loading,
+    dashboardData,
+    user?.id,
+    holdDashboardOverlays,
+    showWelcomeBack,
+    showPrizeWheel,
+    prizeWheelDecisionReady,
+    premiumUpgradeOpen,
+  ])
+
+  const dismissPlanckWeekPromo = () => {
+    if (user) {
+      try {
+        sessionStorage.setItem(getPlanckWeekDashboardPromoSessionKey(user.id), "1")
+      } catch {
+        // ignore
+      }
+    }
+    setShowPlanckWeekPromo(false)
+  }
 
   const persistWelcomeBackDismissState = () => {
     if (!user) return
@@ -772,6 +844,10 @@ export function DashboardAuth() {
           onCtaClick={handleWelcomeCtaClick}
           ctaLoading={welcomeCtaLoading}
         />
+      ) : null}
+
+      {showPlanckWeekPromo && !showWelcomeBack && !showPrizeWheel && !holdDashboardOverlays ? (
+        <PlanckWeekDashboardPromo onClose={dismissPlanckWeekPromo} />
       ) : null}
 
     </DashboardSidebarProvider>
