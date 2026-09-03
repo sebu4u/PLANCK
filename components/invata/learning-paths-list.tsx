@@ -49,6 +49,8 @@ interface LearningPathsListProps {
   completedLessonIds?: string[]
   lessonProgressByLessonId?: LessonProgressByLessonId
   subjectFilter?: InvataSubjectFilter
+  /** Desktop hub only — mobile tree is still in the DOM and must not mount a second spy. */
+  showChapterIndicator?: boolean
 }
 
 type HubProgressResponse = {
@@ -226,6 +228,7 @@ function InvataChapterSection({
     <section
       ref={sectionRef}
       id={invataChapterSectionDomId(chapter.id)}
+      data-invata-chapter-section={chapter.id}
       className={
         chapterIndex === 0
           ? "relative max-sm:scroll-mt-4 sm:scroll-mt-0"
@@ -592,6 +595,7 @@ export function LearningPathsList({
   completedLessonIds = [],
   lessonProgressByLessonId = {},
   subjectFilter = "all",
+  showChapterIndicator = false,
 }: LearningPathsListProps) {
   const { loading: authLoading, user } = useAuth()
   const setInvataHubChapters = useSetInvataHubChapters()
@@ -863,7 +867,7 @@ export function LearningPathsList({
     <div className="pb-14">
       <LazyInvataChapterSectionIndicator
         chapterIds={visibleChapters.map((c) => c.id)}
-        enabled={shouldLoadDesktopChapterIndicator}
+        enabled={showChapterIndicator && shouldLoadDesktopChapterIndicator}
       />
 
       <div className="space-y-12 sm:space-y-10">

@@ -40,8 +40,12 @@ interface InvataHubPageClientProps {
 
 function HubLearningPaths({
   subjectFilter,
+  showChapterIndicator = false,
   ...props
-}: InvataHubPageClientProps & { subjectFilter: InvataSubjectFilter }) {
+}: InvataHubPageClientProps & {
+  subjectFilter: InvataSubjectFilter
+  showChapterIndicator?: boolean
+}) {
   return (
     <LearningPathsList
       chapters={props.chapters}
@@ -51,6 +55,7 @@ function HubLearningPaths({
       completedLessonIds={[]}
       lessonProgressByLessonId={props.lessonProgressByLessonId}
       subjectFilter={subjectFilter}
+      showChapterIndicator={showChapterIndicator}
     />
   )
 }
@@ -144,7 +149,11 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
                     <InvataAdminLearningPathsLink />
                   </div>
                 </header>
-                <HubLearningPaths {...props} subjectFilter={subjectFilter} />
+                <HubLearningPaths
+                  {...props}
+                  subjectFilter={subjectFilter}
+                  showChapterIndicator
+                />
                 <InvataSeoIntro />
               </>
             ) : (

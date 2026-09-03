@@ -7,6 +7,8 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Loader2, Save, X, Eye, EyeOff, BookOpen, AlertTriangle, FileText, Lightbulb, Type, MoveRight, Code2 } from "lucide-react"
 import type { Lesson } from "@/lib/supabase-physics"
+import type { CursuriSubjectId } from "@/lib/cursuri-subjects"
+import { LessonExercisesEditor } from "@/components/admin/lesson-exercises-editor"
 
 const LessonViewer = lazy(() => import("@/components/lesson-viewer").then((m) => ({ default: m.LessonViewer })))
 
@@ -20,6 +22,7 @@ interface LessonFormProps {
   chapters: Chapter[]
   lesson?: Lesson | null
   defaultChapterId?: string
+  subject?: CursuriSubjectId
   onSave: (data: any) => Promise<void>
   onCancel: () => void
 }
@@ -35,7 +38,7 @@ const MARKERS = [
   { tag: "CODECPP", label: "C++", icon: Code2, description: "Bloc de cod cu highlight (C++)" },
 ]
 
-export function LessonForm({ chapters, lesson, defaultChapterId, onSave, onCancel }: LessonFormProps) {
+export function LessonForm({ chapters, lesson, defaultChapterId, subject, onSave, onCancel }: LessonFormProps) {
   const [chapterId, setChapterId] = useState(lesson?.chapter_id || defaultChapterId || "")
   const [title, setTitle] = useState(lesson?.title || "")
   const [content, setContent] = useState(lesson?.content || "")
@@ -324,6 +327,16 @@ export function LessonForm({ chapters, lesson, defaultChapterId, onSave, onCance
           </Button>
         </div>
       </form>
+
+      {lesson?.id ? (
+        <div className="pt-2">
+          <LessonExercisesEditor lessonId={lesson.id} subject={subject ?? "fizica"} />
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-white/15 px-3 py-3 text-xs text-gray-500">
+          Salvează lecția ca să poți atașa exerciții rezolvate.
+        </p>
+      )}
 
       {/* Preview */}
       {showPreview && (

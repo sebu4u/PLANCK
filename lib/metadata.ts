@@ -645,6 +645,45 @@ export const pageMetadata: Record<string, Metadata> = {
     },
   },
 
+  "planck-week": {
+    title: pageTitle("Planck Week — meditații live gratuite"),
+    description:
+      "10–14 septembrie: meditații live gratuite la Fizică, Matematică, Informatică, Biologie și Chimie. Predate de olimpici. Fără card.",
+    keywords:
+      "planck week, meditatii gratuite, meditatii live bac, fizica, matematica, informatica, biologie, chimie, olimpici",
+    alternates: {
+      canonical: "/planck-week",
+    },
+    openGraph: {
+      title: "Planck Week — meditații live gratuite, 10–14 septembrie",
+      description:
+        "Din 10 până pe 14 septembrie, meditații live la 5 materii, predate de olimpici. Fără card. Fără abonament ascuns.",
+      url: `${PLATFORM_SITE_URL}/planck-week`,
+    },
+    twitter: {
+      title: "Planck Week — meditații live gratuite",
+      description:
+        "10–14 septembrie: meditații live la Fizică, Mate, Info, Biologie și Chimie. Fără card.",
+    },
+  },
+
+  "planck-week-confirmare": {
+    title: pageTitle("Loc rezervat — Planck Week"),
+    description: "Locul tău la Planck Week e rezervat. Fără card.",
+    alternates: {
+      canonical: "/planck-week/confirmare",
+    },
+    openGraph: {
+      title: "Loc rezervat — Planck Week",
+      description: "Locul tău la Planck Week e rezervat. Fără card.",
+      url: `${PLATFORM_SITE_URL}/planck-week/confirmare`,
+    },
+    robots: {
+      index: false,
+      follow: true,
+    },
+  },
+
   "1leu": {
     title: pageTitle("20 de locuri. Un an. 1 leu"),
     description:

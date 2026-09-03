@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { Grade, Chapter, Lesson, LessonSummary } from '@/lib/supabase-physics'
+import type { LessonExercisePublic } from '@/lib/lesson-exercises'
 import { Button } from '@/components/ui/button'
 import { PanelRight, X, Shield } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -48,6 +49,8 @@ export function PhysicsLessonsClient({
   const hasInitializedFromPersisted = useRef(false)
   const [isLessonLoading, setIsLessonLoading] = useState(false)
   const lessonCache = useRef<Map<string, Lesson>>(new Map())
+  const exercisesCache = useRef<Map<string, LessonExercisePublic[]>>(new Map())
+  const [exercises, setExercises] = useState<LessonExercisePublic[]>([])
   const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set())
   const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false)
@@ -257,6 +260,41 @@ export function PhysicsLessonsClient({
     return null
   }
 
+  useEffect(() => {
+    if (!currentLesson?.id) {
+      setExercises([])
+      return
+    }
+
+    const lessonId = currentLesson.id
+    const cached = exercisesCache.current.get(lessonId)
+    if (cached) {
+      setExercises(cached)
+      return
+    }
+
+    let cancelled = false
+    setExercises([])
+
+    const loadExercises = async () => {
+      try {
+        const res = await fetch(`/api/physics/lessons/${lessonId}/exercises`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        const list = Array.isArray(data.exercises) ? (data.exercises as LessonExercisePublic[]) : []
+        exercisesCache.current.set(lessonId, list)
+        if (!cancelled) setExercises(list)
+      } catch (e) {
+        console.error('Failed to fetch lesson exercises', lessonId, e)
+      }
+    }
+
+    void loadExercises()
+    return () => {
+      cancelled = true
+    }
+  }, [currentLesson?.id])
+
   // Initializează lecția curentă din URL (path sau query), prop sau localStorage după ce avem toate lecțiile (rezumate)
   useEffect(() => {
     if (hasInitializedFromPersisted.current) return
@@ -433,6 +471,7 @@ export function PhysicsLessonsClient({
                 hasNext={hasNext}
                 currentGrade={currentGrade}
                 subject={subject}
+                exercises={exercises}
                 isCompleted={currentLesson ? completedLessonIds.has(currentLesson.id) : false}
                 onComplete={async () => {
                   if (user && currentLesson) {

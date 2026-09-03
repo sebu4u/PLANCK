@@ -1,17 +1,20 @@
 import Link from "next/link"
 import { Rocket } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type HomePageNavbarProps = {
   variant?: "dark" | "light"
+  className?: string
+  barClassName?: string
 }
 
-export function HomePageNavbar({ variant = "dark" }: HomePageNavbarProps) {
+export function HomePageNavbar({ variant = "dark", className, barClassName }: HomePageNavbarProps) {
   const isLight = variant === "light"
 
   return (
-    <nav className="absolute top-0 left-0 right-0 z-30">
+    <nav className={cn("absolute top-0 left-0 right-0 z-30", className)}>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-24 items-center justify-between">
+        <div className={cn("flex h-24 items-center justify-between", barClassName)}>
           <Link
             href="/"
             className={`title-font animate-fade-in flex flex-shrink-0 items-center gap-2.5 text-3xl font-bold transition-colors ${

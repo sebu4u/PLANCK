@@ -12,7 +12,6 @@ import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-person
 import { StudentGradeGoalCard } from "@/components/dashboard/free-mobile/student-grade-goal-card"
 import { StudentCurrentPathCard } from "@/components/dashboard/free-mobile/student-current-path-card"
 import { StudentPregatireCard } from "@/components/dashboard/free-mobile/student-pregatire-card"
-import { StudentPrizeWheelCard } from "@/components/dashboard/free-mobile/student-prize-wheel-card"
 import { StudentLeaderboardCard } from "@/components/dashboard/free-mobile/student-leaderboard-card"
 
 interface FreeMobileDashboardProps {
@@ -76,8 +75,6 @@ export function FreeMobileDashboard({
       </div>
 
       <StudentGradeGoalCard currentGrade={estimateGradeFromElo(elo)} targetGrade={targetGrade} />
-
-      <StudentPrizeWheelCard />
 
       <StudentPregatireCard preferredMaterie={profile?.preferred_materie} />
 

@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import Link from "next/link"
-import { ArrowRight, Clock, Zap } from "lucide-react"
+import { ArrowRight, Clock, Users, Zap } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
 import {
   Dialog,
@@ -32,6 +32,25 @@ const CALENDAR_START = { year: 2026, month: 9, day: 4 } as const
 const CALENDAR_DAYS = 21
 const COLS = 7
 
+type CalendarAccent = "violet" | "green"
+
+const ACCENT_VARS: Record<CalendarAccent, CSSProperties> = {
+  violet: {
+    "--cal-accent": "#7C5CFC",
+    "--cal-accent-dark": "#5B47D6",
+    "--cal-tint": "#F8F7FF",
+    "--cal-ring": "#EBE8FF",
+    "--cal-glow": "124, 92, 252",
+  } as CSSProperties,
+  green: {
+    "--cal-accent": "#2BCC56",
+    "--cal-accent-dark": "#1FA344",
+    "--cal-tint": "#F4F4F5",
+    "--cal-ring": "#E5E7EB",
+    "--cal-glow": "43, 204, 86",
+  } as CSSProperties,
+}
+
 const SUBJECT_CELL_CLASS: Record<WorkshopSubject, string> = {
   fizica: "bg-[#EDE7FF] ring-[#D4C8FF]",
   mate: "bg-[#DCFCE7] ring-[#BBF7D0]",
@@ -59,6 +78,11 @@ function weekdayShort(label: string): string {
   return label.replace(/\.$/, "")
 }
 
+function workshopSeatsLabel(workshop: WorkshopPublic): string | null {
+  if (workshop.max_seats == null) return null
+  return `${workshop.seats_remaining ?? 0}/${workshop.max_seats} locuri`
+}
+
 function mondayIndexInWeek(days: CalendarDay[]): number {
   const index = days.findIndex((day) => {
     const [year, month, date] = day.key.split("-").map(Number)
@@ -82,6 +106,7 @@ function DayCell({
 }) {
   const subjectClass = items[0] ? SUBJECT_CELL_CLASS[items[0].subject] : null
   const clickable = !loading && items.length > 0
+  const seats = items[0] ? workshopSeatsLabel(items[0]) : null
 
   return (
     <button
@@ -92,19 +117,19 @@ function DayCell({
         "relative flex h-[6rem] w-full flex-col overflow-hidden rounded-xl p-1.5 text-left sm:h-[6.5rem] sm:rounded-2xl sm:p-2",
         items.length > 0 && subjectClass
           ? cn("ring-1", subjectClass)
-          : "bg-[#F8F7FF] ring-1 ring-[#EBE8FF] sm:bg-white/70 sm:ring-[#EBE8FF]/80",
+          : "bg-[var(--cal-tint)] ring-1 ring-[var(--cal-ring)] sm:bg-white/70 sm:ring-[color-mix(in_srgb,var(--cal-ring)_80%,transparent)]",
         clickable && "cursor-pointer transition hover:brightness-[0.97] active:scale-[0.98]",
         !clickable && "cursor-default",
       )}
     >
       <div className="min-h-0 min-w-0 flex-1 pr-4">
         {loading ? (
-          <div className="h-full animate-pulse rounded-md bg-[#EBE8FF]/70" />
+          <div className="h-full animate-pulse rounded-md bg-[var(--cal-ring)]" />
         ) : items.length > 0 ? (
           <ul className="h-full">
             {items.slice(0, 1).map((workshop) => (
               <li key={workshop.id} className="h-full min-w-0">
-                <p className="line-clamp-4 break-words text-[13px] font-bold leading-[1.2] text-gray-900 sm:text-[13px] sm:leading-[1.2]">
+                <p className="line-clamp-3 break-words text-[13px] font-bold leading-[1.2] text-gray-900 sm:text-[13px] sm:leading-[1.2]">
                   {workshop.title}
                 </p>
               </li>
@@ -114,6 +139,12 @@ function DayCell({
           <p className="text-[13px] leading-tight text-gray-300">—</p>
         )}
       </div>
+      {seats ? (
+        <span className="absolute bottom-1 left-1.5 inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums text-gray-500 sm:bottom-1.5 sm:left-2 sm:text-[11px]">
+          <Users className="h-3 w-3" aria-hidden />
+          {seats}
+        </span>
+      ) : null}
       <span className="absolute bottom-1 right-1.5 text-[11px] font-black tabular-nums text-gray-400 sm:bottom-1.5 sm:right-2 sm:text-sm">
         {day.day}
       </span>
@@ -146,12 +177,14 @@ function WorkshopDayListCard({
 }) {
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
   const time = formatWorkshopTime(workshop.starts_at)
+  const seats = workshopSeatsLabel(workshop)
+  const full = workshop.seats_remaining === 0
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="w-full overflow-hidden rounded-2xl border border-[#EBE8FF] bg-white text-left shadow-[0_8px_24px_rgba(124,92,252,0.08)] transition active:scale-[0.99]"
+      className="w-full overflow-hidden rounded-2xl border border-[var(--cal-ring)] bg-white text-left shadow-[0_8px_24px_rgba(var(--cal-glow),0.08)] transition active:scale-[0.99]"
     >
       <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
       <div className="px-4 py-3.5">
@@ -168,6 +201,11 @@ function WorkshopDayListCard({
               {time}
             </span>
           ) : null}
+          {full ? (
+            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+              Locuri epuizate
+            </span>
+          ) : null}
         </div>
         <p className="mt-2 text-[15px] font-black leading-snug tracking-tight text-gray-900">
           {workshop.title}
@@ -175,6 +213,12 @@ function WorkshopDayListCard({
         <p className="mt-1.5 text-sm text-gray-500">
           {workshop.teacher?.name ?? "Profesor PLANCK"}
         </p>
+        {seats ? (
+          <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-500">
+            <Users className="h-3.5 w-3.5" aria-hidden />
+            {seats}
+          </p>
+        ) : null}
       </div>
     </button>
   )
@@ -226,7 +270,7 @@ function MobileWeekAgenda({
               onClick={() => goTo(index)}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-2 transition-colors",
-                isActive ? "bg-gray-900 text-white" : "bg-[#F8F7FF] text-gray-600",
+                isActive ? "bg-gray-900 text-white" : "bg-[var(--cal-tint)] text-gray-600",
               )}
             >
               <span className="text-[10px] font-bold uppercase tracking-wide">
@@ -253,8 +297,8 @@ function MobileWeekAgenda({
             >
               {loading ? (
                 <div className="space-y-3">
-                  <div className="h-24 animate-pulse rounded-2xl bg-[#EBE8FF]/80" />
-                  <div className="h-24 animate-pulse rounded-2xl bg-[#EBE8FF]/80" />
+                  <div className="h-24 animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
+                  <div className="h-24 animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
                 </div>
               ) : items.length > 0 ? (
                 <div className="space-y-3">
@@ -267,7 +311,7 @@ function MobileWeekAgenda({
                   ))}
                 </div>
               ) : (
-                <p className="rounded-2xl bg-[#F8F7FF] px-4 py-8 text-center text-sm leading-relaxed text-gray-500">
+                <p className="rounded-2xl bg-[var(--cal-tint)] px-4 py-8 text-center text-sm leading-relaxed text-gray-500">
                   Nu sunt meditații în această zi.
                 </p>
               )}
@@ -279,11 +323,23 @@ function MobileWeekAgenda({
   )
 }
 
-function WorkshopPreviewCard({ workshop }: { workshop: WorkshopPublic }) {
+function WorkshopPreviewCard({
+  workshop,
+  onReserve,
+  reserveLabel = "Rezervă-ți locul",
+}: {
+  workshop: WorkshopPublic
+  onReserve?: () => void
+  reserveLabel?: string
+}) {
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
+  const seats = workshopSeatsLabel(workshop)
+  const full = workshop.seats_remaining === 0
+  const ctaClassName =
+    "mt-6 flex h-12 w-full items-center justify-center rounded-full bg-[var(--cal-accent)] px-6 text-sm font-bold text-white shadow-[0_4px_0_var(--cal-accent-dark)] transition-[filter] duration-200 hover:brightness-110"
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-[#EBE8FF] bg-white">
+    <article className="overflow-hidden rounded-2xl border border-[var(--cal-ring)] bg-white">
       <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
       <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
@@ -297,6 +353,11 @@ function WorkshopPreviewCard({ workshop }: { workshop: WorkshopPublic }) {
             <Clock className="h-4 w-4" />
             {formatWorkshopDateTime(workshop.starts_at)}
           </span>
+          {full ? (
+            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+              Locuri epuizate
+            </span>
+          ) : null}
         </div>
 
         <h3 className="mt-3 text-xl font-black tracking-tight text-gray-900">{workshop.title}</h3>
@@ -310,7 +371,7 @@ function WorkshopPreviewCard({ workshop }: { workshop: WorkshopPublic }) {
               className="h-12 w-12 shrink-0 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#F8F7FF] text-lg font-semibold text-[#7C5CFC]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--cal-tint)] text-lg font-semibold text-[var(--cal-accent)]">
               {(workshop.teacher?.name ?? "?").slice(0, 1)}
             </div>
           )}
@@ -322,10 +383,18 @@ function WorkshopPreviewCard({ workshop }: { workshop: WorkshopPublic }) {
           </div>
         </div>
 
-        <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700">
-          <Zap className="h-4 w-4 fill-amber-400 text-amber-500" />
-          {workshop.energy_cost} energie
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+            <Zap className="h-4 w-4 fill-amber-400 text-amber-500" />
+            {workshop.energy_cost} energie
+          </p>
+          {seats ? (
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500">
+              <Users className="h-4 w-4" aria-hidden />
+              {seats}
+            </p>
+          ) : null}
+        </div>
 
         {workshop.description ? (
           <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-gray-600">
@@ -333,13 +402,17 @@ function WorkshopPreviewCard({ workshop }: { workshop: WorkshopPublic }) {
           </p>
         ) : null}
 
-        <Link
-          href={`/rezerva?subject=${workshop.subject}`}
-          className="mt-6 flex h-12 w-full items-center justify-center rounded-full bg-[#7C5CFC] px-6 text-sm font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110"
-        >
-          Rezervă-ți locul
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Link>
+        {onReserve ? (
+          <button type="button" onClick={onReserve} className={ctaClassName}>
+            {reserveLabel}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </button>
+        ) : (
+          <Link href={`/rezerva?subject=${workshop.subject}`} className={ctaClassName}>
+            Rezervă-ți locul
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        )}
       </div>
     </article>
   )
@@ -349,10 +422,20 @@ export function LandingWorkshopsCalendarSection({
   title = "Vezi exact ce se explică, în fiecare zi",
   campaignStyle = false,
   cta,
+  onReserve,
+  reserveLabel,
+  mobileDayFrom,
+  mobileDayTo,
+  accent = "violet",
 }: {
   title?: string
   campaignStyle?: boolean
   cta?: ReactNode
+  onReserve?: () => void
+  reserveLabel?: string
+  mobileDayFrom?: string
+  mobileDayTo?: string
+  accent?: CalendarAccent
 }) {
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
   const [loading, setLoading] = useState(true)
@@ -376,9 +459,12 @@ export function LandingWorkshopsCalendarSection({
 
   const weekdayLabels = days.slice(0, COLS).map((d) => d.weekday)
   const mobileDays = useMemo(() => {
+    if (mobileDayFrom && mobileDayTo) {
+      return days.filter((day) => day.key >= mobileDayFrom && day.key <= mobileDayTo)
+    }
     const start = mondayIndexInWeek(days)
     return days.slice(start, start + 7)
-  }, [days])
+  }, [days, mobileDayFrom, mobileDayTo])
 
   useEffect(() => {
     let isMounted = true
@@ -429,11 +515,11 @@ export function LandingWorkshopsCalendarSection({
   }, [workshops])
 
   return (
-    <section className="bg-white py-20 sm:py-28">
+    <section className="bg-white py-20 sm:py-28" style={ACCENT_VARS[accent]}>
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <FadeInUp className={campaignStyle ? "max-w-3xl text-left" : "mx-auto max-w-3xl text-center"}>
           {campaignStyle ? (
-            <span className="inline-flex rounded-md bg-[#7C5CFC] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+            <span className="inline-flex rounded-md bg-[var(--cal-accent)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
               Cum funcționează?
             </span>
           ) : null}
@@ -462,12 +548,12 @@ export function LandingWorkshopsCalendarSection({
             onOpen={setSelected}
           />
 
-          <div className="hidden overflow-hidden rounded-[24px] bg-[#F8F7FF] p-5 shadow-[0_16px_48px_rgba(124,92,252,0.12)] ring-1 ring-[#EBE8FF] sm:block">
+          <div className="hidden overflow-hidden rounded-[24px] bg-[var(--cal-tint)] p-5 shadow-[0_16px_48px_rgba(var(--cal-glow),0.12)] ring-1 ring-[var(--cal-ring)] sm:block">
             <div className="grid grid-cols-7 gap-1.5">
               {weekdayLabels.map((label, index) => (
                 <div
                   key={`${label}-${index}`}
-                  className="pb-1 text-center text-xs font-bold uppercase tracking-wide text-[#7C5CFC]"
+                  className="pb-1 text-center text-xs font-bold uppercase tracking-wide text-[var(--cal-accent)]"
                 >
                   {weekdayShort(label)}
                 </div>
@@ -493,7 +579,7 @@ export function LandingWorkshopsCalendarSection({
           {cta ?? (
             <Link
               href="/register"
-              className="inline-flex h-14 w-full max-w-sm items-center justify-center rounded-full bg-[#7C5CFC] px-8 text-base font-bold text-white shadow-[0_4px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110 sm:w-auto"
+              className="inline-flex h-14 w-full max-w-sm items-center justify-center rounded-full bg-[var(--cal-accent)] px-8 text-base font-bold text-white shadow-[0_4px_0_var(--cal-accent-dark)] transition-[filter] duration-200 hover:brightness-110 sm:w-auto"
             >
               Vreau meditație gratuită
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -503,7 +589,10 @@ export function LandingWorkshopsCalendarSection({
       </div>
 
       <Dialog open={selected != null} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl border border-[#EBE8FF] bg-[#F8F7FF] p-4 shadow-[0_24px_64px_rgba(124,92,252,0.18)] sm:max-w-lg sm:p-5">
+        <DialogContent
+          className="max-h-[85vh] overflow-y-auto rounded-3xl border border-[var(--cal-ring)] bg-[var(--cal-tint)] p-4 shadow-[0_24px_64px_rgba(var(--cal-glow),0.18)] sm:max-w-lg sm:p-5"
+          style={ACCENT_VARS[accent]}
+        >
           <DialogHeader className="pr-6 text-left">
             <DialogTitle className="text-lg font-black tracking-tight text-gray-900">
               Detalii meditație
@@ -514,7 +603,19 @@ export function LandingWorkshopsCalendarSection({
           </DialogHeader>
           <div className="space-y-3">
             {(selected ?? []).map((workshop) => (
-              <WorkshopPreviewCard key={workshop.id} workshop={workshop} />
+              <WorkshopPreviewCard
+                key={workshop.id}
+                workshop={workshop}
+                onReserve={
+                  onReserve
+                    ? () => {
+                        setSelected(null)
+                        onReserve()
+                      }
+                    : undefined
+                }
+                reserveLabel={reserveLabel}
+              />
             ))}
           </div>
         </DialogContent>

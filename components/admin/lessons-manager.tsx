@@ -439,6 +439,7 @@ export function LessonsManager() {
             <LessonForm
               chapters={chapters}
               defaultChapterId={editMode.chapterId}
+              subject={subject}
               onSave={handleSave}
               onCancel={() => setEditMode({ type: "none" })}
             />
@@ -448,6 +449,7 @@ export function LessonsManager() {
             <LessonForm
               chapters={chapters}
               lesson={editingLesson}
+              subject={subject}
               onSave={handleSave}
               onCancel={() => {
                 setEditMode({ type: "none" })

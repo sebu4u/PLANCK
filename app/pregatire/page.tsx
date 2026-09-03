@@ -19,7 +19,7 @@ export default function PregatirePage() {
       <Navigation />
       <main
         className={cn(
-          "min-h-[100dvh] bg-[#fafafa] pt-14 burger:pt-16",
+          "min-h-[100dvh] bg-[#fafafa] pt-14 burger:h-[100dvh] burger:min-h-0 burger:overflow-hidden burger:bg-white burger:pt-16",
           MOBILE_BOTTOM_NAV_PADDING_CLASS,
         )}
       >

@@ -510,6 +510,18 @@ class TikTokPixel {
       this.trackSubmitForm('webinar', 'Webinar Planck')
       return
     }
+    if (pathname === '/planck-week') {
+      this.trackViewContent({
+        contents: [{ content_id: 'planck_week', content_type: 'product', content_name: 'Planck Week' }],
+        value: 0,
+        currency: TIKTOK_CURRENCY,
+      })
+      return
+    }
+    if (pathname === '/planck-week/confirmare') {
+      this.trackSubmitForm('planck_week', 'Planck Week')
+      return
+    }
     if (pathname === '/contact') {
       this.trackFindLocation('contact', 'Planck contact')
       return

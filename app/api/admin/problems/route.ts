@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const catalog = searchParams.get("catalog")?.trim()
+    const limitParam = Number.parseInt(searchParams.get("limit") || "", 10)
+    const queryLimit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 100) : null
 
     if (catalog === "math") {
       const search = searchParams.get("search") || ""
@@ -47,6 +49,10 @@ export async function GET(req: NextRequest) {
 
       if (difficulty && difficulty !== "Toate") {
         query = query.eq("difficulty", difficulty)
+      }
+
+      if (queryLimit) {
+        query = query.limit(queryLimit)
       }
 
       const { data: problems, error: problemsError } = await query
@@ -74,10 +80,11 @@ export async function GET(req: NextRequest) {
     if (catalog === "informatics") {
       const search = searchParams.get("search") || ""
       const difficulty = searchParams.get("difficulty")
+      const language = searchParams.get("language")?.trim()
 
       let query = supabase
         .from("coding_problems")
-        .select("id, slug, display_id, title, difficulty, class, chapter, created_at")
+        .select("id, slug, display_id, title, difficulty, class, chapter, created_at, language")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
 
@@ -87,6 +94,14 @@ export async function GET(req: NextRequest) {
 
       if (difficulty && difficulty !== "Toate") {
         query = query.eq("difficulty", difficulty)
+      }
+
+      if (language === "cpp" || language === "python") {
+        query = query.eq("language", language)
+      }
+
+      if (queryLimit) {
+        query = query.limit(queryLimit)
       }
 
       const { data: problems, error: problemsError } = await query
@@ -105,6 +120,7 @@ export async function GET(req: NextRequest) {
           difficulty: p.difficulty,
           class: p.class,
           chapter: p.chapter,
+          language: p.language,
           created_at: p.created_at,
         })) || []
 
@@ -134,6 +150,10 @@ export async function GET(req: NextRequest) {
 
     if (category && category !== "Toate") {
       query = query.eq("category", category)
+    }
+
+    if (queryLimit) {
+      query = query.limit(queryLimit)
     }
 
     const { data: problems, error: problemsError } = await query

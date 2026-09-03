@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { BookOpen } from "lucide-react"
 import { getLearningPathChapterNavTitle } from "@/lib/learning-path-routes"
 import type { LearningPathHubChapter } from "@/lib/supabase-learning-paths"
-import { invataChapterSectionDomId } from "@/lib/invata/chapter-section-dom"
+import { queryVisibleInvataChapterSection } from "@/lib/invata/chapter-section-dom"
 import { InvataDeferredImage } from "@/components/invata/invata-chapter-image-load-context"
 import { cn } from "@/lib/utils"
 
@@ -102,17 +102,17 @@ export function InvataMobilePathNav({
   useEffect(() => {
     if (chapters.length === 0) return
 
-    const sectionIds = chapters.map((c) => invataChapterSectionDomId(c.id))
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter(Boolean) as HTMLElement[]
+    const elements = chapters
+      .map((chapter) => queryVisibleInvataChapterSection(chapter.id))
+      .filter((section): section is HTMLElement => section !== null)
     if (elements.length === 0) return
 
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue
-          const sectionIndex = sectionIds.indexOf(entry.target.id)
+          const chapterId = (entry.target as HTMLElement).dataset.invataChapterSection
+          const sectionIndex = chapters.findIndex((chapter) => chapter.id === chapterId)
           if (sectionIndex !== -1) setActiveIndex(sectionIndex)
         }
       },
@@ -157,7 +157,7 @@ export function InvataMobilePathNav({
 
   const scrollToChapter = useCallback((chapterId: string, index: number) => {
     setActiveIndex(index)
-    const el = document.getElementById(invataChapterSectionDomId(chapterId))
+    const el = queryVisibleInvataChapterSection(chapterId)
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" })
     }

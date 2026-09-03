@@ -20,9 +20,11 @@ import { WorkInProgressCard } from '@/components/work-in-progress-card'
 import { ShareLessonDialog } from '@/components/share-lesson-dialog'
 import { PremiumFeatureDialog } from '@/components/premium-feature-dialog'
 import { LessonRichContent } from '@/components/lesson-rich-content'
+import { LessonExercisesTab } from '@/components/cursuri/lesson-exercises-tab'
 import { ReportIssueButton } from '@/components/content-reports/report-issue-button'
 import { slugify } from '@/lib/slug'
 import type { CursuriSubjectId } from '@/lib/cursuri-subjects'
+import type { LessonExercisePublic } from '@/lib/lesson-exercises'
 
 import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from '@/lib/mobile-app-nav'
 
@@ -37,6 +39,7 @@ interface LessonViewerProps {
   isCompleted?: boolean
   onComplete?: () => void
   subject?: CursuriSubjectId
+  exercises?: LessonExercisePublic[]
 }
 
 const lessonNavBtnClass =
@@ -59,6 +62,7 @@ export function LessonViewer({
   isCompleted = false,
   onComplete,
   subject,
+  exercises = [],
 }: LessonViewerProps) {
 
   const formatDuration = (minutes: number | null) => {
@@ -304,6 +308,8 @@ export function LessonViewer({
                   <LessonRichContent content={lesson.content} theme="light" />
                 </div>
               </div>
+
+              <LessonExercisesTab exercises={exercises} />
 
               <div className="mt-8 flex flex-row gap-2">
                 <Button

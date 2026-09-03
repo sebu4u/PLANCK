@@ -1,4 +1,12 @@
-const ALLOWED_CHECKOUT_PATHS = ["/pricing", "/pregatire", "/rezerva"] as const
+export const DEFAULT_CHECKOUT_SUCCESS_PATH = "/premium/welcome"
+export const DEFAULT_CHECKOUT_CANCEL_PATH = "/pricing"
+
+const ALLOWED_CHECKOUT_PATHS = [
+  "/pricing",
+  "/pregatire",
+  "/rezerva",
+  "/premium/welcome",
+] as const
 
 export type AllowedCheckoutPath = (typeof ALLOWED_CHECKOUT_PATHS)[number]
 

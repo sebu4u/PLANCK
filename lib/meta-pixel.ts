@@ -357,6 +357,14 @@ class MetaPixel {
     }
     if (pathname === '/gratuit/confirmare') {
       this.trackLead('webinar', 'Webinar Planck')
+      return
+    }
+    if (pathname === '/planck-week') {
+      this.trackViewContent(namedContent('planck_week', 'Planck Week'))
+      return
+    }
+    if (pathname === '/planck-week/confirmare') {
+      this.trackLead('planck_week', 'Planck Week')
     }
   }
 }

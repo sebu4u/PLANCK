@@ -35,6 +35,8 @@ import { isEarlybirdActive } from "@/lib/landing-earlybird"
 import { ensureLaunch20StripeCoupon } from "@/lib/launch-20-discount-coupon"
 import { isLaunch20Active } from "@/lib/launch-20-discount"
 import {
+  DEFAULT_CHECKOUT_CANCEL_PATH,
+  DEFAULT_CHECKOUT_SUCCESS_PATH,
   buildCheckoutCancelUrl,
   buildCheckoutSuccessUrl,
   parseAllowedCheckoutPath,
@@ -367,13 +369,13 @@ export async function POST(req: NextRequest) {
       ? `${siteUrl}/dashboard/parent?checkout=success&session_id={CHECKOUT_SESSION_ID}`
       : buildCheckoutSuccessUrl(
           siteUrl,
-          parseAllowedCheckoutPath(body?.successPath) ?? "/pricing",
+          parseAllowedCheckoutPath(body?.successPath) ?? DEFAULT_CHECKOUT_SUCCESS_PATH,
         )
     const cancelUrl = isParentForChild
       ? `${siteUrl}/dashboard/parent?checkout=canceled`
       : buildCheckoutCancelUrl(
           siteUrl,
-          parseAllowedCheckoutPath(body?.cancelPath) ?? "/pricing",
+          parseAllowedCheckoutPath(body?.cancelPath) ?? DEFAULT_CHECKOUT_CANCEL_PATH,
         )
 
     const prizeMetadata = withPrizeMetadata(

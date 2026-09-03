@@ -29,6 +29,7 @@ import {
 import { WorkshopMaterialsTabs } from "@/components/pregatire/workshop-materials-tabs"
 import { WorkshopWhiteboardCard } from "@/components/pregatire/workshop-whiteboard-card"
 import { WorkshopBacBadge } from "@/components/pregatire/workshop-bac-badge"
+import { cn } from "@/lib/utils"
 
 export function WorkshopDetailPanel({
   workshop: initial,
@@ -37,6 +38,7 @@ export function WorkshopDetailPanel({
   onUnlocked,
   showBack = true,
   compact = false,
+  className,
 }: {
   workshop: WorkshopDetail
   isLoggedIn: boolean
@@ -44,6 +46,7 @@ export function WorkshopDetailPanel({
   onUnlocked?: (workshop: WorkshopDetail) => void
   showBack?: boolean
   compact?: boolean
+  className?: string
 }) {
   const router = useRouter()
   const { toast } = useToast()
@@ -355,7 +358,7 @@ export function WorkshopDetailPanel({
   if (compact) {
     return (
       <div className="relative flex h-full min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-6">
+        <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-6", className)}>
           {detailsBody}
           {extras}
         </div>

@@ -1077,3 +1077,22 @@ export async function getLearningPathResumeHrefForUser(
   const fallback = await getFirstLearningPathItemHref()
   return fallback ?? "/invata"
 }
+
+/** După checkout Premium: reia ultimul capitol lucrat, altfel fallback-ul de resume. */
+export async function getPremiumWelcomeResumeHref(
+  userId: string,
+  client: SupabaseClient = supabase,
+): Promise<string> {
+  const lastWorkedChapterId = await getLastWorkedLearningPathChapterIdForUser(client, userId)
+  if (lastWorkedChapterId) {
+    const chapter = await getLearningPathChapterById(lastWorkedChapterId, client)
+    if (chapter) {
+      const lessons = await getLearningPathLessonsByChapterId(chapter.id, client)
+      if (lessons.length) {
+        return getLearningPathResumeHrefForChapter(client, userId, chapter, lessons)
+      }
+    }
+  }
+
+  return getLearningPathResumeHrefForUser(userId, client)
+}

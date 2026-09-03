@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { metaPixel } from "@/lib/meta-pixel"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
 
-export function CheckoutSuccessSync() {
+export function CheckoutSuccessSync({ silent = false }: { silent?: boolean }) {
   const searchParams = useSearchParams()
   const { user, refreshProfile } = useAuth()
   const { toast } = useToast()
@@ -21,11 +21,13 @@ export function CheckoutSuccessSync() {
     if (status === "success") {
       tiktokPixel.trackCheckoutSuccess(sessionId)
       metaPixel.trackCheckoutSuccess(sessionId)
-      toast({
-        title: "Plată reușită",
-        description: "Abonamentul va fi activat în câteva secunde.",
-      })
-    } else if (status === "canceled") {
+      if (!silent) {
+        toast({
+          title: "Plată reușită",
+          description: "Abonamentul va fi activat în câteva secunde.",
+        })
+      }
+    } else if (status === "canceled" && !silent) {
       toast({
         title: "Plata a fost anulată",
         description: "Poți relua rezervarea oricând.",
@@ -66,7 +68,7 @@ export function CheckoutSuccessSync() {
     }
 
     void syncSubscription()
-  }, [refreshProfile, searchParams, syncingSessionId, toast, user])
+  }, [refreshProfile, searchParams, silent, syncingSessionId, toast, user])
 
   return null
 }

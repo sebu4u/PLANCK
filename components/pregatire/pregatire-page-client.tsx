@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Loader2, X } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { EnergyBadge } from "@/components/pregatire/energy-badge"
 import { FloatingWeekCalendar } from "@/components/pregatire/floating-week-calendar"
@@ -37,6 +37,7 @@ import {
   type WorkshopPublic,
   type WorkshopSubject,
 } from "@/lib/pregatire/types"
+import { PlanckWeekPregatireBanner } from "@/components/planck-week/pregatire-week-banner"
 import { cn } from "@/lib/utils"
 
 const BURGER_BREAKPOINT = 948
@@ -217,6 +218,15 @@ export function PregatirePageClient() {
     void refreshMaterials()
   }, [tab, materials, refreshMaterials])
 
+  useEffect(() => {
+    if (isMobile !== false || !sheetWorkshop) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSheetWorkshop(null)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [isMobile, sheetWorkshop])
+
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const date = addDays(weekAnchor, i)
@@ -248,10 +258,6 @@ export function PregatirePageClient() {
     const key = `${source}:${workshop.id}`
     if (openingKey) return
     setOpeningKey(key)
-    if (!isMobile) {
-      router.push(`/pregatire/${workshop.id}`)
-      return
-    }
     try {
       const headers = await authHeaders()
       const response = await fetch(`/api/pregatire/${workshop.id}`, { headers })
@@ -267,6 +273,29 @@ export function PregatirePageClient() {
       setOpeningKey(null)
     }
   }
+
+  const closeWorkshopSheet = () => setSheetWorkshop(null)
+
+  const workshopDetail = sheetWorkshop ? (
+    <WorkshopDetailPanel
+      workshop={sheetWorkshop}
+      isLoggedIn={Boolean(user)}
+      showBack={false}
+      compact
+      className={isMobile === false ? "pr-12" : undefined}
+      onBalanceChange={(next) => {
+        setEnergy(next.balance)
+        setCarryoverEnergy(next.carryoverBalance)
+      }}
+      onUnlocked={(next) => {
+        setSheetWorkshop(next)
+        setWorkshops((list) =>
+          list.map((w) => (w.id === next.id ? { ...w, unlocked: true } : w)),
+        )
+        void refreshMaterials()
+      }}
+    />
+  ) : null
 
   const onMonthChange = (y: number, m: number) => {
     setYear(y)
@@ -305,15 +334,21 @@ export function PregatirePageClient() {
     </>
   )
 
+  const desktopSidebarOpen = isMobile === false && Boolean(sheetWorkshop)
+
   return (
-    <div className={cn("relative", isMobile === false && "overflow-hidden")}>
+    <div className={cn("relative", isMobile === false && "h-[calc(100dvh-4rem)] overflow-hidden bg-white")}>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.18),_transparent_55%),radial-gradient(ellipse_at_80%_0%,_rgba(37,99,235,0.08),_transparent_45%)]"
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.18),_transparent_55%),radial-gradient(ellipse_at_80%_0%,_rgba(37,99,235,0.08),_transparent_45%)]",
+          isMobile === false && "hidden",
+        )}
       />
 
       {isMobile === true ? (
         <div className="relative mx-auto max-w-6xl px-4 pt-4">
+          <PlanckWeekPregatireBanner />
           <div className="flex justify-end">
             <PushPrompt isLoggedIn={Boolean(user)} />
           </div>
@@ -363,104 +398,116 @@ export function PregatirePageClient() {
           )}
         </div>
       ) : isMobile === false ? (
-        <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-6 sm:px-6">
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-amber-700/90">Workshop-uri live</p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#111827] sm:text-4xl">
-                Pregatire
-              </h1>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#6b7280]">
-                Sesiuni pe materii, cu profesori Planck. Folosește energia pentru a debloca Meet-ul
-                sau înregistrarea.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {user ? (
-                <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} loading={energyLoading} />
-              ) : null}
-              <PushPrompt isLoggedIn={Boolean(user)} />
-            </div>
-          </header>
-
-          <div className="mt-6">
-            <SubjectChips subject={subject} onChange={setSubject} />
-          </div>
-
-          <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
-            <div className="space-y-6">
-              <PregatireMonthCalendar
-                workshops={workshops}
-                year={year}
-                month={month}
-                selectedDay={selectedDay}
-                onSelectDay={setSelectedDay}
-                onMonthChange={onMonthChange}
-                weekAnchor={weekAnchor}
-                onWeekChange={onWeekChange}
-              />
-
-              <div className="rounded-2xl border border-[#e5e7eb] bg-white/80 p-4 shadow-sm backdrop-blur">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-[#111827]">Săptămâna asta</h3>
-                  <div className="flex gap-2 text-xs">
-                    <button
-                      type="button"
-                      className="text-[#6b7280] hover:text-[#111827]"
-                      onClick={() => setWeekAnchor((d) => addDays(d, -7))}
-                    >
-                      ←
-                    </button>
-                    <button
-                      type="button"
-                      className="text-[#6b7280] hover:text-[#111827]"
-                      onClick={() => setWeekAnchor(startOfWeekMonday(new Date()))}
-                    >
-                      Azi
-                    </button>
-                    <button
-                      type="button"
-                      className="text-[#6b7280] hover:text-[#111827]"
-                      onClick={() => setWeekAnchor((d) => addDays(d, 7))}
-                    >
-                      →
-                    </button>
+        <div
+          className={cn(
+            "relative h-full min-w-0 transition-[margin] duration-300 ease-out",
+            desktopSidebarOpen ? "mr-[min(28rem,38vw)]" : "mr-0",
+          )}
+        >
+          <div className="absolute inset-[3px] overflow-hidden rounded-xl bg-[#f5f4f2]">
+            <div className="h-full overflow-y-auto">
+              <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-6 sm:px-6">
+                <PlanckWeekPregatireBanner />
+                <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-amber-700/90">Workshop-uri live</p>
+                    <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#111827] sm:text-4xl">
+                      Pregatire
+                    </h1>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#6b7280]">
+                      Sesiuni pe materii, cu profesori Planck. Folosește energia pentru a debloca Meet-ul
+                      sau înregistrarea.
+                    </p>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {user ? (
+                      <EnergyBadge balance={energy} carryoverBalance={carryoverEnergy} loading={energyLoading} />
+                    ) : null}
+                    <PushPrompt isLoggedIn={Boolean(user)} />
+                  </div>
+                </header>
+
+                <div className="mt-6">
+                  <SubjectChips subject={subject} onChange={setSubject} />
                 </div>
-                <div className="space-y-2">
-                  {weekWorkshops.length === 0 ? (
-                    <p className="text-sm text-[#9ca3af]">Nicio pregătire în această săptămână.</p>
-                  ) : (
-                    weekWorkshops.map((w) => (
-                      <WorkshopCard
-                        key={w.id}
-                        workshop={w}
-                        loading={openingKey === `week:${w.id}`}
-                        onSelect={() => void openWorkshop(w, "week")}
-                      />
-                    ))
-                  )}
+
+                <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+                  <div className="space-y-6">
+                    <PregatireMonthCalendar
+                      workshops={workshops}
+                      year={year}
+                      month={month}
+                      selectedDay={selectedDay}
+                      onSelectDay={setSelectedDay}
+                      onMonthChange={onMonthChange}
+                      weekAnchor={weekAnchor}
+                      onWeekChange={onWeekChange}
+                    />
+
+                    <div className="rounded-2xl border border-[#e5e7eb] bg-white/80 p-4 shadow-sm backdrop-blur">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-[#111827]">Săptămâna asta</h3>
+                        <div className="flex gap-2 text-xs">
+                          <button
+                            type="button"
+                            className="text-[#6b7280] hover:text-[#111827]"
+                            onClick={() => setWeekAnchor((d) => addDays(d, -7))}
+                          >
+                            ←
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[#6b7280] hover:text-[#111827]"
+                            onClick={() => setWeekAnchor(startOfWeekMonday(new Date()))}
+                          >
+                            Azi
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[#6b7280] hover:text-[#111827]"
+                            onClick={() => setWeekAnchor((d) => addDays(d, 7))}
+                          >
+                            →
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {weekWorkshops.length === 0 ? (
+                          <p className="text-sm text-[#9ca3af]">Nicio pregătire în această săptămână.</p>
+                        ) : (
+                          weekWorkshops.map((w) => (
+                            <WorkshopCard
+                              key={w.id}
+                              workshop={w}
+                              loading={openingKey === `week:${w.id}`}
+                              onSelect={() => void openWorkshop(w, "week")}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <section>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-[#111827]">
+                        {selectedDay ? "Pregătiri în ziua selectată" : "Toate pregătirile"}
+                      </h2>
+                      {selectedDay ? (
+                        <button
+                          type="button"
+                          className="text-sm text-[#6b7280] hover:text-[#111827]"
+                          onClick={() => setSelectedDay(null)}
+                        >
+                          Resetează filtrul
+                        </button>
+                      ) : null}
+                    </div>
+                    {workshopList}
+                  </section>
                 </div>
               </div>
             </div>
-
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-[#111827]">
-                  {selectedDay ? "Pregătiri în ziua selectată" : "Toate pregătirile"}
-                </h2>
-                {selectedDay ? (
-                  <button
-                    type="button"
-                    className="text-sm text-[#6b7280] hover:text-[#111827]"
-                    onClick={() => setSelectedDay(null)}
-                  >
-                    Resetează filtrul
-                  </button>
-                ) : null}
-              </div>
-              {workshopList}
-            </section>
           </div>
         </div>
       ) : null}
@@ -475,39 +522,48 @@ export function PregatirePageClient() {
         />
       ) : null}
 
-      <PregatireIntroCard />
+      {searchParams.get("from") === "planck-week" ? null : <PregatireIntroCard />}
 
-      <Sheet open={Boolean(sheetWorkshop)} onOpenChange={(open) => !open && setSheetWorkshop(null)}>
-        <SheetContent
-          side="bottom"
-          overlayClassName="!z-[400] bg-black/30"
-          onOpenAutoFocus={(event) => event.preventDefault()}
-          className="!z-[401] flex h-[70dvh] flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x border-t border-[#d1d5db] bg-white p-0 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] sm:max-w-lg sm:rounded-none"
+      {isMobile === true ? (
+        <Sheet open={Boolean(sheetWorkshop)} onOpenChange={(open) => !open && closeWorkshopSheet()}>
+          <SheetContent
+            side="bottom"
+            overlayClassName="!z-[400] bg-black/30"
+            onOpenAutoFocus={(event) => event.preventDefault()}
+            className="!z-[401] flex h-[70dvh] flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x border-t border-[#d1d5db] bg-white p-0 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] sm:max-w-lg sm:rounded-none"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>{sheetWorkshop?.title ?? "Pregătire"}</SheetTitle>
+            </SheetHeader>
+            {workshopDetail}
+          </SheetContent>
+        </Sheet>
+      ) : null}
+
+      {isMobile === false ? (
+        <aside
+          aria-hidden={!desktopSidebarOpen}
+          aria-label="Detalii pregătire"
+          className={cn(
+            "fixed bottom-0 right-0 top-16 z-20 flex min-h-0 w-[min(28rem,38vw)] flex-col bg-white transition-transform duration-300 ease-out",
+            desktopSidebarOpen ? "translate-x-0" : "pointer-events-none translate-x-full",
+          )}
         >
-          <SheetHeader className="sr-only">
-            <SheetTitle>{sheetWorkshop?.title ?? "Pregătire"}</SheetTitle>
-          </SheetHeader>
           {sheetWorkshop ? (
-            <WorkshopDetailPanel
-              workshop={sheetWorkshop}
-              isLoggedIn={Boolean(user)}
-              showBack={false}
-              compact
-              onBalanceChange={(next) => {
-                setEnergy(next.balance)
-                setCarryoverEnergy(next.carryoverBalance)
-              }}
-              onUnlocked={(next) => {
-                setSheetWorkshop(next)
-                setWorkshops((list) =>
-                  list.map((w) => (w.id === next.id ? { ...w, unlocked: true } : w)),
-                )
-                void refreshMaterials()
-              }}
-            />
+            <>
+              <button
+                type="button"
+                onClick={closeWorkshopSheet}
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full text-[#6b7280] transition hover:bg-[#f3f4f6] hover:text-[#111827]"
+                aria-label="Închide detaliile pregătirii"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              {workshopDetail}
+            </>
           ) : null}
-        </SheetContent>
-      </Sheet>
+        </aside>
+      ) : null}
     </div>
   )
 }
