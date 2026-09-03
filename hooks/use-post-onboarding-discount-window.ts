@@ -2,6 +2,8 @@
 
 import { useCallback, useLayoutEffect, useMemo, useState } from "react"
 
+import { isLaunch20Active } from "@/lib/launch-20-discount"
+
 export const POST_ONBOARDING_DISCOUNT_WINDOW_MS = 60 * 60 * 1000
 
 const WINDOW_MS = POST_ONBOARDING_DISCOUNT_WINDOW_MS
@@ -61,7 +63,7 @@ export function usePostOnboardingDiscountWindow(userId: string | undefined) {
   }, [userId])
 
   const discount = useMemo(() => {
-    if (now === 0 || !userId) {
+    if (now === 0 || !userId || !isLaunch20Active(new Date(now))) {
       return { active: false as const, remainingLabel: "00:00" }
     }
 

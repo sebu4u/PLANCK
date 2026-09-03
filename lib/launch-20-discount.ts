@@ -1,15 +1,11 @@
-import { isPrizeWheelCampaignOpen } from "@/lib/prize-wheel/campaign"
-
-/** Automatic 20% off weekly/monthly Premium — until 10 September. */
+/** Automatic 20% off weekly/monthly Premium — pulled; kept for leftover UI branches. */
 
 export const LAUNCH_20_DEADLINE = new Date("2026-09-10T23:59:59+03:00")
 export const LAUNCH_20_PERCENT = 20
 export const LAUNCH_20_DEADLINE_LABEL = "10 septembrie"
 
-export function isLaunch20Active(now = new Date()): boolean {
-  // Hide until prize wheel opens (1 Sept 12:00 Bucharest) to avoid conflicting with 1 leu campaign
-  if (!isPrizeWheelCampaignOpen(now)) return false
-  return now.getTime() < LAUNCH_20_DEADLINE.getTime()
+export function isLaunch20Active(_now = new Date()): boolean {
+  return false
 }
 
 export function getLaunch20PriceRon(fullPriceRon: number): number {
