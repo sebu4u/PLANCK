@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
 import { getAccessTokenFromRequest } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
-import { visibleWorkshopMeetUrl } from "@/lib/pregatire/dates"
+import { formatWorkshopDateTime, visibleWorkshopMeetUrl } from "@/lib/pregatire/dates"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
+import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
+import { triggerWorkshopEmail } from "@/lib/mailerlite/workshop-trigger"
 
 export async function POST(
   req: NextRequest,
@@ -77,7 +80,7 @@ export async function POST(
       .eq("id", id)
       .maybeSingle()
 
-    return NextResponse.json({
+    const responsePayload = {
       unlocked: true,
       already_unlocked: Boolean(result.already_unlocked),
       meet_url: visibleWorkshopMeetUrl(
@@ -87,9 +90,135 @@ export async function POST(
       recording_url: result.recording_url ?? null,
       balance: result.balance ?? 0,
       carryoverBalance: result.carryover_balance ?? 0,
-    })
+    }
+
+    if (!result.already_unlocked) {
+      after(() => {
+        sendWorkshopConfirmationEmail({
+          workshopId: id,
+          userId: userData.user.id,
+          userEmail: userData.user.email,
+        }).catch((err) => {
+          logger.error("[pregatire/unlock] confirmation email failed:", err)
+        })
+      })
+    }
+
+    return NextResponse.json(responsePayload)
   } catch (err) {
     logger.error("[pregatire/unlock] error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
+  }
+}
+
+async function sendWorkshopConfirmationEmail(input: {
+  workshopId: string
+  userId: string
+  userEmail?: string
+}) {
+  const supabase = getServiceRoleSupabase()
+
+  const alreadySent = await supabase
+    .from("workshop_reminder_sends")
+    .select("id")
+    .eq("workshop_id", input.workshopId)
+    .eq("user_id", input.userId)
+    .eq("reminder_kind", "confirm")
+    .eq("channel", "email")
+    .eq("status", "sent")
+    .maybeSingle()
+
+  if (alreadySent.data) {
+    logger.info("[pregatire/unlock] confirm email already sent", {
+      workshopId: input.workshopId,
+      userId: input.userId,
+    })
+    return
+  }
+
+  if (!input.userEmail) {
+    await supabase.from("workshop_reminder_sends").upsert(
+      {
+        workshop_id: input.workshopId,
+        user_id: input.userId,
+        reminder_kind: "confirm",
+        channel: "email",
+        status: "skipped",
+        error_message: "no_email",
+        sent_at: new Date().toISOString(),
+      },
+      { onConflict: "workshop_id,user_id,reminder_kind,channel" }
+    )
+    return
+  }
+
+  const { data: workshop } = await supabase
+    .from("workshops")
+    .select("title, starts_at, subject, teacher_id")
+    .eq("id", input.workshopId)
+    .maybeSingle()
+
+  if (!workshop) {
+    await supabase.from("workshop_reminder_sends").upsert(
+      {
+        workshop_id: input.workshopId,
+        user_id: input.userId,
+        reminder_kind: "confirm",
+        channel: "email",
+        status: "failed",
+        error_message: "workshop_not_found",
+        sent_at: new Date().toISOString(),
+      },
+      { onConflict: "workshop_id,user_id,reminder_kind,channel" }
+    )
+    return
+  }
+
+  const { data: teacher } = await supabase
+    .from("workshop_teachers")
+    .select("name")
+    .eq("id", workshop.teacher_id)
+    .maybeSingle()
+
+  const siteUrl =
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://planck.academy").replace(/\/$/, "")
+
+  const result = await triggerWorkshopEmail({
+    email: input.userEmail,
+    kind: "confirm",
+    fields: {
+      ws_title: workshop.title,
+      ws_when: formatWorkshopDateTime(workshop.starts_at),
+      ws_url: `${siteUrl}/pregatire/${input.workshopId}`,
+      ws_meet_url: "",
+      ws_teacher: teacher?.name || "",
+      ws_subject: workshop.subject,
+    },
+  })
+
+  await supabase.from("workshop_reminder_sends").upsert(
+    {
+      workshop_id: input.workshopId,
+      user_id: input.userId,
+      reminder_kind: "confirm",
+      channel: "email",
+      status: result.ok ? "sent" : "failed",
+      error_message: result.ok ? null : result.message,
+      sent_at: new Date().toISOString(),
+    },
+    { onConflict: "workshop_id,user_id,reminder_kind,channel" }
+  )
+
+  if (result.ok) {
+    logger.info("[pregatire/unlock] confirm email sent", {
+      workshopId: input.workshopId,
+      userId: input.userId,
+    })
+  } else {
+    logger.error("[pregatire/unlock] confirm email failed", {
+      workshopId: input.workshopId,
+      userId: input.userId,
+      error: result.message,
+    })
   }
 }
