@@ -54,6 +54,7 @@ export async function GET(
     const userId = await optionalUserId(req)
 
     let unlocked = false
+    let confirmedAt: string | null = null
     let meetUrl: string | null = null
     let recordingUrl: string | null = null
     let materials = lockedMaterials()
@@ -61,12 +62,13 @@ export async function GET(
     if (userId) {
       const { data: unlock } = await supabase
         .from("workshop_unlocks")
-        .select("workshop_id")
+        .select("workshop_id, confirmed_at")
         .eq("user_id", userId)
         .eq("workshop_id", id)
         .maybeSingle()
 
       unlocked = Boolean(unlock)
+      confirmedAt = unlock?.confirmed_at ?? null
       if (unlocked) {
         const unlockedPayload = await loadUnlockedMaterials(supabase, id)
         meetUrl = unlockedPayload.meet_url
@@ -91,6 +93,7 @@ export async function GET(
         teacherMap.get(row.teacher_id as string) ?? null,
         unlocked,
       ),
+      confirmed_at: confirmedAt,
       meet_url: unlocked ? visibleWorkshopMeetUrl(String(row.starts_at), meetUrl) : null,
       recording_url: unlocked ? recordingUrl : null,
       ...materials,

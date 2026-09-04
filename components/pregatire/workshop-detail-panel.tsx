@@ -52,11 +52,54 @@ export function WorkshopDetailPanel({
   const { toast } = useToast()
   const [workshop, setWorkshop] = useState(initial)
   const [unlocking, setUnlocking] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     setWorkshop(initial)
   }, [initial])
+
+  // Handle ?confirmed=1 query parameter for auto-confirmation after email link
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const confirmed = params.get("confirmed") === "1" || params.get("confirm") === "1"
+    
+    if (confirmed && workshop.unlocked && !workshop.confirmed_at && isLoggedIn) {
+      // Auto-confirm
+      const autoConfirm = async () => {
+        const { data } = await supabase.auth.getSession()
+        const token = data.session?.access_token
+        if (!token) return
+
+        try {
+          const response = await fetch(`/api/pregatire/${workshop.id}/confirm`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          
+          if (response.ok) {
+            const payload = await response.json()
+            setWorkshop((prev) => ({ ...prev, confirmed_at: payload.confirmed_at }))
+            toast({
+              title: "Participare confirmată",
+              description: "Mulțumim! Ne vedem la pregătire.",
+            })
+          }
+        } catch {
+          // Silent fail - user can still confirm manually
+        }
+      }
+
+      void autoConfirm()
+      
+      // Clean query params
+      const url = new URL(window.location.href)
+      url.searchParams.delete("confirmed")
+      url.searchParams.delete("confirm")
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [workshop.id, workshop.unlocked, workshop.confirmed_at, isLoggedIn, toast])
 
   const past = isWorkshopPast(workshop.starts_at, workshop.duration_minutes)
   const waitingForMeet = workshop.unlocked && !past && !workshop.meet_url
@@ -197,6 +240,46 @@ export function WorkshopDetailPanel({
     }
   }
 
+  const handleConfirm = async () => {
+    if (!isLoggedIn) return
+
+    setConfirming(true)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) return
+
+      const response = await fetch(`/api/pregatire/${workshop.id}/confirm`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const payload = await response.json()
+      
+      if (!response.ok) {
+        toast({
+          title: "Nu am putut confirma participarea",
+          description: payload.error ?? "Încearcă din nou.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setWorkshop((prev) => ({ ...prev, confirmed_at: payload.confirmed_at }))
+      toast({
+        title: payload.already_confirmed ? "Deja confirmat" : "Participare confirmată",
+        description: "Mulțumim! Ne vedem la pregătire.",
+      })
+    } catch {
+      toast({
+        title: "Eroare",
+        description: "Nu am putut confirma participarea.",
+        variant: "destructive",
+      })
+    } finally {
+      setConfirming(false)
+    }
+  }
+
   const primaryCta = (
     <>
       {!workshop.unlocked ? (
@@ -215,6 +298,36 @@ export function WorkshopDetailPanel({
             </span>
           ) : null}
         </Button>
+      ) : null}
+
+      {workshop.unlocked && !workshop.confirmed_at && !past ? (
+        <Button
+          type="button"
+          size="lg"
+          className="w-full bg-[#2563eb] text-white hover:bg-[#1d4ed8]"
+          disabled={confirming}
+          onClick={() => void handleConfirm()}
+        >
+          {confirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Confirmă că vii
+        </Button>
+      ) : null}
+
+      {workshop.unlocked && workshop.confirmed_at ? (
+        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mr-2 inline h-4 w-4" />
+          Participarea confirmată
+          {workshop.confirmed_at ? (
+            <span className="ml-1 text-emerald-600">
+              • {new Date(workshop.confirmed_at).toLocaleDateString("ro-RO", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          ) : null}
+        </p>
       ) : null}
 
       {workshop.unlocked && !past && workshop.meet_url ? (
