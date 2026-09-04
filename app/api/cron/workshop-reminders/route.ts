@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { sendWorkshopReminderEmail } from "@/lib/pregatire/email"
 import { createWorkshopInAppReminder } from "@/lib/pregatire/in-app-notification"
 import { sendWorkshopPushToUser } from "@/lib/pregatire/push"
 import { formatWorkshopDateTime } from "@/lib/pregatire/dates"
 import { logger } from "@/lib/logger"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
+import { triggerWorkshopEmail } from "@/lib/mailerlite/workshop-trigger"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
-type ReminderKind = "24h" | "30m"
+type ReminderKind = "24h" | "30m" | "10m"
 type ReminderChannel = "email" | "push" | "in_app"
 
 function isAuthorized(request: NextRequest): boolean {
@@ -20,11 +20,19 @@ function isAuthorized(request: NextRequest): boolean {
 
 /** Due-and-unsent windows so delayed schedulers still catch reminders. */
 function windowFor(kind: ReminderKind, now: Date) {
+  const tenMinMs = 10 * 60_000
   const thirtyMinMs = 30 * 60_000
   const twentyFourHMs = 24 * 60 * 60_000
-  if (kind === "30m") {
+
+  if (kind === "10m") {
     return {
       from: now.toISOString(),
+      to: new Date(now.getTime() + tenMinMs).toISOString(),
+    }
+  }
+  if (kind === "30m") {
+    return {
+      from: new Date(now.getTime() + tenMinMs).toISOString(),
       to: new Date(now.getTime() + thirtyMinMs).toISOString(),
     }
   }
@@ -94,11 +102,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    for (const kind of ["24h", "30m"] as ReminderKind[]) {
+    for (const kind of ["24h", "30m", "10m"] as ReminderKind[]) {
       const { from, to } = windowFor(kind, now)
       const { data: workshops, error } = await supabase
         .from("workshops")
-        .select("id, title, starts_at, is_published")
+        .select("id, title, starts_at, is_published, subject, teacher_id, meet_url")
         .eq("is_published", true)
         .gt("starts_at", from)
         .lte("starts_at", to)
@@ -116,9 +124,14 @@ export async function GET(request: NextRequest) {
           const userId = unlock.user_id as string
           const detailUrl = `${siteUrl}/pregatire/${workshop.id}`
           const when = formatWorkshopDateTime(workshop.starts_at)
-          const timing = kind === "24h" ? "în 24 de ore" : "în 30 de minute"
+          const timing =
+            kind === "24h"
+              ? "în 24 de ore"
+              : kind === "30m"
+                ? "în 30 de minute"
+                : "în 10 minute"
 
-          // Email
+          // Email via MailerLite
           if (!(await alreadySent(workshop.id, userId, kind, "email"))) {
             const { data: authUser } = await supabase.auth.admin.getUserById(userId)
             const email = authUser.user?.email
@@ -133,13 +146,25 @@ export async function GET(request: NextRequest) {
               })
               summary.skipped += 1
             } else {
-              const result = await sendWorkshopReminderEmail({
-                to: email,
-                workshopTitle: workshop.title,
-                workshopId: workshop.id,
-                startsAt: workshop.starts_at,
-                reminderKind: kind,
+              const { data: teacher } = await supabase
+                .from("workshop_teachers")
+                .select("name")
+                .eq("id", workshop.teacher_id)
+                .maybeSingle()
+
+              const result = await triggerWorkshopEmail({
+                email,
+                kind,
+                fields: {
+                  ws_title: workshop.title,
+                  ws_when: when,
+                  ws_url: detailUrl,
+                  ws_meet_url: kind === "10m" ? workshop.meet_url || "" : "",
+                  ws_teacher: teacher?.name || "",
+                  ws_subject: workshop.subject,
+                },
               })
+
               if (result.ok) {
                 await logSend({
                   workshopId: workshop.id,
@@ -163,8 +188,8 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // Push
-          if (!(await alreadySent(workshop.id, userId, kind, "push"))) {
+          // Push (only for 24h and 30m)
+          if ((kind === "24h" || kind === "30m") && !(await alreadySent(workshop.id, userId, kind, "push"))) {
             const pushResult = await sendWorkshopPushToUser({
               userId,
               title: `Pregătire ${timing}`,
@@ -203,8 +228,8 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // In-app (navbar)
-          if (!(await alreadySent(workshop.id, userId, kind, "in_app"))) {
+          // In-app (navbar) (only for 24h and 30m)
+          if ((kind === "24h" || kind === "30m") && !(await alreadySent(workshop.id, userId, kind, "in_app"))) {
             const inAppResult = await createWorkshopInAppReminder({
               userId,
               workshopId: workshop.id,
