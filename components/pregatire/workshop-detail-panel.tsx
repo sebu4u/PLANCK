@@ -59,44 +59,90 @@ export function WorkshopDetailPanel({
     setWorkshop(initial)
   }, [initial])
 
-  // Handle ?confirmed=1 query parameter for auto-confirmation after email link
+  // Handle ?confirmed=1 and ?error=... query parameters from email confirmation flow
   useEffect(() => {
     if (typeof window === "undefined") return
     const params = new URLSearchParams(window.location.search)
-    const confirmed = params.get("confirmed") === "1" || params.get("confirm") === "1"
+    const confirmed = params.get("confirmed") === "1"
+    const errorParam = params.get("error")
     
-    if (confirmed && workshop.unlocked && !workshop.confirmed_at && isLoggedIn) {
-      // Auto-confirm
-      const autoConfirm = async () => {
-        const { data } = await supabase.auth.getSession()
-        const token = data.session?.access_token
-        if (!token) return
+    // Handle email confirmation success (works for both logged-in and logged-out users)
+    if (confirmed) {
+      // For logged-in users with unlocked workshop, update state via authenticated POST
+      if (isLoggedIn && workshop.unlocked && !workshop.confirmed_at) {
+        const autoConfirm = async () => {
+          const { data } = await supabase.auth.getSession()
+          const token = data.session?.access_token
+          if (!token) return
 
-        try {
-          const response = await fetch(`/api/pregatire/${workshop.id}/confirm`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          
-          if (response.ok) {
-            const payload = await response.json()
-            setWorkshop((prev) => ({ ...prev, confirmed_at: payload.confirmed_at }))
-            toast({
-              title: "Participare confirmată",
-              description: "Mulțumim! Ne vedem la pregătire.",
+          try {
+            const response = await fetch(`/api/pregatire/${workshop.id}/confirm`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
             })
+            
+            if (response.ok) {
+              const payload = await response.json()
+              setWorkshop((prev) => ({ ...prev, confirmed_at: payload.confirmed_at }))
+            }
+          } catch {
+            // Silent fail - success toast already shown below
           }
-        } catch {
-          // Silent fail - user can still confirm manually
         }
-      }
 
-      void autoConfirm()
+        void autoConfirm()
+      }
+      
+      // Show success toast for all users (logged in or out)
+      toast({
+        title: "Participare confirmată",
+        description: isLoggedIn 
+          ? "Mulțumim! Ne vedem la pregătire."
+          : "Mulțumim! Autentifică-te pentru a accesa materialele.",
+      })
       
       // Clean query params
       const url = new URL(window.location.href)
       url.searchParams.delete("confirmed")
       url.searchParams.delete("confirm")
+      window.history.replaceState({}, "", url.toString())
+    }
+    
+    // Handle email confirmation errors
+    if (errorParam) {
+      const errorMessages: Record<string, { title: string; description: string }> = {
+        invalid_token: {
+          title: "Link invalid",
+          description: "Link-ul de confirmare este invalid sau a expirat.",
+        },
+        not_unlocked: {
+          title: "Loc nereservat",
+          description: "Trebuie să rezervi locul înainte de a confirma participarea.",
+        },
+        update_failed: {
+          title: "Eroare la confirmare",
+          description: "Nu am putut confirma participarea. Te rugăm să încerci din nou.",
+        },
+        server_error: {
+          title: "Eroare server",
+          description: "A apărut o eroare. Te rugăm să încerci din nou mai târziu.",
+        },
+      }
+      
+      const error = errorMessages[errorParam] || {
+        title: "Eroare",
+        description: "A apărut o problemă la confirmare.",
+      }
+      
+      toast({
+        title: error.title,
+        description: error.description,
+        variant: "destructive",
+      })
+      
+      // Clean query params
+      const url = new URL(window.location.href)
+      url.searchParams.delete("error")
       window.history.replaceState({}, "", url.toString())
     }
   }, [workshop.id, workshop.unlocked, workshop.confirmed_at, isLoggedIn, toast])
