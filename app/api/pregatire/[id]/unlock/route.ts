@@ -8,7 +8,6 @@ import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
 import { triggerWorkshopEmail } from "@/lib/mailerlite/workshop-trigger"
 import { mintConfirmToken } from "@/lib/pregatire/confirm-token"
-import { mintConfirmToken } from "@/app/api/pregatire/[id]/confirm/route"
 
 export async function POST(
   req: NextRequest,
