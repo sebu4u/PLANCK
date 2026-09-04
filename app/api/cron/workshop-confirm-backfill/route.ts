@@ -3,6 +3,7 @@ import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
 import { triggerWorkshopEmail } from "@/lib/mailerlite/workshop-trigger"
 import { formatWorkshopDateTime } from "@/lib/pregatire/dates"
 import { logger } from "@/lib/logger"
+import { mintConfirmToken } from "@/lib/pregatire/confirm-token"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -16,15 +17,21 @@ function isAuthorized(request: NextRequest): boolean {
 /**
  * Backfill confirmation emails for Planck Week workshops (2026-09-10 to 2026-09-15).
  * Sends MailerLite confirmation to users who unlocked but never received a confirm email.
+ * 
+ * Query params:
+ *   - force=1: Resend even if status is already "sent" (for confirmed_at IS NULL unlocks)
  */
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const { searchParams } = new URL(request.url)
+  const force = searchParams.get("force") === "1"
+
   const supabase = getServiceRoleSupabase()
   const siteUrl =
-    (process.env.NEXT_PUBLIC_SITE_URL || "https://planck.academy").replace(/\/$/, "")
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://www.planck.academy").replace(/\/$/, "")
 
   const summary = {
     workshopsScanned: 0,
@@ -70,9 +77,24 @@ export async function POST(request: NextRequest) {
           .eq("channel", "email")
           .maybeSingle()
 
-        if (existingSend?.status === "sent") {
+        if (existingSend?.status === "sent" && !force) {
           summary.emailsSkipped += 1
           continue
+        }
+
+        // When force=1, check if already confirmed
+        if (force) {
+          const { data: unlockRow } = await supabase
+            .from("workshop_unlocks")
+            .select("confirmed_at")
+            .eq("user_id", userId)
+            .eq("workshop_id", workshop.id)
+            .maybeSingle()
+
+          if (unlockRow?.confirmed_at) {
+            summary.emailsSkipped += 1
+            continue
+          }
         }
 
         const { data: authUser } = await supabase.auth.admin.getUserById(userId)
@@ -101,6 +123,32 @@ export async function POST(request: NextRequest) {
           .eq("id", workshop.teacher_id)
           .maybeSingle()
 
+        let confirmUrl = ""
+        try {
+          const token = mintConfirmToken(userId, workshop.id)
+          confirmUrl = `${siteUrl}/api/pregatire/${workshop.id}/confirm?token=${encodeURIComponent(token)}`
+        } catch (err) {
+          logger.error("[workshop-confirm-backfill] failed to mint confirm token:", {
+            workshopId: workshop.id,
+            userId,
+            error: err,
+          })
+          await supabase.from("workshop_reminder_sends").upsert(
+            {
+              workshop_id: workshop.id,
+              user_id: userId,
+              reminder_kind: "confirm",
+              channel: "email",
+              status: "failed",
+              error_message: "token_mint_failed",
+              sent_at: new Date().toISOString(),
+            },
+            { onConflict: "workshop_id,user_id,reminder_kind,channel" }
+          )
+          summary.emailsFailed += 1
+          continue
+        }
+
         const result = await triggerWorkshopEmail({
           email,
           kind: "confirm",
@@ -111,6 +159,7 @@ export async function POST(request: NextRequest) {
             ws_meet_url: "",
             ws_teacher: teacher?.name || "",
             ws_subject: workshop.subject,
+            ws_confirm_url: confirmUrl,
           },
         })
 

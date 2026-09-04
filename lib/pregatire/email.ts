@@ -28,7 +28,7 @@ export async function sendWorkshopReminderEmail(input: {
   const when = formatWorkshopDateTime(input.startsAt)
   const timing =
     input.reminderKind === "24h" ? "în 24 de ore" : "în 30 de minute"
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://planck.academy"
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.planck.academy"
   const url = `${siteUrl.replace(/\/$/, "")}/pregatire/${input.workshopId}`
 
   try {

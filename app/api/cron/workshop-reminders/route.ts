@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = getServiceRoleSupabase()
   const now = new Date()
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://planck.academy").replace(/\/$/, "")
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.planck.academy").replace(/\/$/, "")
   const summary = {
     scanned: 0,
     emailSent: 0,

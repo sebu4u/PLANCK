@@ -7,7 +7,7 @@ import { formatWorkshopDateTime, visibleWorkshopMeetUrl } from "@/lib/pregatire/
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
 import { triggerWorkshopEmail } from "@/lib/mailerlite/workshop-trigger"
-import { mintConfirmToken } from "@/app/api/pregatire/[id]/confirm/route"
+import { mintConfirmToken } from "@/lib/pregatire/confirm-token"
 
 export async function POST(
   req: NextRequest,
@@ -182,7 +182,7 @@ async function sendWorkshopConfirmationEmail(input: {
     .maybeSingle()
 
   const siteUrl =
-    (process.env.NEXT_PUBLIC_SITE_URL || "https://planck.academy").replace(/\/$/, "")
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://www.planck.academy").replace(/\/$/, "")
 
   // Generate signed confirmation token for one-click email link
   let confirmUrl = `${siteUrl}/pregatire/${input.workshopId}`

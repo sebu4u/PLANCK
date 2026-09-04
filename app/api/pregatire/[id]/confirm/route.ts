@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createHmac } from "crypto"
 import { getAccessTokenFromRequest } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { logger } from "@/lib/logger"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
+import { verifyConfirmToken } from "@/lib/pregatire/confirm-token"
 
 /**
  * POST /api/pregatire/[id]/confirm
@@ -89,43 +89,19 @@ export async function GET(
       )
     }
 
-    // Decode token: userId:workshopId:signature
-    const parts = token.split(":")
-    if (parts.length !== 3) {
+    const verification = verifyConfirmToken(token, id)
+    if (!verification.valid) {
+      const errorType = verification.error === "secret_not_configured" ? "server_error" : "invalid_token"
+      if (verification.error === "secret_not_configured") {
+        logger.error("[pregatire/confirm] GET: WORKSHOP_CONFIRM_SECRET not configured")
+      }
       return NextResponse.redirect(
-        new URL(`/pregatire/${id}?error=invalid_token`, req.url),
+        new URL(`/pregatire/${id}?error=${errorType}`, req.url),
         { status: 302 },
       )
     }
 
-    const [userId, workshopId, signature] = parts
-    if (workshopId !== id) {
-      return NextResponse.redirect(
-        new URL(`/pregatire/${id}?error=invalid_token`, req.url),
-        { status: 302 },
-      )
-    }
-
-    // Verify signature
-    const secret = process.env.WORKSHOP_CONFIRM_SECRET || process.env.CRON_SECRET || ""
-    if (!secret) {
-      logger.error("[pregatire/confirm] GET: WORKSHOP_CONFIRM_SECRET not configured")
-      return NextResponse.redirect(
-        new URL(`/pregatire/${id}?error=server_error`, req.url),
-        { status: 302 },
-      )
-    }
-
-    const expectedSignature = createHmac("sha256", secret)
-      .update(`${userId}:${workshopId}`)
-      .digest("hex")
-
-    if (signature !== expectedSignature) {
-      return NextResponse.redirect(
-        new URL(`/pregatire/${id}?error=invalid_token`, req.url),
-        { status: 302 },
-      )
-    }
+    const { userId, workshopId } = verification
 
     // Valid token: confirm attendance using service role
     const supabase = getServiceRoleSupabase()
@@ -176,17 +152,3 @@ export async function GET(
   }
 }
 
-/**
- * Mint a signed confirmation token for email links.
- * Export this for use in workshop unlock route.
- */
-export function mintConfirmToken(userId: string, workshopId: string): string {
-  const secret = process.env.WORKSHOP_CONFIRM_SECRET || process.env.CRON_SECRET || ""
-  if (!secret) {
-    throw new Error("WORKSHOP_CONFIRM_SECRET not configured")
-  }
-  const signature = createHmac("sha256", secret)
-    .update(`${userId}:${workshopId}`)
-    .digest("hex")
-  return `${userId}:${workshopId}:${signature}`
-}
