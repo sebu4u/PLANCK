@@ -193,6 +193,7 @@ export interface WorkshopMaterialsHubItem {
 }
 
 export interface WorkshopDetail extends WorkshopPublic {
+  confirmed_at?: string | null
   meet_url?: string | null
   recording_url?: string | null
   whiteboard_url?: string | null

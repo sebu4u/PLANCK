@@ -91,6 +91,7 @@ interface WorkshopEmailFields {
   ws_meet_url?: string
   ws_teacher: string
   ws_subject: string
+  ws_confirm_url?: string
 }
 
 const GROUP_ID_ENV_MAP: Record<WorkshopReminderKind, string> = {
@@ -161,6 +162,7 @@ export async function triggerWorkshopEmail(
         ws_meet_url: input.fields.ws_meet_url || "",
         ws_teacher: input.fields.ws_teacher,
         ws_subject: input.fields.ws_subject,
+        ws_confirm_url: input.fields.ws_confirm_url || "",
       },
     })
 
