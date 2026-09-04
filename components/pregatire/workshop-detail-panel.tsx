@@ -68,7 +68,14 @@ export function WorkshopDetailPanel({
 
     // Handle email confirmation success (works for both logged-in and logged-out users)
     if (confirmed) {
-      // For logged-in users with unlocked workshop, update state via authenticated POST
+      // Update local state for all users (email confirm already succeeded in DB)
+      setWorkshop((prev) => ({
+        ...prev,
+        unlocked: true,
+        confirmed_at: prev.confirmed_at ?? new Date().toISOString(),
+      }))
+
+      // For logged-in users, optionally sync via authenticated POST
       if (isLoggedIn && workshop.unlocked && !workshop.confirmed_at) {
         const autoConfirm = async () => {
           const { data } = await supabase.auth.getSession()
@@ -93,12 +100,10 @@ export function WorkshopDetailPanel({
         void autoConfirm()
       }
 
-      // Show success toast for all users (logged in or out)
+      // Show success toast for all users
       toast({
         title: "Participare confirmată",
-        description: isLoggedIn
-          ? "Mulțumim! Ne vedem la pregătire."
-          : "Mulțumim! Autentifică-te pentru a accesa materialele.",
+        description: "Mulțumim! Ne vedem la pregătire.",
       })
 
       // Clean query params
