@@ -65,7 +65,7 @@ export function WorkshopDetailPanel({
     const params = new URLSearchParams(window.location.search)
     const confirmed = params.get("confirmed") === "1"
     const errorParam = params.get("error")
-    
+
     // Handle email confirmation success (works for both logged-in and logged-out users)
     if (confirmed) {
       // For logged-in users with unlocked workshop, update state via authenticated POST
@@ -80,7 +80,7 @@ export function WorkshopDetailPanel({
               method: "POST",
               headers: { Authorization: `Bearer ${token}` },
             })
-            
+
             if (response.ok) {
               const payload = await response.json()
               setWorkshop((prev) => ({ ...prev, confirmed_at: payload.confirmed_at }))
@@ -92,22 +92,22 @@ export function WorkshopDetailPanel({
 
         void autoConfirm()
       }
-      
+
       // Show success toast for all users (logged in or out)
       toast({
         title: "Participare confirmată",
-        description: isLoggedIn 
+        description: isLoggedIn
           ? "Mulțumim! Ne vedem la pregătire."
           : "Mulțumim! Autentifică-te pentru a accesa materialele.",
       })
-      
+
       // Clean query params
       const url = new URL(window.location.href)
       url.searchParams.delete("confirmed")
       url.searchParams.delete("confirm")
       window.history.replaceState({}, "", url.toString())
     }
-    
+
     // Handle email confirmation errors
     if (errorParam) {
       const errorMessages: Record<string, { title: string; description: string }> = {
@@ -128,18 +128,18 @@ export function WorkshopDetailPanel({
           description: "A apărut o eroare. Te rugăm să încerci din nou mai târziu.",
         },
       }
-      
+
       const error = errorMessages[errorParam] || {
         title: "Eroare",
         description: "A apărut o problemă la confirmare.",
       }
-      
+
       toast({
         title: error.title,
         description: error.description,
         variant: "destructive",
       })
-      
+
       // Clean query params
       const url = new URL(window.location.href)
       url.searchParams.delete("error")
@@ -300,7 +300,7 @@ export function WorkshopDetailPanel({
         headers: { Authorization: `Bearer ${token}` },
       })
       const payload = await response.json()
-      
+
       if (!response.ok) {
         toast({
           title: "Nu am putut confirma participarea",
