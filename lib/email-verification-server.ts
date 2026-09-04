@@ -14,7 +14,7 @@ import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
 const TOKEN_TTL_HOURS = 48
 
 function siteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "https://planck.academy").replace(/\/$/, "")
+  return (process.env.NEXT_PUBLIC_SITE_URL || "https://www.planck.academy").replace(/\/$/, "")
 }
 
 function fromAddress() {
