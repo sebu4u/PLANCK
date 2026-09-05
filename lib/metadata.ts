@@ -668,14 +668,14 @@ export const pageMetadata: Record<string, Metadata> = {
   },
 
   "planck-week-confirmare": {
-    title: pageTitle("Loc rezervat — Planck Week"),
-    description: "Locul tău la Planck Week e rezervat. Fără card.",
+    title: pageTitle("Creează-ți contul — Planck Week"),
+    description: "Locul tău la Planck Week e salvat. Creează-ți contul ca să vezi programul live.",
     alternates: {
       canonical: "/planck-week/confirmare",
     },
     openGraph: {
-      title: "Loc rezervat — Planck Week",
-      description: "Locul tău la Planck Week e rezervat. Fără card.",
+      title: "Creează-ți contul — Planck Week",
+      description: "Locul tău la Planck Week e salvat. Creează-ți contul ca să vezi programul live.",
       url: `${PLATFORM_SITE_URL}/planck-week/confirmare`,
     },
     robots: {

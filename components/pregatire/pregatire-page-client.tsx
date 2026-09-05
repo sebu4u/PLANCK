@@ -38,6 +38,7 @@ import {
   type WorkshopSubject,
 } from "@/lib/pregatire/types"
 import { PlanckWeekPregatireBanner } from "@/components/planck-week/pregatire-week-banner"
+import { getPlanckWeekCalendarAnchor } from "@/lib/planck-week"
 import { cn } from "@/lib/utils"
 
 const BURGER_BREAKPOINT = 948
@@ -117,8 +118,9 @@ export function PregatirePageClient() {
   const { tab, selectTab } = usePregatireHubTab()
 
   const nowParts = bucharestParts()
-  const [year, setYear] = useState(nowParts.year)
-  const [month, setMonth] = useState(nowParts.month)
+  const fromPlanckWeek = searchParams.get("from") === "planck-week"
+  const [year, setYear] = useState(fromPlanckWeek ? 2026 : nowParts.year)
+  const [month, setMonth] = useState(fromPlanckWeek ? 9 : nowParts.month)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const subjectParam = searchParams.get("subject")
   const subject: WorkshopSubject | "all" = isWorkshopSubject(subjectParam) ? subjectParam : "all"
@@ -140,9 +142,22 @@ export function PregatirePageClient() {
   const [energyLoading, setEnergyLoading] = useState(false)
   const [sheetWorkshop, setSheetWorkshop] = useState<WorkshopDetail | null>(null)
   const [openingKey, setOpeningKey] = useState<string | null>(null)
-  const [weekAnchor, setWeekAnchor] = useState(() => startOfWeekMonday(new Date()))
+  const [weekAnchor, setWeekAnchor] = useState(() =>
+    fromPlanckWeek
+      ? startOfWeekMonday(getPlanckWeekCalendarAnchor())
+      : startOfWeekMonday(new Date()),
+  )
   const [materials, setMaterials] = useState<WorkshopMaterialsHubItem[] | null>(null)
   const [materialsLoading, setMaterialsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!fromPlanckWeek) return
+    const anchor = startOfWeekMonday(getPlanckWeekCalendarAnchor())
+    const parts = bucharestParts(anchor)
+    setWeekAnchor(anchor)
+    setYear(parts.year)
+    setMonth(parts.month)
+  }, [fromPlanckWeek])
 
   const authHeaders = useCallback(async (): Promise<HeadersInit> => {
     const { data } = await supabase.auth.getSession()

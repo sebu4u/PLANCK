@@ -4,7 +4,13 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { upsertSubscriber } from "@/lib/mailerlite/client"
 import { logger } from "@/lib/logger"
-import { PLANCK_WEEK_MOBILE_CALENDAR_FROM, PLANCK_WEEK_MOBILE_CALENDAR_TO } from "@/lib/planck-week"
+import {
+  PLANCK_WEEK_MOBILE_CALENDAR_FROM,
+  PLANCK_WEEK_MOBILE_CALENDAR_TO,
+  getPlanckWeekPregatirePath,
+  planckWeekConfirmarePath,
+} from "@/lib/planck-week"
+import { claimPlanckWeekForUser } from "@/lib/planck-week-claim"
 import { isWorkshopSubject, WORKSHOP_SUBJECTS, type WorkshopSubject } from "@/lib/pregatire/types"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
@@ -84,6 +90,17 @@ export async function getPlanckWeekSubjectSeats(): Promise<PlanckWeekSubjectSeat
   }
 }
 
+async function currentPlanckWeekUser(): Promise<{ id: string; email: string } | null> {
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    if (!data.user?.id || !data.user.email) return null
+    return { id: data.user.id, email: data.user.email }
+  } catch {
+    return null
+  }
+}
+
 export async function submitPlanckWeekLead(
   _prev: PlanckWeekLeadActionState,
   formData: FormData,
@@ -121,8 +138,9 @@ export async function submitPlanckWeekLead(
   }
 
   const email = parsed.data.email.toLowerCase()
+  const selectedSubjects = parsed.data.subjects.filter(isWorkshopSubject)
   const seats = await getPlanckWeekSubjectSeats()
-  const fullSubjects = parsed.data.subjects.filter((subject) => seats[subject]?.remaining === 0)
+  const fullSubjects = selectedSubjects.filter((subject) => seats[subject]?.remaining === 0)
   if (fullSubjects.length > 0) {
     return {
       error: "Nu mai sunt locuri la una dintre materiile alese. Alege altă materie.",
@@ -134,7 +152,7 @@ export async function submitPlanckWeekLead(
   const { error } = await supabase.from("planck_week_leads").insert({
     name: parsed.data.name,
     email,
-    subjects: parsed.data.subjects,
+    subjects: selectedSubjects,
   })
 
   if (error) {
@@ -157,6 +175,27 @@ export async function submitPlanckWeekLead(
     }
   }
 
-  const materii = parsed.data.subjects.join(",")
-  redirect(`/planck-week/confirmare?materii=${encodeURIComponent(materii)}`)
+  const sessionUser = await currentPlanckWeekUser()
+  if (sessionUser) {
+    let nextPath = getPlanckWeekPregatirePath(selectedSubjects[0] ?? null)
+    try {
+      const claimed = await claimPlanckWeekForUser({
+        userId: sessionUser.id,
+        email,
+        sendSummaryEmail: false,
+      })
+      nextPath = claimed.redirectPath ?? nextPath
+    } catch (err) {
+      logger.error("[planck-week] logged-in claim failed:", err)
+    }
+    redirect(nextPath)
+  }
+
+  redirect(
+    planckWeekConfirmarePath({
+      subjects: selectedSubjects,
+      email,
+      name: parsed.data.name,
+    }),
+  )
 }

@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { X } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 const STORAGE_KEY = "planck-week-pregatire-banner-seen"
 
 export function PlanckWeekPregatireBanner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user } = useAuth()
   const fromWeek = searchParams.get("from") === "planck-week"
   const [visible, setVisible] = useState(false)
 
@@ -47,12 +49,25 @@ export function PlanckWeekPregatireBanner() {
       >
         <X className="h-4 w-4" />
       </button>
-      <p className="pr-8 text-sm font-bold text-gray-900 sm:text-base">
-        Ai loc la Planck Week — iată programul live
-      </p>
-      <p className="mt-1 pr-8 text-sm leading-relaxed text-gray-500">
-        Alege sesiunile la materiile rezervate. Ședințele rămân înregistrate dacă ratezi ora.
-      </p>
+      {user ? (
+        <>
+          <p className="pr-8 text-sm font-bold text-gray-900 sm:text-base">
+            Sesiunile tale sunt rezervate
+          </p>
+          <p className="mt-1 pr-8 text-sm leading-relaxed text-gray-500">
+            Alege o ședință ca să vezi Meet-ul și materialele. Link-ul apare cu 10 minute înainte.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="pr-8 text-sm font-bold text-gray-900 sm:text-base">
+            Ai loc la Planck Week — confirmă din email
+          </p>
+          <p className="mt-1 pr-8 text-sm leading-relaxed text-gray-500">
+            Deschide linkul primit pe email ca să-ți activezi locul și să vezi programul live.
+          </p>
+        </>
+      )}
     </div>
   )
 }

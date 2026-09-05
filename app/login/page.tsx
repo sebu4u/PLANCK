@@ -10,6 +10,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { LoginButton } from "@/components/LoginButton"
 import { REGISTER_ONBOARDING_PATH } from "@/lib/onboarding"
+import { authRedirectFromSearchParams } from "@/lib/auth-next"
+import { getPlanckWeekAuthConfirmUrl } from "@/lib/planck-week"
 import Link from "next/link"
 
 // Apple icon SVG component
@@ -31,22 +33,29 @@ const MicrosoftIcon = () => (
 
 function LoginPageContent() {
     const [email, setEmail] = useState("")
-    const [loading, setLoading] = useState<"email" | null>(null)
+    const [loading, setLoading] = useState<"email" | "otp" | null>(null)
 
     const [step, setStep] = useState<"email" | "password">("email")
     const [password, setPassword] = useState("")
+    const [otpSent, setOtpSent] = useState(false)
 
     // Check for "error" query param from Supabase Auth redirect
     const { toast } = useToast()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const redirectTo = searchParams.get("redirect")
+    const redirectTo = authRedirectFromSearchParams(searchParams)
     const { user, needsOnboarding, profileSyncedUserId } = useAuth()
 
     // Redirect if already logged in
     useEffect(() => {
         if (!user || profileSyncedUserId !== user.id) return
-        if (needsOnboarding && !(redirectTo?.startsWith("/rezerva"))) {
+        if (
+            needsOnboarding &&
+            !(
+                redirectTo.startsWith("/rezerva") ||
+                redirectTo.startsWith("/pregatire")
+            )
+        ) {
             router.push(REGISTER_ONBOARDING_PATH)
             return
         }
@@ -106,6 +115,43 @@ function LoginPageContent() {
             // But we can also force a redirect or just wait for the loop
             setLoading(null)
         }
+    }
+
+    const handleMagicLink = async () => {
+        if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+            toast({
+                title: "Eroare",
+                description: "Te rugăm să introduci un email valid",
+                variant: "destructive",
+            })
+            return
+        }
+        setLoading("otp")
+        const { supabase } = await import("@/lib/supabaseClient")
+        const { error } = await supabase.auth.signInWithOtp({
+            email: email.trim().toLowerCase(),
+            options: {
+                shouldCreateUser: false,
+                emailRedirectTo: getPlanckWeekAuthConfirmUrl(
+                    redirectTo.startsWith("/") ? redirectTo : "/dashboard",
+                    window.location.origin,
+                ),
+            },
+        })
+        setLoading(null)
+        if (error) {
+            toast({
+                title: "Nu am putut trimite linkul",
+                description: error.message,
+                variant: "destructive",
+            })
+            return
+        }
+        setOtpSent(true)
+        toast({
+            title: "Verifică emailul",
+            description: "Ți-am trimis un link de acces. Deschide-l ca să te conectezi.",
+        })
     }
 
     return (
@@ -214,7 +260,10 @@ function LoginPageContent() {
                         <div className="w-full animate-in slide-in-from-right-8 fade-in duration-300">
                             <div className="mb-6">
                                 <button
-                                    onClick={() => setStep("email")}
+                                    onClick={() => {
+                                        setStep("email")
+                                        setOtpSent(false)
+                                    }}
                                     className="text-sm text-gray-500 hover:text-black flex items-center gap-1 transition-colors mb-2"
                                 >
                                     ← Back
@@ -245,6 +294,18 @@ function LoginPageContent() {
                                 >
                                     {loading === "email" ? "Logging in..." : "Log In"}
                                 </Button>
+                                <button
+                                    type="button"
+                                    onClick={() => void handleMagicLink()}
+                                    disabled={loading === "otp" || otpSent}
+                                    className="w-full text-center text-sm text-[#10a37f] hover:underline disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                    {loading === "otp"
+                                        ? "Se trimite linkul…"
+                                        : otpSent
+                                            ? "Link trimis. Verifică emailul."
+                                            : "Trimite link de acces"}
+                                </button>
                             </form>
                         </div>
                     )}

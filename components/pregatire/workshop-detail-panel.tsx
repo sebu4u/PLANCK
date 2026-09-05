@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { loginPath } from "@/lib/auth-next"
 import { supabase } from "@/lib/supabaseClient"
 import {
   formatWorkshopDateTime,
@@ -213,7 +214,7 @@ export function WorkshopDetailPanel({
 
   const handleUnlock = async () => {
     if (!isLoggedIn) {
-      router.push(`/login?next=${encodeURIComponent(`/pregatire/${workshop.id}`)}`)
+      router.push(loginPath(`/pregatire/${workshop.id}`))
       return
     }
 
@@ -222,7 +223,7 @@ export function WorkshopDetailPanel({
       const { data } = await supabase.auth.getSession()
       const token = data.session?.access_token
       if (!token) {
-        router.push(`/login?next=${encodeURIComponent(`/pregatire/${workshop.id}`)}`)
+        router.push(loginPath(`/pregatire/${workshop.id}`))
         return
       }
 

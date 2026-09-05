@@ -5,6 +5,7 @@ import { isAlreadyRegisteredError } from "@/lib/email-verification"
 export async function signUpWithEmailPassword(
   email: string,
   password: string,
+  options?: { sendConfirmationEmail?: boolean },
 ): Promise<
   | { ok: true }
   | { ok: false; alreadyRegistered?: boolean; noSession?: boolean; message: string }
@@ -33,6 +34,8 @@ export async function signUpWithEmailPassword(
     }
   }
 
-  fireSendConfirmationEmail(data.session.access_token)
+  if (options?.sendConfirmationEmail !== false) {
+    fireSendConfirmationEmail(data.session.access_token)
+  }
   return { ok: true }
 }

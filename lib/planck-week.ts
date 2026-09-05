@@ -1,5 +1,7 @@
-import { PLATFORM_STATS, TESTIMONIALS_COUNT } from "@/lib/platform-marketing"
+import { sanitizeInternalPath } from "@/lib/auth-next"
+import { PLATFORM_SITE_URL, PLATFORM_STATS, TESTIMONIALS_COUNT } from "@/lib/platform-marketing"
 import { HOMEPAGE_TESTIMONIALS } from "@/lib/homepage-testimonials"
+import type { OnboardingSubjectId } from "@/lib/onboarding"
 import {
   WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_LABELS,
@@ -32,6 +34,65 @@ export const PLANCK_WEEK_FINAL_SCARCITY =
   "Locurile sunt limitate, ca mentorii să poată răspunde fiecărui elev."
 
 export const PLANCK_WEEK_PREGATIRE_PATH = "/pregatire?from=planck-week"
+
+export const PLANCK_WEEK_AUTH_CONFIRM_PATH = "/auth/confirm"
+
+export function getPlanckWeekSiteUrl(): string {
+  return (process.env.NEXT_PUBLIC_SITE_URL || PLATFORM_SITE_URL).replace(/\/$/, "")
+}
+
+export const PLANCK_WEEK_GRADE_OPTIONS = ["9", "10", "11", "12"] as const
+export type PlanckWeekGradeOption = (typeof PLANCK_WEEK_GRADE_OPTIONS)[number]
+
+export function isPlanckWeekGradeOption(value: unknown): value is PlanckWeekGradeOption {
+  return typeof value === "string" && (PLANCK_WEEK_GRADE_OPTIONS as readonly string[]).includes(value)
+}
+
+export function getPlanckWeekPregatirePath(subject?: WorkshopSubject | null): string {
+  const params = new URLSearchParams({ from: "planck-week" })
+  if (subject) params.set("subject", subject)
+  return `/pregatire?${params.toString()}`
+}
+
+export function planckWeekConfirmarePath(input: {
+  subjects: string[]
+  email: string
+  name?: string
+}): string {
+  const params = new URLSearchParams()
+  if (input.subjects.length > 0) params.set("materii", input.subjects.join(","))
+  if (input.email) params.set("email", input.email)
+  if (input.name?.trim()) params.set("name", input.name.trim())
+  const query = params.toString()
+  return query ? `/planck-week/confirmare?${query}` : "/planck-week/confirmare"
+}
+
+export function getPlanckWeekCalendarAnchor(): Date {
+  return new Date(`${PLANCK_WEEK_MOBILE_CALENDAR_FROM}T12:00:00+03:00`)
+}
+
+export function workshopSubjectToOnboardingSubject(
+  subject: WorkshopSubject,
+): OnboardingSubjectId {
+  switch (subject) {
+    case "mate":
+      return "matematica"
+    case "info":
+      return "informatica"
+    case "fizica":
+      return "fizica"
+    case "biologie":
+      return "biologie"
+    case "chimie":
+      return "chimie"
+  }
+}
+
+export function getPlanckWeekAuthConfirmUrl(nextPath: string, origin?: string): string {
+  const next = sanitizeInternalPath(nextPath, PLANCK_WEEK_PREGATIRE_PATH)
+  const base = (origin ?? getPlanckWeekSiteUrl()).replace(/\/$/, "")
+  return `${base}${PLANCK_WEEK_AUTH_CONFIRM_PATH}?next=${encodeURIComponent(next)}`
+}
 
 /** Inclusive end of Planck Week in Bucharest (promo overlay stays up through this day). */
 const PLANCK_WEEK_PROMO_ENDS_AT = new Date("2026-09-15T00:00:00+03:00")
