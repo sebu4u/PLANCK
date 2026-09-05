@@ -12,24 +12,27 @@ interface LazyYouTubePlayerProps {
   lockedLabel?: string
   /** Caption shown at the bottom of the thumbnail before playback. */
   caption?: string
+  /** Default 16:9. Use 9:16 for Shorts / vertical teacher clips. */
+  aspect?: "16/9" | "9/16"
 }
 
 // Utility function to extract YouTube video ID from various URL formats
 export function extractYouTubeVideoId(url: string): string | null {
   if (!url) return null
-  
+
+  const trimmed = url.trim()
+  if (/^[\w-]{11}$/.test(trimmed)) return trimmed
+
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{11})/,
+    /youtube\.com\/watch\?.*v=([\w-]{11})/,
   ]
-  
+
   for (const pattern of patterns) {
-    const match = url.match(pattern)
-    if (match) {
-      return match[1]
-    }
+    const match = trimmed.match(pattern)
+    if (match) return match[1]
   }
-  
+
   return null
 }
 
@@ -41,6 +44,7 @@ export function LazyYouTubePlayer({
   onLockedClick,
   lockedLabel = "Disponibil cu Planck Plus+",
   caption,
+  aspect = "16/9",
 }: LazyYouTubePlayerProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -63,7 +67,11 @@ export function LazyYouTubePlayer({
   const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&playsinline=1`
 
   return (
-    <div className={`relative w-full aspect-video rounded-lg overflow-hidden shadow-lg bg-gray-100 ${className}`}>
+    <div
+      className={`relative w-full overflow-hidden rounded-lg bg-gray-100 shadow-lg ${
+        aspect === "9/16" ? "aspect-[9/16]" : "aspect-video"
+      } ${className}`}
+    >
       {!isLoaded || locked ? (
         // Thumbnail with play button (or locked overlay)
         <div className="relative w-full h-full cursor-pointer group" onClick={handlePlayClick}>
@@ -98,8 +106,14 @@ export function LazyYouTubePlayer({
             <>
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent to-50% transition-all duration-300 group-hover:from-black/30" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="rounded-full bg-red-600 p-4 shadow-2xl transition-all duration-300 hover:bg-red-700 group-hover:scale-110">
-                  <Play className="ml-1 h-8 w-8 fill-white text-white" />
+                <div
+                  className={`rounded-full bg-red-600 shadow-2xl transition-all duration-300 hover:bg-red-700 group-hover:scale-110 ${
+                    aspect === "9/16" ? "p-3" : "p-4"
+                  }`}
+                >
+                  <Play
+                    className={`ml-0.5 fill-white text-white ${aspect === "9/16" ? "h-6 w-6" : "ml-1 h-8 w-8"}`}
+                  />
                 </div>
               </div>
               {caption ? (

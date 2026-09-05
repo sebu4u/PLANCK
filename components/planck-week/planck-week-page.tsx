@@ -7,6 +7,7 @@ import { LandingHeroTestimonialsRow } from "@/components/landing/hero-review-row
 import { Footer } from "@/components/footer"
 import { PlanckWeekHeroSection } from "@/components/planck-week/hero-section"
 import { PlanckWeekFaqSection } from "@/components/planck-week/faq-section"
+import { PlanckWeekTeacherVideosSection } from "@/components/planck-week/teacher-videos-section"
 import { PlanckWeekFinalCtaSection } from "@/components/planck-week/final-cta-section"
 import { PlanckWeekStickyMobileCta } from "@/components/planck-week/sticky-mobile-cta"
 import { PlanckWeekReserveModal } from "@/components/planck-week/reserve-modal"
@@ -39,6 +40,7 @@ export function PlanckWeekPage() {
         cta={<PlanckWeekCtaButton onClick={() => openReserve("planck_week_calendar")} />}
       />
       <LandingTeachersSection />
+      <PlanckWeekTeacherVideosSection />
       <PlanckWeekFaqSection />
       <PlanckWeekFinalCtaSection onReserve={() => openReserve("planck_week_final")} />
       <Footer theme="light" backgroundColor="bg-[#F8F7FF]" borderColor="border-gray-200" />

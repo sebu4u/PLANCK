@@ -135,6 +135,33 @@ export const PLANCK_WEEK_SUBJECT_OPTIONS = WORKSHOP_SUBJECTS.map((id) => ({
   label: WORKSHOP_SUBJECT_LABELS[id],
 }))
 
+export const PLANCK_WEEK_TEACHER_VIDEOS = [
+  {
+    teacherId: "briana-bucur",
+    name: "Bucur Briana",
+    subject: "info" as const,
+    youtubeUrl: "https://www.youtube.com/shorts/1gT4ak1Psuc",
+  },
+  {
+    teacherId: "denisa",
+    name: "Banu Denisa",
+    subject: "chimie" as const,
+    youtubeUrl: "https://www.youtube.com/shorts/Zagb-UZzbt4",
+  },
+  {
+    teacherId: "pavel-andrei",
+    name: "Pavel Andrei",
+    subject: "mate" as const,
+    youtubeUrl: "https://www.youtube.com/shorts/GQwGmeXVpaQ",
+  },
+  {
+    teacherId: "diana",
+    name: "Rotaru Diana",
+    subject: "biologie" as const,
+    youtubeUrl: "https://www.youtube.com/shorts/cVv0760eTu0",
+  },
+] as const
+
 export function parsePlanckWeekSubjects(value: string | null | undefined): WorkshopSubject[] {
   if (!value) return []
   const allowed = new Set<string>(WORKSHOP_SUBJECTS)
