@@ -518,10 +518,6 @@ class TikTokPixel {
       })
       return
     }
-    if (pathname === '/planck-week/confirmare') {
-      this.trackSubmitForm('planck_week', 'Planck Week')
-      return
-    }
     if (pathname === '/contact') {
       this.trackFindLocation('contact', 'Planck contact')
       return

@@ -10,6 +10,7 @@ import {
   PLANCK_WEEK_PREGATIRE_PATH,
 } from "@/lib/planck-week"
 import { trackFunnelEvent } from "@/lib/funnel-analytics"
+import { trackPlanckWeekLeadPixels } from "@/lib/planck-week-pixels"
 
 const REDIRECT_MS = 4000
 
@@ -23,6 +24,7 @@ export function PlanckWeekConfirmClient() {
   const subjectsLabel = formatPlanckWeekSubjects(subjects)
 
   useEffect(() => {
+    trackPlanckWeekLeadPixels()
     trackFunnelEvent("planck_week_reserved", {
       subjects: subjects.join(","),
     })

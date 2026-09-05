@@ -363,9 +363,6 @@ class MetaPixel {
       this.trackViewContent(namedContent('planck_week', 'Planck Week'))
       return
     }
-    if (pathname === '/planck-week/confirmare') {
-      this.trackLead('planck_week', 'Planck Week')
-    }
   }
 }
 

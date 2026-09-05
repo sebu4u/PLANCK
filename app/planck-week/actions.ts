@@ -4,8 +4,10 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { upsertSubscriber } from "@/lib/mailerlite/client"
 import { logger } from "@/lib/logger"
-import { isWorkshopSubject, WORKSHOP_SUBJECTS } from "@/lib/pregatire/types"
+import { PLANCK_WEEK_MOBILE_CALENDAR_FROM, PLANCK_WEEK_MOBILE_CALENDAR_TO } from "@/lib/planck-week"
+import { isWorkshopSubject, WORKSHOP_SUBJECTS, type WorkshopSubject } from "@/lib/pregatire/types"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
 
 export type PlanckWeekLeadActionState = {
   error: string | null
@@ -37,6 +39,49 @@ function firstFieldError(
   key: "name" | "email" | "subjects",
 ): string | undefined {
   return flat[key]?.[0]
+}
+
+export type PlanckWeekSubjectSeat = {
+  remaining: number
+  max: number
+}
+
+export type PlanckWeekSubjectSeats = Partial<Record<WorkshopSubject, PlanckWeekSubjectSeat>>
+
+export async function getPlanckWeekSubjectSeats(): Promise<PlanckWeekSubjectSeats> {
+  const from = `${PLANCK_WEEK_MOBILE_CALENDAR_FROM}T00:00:00+03:00`
+  const to = `${PLANCK_WEEK_MOBILE_CALENDAR_TO}T23:59:59+03:00`
+
+  try {
+    const supabase = getServiceRoleSupabase()
+    const { data, error } = await supabase
+      .from("workshops_public")
+      .select("subject, max_seats, unlock_count, starts_at")
+      .gte("starts_at", from)
+      .lte("starts_at", to)
+      .order("starts_at", { ascending: true })
+
+    if (error) {
+      logger.error("[planck-week] seats query failed:", error.message)
+      return {}
+    }
+
+    const seats: PlanckWeekSubjectSeats = {}
+    for (const row of data ?? []) {
+      if (!isWorkshopSubject(row.subject) || seats[row.subject]) continue
+      if (row.max_seats == null) continue
+      const max = Number(row.max_seats)
+      const taken = Number(row.unlock_count ?? 0)
+      seats[row.subject] = {
+        max,
+        remaining: Math.max(0, max - taken),
+      }
+    }
+    return seats
+  } catch (err) {
+    logger.error("[planck-week] seats query error:", err)
+    return {}
+  }
 }
 
 export async function submitPlanckWeekLead(
@@ -76,6 +121,15 @@ export async function submitPlanckWeekLead(
   }
 
   const email = parsed.data.email.toLowerCase()
+  const seats = await getPlanckWeekSubjectSeats()
+  const fullSubjects = parsed.data.subjects.filter((subject) => seats[subject]?.remaining === 0)
+  if (fullSubjects.length > 0) {
+    return {
+      error: "Nu mai sunt locuri la una dintre materiile alese. Alege altă materie.",
+      fieldErrors: { subjects: "Nu mai sunt locuri la una dintre materiile alese." },
+    }
+  }
+
   const supabase = await createClient()
   const { error } = await supabase.from("planck_week_leads").insert({
     name: parsed.data.name,

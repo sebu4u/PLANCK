@@ -14,9 +14,12 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { submitPlanckWeekLead, type PlanckWeekLeadActionState } from "@/app/planck-week/actions"
+import { submitPlanckWeekLead, getPlanckWeekSubjectSeats, type PlanckWeekLeadActionState, type PlanckWeekSubjectSeats } from "@/app/planck-week/actions"
 import { PLANCK_WEEK_CTA, PLANCK_WEEK_SUBJECT_OPTIONS } from "@/lib/planck-week"
+import { rememberPlanckWeekLeadEmail } from "@/lib/planck-week-pixels"
 import { trackFunnelEvent } from "@/lib/funnel-analytics"
+import { metaPixel } from "@/lib/meta-pixel"
+import { tiktokPixel } from "@/lib/tiktok-pixel"
 import { cn } from "@/lib/utils"
 
 const BURGER_BREAKPOINT = 948
@@ -64,16 +67,22 @@ function ReserveForm({
   Description,
   state,
   formAction,
+  seats,
 }: {
   Title: ComponentType<{ className?: string; children?: React.ReactNode }>
   Description: ComponentType<{ className?: string; children?: React.ReactNode }>
   state: PlanckWeekLeadActionState
   formAction: (payload: FormData) => void
+  seats: PlanckWeekSubjectSeats | null
 }) {
   return (
     <form
       action={formAction}
-      onSubmit={() => {
+      onSubmit={(event) => {
+        const email = String(new FormData(event.currentTarget).get("email") || "")
+        rememberPlanckWeekLeadEmail(email)
+        void tiktokPixel.identify({ email })
+        metaPixel.identify({ email })
         trackFunnelEvent("planck_week_reserve_submitted", { placement: "reserve_modal" })
       }}
       className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pt-2 sm:px-6 sm:pb-6"
@@ -119,20 +128,31 @@ function ReserveForm({
       <fieldset className="mt-4">
         <legend className="text-sm font-semibold text-gray-900">Materie(le)</legend>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {PLANCK_WEEK_SUBJECT_OPTIONS.map((subject) => (
-            <label
-              key={subject.id}
-              className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-[#EBE8FF] bg-[#F8F7FF] px-3 py-2.5 text-sm font-medium text-gray-800 has-[:checked]:border-[#7C5CFC] has-[:checked]:bg-[#7C5CFC]/10"
-            >
-              <input
-                type="checkbox"
-                name="subjects"
-                value={subject.id}
-                className="h-4 w-4 rounded border-gray-300 text-[#7C5CFC] focus:ring-[#7C5CFC]"
-              />
-              {subject.label}
-            </label>
-          ))}
+          {PLANCK_WEEK_SUBJECT_OPTIONS.map((subject) => {
+            const seat = seats?.[subject.id]
+            const full = seat?.remaining === 0
+            return (
+              <label
+                key={subject.id}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2.5 rounded-xl border border-[#EBE8FF] bg-[#F8F7FF] px-3 py-2.5 text-sm font-medium text-gray-800 has-[:checked]:border-[#7C5CFC] has-[:checked]:bg-[#7C5CFC]/10",
+                  full && "cursor-not-allowed opacity-55 has-[:checked]:border-[#EBE8FF] has-[:checked]:bg-[#F8F7FF]",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  name="subjects"
+                  value={subject.id}
+                  disabled={full}
+                  className="h-4 w-4 rounded border-gray-300 text-[#7C5CFC] focus:ring-[#7C5CFC]"
+                />
+                <span className="min-w-0 flex-1">{subject.label}</span>
+                <span className="shrink-0 tabular-nums text-xs font-semibold text-gray-500">
+                  {seat ? `${seat.remaining}/${seat.max}` : "…"}
+                </span>
+              </label>
+            )
+          })}
         </div>
         <FieldError message={state.fieldErrors?.subjects} />
       </fieldset>
@@ -170,6 +190,18 @@ export function PlanckWeekReserveModal({
 }) {
   const isMobile = useIsMobile()
   const [state, formAction] = useActionState(submitPlanckWeekLead, initialState)
+  const [seats, setSeats] = useState<PlanckWeekSubjectSeats | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void getPlanckWeekSubjectSeats().then((next) => {
+      if (!cancelled) setSeats(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open || isMobile) return
@@ -185,6 +217,7 @@ export function PlanckWeekReserveModal({
       Description={isMobile ? SheetDescription : DialogDescription}
       state={state}
       formAction={formAction}
+      seats={seats}
     />
   )
 

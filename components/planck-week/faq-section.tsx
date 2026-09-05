@@ -1,29 +1,18 @@
 "use client"
 
-import { useState } from "react"
-import Image from "next/image"
+import React from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Plus, X } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
+import { PlanckWeekFaqTeacher } from "@/components/planck-week/faq-teacher"
 import { PLANCK_WEEK_FAQ } from "@/lib/planck-week"
 
 export function PlanckWeekFaqSection() {
-  const [openId, setOpenId] = useState<string | null>("gratuit")
+  const [openId, setOpenId] = React.useState<string | null>("gratuit")
 
   return (
     <section>
-      <div className="bg-white">
-        <FadeInUp className="flex justify-center leading-none">
-          <Image
-            src="/landing-teacher.png"
-            alt="Profesoară PLANCK"
-            width={1024}
-            height={1024}
-            className="block h-auto w-[240px] select-none object-contain object-bottom sm:w-[300px] lg:w-[340px]"
-            sizes="(max-width: 640px) 240px, (max-width: 1024px) 300px, 340px"
-          />
-        </FadeInUp>
-      </div>
+      <PlanckWeekFaqTeacher />
       <div className="bg-[#F8F7FF] pb-20 pt-8 sm:pb-28 sm:pt-10">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <FadeInUp className="mb-12 text-center">
