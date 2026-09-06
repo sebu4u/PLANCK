@@ -12,9 +12,13 @@ export default async function DashboardPage() {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("is_dev, user_type")
+      .select("is_dev, is_mentor, user_type")
       .eq("user_id", user.id)
       .maybeSingle()
+
+    if (profile?.is_mentor === true) {
+      redirect("/dashboard/mentor")
+    }
 
     if (profile?.is_dev === true) {
       redirect("/dashboard/dev")

@@ -43,6 +43,8 @@ interface AuthContextType {
   isAdmin: boolean
   /** true dacă profiles.is_dev = true (setat în DB / de admin) */
   isDev: boolean
+  /** true dacă profiles.is_mentor = true (legat de un profesor /pregatire) */
+  isMentor: boolean
   devSubjects: DevSubjectKey[] | null
   isSuperDev: boolean
   needsOnboarding: boolean
@@ -66,7 +68,7 @@ const REFERRAL_CODE_STORAGE_KEY = "planck_referral_code"
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
 const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
 const PROFILE_SELECT =
-  "name, nickname, user_icon, grade, preferred_materie, plan, plus_months_remaining, referred_by, is_admin, is_dev, dev_subjects, onboarding_completed_at, user_type, parent_invite_code, teaching_materie, email_verified"
+  "name, nickname, user_icon, grade, preferred_materie, plan, plus_months_remaining, referred_by, is_admin, is_dev, is_mentor, dev_subjects, onboarding_completed_at, user_type, parent_invite_code, teaching_materie, email_verified"
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (
@@ -87,6 +89,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
   const [userElo, setUserElo] = useState<number | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
   const [isDev, setIsDev] = useState<boolean>(false)
+  const [isMentor, setIsMentor] = useState<boolean>(false)
   const [devSubjects, setDevSubjects] = useState<DevSubjectKey[] | null>(null)
   const [profileSyncedUserId, setProfileSyncedUserId] = useState<string | null>(null)
   const [pendingOAuthOnboardingCheck, setPendingOAuthOnboardingCheck] = useState(false)
@@ -111,6 +114,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
     setUserElo(null)
     setIsAdmin(false)
     setIsDev(false)
+    setIsMentor(false)
     setDevSubjects(null)
     setProfileSyncedUserId(null)
   }, [])
@@ -158,6 +162,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
         setUserElo(null)
         setIsAdmin(false)
         setIsDev(false)
+        setIsMentor(false)
         setDevSubjects(null)
         setProfileSyncedUserId(null)
       } else {
@@ -225,6 +230,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
       setUserElo(null)
       setIsAdmin(false)
       setIsDev(false)
+      setIsMentor(false)
       setDevSubjects(null)
       setProfileSyncedUserId(null)
       return
@@ -253,6 +259,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
       // Setează starea de admin / dev din baza de date
       setIsAdmin(data.is_admin === true)
       setIsDev(data.is_dev === true)
+      setIsMentor(data.is_mentor === true)
       setDevSubjects(normalizeDevSubjects(data.dev_subjects))
       setProfileSyncedUserId(user.id)
       return
@@ -284,15 +291,18 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
         )
         setIsAdmin(created.is_admin === true)
         setIsDev(created.is_dev === true)
+        setIsMentor(created.is_mentor === true)
         setDevSubjects(normalizeDevSubjects(created.dev_subjects))
       } else {
         setIsAdmin(false)
         setIsDev(false)
+        setIsMentor(false)
         setDevSubjects(null)
       }
     } else {
       setIsAdmin(false)
       setIsDev(false)
+      setIsMentor(false)
       setDevSubjects(null)
     }
     setProfileSyncedUserId(user.id)
@@ -460,6 +470,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
         userElo,
         isAdmin,
         isDev,
+        isMentor,
         devSubjects,
         isSuperDev: resolveIsSuperDev(isDev, devSubjects),
         needsOnboarding,

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Clock, Loader2, Users, Video } from "lucide-react"
+import { CheckCircle2, Clock, Loader2, Users, Video } from "lucide-react"
 import {
   formatWorkshopTime,
   isWorkshopPast,
@@ -34,7 +34,7 @@ export function WorkshopCard({
       className={cn(
         "group relative w-full overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white p-4 text-left shadow-sm transition",
         "hover:border-[#d1d5db] hover:shadow-md",
-        workshop.unlocked && "ring-1 ring-emerald-200",
+        workshop.unlocked && "border-emerald-200 bg-emerald-50/40 ring-1 ring-emerald-200",
         loading && "pointer-events-none",
       )}
     >
@@ -56,7 +56,8 @@ export function WorkshopCard({
             </span>
             {workshop.is_bac ? <WorkshopBacBadge /> : null}
             {workshop.unlocked ? (
-              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                <CheckCircle2 className="h-3 w-3" aria-hidden />
                 Înscris
               </span>
             ) : null}
@@ -95,7 +96,11 @@ export function WorkshopCard({
           <p className="text-sm font-semibold tabular-nums text-[#111827]">
             {formatWorkshopTime(workshop.starts_at)}
           </p>
-          <p className="mt-1 text-xs font-medium text-emerald-700">Gratuit</p>
+          {workshop.unlocked ? (
+            <p className="mt-1 text-xs font-semibold text-emerald-800">Loc rezervat</p>
+          ) : (
+            <p className="mt-1 text-xs font-medium text-emerald-700">Gratuit</p>
+          )}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 pl-2 text-xs text-[#9ca3af]">

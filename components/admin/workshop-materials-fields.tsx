@@ -68,11 +68,15 @@ export function WorkshopMaterialsFields({
   onChange,
   workshopId,
   getAccessToken,
+  uploadUrl,
+  catalogSearchUrl,
 }: {
   value: WorkshopMaterialsFormValue
   onChange: (next: WorkshopMaterialsFormValue) => void
   workshopId: string | null
   getAccessToken: () => Promise<string | null>
+  uploadUrl?: string
+  catalogSearchUrl?: string
 }) {
   const [catalog, setCatalog] = useState<CatalogKind>("physics_problem")
   const [search, setSearch] = useState("")
@@ -100,7 +104,7 @@ export function WorkshopMaterialsFields({
       form.set("file", file)
       form.set("workshopId", workshopId)
       form.set("kind", kind)
-      const response = await fetch("/api/admin/pregatiri/upload", {
+      const response = await fetch(uploadUrl ?? "/api/admin/pregatiri/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -134,6 +138,15 @@ export function WorkshopMaterialsFields({
         return
       }
       const headers = { Authorization: `Bearer ${token}` }
+      if (catalogSearchUrl) {
+        const params = new URLSearchParams({ kind: catalog })
+        if (search.trim()) params.set("search", search.trim())
+        const response = await fetch(`${catalogSearchUrl}?${params}`, { headers })
+        if (!response.ok) throw new Error("Nu am putut căuta materialele.")
+        const data = await response.json()
+        setHits((data.hits ?? []) as SearchHit[])
+        return
+      }
       if (catalog === "grila_fizica" || catalog === "grila_biologie") {
         const params = new URLSearchParams({
           action: "quiz-questions",
@@ -187,7 +200,7 @@ export function WorkshopMaterialsFields({
     } finally {
       setSearching(false)
     }
-  }, [catalog, getAccessToken, search])
+  }, [catalog, catalogSearchUrl, getAccessToken, search])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

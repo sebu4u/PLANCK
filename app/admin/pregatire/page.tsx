@@ -75,15 +75,25 @@ export default function AdminPregatirePage() {
     <div className="min-h-screen bg-black text-white">
       <Navigation />
       <main className="mx-auto max-w-[1500px] px-4 pb-12 pt-24">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-4 text-gray-300"
-          onClick={() => router.push("/admin/learning-paths")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Administrare
-        </Button>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-300"
+            onClick={() => router.push("/admin/learning-paths")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Administrare
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-300"
+            onClick={() => router.push("/admin/mentors")}
+          >
+            Mentori
+          </Button>
+        </div>
         <h1 className="text-3xl font-bold">Pregătire</h1>
         <p className="mt-2 text-gray-400">
           Gestionează workshop-urile live, profesorii CMS și vezi elevii înscriși la fiecare pregătire.

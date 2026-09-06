@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { CheckCircle2, Loader2 } from "lucide-react"
 import {
   formatWorkshopHeroDate,
   formatWorkshopStartsIn,
@@ -66,6 +66,7 @@ export function NextWorkshopHero({
       className={cn(
         "relative w-full overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white px-4 py-3 text-left shadow-sm transition",
         "hover:border-[#d1d5db] hover:shadow-md",
+        next.unlocked && "border-emerald-200 ring-1 ring-emerald-200",
         opening && "pointer-events-none",
       )}
     >
@@ -96,12 +97,20 @@ export function NextWorkshopHero({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">
             Următoarea meditație
           </p>
-          <span
-            className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
-            style={{ backgroundColor: color }}
-          >
-            {WORKSHOP_SUBJECT_LABELS[next.subject]}
-          </span>
+          <div className="flex items-center gap-1.5">
+            {next.unlocked ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                <CheckCircle2 className="h-3 w-3" aria-hidden />
+                Înscris
+              </span>
+            ) : null}
+            <span
+              className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+              style={{ backgroundColor: color }}
+            >
+              {WORKSHOP_SUBJECT_LABELS[next.subject]}
+            </span>
+          </div>
         </div>
         <h2 className="mt-1 text-base font-semibold leading-snug tracking-tight text-[#111827]">
           {next.title}

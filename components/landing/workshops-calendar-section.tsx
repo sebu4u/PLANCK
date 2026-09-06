@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react"
 import Link from "next/link"
 import { ArrowRight, Clock, Users, Zap } from "lucide-react"
 import { FadeInUp } from "@/components/scroll-animations"
@@ -20,9 +20,11 @@ import {
   formatWorkshopTime,
 } from "@/lib/pregatire/dates"
 import {
+  WORKSHOP_HERO_IMAGE_SRC,
   WORKSHOP_SUBJECTS,
   WORKSHOP_SUBJECT_COLORS,
   WORKSHOP_SUBJECT_LABELS,
+  WORKSHOP_TZ,
   type WorkshopPublic,
   type WorkshopSubject,
 } from "@/lib/pregatire/types"
@@ -168,7 +170,18 @@ function SubjectLegend() {
   )
 }
 
-function WorkshopDayListCard({
+function formatWorkshopDateLabel(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+  return date.toLocaleDateString("ro-RO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: WORKSHOP_TZ,
+  })
+}
+
+function LandingMobileWorkshopCard({
   workshop,
   onOpen,
 }: {
@@ -176,55 +189,61 @@ function WorkshopDayListCard({
   onOpen: () => void
 }) {
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
+  const dateLabel = formatWorkshopDateLabel(workshop.starts_at)
   const time = formatWorkshopTime(workshop.starts_at)
-  const seats = workshopSeatsLabel(workshop)
-  const full = workshop.seats_remaining === 0
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="w-full overflow-hidden rounded-2xl border border-[var(--cal-ring)] bg-white text-left shadow-[0_8px_24px_rgba(var(--cal-glow),0.08)] transition active:scale-[0.99]"
+      className="relative w-full overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white px-4 py-3 text-left shadow-sm transition hover:border-[#d1d5db] hover:shadow-md active:scale-[0.99]"
     >
-      <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
-      <div className="px-4 py-3.5">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="absolute inset-y-0 left-0 z-[1] w-1" style={{ backgroundColor: color }} />
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[30%] overflow-hidden"
+        aria-hidden
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={WORKSHOP_HERO_IMAGE_SRC[workshop.subject]}
+          alt=""
+          className="h-full w-full object-cover object-center"
+          onError={(event) => {
+            event.currentTarget.parentElement?.classList.add("hidden")
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-white from-0% via-white/75 to-transparent" />
+      </div>
+      <div className="relative z-[1] pl-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">
+            Gratuit
+          </p>
           <span
-            className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white"
+            className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
             style={{ backgroundColor: color }}
           >
             {WORKSHOP_SUBJECT_LABELS[workshop.subject]}
           </span>
+        </div>
+        <h3 className="mt-1 text-base font-semibold leading-snug tracking-tight text-[#111827]">
+          {workshop.title}
+        </h3>
+        <p className="mt-0.5 text-sm font-semibold tracking-tight text-[#111827]">
+          <span className="capitalize">{dateLabel}</span>
           {time ? (
-            <span className="inline-flex items-center gap-1 text-sm font-medium text-gray-500">
-              <Clock className="h-3.5 w-3.5" />
+            <span className="tabular-nums text-[#6b7280]">
+              {" · "}
               {time}
             </span>
           ) : null}
-          {full ? (
-            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
-              Locuri epuizate
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-2 text-[15px] font-black leading-snug tracking-tight text-gray-900">
-          {workshop.title}
         </p>
-        <p className="mt-1.5 text-sm text-gray-500">
-          {workshop.teacher?.name ?? "Profesor PLANCK"}
-        </p>
-        {seats ? (
-          <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-500">
-            <Users className="h-3.5 w-3.5" aria-hidden />
-            {seats}
-          </p>
-        ) : null}
       </div>
     </button>
   )
 }
 
-function MobileWeekAgenda({
+function MobileStackedAgenda({
   days,
   byDay,
   loading,
@@ -233,92 +252,31 @@ function MobileWeekAgenda({
   days: CalendarDay[]
   byDay: Map<string, WorkshopPublic[]>
   loading: boolean
-  onOpen: (workshops: WorkshopPublic[]) => void
+  onOpen: (workshop: WorkshopPublic) => void
 }) {
-  const scrollerRef = useRef<HTMLDivElement>(null)
-  const [activeIndex, setActiveIndex] = useState(0)
-
-  const syncActiveFromScroll = useCallback(() => {
-    const el = scrollerRef.current
-    if (!el || el.clientWidth === 0) return
-    const next = Math.round(el.scrollLeft / el.clientWidth)
-    setActiveIndex(Math.min(days.length - 1, Math.max(0, next)))
-  }, [days.length])
-
-  const goTo = (index: number) => {
-    const el = scrollerRef.current
-    if (!el) return
-    el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" })
-    setActiveIndex(index)
-  }
+  const items = days.flatMap((day) => byDay.get(day.key) ?? [])
 
   return (
-    <div className="sm:hidden">
-      <div
-        className="flex gap-1 px-4"
-        role="tablist"
-        aria-label="Zilele săptămânii"
-      >
-        {days.map((day, index) => {
-          const isActive = index === activeIndex
-          return (
-            <button
-              key={day.key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => goTo(index)}
-              className={cn(
-                "flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-2 transition-colors",
-                isActive ? "bg-gray-900 text-white" : "bg-[var(--cal-tint)] text-gray-600",
-              )}
-            >
-              <span className="text-[10px] font-bold uppercase tracking-wide">
-                {weekdayShort(day.weekday)}
-              </span>
-              <span className="mt-0.5 text-sm font-black tabular-nums">{day.day}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      <div
-        ref={scrollerRef}
-        onScroll={syncActiveFromScroll}
-        className="mt-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {days.map((day) => {
-          const items = byDay.get(day.key) ?? []
-          return (
-            <div
-              key={day.key}
-              className="w-full shrink-0 snap-start px-4"
-              role="tabpanel"
-            >
-              {loading ? (
-                <div className="space-y-3">
-                  <div className="h-24 animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
-                  <div className="h-24 animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
-                </div>
-              ) : items.length > 0 ? (
-                <div className="space-y-3">
-                  {items.map((workshop) => (
-                    <WorkshopDayListCard
-                      key={workshop.id}
-                      workshop={workshop}
-                      onOpen={() => onOpen([workshop])}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl bg-[var(--cal-tint)] px-4 py-8 text-center text-sm leading-relaxed text-gray-500">
-                  Nu sunt meditații în această zi.
-                </p>
-              )}
-            </div>
-          )
-        })}
-      </div>
+    <div className="space-y-3 px-4 sm:hidden">
+      {loading ? (
+        <>
+          <div className="h-[5.5rem] animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
+          <div className="h-[5.5rem] animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
+          <div className="h-[5.5rem] animate-pulse rounded-2xl bg-[var(--cal-ring)]" />
+        </>
+      ) : items.length > 0 ? (
+        items.map((workshop) => (
+          <LandingMobileWorkshopCard
+            key={workshop.id}
+            workshop={workshop}
+            onOpen={() => onOpen(workshop)}
+          />
+        ))
+      ) : (
+        <p className="rounded-2xl bg-[var(--cal-tint)] px-4 py-8 text-center text-sm leading-relaxed text-gray-500">
+          Nu sunt meditații programate.
+        </p>
+      )}
     </div>
   )
 }
@@ -431,7 +389,7 @@ export function LandingWorkshopsCalendarSection({
   title?: string
   campaignStyle?: boolean
   cta?: ReactNode
-  onReserve?: () => void
+  onReserve?: (subject?: WorkshopSubject) => void
   reserveLabel?: string
   mobileDayFrom?: string
   mobileDayTo?: string
@@ -541,11 +499,17 @@ export function LandingWorkshopsCalendarSection({
       </div>
 
         <FadeInUp delay={0.12} className="mt-10 w-full sm:mx-auto sm:mt-12 sm:max-w-4xl sm:px-6 lg:px-8">
-          <MobileWeekAgenda
+          <MobileStackedAgenda
             days={mobileDays}
             byDay={byDay}
             loading={loading}
-            onOpen={setSelected}
+            onOpen={(workshop) => {
+              if (onReserve) {
+                onReserve(workshop.subject)
+                return
+              }
+              setSelected([workshop])
+            }}
           />
 
           <div className="hidden overflow-hidden rounded-[24px] bg-[var(--cal-tint)] p-5 shadow-[0_16px_48px_rgba(var(--cal-glow),0.12)] ring-1 ring-[var(--cal-ring)] sm:block">
@@ -610,7 +574,7 @@ export function LandingWorkshopsCalendarSection({
                   onReserve
                     ? () => {
                         setSelected(null)
-                        onReserve()
+                        onReserve(workshop.subject)
                       }
                     : undefined
                 }

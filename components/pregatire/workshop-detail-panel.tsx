@@ -471,7 +471,14 @@ export function WorkshopDetailPanel({
           <Clock className="h-4 w-4" />
           {workshop.duration_minutes} minute
         </span>
-        <span className="inline-flex items-center gap-1.5 text-emerald-700">Gratuit</span>
+        {workshop.unlocked ? (
+          <span className="inline-flex items-center gap-1.5 font-medium text-emerald-800">
+            <CheckCircle2 className="h-4 w-4" />
+            Ești înscris
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-emerald-700">Gratuit</span>
+        )}
         {workshop.max_seats != null ? (
           <span className="inline-flex items-center gap-1.5">
             <Users className="h-4 w-4" />

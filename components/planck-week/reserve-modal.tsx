@@ -20,6 +20,7 @@ import { rememberPlanckWeekLeadEmail } from "@/lib/planck-week-pixels"
 import { trackFunnelEvent } from "@/lib/funnel-analytics"
 import { metaPixel } from "@/lib/meta-pixel"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
+import type { WorkshopSubject } from "@/lib/pregatire/types"
 import { cn } from "@/lib/utils"
 
 const BURGER_BREAKPOINT = 948
@@ -68,12 +69,14 @@ function ReserveForm({
   state,
   formAction,
   seats,
+  initialSubject,
 }: {
   Title: ComponentType<{ className?: string; children?: React.ReactNode }>
   Description: ComponentType<{ className?: string; children?: React.ReactNode }>
   state: PlanckWeekLeadActionState
   formAction: (payload: FormData) => void
   seats: PlanckWeekSubjectSeats | null
+  initialSubject?: WorkshopSubject | null
 }) {
   return (
     <form
@@ -143,6 +146,7 @@ function ReserveForm({
                   type="checkbox"
                   name="subjects"
                   value={subject.id}
+                  defaultChecked={initialSubject === subject.id && !full}
                   disabled={full}
                   className="h-4 w-4 rounded border-gray-300 text-[#7C5CFC] focus:ring-[#7C5CFC]"
                 />
@@ -184,9 +188,11 @@ function ReserveForm({
 export function PlanckWeekReserveModal({
   open,
   onOpenChange,
+  initialSubject,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialSubject?: WorkshopSubject | null
 }) {
   const isMobile = useIsMobile()
   const [state, formAction] = useActionState(submitPlanckWeekLead, initialState)
@@ -213,11 +219,13 @@ export function PlanckWeekReserveModal({
 
   const inner = (
     <ReserveForm
+      key={`${open ? "open" : "closed"}-${initialSubject ?? "none"}`}
       Title={isMobile ? SheetTitle : DialogTitle}
       Description={isMobile ? SheetDescription : DialogDescription}
       state={state}
       formAction={formAction}
       seats={seats}
+      initialSubject={initialSubject}
     />
   )
 

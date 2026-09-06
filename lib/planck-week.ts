@@ -15,6 +15,31 @@ export const PLANCK_WEEK_DATES = "10-14 septembrie · Planck Week"
 export const PLANCK_WEEK_MOBILE_CALENDAR_FROM = "2026-09-10"
 export const PLANCK_WEEK_MOBILE_CALENDAR_TO = "2026-09-14"
 
+/** Înscrierile se închid joi, 10 septembrie 2026, ora 20:00 (Europe/Bucharest). */
+export const PLANCK_WEEK_SIGNUP_CLOSES_AT = new Date("2026-09-10T20:00:00+03:00")
+
+export type PlanckWeekSignupCountdown = {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+  closed: boolean
+}
+
+export function getPlanckWeekSignupCountdown(
+  now = Date.now(),
+): PlanckWeekSignupCountdown {
+  const remaining = Math.max(0, PLANCK_WEEK_SIGNUP_CLOSES_AT.getTime() - now)
+  const totalSeconds = Math.floor(remaining / 1000)
+  return {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+    closed: remaining <= 0,
+  }
+}
+
 export const PLANCK_WEEK_HEADLINE = "Planck Week. Meditații live gratuite, 10–14 septembrie."
 
 export const PLANCK_WEEK_HERO_BULLETS = [
@@ -169,7 +194,7 @@ export const PLANCK_WEEK_FAQ = [
   {
     id: "gratuit",
     question: "E chiar gratuit, fără niciun cost ascuns?",
-    answer: "Da. Toată Planck Week e gratuită, fără card la înscriere.",
+    answer: "Da. Tot ce oferă Planck Week e gratuit, ai nevoie doar de cont la înscriere.",
   },
   {
     id: "dupa",

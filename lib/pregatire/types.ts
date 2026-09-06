@@ -75,6 +75,7 @@ export interface WorkshopTeacher {
   description: string
   icon_url: string | null
   is_active: boolean
+  mentor_user_id?: string | null
   created_at?: string
   updated_at?: string
 }

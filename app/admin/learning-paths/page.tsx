@@ -124,6 +124,14 @@ export default function AdminLearningPathsPage() {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => router.push("/admin/mentors")}
+              className="text-gray-200 hover:text-white hover:bg-white/10"
+            >
+              Mentori
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => router.push("/admin/content-reports")}
               className="text-gray-200 hover:text-white hover:bg-white/10"
             >
