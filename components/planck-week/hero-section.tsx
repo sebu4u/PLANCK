@@ -1,12 +1,18 @@
 "use client"
 
+import { useCallback, useState } from "react"
 import { FadeInUp } from "@/components/scroll-animations"
 import { HomePageNavbar } from "@/components/homepage-navbar"
 import { Landing1LeuHeroConfetti } from "@/components/landing-1leu/hero-confetti"
+import { Landing1LeuWhatIsSheet } from "@/components/landing-1leu/what-is-planck-sheet"
 import { PlanckWeekCtaButton } from "@/components/planck-week/cta-button"
 import { PLANCK_WEEK_DATES, PLANCK_WEEK_MICROCOPY } from "@/lib/planck-week"
 
 export function PlanckWeekHeroSection({ onReserve }: { onReserve: () => void }) {
+  const [whatIsOpen, setWhatIsOpen] = useState(false)
+  const openWhatIs = useCallback(() => setWhatIsOpen(true), [])
+  const closeWhatIs = useCallback(() => setWhatIsOpen(false), [])
+
   return (
     <section className="relative overflow-hidden bg-[linear-gradient(to_bottom,#c8e6ff_0%,#e8f4ff_16%,#ffffff_38%)]">
       <Landing1LeuHeroConfetti />
@@ -43,8 +49,16 @@ export function PlanckWeekHeroSection({ onReserve }: { onReserve: () => void }) 
           <p className="mt-2.5 text-sm leading-relaxed text-gray-500 sm:text-[15px]">
             {PLANCK_WEEK_MICROCOPY}
           </p>
+          <button
+            type="button"
+            onClick={openWhatIs}
+            className="mt-1 inline-flex min-h-11 items-center justify-center text-sm font-semibold text-[#7C5CFC] underline-offset-4 hover:underline active:opacity-80"
+          >
+            Ce este PLANCK? →
+          </button>
         </FadeInUp>
       </div>
+      <Landing1LeuWhatIsSheet open={whatIsOpen} onClose={closeWhatIs} />
     </section>
   )
 }
