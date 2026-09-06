@@ -33,7 +33,12 @@ export async function POST(req: NextRequest) {
       sendSummaryEmail: false,
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      ok: result.ok,
+      claimed: result.claimed,
+      unlockedCount: result.unlockedCount,
+      redirectPath: result.redirectPath,
+    })
   } catch (err) {
     logger.error("[planck-week/claim] error:", err)
     return NextResponse.json({ error: "Eroare internă." }, { status: 500 })
