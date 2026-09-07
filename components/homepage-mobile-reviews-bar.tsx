@@ -86,16 +86,37 @@ function ReviewCard({ review }: { review: HomepageMobileReview }) {
   )
 }
 
-export function HomepageMobileReviewsBar() {
+export function HomepageMobileReviewsBar({
+  placement = "bottom",
+  visible = true,
+}: {
+  placement?: "top" | "bottom"
+  visible?: boolean
+} = {}) {
   const marqueeItems = useMemo(
     () => [...HOMEPAGE_MOBILE_REVIEWS, ...HOMEPAGE_MOBILE_REVIEWS],
     []
   )
+  const isTop = placement === "top"
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-[45] border-t border-gray-200/90 bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 md:hidden"
-      style={{ paddingBottom: "max(0.25rem, env(safe-area-inset-bottom, 0px))" }}
+      className={cn(
+        "fixed inset-x-0 z-[45] bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 md:hidden",
+        isTop ? "top-0 border-b border-gray-200/90" : "bottom-0 border-t border-gray-200/90",
+        "transition-[transform,opacity] duration-300 ease-out",
+        visible
+          ? "translate-y-0 opacity-100"
+          : isTop
+            ? "pointer-events-none -translate-y-full opacity-0"
+            : "pointer-events-none translate-y-full opacity-0",
+      )}
+      style={
+        isTop
+          ? { paddingTop: "env(safe-area-inset-top, 0px)" }
+          : { paddingBottom: "max(0.25rem, env(safe-area-inset-bottom, 0px))" }
+      }
+      aria-hidden={!visible}
       aria-label="Review-uri elevi"
     >
       <div className="relative overflow-hidden py-1.5">

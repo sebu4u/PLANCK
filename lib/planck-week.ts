@@ -49,7 +49,17 @@ export const PLANCK_WEEK_HERO_BULLETS = [
   "Complet GRATUIT",
 ] as const
 
-export const PLANCK_WEEK_MICROCOPY = "Fără card. Fără abonament ascuns. Anulezi oricând."
+export const PLANCK_WEEK_MICROCOPY = "0 lei · fără card · fără obligații"
+
+export const PLANCK_WEEK_HERO_SUBJECTS =
+  "10–14 septembrie · Fizică · Matematică · Informatică · Chimie · Biologie"
+
+export const PLANCK_WEEK_HERO_TAGLINE =
+  "Învață direct de la olimpici naționali și internaționali."
+
+export const PLANCK_WEEK_CALENDAR_TITLE = "Alege ce vrei să înveți"
+
+export const PLANCK_WEEK_CALENDAR_SUBTITLE = "5 materii · 5 zile · 5 meditații live"
 
 export const PLANCK_WEEK_FINAL_MICROCOPY = "Fără card. Anulezi oricând după Planck Week."
 

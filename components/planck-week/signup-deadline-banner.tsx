@@ -35,7 +35,7 @@ export function PlanckWeekSignupDeadlineBanner() {
   }, [])
 
   return (
-    <div className="fixed inset-x-0 top-0 z-[80] border-b border-[#E8DDC8] bg-[#F8F1E3] text-[#3F3426] pt-[env(safe-area-inset-top)]">
+    <div className="relative border-b border-[#E8DDC8] bg-[#F8F1E3] text-[#3F3426] pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex min-h-11 max-w-7xl flex-nowrap items-center justify-center gap-x-3 px-3 py-2 text-center sm:min-h-12 sm:px-4">
         {countdown.closed ? (
           <p className="text-[13px] font-bold sm:text-sm">Înscrierile s-au închis.</p>

@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import {
   WORKSHOP_HOMEWORK_ITEM_LABELS,
   WORKSHOP_HOMEWORK_ITEM_TYPES,
@@ -70,6 +71,7 @@ export function WorkshopMaterialsFields({
   getAccessToken,
   uploadUrl,
   catalogSearchUrl,
+  tone = "dark",
 }: {
   value: WorkshopMaterialsFormValue
   onChange: (next: WorkshopMaterialsFormValue) => void
@@ -77,7 +79,12 @@ export function WorkshopMaterialsFields({
   getAccessToken: () => Promise<string | null>
   uploadUrl?: string
   catalogSearchUrl?: string
+  tone?: "dark" | "light"
 }) {
+  const light = tone === "light"
+  const fieldClass = light
+    ? "border-[#e5e7eb] bg-white text-[#111827] placeholder:text-[#9ca3af]"
+    : "border-white/20 bg-black/40 text-white"
   const [catalog, setCatalog] = useState<CatalogKind>("physics_problem")
   const [search, setSearch] = useState("")
   const [hits, setHits] = useState<SearchHit[]>([])
@@ -229,10 +236,17 @@ export function WorkshopMaterialsFields({
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-white/10 bg-black/20 p-4">
+    <div
+      className={cn(
+        "space-y-4 rounded-xl border p-4",
+        light ? "border-[#eceff3] bg-[#f8f8fb]" : "border-white/10 bg-black/20",
+      )}
+    >
       <div>
-        <h3 className="text-sm font-semibold text-white">Materiale</h3>
-        <p className="mt-1 text-xs text-gray-400">
+        <h3 className={cn("text-sm font-semibold", light ? "text-[#111827]" : "text-white")}>
+          Materiale
+        </h3>
+        <p className={cn("mt-1 text-xs", light ? "text-[#6b7280]" : "text-gray-400")}>
           Vizibile pe /pregatire/[id] doar după deblocarea cu energie.
         </p>
       </div>
@@ -243,7 +257,7 @@ export function WorkshopMaterialsFields({
           id="ws_whiteboard"
           value={value.whiteboard_url}
           onChange={(e) => patch({ whiteboard_url: e.target.value })}
-          className="border-white/20 bg-black/40 text-white"
+          className={fieldClass}
           placeholder="https://..."
         />
       </div>
@@ -255,7 +269,7 @@ export function WorkshopMaterialsFields({
           rows={8}
           value={value.notes_markdown}
           onChange={(e) => patch({ notes_markdown: e.target.value })}
-          className="border-white/20 bg-black/40 font-mono text-sm text-white"
+          className={cn(fieldClass, "font-mono text-sm")}
           placeholder="Poți folosi markdown și [FORMULA] ... [/FORMULA]"
         />
       </div>
@@ -266,6 +280,7 @@ export function WorkshopMaterialsFields({
         url={value.notes_pdf_url}
         uploading={uploading === "notes"}
         disabled={!workshopId}
+        light={light}
         onFile={(file) => void uploadPdf("notes", file)}
         onClear={() => patch({ notes_pdf_path: "", notes_pdf_url: "" })}
       />
@@ -276,6 +291,7 @@ export function WorkshopMaterialsFields({
         url={value.homework_pdf_url}
         uploading={uploading === "homework"}
         disabled={!workshopId}
+        light={light}
         onFile={(file) => void uploadPdf("homework", file)}
         onClear={() => patch({ homework_pdf_path: "", homework_pdf_url: "" })}
       />
@@ -284,7 +300,7 @@ export function WorkshopMaterialsFields({
         <Label>Probleme și grile ca temă</Label>
         <div className="grid gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <Select value={catalog} onValueChange={(next) => setCatalog(next as CatalogKind)}>
-            <SelectTrigger className="border-white/20 bg-black/40 text-white">
+            <SelectTrigger className={fieldClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -300,7 +316,7 @@ export function WorkshopMaterialsFields({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border-white/20 bg-black/40 pl-8 text-white"
+              className={cn(fieldClass, "pl-8")}
               placeholder={
                 catalog === "grila_fizica" || catalog === "grila_biologie"
                   ? "Caută după enunț sau ID"
@@ -309,9 +325,14 @@ export function WorkshopMaterialsFields({
             />
           </div>
         </div>
-        <div className="max-h-48 overflow-y-auto rounded-md border border-white/10">
+        <div
+          className={cn(
+            "max-h-48 overflow-y-auto rounded-md border",
+            light ? "border-[#eceff3] bg-white" : "border-white/10",
+          )}
+        >
           {searching ? (
-            <p className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400">
+            <p className={cn("flex items-center gap-2 px-3 py-2 text-xs", light ? "text-[#6b7280]" : "text-gray-400")}>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Se caută…
             </p>
@@ -322,11 +343,18 @@ export function WorkshopMaterialsFields({
               <button
                 key={`${catalog}-${hit.id}`}
                 type="button"
-                className="flex w-full items-start justify-between gap-2 border-b border-white/5 px-3 py-2 text-left last:border-b-0 hover:bg-white/5"
+                className={cn(
+                  "flex w-full items-start justify-between gap-2 border-b px-3 py-2 text-left last:border-b-0",
+                  light
+                    ? "border-[#f3f4f6] hover:bg-[#f8f8fb]"
+                    : "border-white/5 hover:bg-white/5",
+                )}
                 onClick={() => addItem(hit)}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm text-white">{hit.title}</span>
+                  <span className={cn("block truncate text-sm", light ? "text-[#111827]" : "text-white")}>
+                    {hit.title}
+                  </span>
                   {hit.subtitle ? (
                     <span className="block truncate text-[11px] text-gray-500">{hit.subtitle}</span>
                   ) : null}
@@ -343,17 +371,20 @@ export function WorkshopMaterialsFields({
           {value.homework_items.map((item, index) => (
             <li
               key={`${item.item_type}-${item.ref_id}-${index}`}
-              className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-2"
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-2 py-2",
+                light ? "border-[#eceff3] bg-white" : "border-white/10 bg-black/30",
+              )}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-white">{item.title}</p>
+                <p className={cn("truncate text-sm", light ? "text-[#111827]" : "text-white")}>{item.title}</p>
                 <p className="text-[11px] text-gray-500">{WORKSHOP_HOMEWORK_ITEM_LABELS[item.item_type]}</p>
               </div>
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-gray-300"
+                className={cn("h-8 w-8", light ? "text-[#6b7280]" : "text-gray-300")}
                 onClick={() => moveItem(index, -1)}
               >
                 <ArrowUp className="h-4 w-4" />
@@ -362,7 +393,7 @@ export function WorkshopMaterialsFields({
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-gray-300"
+                className={cn("h-8 w-8", light ? "text-[#6b7280]" : "text-gray-300")}
                 onClick={() => moveItem(index, 1)}
               >
                 <ArrowDown className="h-4 w-4" />
@@ -371,7 +402,7 @@ export function WorkshopMaterialsFields({
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-red-300"
+                className="h-8 w-8 text-red-500"
                 onClick={() =>
                   patch({
                     homework_items: value.homework_items.filter((_, i) => i !== index),
@@ -385,7 +416,9 @@ export function WorkshopMaterialsFields({
         </ul>
       ) : null}
 
-      {localError ? <p className="text-sm text-red-200">{localError}</p> : null}
+      {localError ? (
+        <p className={cn("text-sm", light ? "text-red-600" : "text-red-200")}>{localError}</p>
+      ) : null}
     </div>
   )
 }
@@ -396,6 +429,7 @@ function PdfSlot({
   url,
   uploading,
   disabled,
+  light = false,
   onFile,
   onClear,
 }: {
@@ -404,6 +438,7 @@ function PdfSlot({
   url: string
   uploading: boolean
   disabled: boolean
+  light?: boolean
   onFile: (file: File) => void
   onClear: () => void
 }) {
@@ -411,25 +446,37 @@ function PdfSlot({
     <div className="space-y-2">
       <Label>{label}</Label>
       {path ? (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-white/10 px-3 py-2">
+        <div
+          className={cn(
+            "flex items-center justify-between gap-2 rounded-md border px-3 py-2",
+            light ? "border-[#eceff3] bg-white" : "border-white/10",
+          )}
+        >
           <a
             href={url || undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-w-0 items-center gap-2 text-sm text-sky-300 hover:underline"
+            className={cn(
+              "inline-flex min-w-0 items-center gap-2 text-sm hover:underline",
+              light ? "text-[#1a73e8]" : "text-sky-300",
+            )}
           >
             <FileText className="h-4 w-4 shrink-0" />
             <span className="truncate">{path.split("/").pop()}</span>
           </a>
-          <Button type="button" size="sm" variant="ghost" className="text-red-300" onClick={onClear}>
+          <Button type="button" size="sm" variant="ghost" className="text-red-500" onClick={onClear}>
             Șterge
           </Button>
         </div>
       ) : (
         <label
-          className={`flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-white/20 px-3 py-3 text-sm text-gray-300 ${
-            disabled ? "cursor-not-allowed opacity-50" : "hover:bg-white/5"
-          }`}
+          className={cn(
+            "flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm",
+            light
+              ? "border-[#d1d5db] bg-white text-[#6b7280] hover:bg-[#f8f8fb]"
+              : "border-white/20 text-gray-300 hover:bg-white/5",
+            disabled && "cursor-not-allowed opacity-50 hover:bg-transparent",
+          )}
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           {disabled ? "Salvează pregătirea întâi" : "Încarcă PDF"}

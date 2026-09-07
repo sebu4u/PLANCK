@@ -184,13 +184,17 @@ function formatWorkshopDateLabel(iso: string): string {
 function LandingMobileWorkshopCard({
   workshop,
   onOpen,
+  showTeacher = false,
 }: {
   workshop: WorkshopPublic
   onOpen: () => void
+  showTeacher?: boolean
 }) {
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
   const dateLabel = formatWorkshopDateLabel(workshop.starts_at)
   const time = formatWorkshopTime(workshop.starts_at)
+  const teacherName = workshop.teacher?.name ?? null
+  const teacherInitial = (teacherName ?? "?").trim().slice(0, 1)
 
   return (
     <button
@@ -238,6 +242,23 @@ function LandingMobileWorkshopCard({
             </span>
           ) : null}
         </p>
+        {showTeacher && teacherName ? (
+          <div className="mt-2 flex items-center gap-2">
+            {workshop.teacher?.icon_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={workshop.teacher.icon_url}
+                alt=""
+                className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/5"
+              />
+            ) : (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600 ring-1 ring-black/5">
+                {teacherInitial}
+              </div>
+            )}
+            <p className="truncate text-sm font-medium text-gray-700">{teacherName}</p>
+          </div>
+        ) : null}
       </div>
     </button>
   )
@@ -248,11 +269,13 @@ function MobileStackedAgenda({
   byDay,
   loading,
   onOpen,
+  showTeacher = false,
 }: {
   days: CalendarDay[]
   byDay: Map<string, WorkshopPublic[]>
   loading: boolean
   onOpen: (workshop: WorkshopPublic) => void
+  showTeacher?: boolean
 }) {
   const items = days.flatMap((day) => byDay.get(day.key) ?? [])
 
@@ -270,6 +293,7 @@ function MobileStackedAgenda({
             key={workshop.id}
             workshop={workshop}
             onOpen={() => onOpen(workshop)}
+            showTeacher={showTeacher}
           />
         ))
       ) : (
@@ -376,8 +400,12 @@ function WorkshopPreviewCard({
   )
 }
 
+const DEFAULT_CALENDAR_SUBTITLE =
+  "Alege materia, vezi ce se predă azi, și intri direct. Fără să cauți profesor după profesor. Înveți de la olimpici naționali și internaționali la aceste discipline."
+
 export function LandingWorkshopsCalendarSection({
   title = "Vezi exact ce se explică, în fiecare zi",
+  subtitle = DEFAULT_CALENDAR_SUBTITLE,
   campaignStyle = false,
   cta,
   onReserve,
@@ -385,8 +413,10 @@ export function LandingWorkshopsCalendarSection({
   mobileDayFrom,
   mobileDayTo,
   accent = "violet",
+  showTeacher = false,
 }: {
   title?: string
+  subtitle?: string
   campaignStyle?: boolean
   cta?: ReactNode
   onReserve?: (subject?: WorkshopSubject) => void
@@ -394,6 +424,7 @@ export function LandingWorkshopsCalendarSection({
   mobileDayFrom?: string
   mobileDayTo?: string
   accent?: CalendarAccent
+  showTeacher?: boolean
 }) {
   const [workshops, setWorkshops] = useState<WorkshopPublic[]>([])
   const [loading, setLoading] = useState(true)
@@ -492,8 +523,7 @@ export function LandingWorkshopsCalendarSection({
           </h2>
           {campaignStyle ? <div className="mt-4 h-[3px] w-16 rounded-full bg-[#A3E635]" aria-hidden /> : null}
           <p className="mt-4 text-base leading-relaxed text-gray-500 sm:text-lg">
-            Alege materia, vezi ce se predă azi, și intri direct. Fără să cauți profesor după
-            profesor. Înveți de la olimpici naționali și internaționali la aceste discipline.
+            {subtitle}
           </p>
         </FadeInUp>
       </div>
@@ -503,6 +533,7 @@ export function LandingWorkshopsCalendarSection({
             days={mobileDays}
             byDay={byDay}
             loading={loading}
+            showTeacher={showTeacher}
             onOpen={(workshop) => {
               if (onReserve) {
                 onReserve(workshop.subject)
