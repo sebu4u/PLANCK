@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth-provider"
 
 export function DashboardRedirect() {
   const router = useRouter()
-  const { user, loading, isDev, profileSyncedUserId } = useAuth()
+  const { user, loading, isDev, isMentor, profileSyncedUserId } = useAuth()
   const [isRedirecting, setIsRedirecting] = useState(false)
 
   useEffect(() => {
@@ -16,8 +16,9 @@ export function DashboardRedirect() {
     if (profileSyncedUserId !== user.id) return
 
     setIsRedirecting(true)
-    router.replace(isDev ? "/dashboard/dev" : "/dashboard")
-  }, [user, loading, isDev, profileSyncedUserId, router])
+    const destination = isMentor ? "/dashboard/mentor" : isDev ? "/dashboard/dev" : "/dashboard"
+    router.replace(destination)
+  }, [user, loading, isDev, isMentor, profileSyncedUserId, router])
 
   const shouldShowLoading = loading || user || isRedirecting
 
