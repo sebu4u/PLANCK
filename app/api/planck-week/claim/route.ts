@@ -4,6 +4,7 @@ import { isJwtExpired } from "@/lib/auth-validate"
 import { isPlanckWeekGradeOption } from "@/lib/planck-week"
 import { claimPlanckWeekForUser } from "@/lib/planck-week-claim"
 import { logger } from "@/lib/logger"
+import { isWorkshopSubject } from "@/lib/pregatire/types"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
 
 export async function POST(req: NextRequest) {
@@ -22,15 +23,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sesiune invalidă." }, { status: 401 })
     }
 
-    const body = (await req.json().catch(() => null)) as { grade?: unknown } | null
+    const body = (await req.json().catch(() => null)) as {
+      grade?: unknown
+      subjects?: unknown
+      name?: unknown
+    } | null
     const rawGrade = body?.grade
     const schoolGrade = isPlanckWeekGradeOption(rawGrade) ? rawGrade : null
+    const subjects = Array.isArray(body?.subjects)
+      ? body.subjects.filter((value): value is string => typeof value === "string")
+      : undefined
+    const name = typeof body?.name === "string" ? body.name : undefined
 
     const result = await claimPlanckWeekForUser({
       userId: data.user.id,
       email: data.user.email,
       schoolGrade,
       sendSummaryEmail: false,
+      subjects: subjects?.filter(isWorkshopSubject),
+      name,
     })
 
     return NextResponse.json({

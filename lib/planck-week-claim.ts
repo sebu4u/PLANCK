@@ -1,5 +1,6 @@
 import "server-only"
 
+import { upsertSubscriber } from "@/lib/mailerlite/client"
 import { logger } from "@/lib/logger"
 import type { OnboardingSubjectId } from "@/lib/onboarding"
 import {
@@ -42,7 +43,7 @@ type WorkshopRow = {
   max_seats: number | null
 }
 
-function parseLeadSubjects(raw: string[] | null): WorkshopSubject[] {
+function parseLeadSubjects(raw: readonly string[] | null): WorkshopSubject[] {
   if (!raw) return []
   const seen = new Set<WorkshopSubject>()
   const result: WorkshopSubject[] = []
@@ -182,11 +183,18 @@ async function unlockPlanckWeekWorkshops(input: {
   return { unlocked, skippedFull }
 }
 
+function nameFromEmail(email: string): string {
+  const local = email.split("@")[0]?.replace(/[._-]+/g, " ").trim() ?? ""
+  return local.length >= 2 ? local : "Elev Planck"
+}
+
 export async function claimPlanckWeekForUser(input: {
   userId: string
   email: string
   schoolGrade?: string | null
   sendSummaryEmail?: boolean
+  subjects?: WorkshopSubject[]
+  name?: string | null
 }): Promise<PlanckWeekClaimResult> {
   const email = input.email.trim().toLowerCase()
   const supabase = getServiceRoleSupabase()
@@ -203,28 +211,76 @@ export async function claimPlanckWeekForUser(input: {
     logger.error("[planck-week] lead lookup failed:", leadError.message)
   }
 
-  const row = (lead ?? null) as LeadRow | null
-  const subjects = parseLeadSubjects(row?.subjects ?? null)
+  let row = (lead ?? null) as LeadRow | null
+  const requestedSubjects = input.subjects ? parseLeadSubjects(input.subjects) : []
+  const leadSubjects = parseLeadSubjects(row?.subjects ?? null)
+  const subjects = requestedSubjects.length > 0 ? requestedSubjects : leadSubjects
+  const displayName = (input.name?.trim() || row?.name || nameFromEmail(email)).slice(0, 80)
+
+  if (subjects.length > 0) {
+    if (row) {
+      const { error: updateLeadError } = await supabase
+        .from("planck_week_leads")
+        .update({
+          name: displayName,
+          subjects,
+        })
+        .eq("id", row.id)
+      if (updateLeadError) {
+        logger.error("[planck-week] lead update failed:", updateLeadError.message)
+      } else {
+        row = { ...row, name: displayName, subjects }
+      }
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from("planck_week_leads")
+        .insert({
+          name: displayName,
+          email,
+          subjects,
+        })
+        .select("id, name, email, subjects, user_id, claimed_at")
+        .maybeSingle()
+      if (insertError) {
+        logger.error("[planck-week] lead insert failed:", insertError.message)
+      } else {
+        row = (inserted ?? null) as LeadRow | null
+      }
+    }
+
+    const groupId = process.env.MAILERLITE_PLANCK_WEEK_GROUP_ID?.trim()
+    if (groupId) {
+      try {
+        await upsertSubscriber(email, {
+          fields: { name: displayName },
+          groups: [groupId],
+        })
+      } catch {
+        // Reservation already saved — MailerLite is optional.
+      }
+    }
+  }
+
   const firstSubject = subjects[0] ?? null
   const redirectPath = getPlanckWeekPregatirePath(firstSubject)
   const preferredMaterie = firstSubject
     ? workshopSubjectToOnboardingSubject(firstSubject)
     : null
 
-  if (!row) {
+  if (!row || subjects.length === 0) {
     return {
       ok: true,
       claimed: false,
       alreadyClaimed: false,
       unlockedCount: 0,
       skippedFull: 0,
-      redirectPath: null,
+      redirectPath,
     }
   }
 
   await lightCompleteProfile({
     userId: input.userId,
-    name: row.name,
+    name: displayName,
     subject: preferredMaterie,
     schoolGrade: input.schoolGrade,
   })

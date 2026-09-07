@@ -61,6 +61,11 @@ export const PLANCK_WEEK_CALENDAR_TITLE = "Alege ce vrei să înveți"
 
 export const PLANCK_WEEK_CALENDAR_SUBTITLE = "5 materii · 5 zile · 5 meditații live"
 
+export const PLANCK_WEEK_ONBOARDING_SUCCESS_TITLE = "Ești înregistrat la Planck Week"
+export const PLANCK_WEEK_ONBOARDING_SUCCESS_BODY =
+  "Locul tău e rezervat. Intră pe platformă ca să vezi meditația și să te pregătești."
+export const PLANCK_WEEK_ONBOARDING_SUCCESS_CTA = "Intră la meditații →"
+
 export const PLANCK_WEEK_FINAL_MICROCOPY = "Fără card. Anulezi oricând după Planck Week."
 
 export const PLANCK_WEEK_FINAL_HEADLINE = "Planck Week ține 10–14 septembrie."

@@ -32,6 +32,8 @@ type OnboardingAccountStepProps = {
   /** After finishing the demo path without an account: hide “try without account”. */
   variant?: "default" | "after-demo" | "email-only"
   googleIcon?: React.ReactNode
+  title?: string
+  subtitle?: string
 }
 
 export function OnboardingAccountStep({
@@ -45,8 +47,10 @@ export function OnboardingAccountStep({
   onGoHome,
   variant = "default",
   googleIcon,
+  title,
+  subtitle,
 }: OnboardingAccountStepProps) {
-  const copy =
+  const defaultCopy =
     variant === "email-only"
       ? {
           title: "Creează-ți contul",
@@ -56,6 +60,10 @@ export function OnboardingAccountStep({
           selfGrade: selfGrade ?? 7,
           targetGrade: targetGrade ?? 9,
         })
+  const copy = {
+    title: title ?? defaultCopy.title,
+    subtitle: subtitle ?? defaultCopy.subtitle,
+  }
   const busy = oauthLoading !== null
   const emailOnly = variant === "email-only"
 

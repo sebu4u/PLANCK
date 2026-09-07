@@ -10,7 +10,7 @@ import { PlanckWeekFaqSection } from "@/components/planck-week/faq-section"
 import { PlanckWeekTeacherVideosSection } from "@/components/planck-week/teacher-videos-section"
 import { PlanckWeekFinalCtaSection } from "@/components/planck-week/final-cta-section"
 import { PlanckWeekStickyMobileCta } from "@/components/planck-week/sticky-mobile-cta"
-import { PlanckWeekReserveModal } from "@/components/planck-week/reserve-modal"
+import { PlanckWeekOnboarding } from "@/components/planck-week/onboarding"
 import { PlanckWeekCtaButton } from "@/components/planck-week/cta-button"
 import { PlanckWeekSignupDeadlineBanner } from "@/components/planck-week/signup-deadline-banner"
 import {
@@ -32,7 +32,7 @@ export function PlanckWeekPage() {
     trackFunnelEvent("cta_clicked", {
       cta_id: "planck_week_reserve",
       placement,
-      destination: "reserve_modal",
+      destination: "onboarding",
     })
     setReserveSubject(subject ?? null)
     setOpen(true)
@@ -73,7 +73,7 @@ export function PlanckWeekPage() {
       <Footer theme="light" backgroundColor="bg-[#F8F7FF]" borderColor="border-gray-200" />
       <HomepageMobileReviewsBar placement="top" visible={pastHero} />
       <PlanckWeekStickyMobileCta onReserve={() => openReserve("planck_week_sticky")} />
-      <PlanckWeekReserveModal
+      <PlanckWeekOnboarding
         open={open}
         onOpenChange={(next) => {
           setOpen(next)
