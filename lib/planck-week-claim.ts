@@ -150,8 +150,16 @@ async function unlockPlanckWeekWorkshops(input: {
         .eq("workshop_id", workshop.id)
 
       if ((count ?? 0) >= workshop.max_seats) {
-        skippedFull += 1
-        continue
+        const { error: updateError } = await supabase
+          .from("workshops")
+          .update({ max_seats: workshop.max_seats + 10 })
+          .eq("id", workshop.id)
+
+        if (updateError) {
+          logger.error("[planck-week] capacity expand failed:", updateError.message)
+          skippedFull += 1
+          continue
+        }
       }
     }
 
