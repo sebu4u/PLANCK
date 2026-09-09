@@ -7,10 +7,12 @@ import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
  * GET /api/pregatire/[id]/enroll?token=...
  * One-click workshop enrollment via signed token from marketing emails.
  * 
- * Token = HMAC-SHA256(userId:workshopId) using WORKSHOP_CONFIRM_SECRET or CRON_SECRET.
+ * Supports two token types:
+ * 1. HMAC tokens: userId:workshopId:signature (HMAC-SHA256 using WORKSHOP_CONFIRM_SECRET or CRON_SECRET)
+ * 2. Opaque tokens: random string from workshop_enroll_tokens table (no secret required)
  * 
  * This route:
- * - Verifies the signed token
+ * - Verifies the token (HMAC or opaque DB lookup)
  * - Inserts workshop_unlocks for the user (idempotent)
  * - Does NOT charge energy (free Planck Week invite path)
  * - Auto-bumps max_seats by +10 if workshop is at capacity
@@ -31,19 +33,59 @@ export async function GET(
       return NextResponse.redirect(redirectUrl, { status: 302 })
     }
 
-    const verification = verifyEnrollToken(token, id)
-    if (!verification.valid) {
-      const errorType = verification.error === "secret_not_configured" ? "server_error" : "invalid_token"
-      if (verification.error === "secret_not_configured") {
-        logger.error("[pregatire/enroll] GET: WORKSHOP_CONFIRM_SECRET not configured")
-      }
-      const redirectUrl = new URL(`/pregatire/${id}/inscris`, req.url)
-      redirectUrl.searchParams.set("error", errorType)
-      return NextResponse.redirect(redirectUrl, { status: 302 })
-    }
-
-    const { userId, workshopId } = verification
     const supabase = getServiceRoleSupabase()
+    let userId: string
+    let workshopId: string
+
+    // Try HMAC token format first (contains colons)
+    if (token.includes(":")) {
+      const verification = verifyEnrollToken(token, id)
+      if (!verification.valid) {
+        const errorType = verification.error === "secret_not_configured" ? "server_error" : "invalid_token"
+        if (verification.error === "secret_not_configured") {
+          logger.error("[pregatire/enroll] GET: WORKSHOP_CONFIRM_SECRET not configured")
+        }
+        const redirectUrl = new URL(`/pregatire/${id}/inscris`, req.url)
+        redirectUrl.searchParams.set("error", errorType)
+        return NextResponse.redirect(redirectUrl, { status: 302 })
+      }
+      userId = verification.userId
+      workshopId = verification.workshopId
+    } else {
+      // Opaque token: look up in workshop_enroll_tokens table
+      const { data: tokenRow, error: tokenError } = await supabase
+        .from("workshop_enroll_tokens")
+        .select("user_id, workshop_id, expires_at, used_at")
+        .eq("token", token)
+        .eq("workshop_id", id)
+        .maybeSingle()
+
+      if (tokenError || !tokenRow) {
+        logger.info("[pregatire/enroll] opaque token not found:", { token: token.slice(0, 8), workshopId: id })
+        const redirectUrl = new URL(`/pregatire/${id}/inscris`, req.url)
+        redirectUrl.searchParams.set("error", "invalid_token")
+        return NextResponse.redirect(redirectUrl, { status: 302 })
+      }
+
+      // Check expiration
+      if (new Date(tokenRow.expires_at) < new Date()) {
+        logger.info("[pregatire/enroll] opaque token expired:", { token: token.slice(0, 8), expiresAt: tokenRow.expires_at })
+        const redirectUrl = new URL(`/pregatire/${id}/inscris`, req.url)
+        redirectUrl.searchParams.set("error", "token_expired")
+        return NextResponse.redirect(redirectUrl, { status: 302 })
+      }
+
+      userId = tokenRow.user_id
+      workshopId = tokenRow.workshop_id
+
+      // Mark token as used (idempotent - OK if already used)
+      if (!tokenRow.used_at) {
+        await supabase
+          .from("workshop_enroll_tokens")
+          .update({ used_at: new Date().toISOString() })
+          .eq("token", token)
+      }
+    }
 
     // Verify user exists
     const { data: user, error: userError } = await supabase.auth.admin.getUserById(userId)

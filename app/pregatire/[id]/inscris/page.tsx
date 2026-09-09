@@ -91,6 +91,8 @@ export default function PregatireInscrisPage() {
     switch (errorCode) {
       case "invalid_token":
         return "Link-ul de înscriere este invalid sau a expirat."
+      case "token_expired":
+        return "Link-ul de înscriere a expirat. Te rugăm să solici un link nou."
       case "user_not_found":
         return "Contul asociat cu acest link nu a fost găsit."
       case "workshop_not_found":
