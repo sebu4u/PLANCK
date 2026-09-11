@@ -55,8 +55,9 @@ export function NextWorkshopHero({
   }
 
   const live = isWorkshopLive(next.starts_at, next.duration_minutes, now)
+  const postponed = next.status === "postponed"
   const color = WORKSHOP_SUBJECT_COLORS[next.subject]
-  const countdown = live ? "În desfășurare" : formatWorkshopStartsIn(next.starts_at, now)
+  const countdown = postponed ? "în curând" : live ? "În desfășurare" : formatWorkshopStartsIn(next.starts_at, now)
 
   return (
     <button
@@ -98,6 +99,11 @@ export function NextWorkshopHero({
             Următoarea meditație
           </p>
           <div className="flex items-center gap-1.5">
+            {postponed ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                Amânat
+              </span>
+            ) : null}
             {next.unlocked ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
                 <CheckCircle2 className="h-3 w-3" aria-hidden />
@@ -118,14 +124,16 @@ export function NextWorkshopHero({
         <p
           className={cn(
             "mt-0.5 text-sm font-semibold tracking-tight",
-            live ? "text-rose-600" : "text-[#111827]",
+            live && !postponed ? "text-rose-600" : "text-[#111827]",
           )}
         >
           {countdown}
-          <span className="font-medium capitalize text-[#6b7280]">
-            {" · "}
-            {formatWorkshopHeroDate(next.starts_at)}
-          </span>
+          {!postponed ? (
+            <span className="font-medium capitalize text-[#6b7280]">
+              {" · "}
+              {formatWorkshopHeroDate(next.starts_at)}
+            </span>
+          ) : null}
         </p>
       </div>
     </button>
