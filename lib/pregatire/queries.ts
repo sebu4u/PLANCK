@@ -1,8 +1,8 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { WorkshopPublic, WorkshopSubject, WorkshopTeacher } from "@/lib/pregatire/types"
-import { isWorkshopSubject } from "@/lib/pregatire/types"
+import type { WorkshopPublic, WorkshopStatus, WorkshopSubject, WorkshopTeacher } from "@/lib/pregatire/types"
+import { WORKSHOP_STATUSES, isWorkshopSubject } from "@/lib/pregatire/types"
 
 type WorkshopPublicRow = {
   id: string
@@ -16,6 +16,7 @@ type WorkshopPublicRow = {
   energy_cost: number
   max_seats: number | null
   is_published: boolean
+  status: string
   is_bac: boolean
   has_recording: boolean
   unlock_count: number
@@ -29,6 +30,9 @@ export function mapWorkshopPublic(
   unlocked = false,
 ): WorkshopPublic {
   const subject: WorkshopSubject = isWorkshopSubject(row.subject) ? row.subject : "mate"
+  const status: WorkshopStatus = WORKSHOP_STATUSES.includes(row.status as WorkshopStatus)
+    ? (row.status as WorkshopStatus)
+    : "scheduled"
   const seatsRemaining =
     row.max_seats == null ? null : Math.max(0, row.max_seats - (row.unlock_count ?? 0))
 
@@ -44,6 +48,7 @@ export function mapWorkshopPublic(
     energy_cost: row.energy_cost,
     max_seats: row.max_seats,
     is_published: row.is_published,
+    status,
     is_bac: Boolean(row.is_bac),
     has_recording: Boolean(row.has_recording),
     unlock_count: row.unlock_count ?? 0,

@@ -10,6 +10,10 @@ export const WORKSHOP_SUBJECTS = [
 
 export type WorkshopSubject = (typeof WORKSHOP_SUBJECTS)[number]
 
+export const WORKSHOP_STATUSES = ["scheduled", "postponed"] as const
+
+export type WorkshopStatus = (typeof WORKSHOP_STATUSES)[number]
+
 /** Maps dashboard/practice preferred materie to workshop subject keys. */
 export function practiceSubjectToWorkshopSubject(id: PracticeSubjectId): WorkshopSubject {
   switch (id) {
@@ -92,6 +96,7 @@ export interface WorkshopPublic {
   energy_cost: number
   max_seats: number | null
   is_published: boolean
+  status: WorkshopStatus
   is_bac: boolean
   has_recording: boolean
   unlock_count: number

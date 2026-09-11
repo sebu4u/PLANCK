@@ -154,7 +154,8 @@ export function WorkshopDetailPanel({
   }, [workshop.id, workshop.unlocked, workshop.confirmed_at, isLoggedIn, toast])
 
   const past = isWorkshopPast(workshop.starts_at, workshop.duration_minutes)
-  const waitingForMeet = workshop.unlocked && !past && !workshop.meet_url
+  const postponed = workshop.status === "postponed"
+  const waitingForMeet = workshop.unlocked && !past && !postponed && !workshop.meet_url
   const meetWindowOpen = isWorkshopMeetVisible(workshop.starts_at, new Date(nowMs))
 
   useEffect(() => {
@@ -203,12 +204,14 @@ export function WorkshopDetailPanel({
     workshop.max_seats != null
       ? `${workshop.seats_remaining ?? 0}/${workshop.max_seats}`
       : null
-  const unlockCtaBase = full
-    ? "Locuri epuizate"
-    : isLoggedIn
-      ? "Rezervă-ți locul gratuit"
-      : "Autentifică-te pentru a rezerva"
-  const unlockCtaLabel = seatsCountLabel
+  const unlockCtaBase = postponed
+    ? "Amânat"
+    : full
+      ? "Locuri epuizate"
+      : isLoggedIn
+        ? "Rezervă-ți locul gratuit"
+        : "Autentifică-te pentru a rezerva"
+  const unlockCtaLabel = seatsCountLabel && !postponed
     ? `${unlockCtaBase} · ${seatsCountLabel}`
     : unlockCtaBase
 
@@ -334,7 +337,7 @@ export function WorkshopDetailPanel({
 
   const primaryCta = (
     <>
-      {!workshop.unlocked ? (
+      {!workshop.unlocked && !postponed ? (
         <Button
           type="button"
           size="lg"
@@ -352,7 +355,13 @@ export function WorkshopDetailPanel({
         </Button>
       ) : null}
 
-      {workshop.unlocked && !workshop.confirmed_at && !past ? (
+      {postponed ? (
+        <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Această pregătire a fost amânată. Vei fi notificat când va fi reprogramată.
+        </p>
+      ) : null}
+
+      {workshop.unlocked && !workshop.confirmed_at && !past && !postponed ? (
         <Button
           type="button"
           size="lg"
@@ -365,7 +374,7 @@ export function WorkshopDetailPanel({
         </Button>
       ) : null}
 
-      {workshop.unlocked && workshop.confirmed_at ? (
+      {workshop.unlocked && workshop.confirmed_at && !postponed ? (
         <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <CheckCircle2 className="mr-2 inline h-4 w-4" />
           Participarea confirmată
@@ -382,7 +391,7 @@ export function WorkshopDetailPanel({
         </p>
       ) : null}
 
-      {workshop.unlocked && !past && workshop.meet_url ? (
+      {workshop.unlocked && !past && !postponed && workshop.meet_url ? (
         <Button asChild size="lg" className="w-full bg-[#2563eb] hover:bg-[#1d4ed8]">
           <a href={workshop.meet_url} target="_blank" rel="noopener noreferrer">
             Intră pe Google Meet
@@ -391,14 +400,14 @@ export function WorkshopDetailPanel({
         </Button>
       ) : null}
 
-      {waitingForMeet ? (
+      {waitingForMeet && !postponed ? (
         <p className="rounded-xl bg-[#eff6ff] px-4 py-3 text-sm text-[#1e40af]">
           Link-ul Google Meet apare cu 10 minute înainte de începere
           {meetWindowOpen ? "." : ` (${formatWorkshopMeetWait(workshop.starts_at, new Date(nowMs))}).`}
         </p>
       ) : null}
 
-      {workshop.unlocked && past && workshop.recording_url ? (
+      {workshop.unlocked && past && !postponed && workshop.recording_url ? (
         <Button asChild size="lg" className="w-full bg-sky-600 hover:bg-sky-700">
           <a href={workshop.recording_url} target="_blank" rel="noopener noreferrer">
             <Video className="mr-2 h-4 w-4" />
@@ -408,7 +417,7 @@ export function WorkshopDetailPanel({
         </Button>
       ) : null}
 
-      {workshop.unlocked && past && !workshop.recording_url ? (
+      {workshop.unlocked && past && !postponed && !workshop.recording_url ? (
         <p className="rounded-xl bg-[#f9fafb] px-4 py-3 text-sm text-[#6b7280]">
           Pregătirea s-a încheiat. Înregistrarea va apărea aici când este disponibilă.
         </p>
@@ -426,6 +435,11 @@ export function WorkshopDetailPanel({
           {WORKSHOP_SUBJECT_LABELS[workshop.subject]}
         </span>
         {workshop.is_bac ? <WorkshopBacBadge /> : null}
+        {postponed ? (
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+            Amânat
+          </span>
+        ) : null}
         {workshop.unlocked ? (
           <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
             <CheckCircle2 className="h-3 w-3" />
@@ -437,7 +451,9 @@ export function WorkshopDetailPanel({
       <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#111827] sm:text-3xl">
         {workshop.title}
       </h1>
-      <p className="mt-2 text-sm text-[#6b7280]">{formatWorkshopDateTime(workshop.starts_at)}</p>
+      <p className="mt-2 text-sm text-[#6b7280]">
+        {postponed ? "în curând" : formatWorkshopDateTime(workshop.starts_at)}
+      </p>
 
       <div className="mt-5 flex items-center gap-3">
         {workshop.teacher?.icon_url ? (
