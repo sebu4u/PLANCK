@@ -10,6 +10,7 @@ create index if not exists workshops_status_starts_idx
   on public.workshops (status, starts_at);
 
 -- Update the workshops_public view to include status
+-- IMPORTANT: Must preserve production column order - cannot reorder with CREATE OR REPLACE VIEW
 create or replace view public.workshops_public
 with (security_invoker = false)
 as
@@ -25,12 +26,12 @@ select
   w.energy_cost,
   w.max_seats,
   w.is_published,
-  w.status,
   w.created_at,
   w.updated_at,
   (w.recording_url is not null and length(trim(w.recording_url)) > 0) as has_recording,
   (select count(*)::integer from public.workshop_unlocks u where u.workshop_id = w.id) as unlock_count,
-  w.is_bac
+  w.is_bac,
+  w.status
 from public.workshops w
 where w.is_published = true;
 
