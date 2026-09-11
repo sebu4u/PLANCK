@@ -29,7 +29,8 @@ select
   w.created_at,
   w.updated_at,
   (w.recording_url is not null and length(trim(w.recording_url)) > 0) as has_recording,
-  (select count(*)::integer from public.workshop_unlocks u where u.workshop_id = w.id) as unlock_count
+  (select count(*)::integer from public.workshop_unlocks u where u.workshop_id = w.id) as unlock_count,
+  w.is_bac
 from public.workshops w
 where w.is_published = true;
 
