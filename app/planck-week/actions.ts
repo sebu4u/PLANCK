@@ -62,7 +62,7 @@ export async function getPlanckWeekSubjectSeats(): Promise<PlanckWeekSubjectSeat
     const supabase = getServiceRoleSupabase()
     const { data, error } = await supabase
       .from("workshops_public")
-      .select("subject, max_seats, unlock_count, starts_at")
+      .select("subject, max_seats, unlock_count, starts_at, id")
       .gte("starts_at", from)
       .lte("starts_at", to)
       .order("starts_at", { ascending: true })
@@ -73,16 +73,38 @@ export async function getPlanckWeekSubjectSeats(): Promise<PlanckWeekSubjectSeat
     }
 
     const seats: PlanckWeekSubjectSeats = {}
+    const workshopsToExpand: { id: string; subject: WorkshopSubject; maxSeats: number }[] = []
+
     for (const row of data ?? []) {
       if (!isWorkshopSubject(row.subject) || seats[row.subject]) continue
       if (row.max_seats == null) continue
       const max = Number(row.max_seats)
       const taken = Number(row.unlock_count ?? 0)
-      seats[row.subject] = {
-        max,
-        remaining: Math.max(0, max - taken),
+      const remaining = Math.max(0, max - taken)
+
+      seats[row.subject] = { max, remaining }
+
+      if (remaining === 0 && row.id) {
+        workshopsToExpand.push({ id: row.id, subject: row.subject, maxSeats: max })
       }
     }
+
+    for (const workshop of workshopsToExpand) {
+      const { error: updateError } = await supabase
+        .from("workshops")
+        .update({ max_seats: workshop.maxSeats + 10 })
+        .eq("id", workshop.id)
+
+      if (updateError) {
+        logger.error("[planck-week] proactive capacity expand failed:", updateError.message)
+      } else {
+        seats[workshop.subject] = {
+          max: workshop.maxSeats + 10,
+          remaining: 10,
+        }
+      }
+    }
+
     return seats
   } catch (err) {
     logger.error("[planck-week] seats query error:", err)
