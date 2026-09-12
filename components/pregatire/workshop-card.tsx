@@ -28,6 +28,7 @@ export function WorkshopCard({
 }) {
   const past = isWorkshopPast(workshop.starts_at, workshop.duration_minutes)
   const full = workshop.seats_remaining === 0
+  const postponed = workshop.status === "postponed"
   const color = WORKSHOP_SUBJECT_COLORS[workshop.subject]
 
   const content = (
@@ -57,6 +58,11 @@ export function WorkshopCard({
               {WORKSHOP_SUBJECT_LABELS[workshop.subject]}
             </span>
             {workshop.is_bac ? <WorkshopBacBadge /> : null}
+            {postponed ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                Amânat
+              </span>
+            ) : null}
             {workshop.unlocked ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
                 <CheckCircle2 className="h-3 w-3" aria-hidden />
@@ -96,7 +102,7 @@ export function WorkshopCard({
         </div>
         <div className="shrink-0 text-right">
           <p className="text-sm font-semibold tabular-nums text-[#111827]">
-            {formatWorkshopTime(workshop.starts_at)}
+            {postponed ? "în curând" : formatWorkshopTime(workshop.starts_at)}
           </p>
           {workshop.unlocked ? (
             <p className="mt-1 text-xs font-semibold text-emerald-800">Loc rezervat</p>
