@@ -2526,6 +2526,25 @@ body.problem-page-scrollbar *::-webkit-scrollbar-thumb:hover {
   }
 }
 
+.press-shrink {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .press-shrink {
+    transition: transform 90ms ease;
+  }
+
+  .press-shrink.is-pressed:not(.dashboard-start-glow) {
+    transform: scale(0.96);
+  }
+
+  .press-shrink.press-shrink-strong.is-pressed:not(.dashboard-start-glow) {
+    transform: scale(0.86);
+  }
+}
+
 .dashboard-start-glow {
   position: relative;
   overflow: hidden;

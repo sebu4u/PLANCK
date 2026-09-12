@@ -55,6 +55,7 @@ import { isInformaticaProblemDetailRoute, isPlanckCodeShellRoute } from "@/lib/p
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { isStudentDashboardRoute, normalizePracticeSubject, type PracticeSubjectId } from "@/lib/practice-subject"
 import { getPregatireBackTarget } from "@/lib/pregatire/back-target"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 
 function isInsideMonacoEditor(element: EventTarget | null): boolean {
   if (!(element instanceof HTMLElement)) return false
@@ -62,6 +63,9 @@ function isInsideMonacoEditor(element: EventTarget | null): boolean {
 }
 
 type SearchResultItem = { type: 'problem' | 'lesson'; id: string; title: string; url: string }
+
+const MOBILE_BACK_BUTTON_CLASS = `${PRESS_SHRINK_CLASS} inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100`
+const MOBILE_FALLBACK_NAV_ICON_CLASS = `${PRESS_SHRINK_CLASS} relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none`
 
 /** Desktop: ca butonul „Start” din dashboard (gradient + glow). */
 const GUEST_REGISTER_CTA_CLASS =
@@ -734,7 +738,7 @@ export function Navigation() {
                       </Link>
                       <Link
                         href="/register"
-                        className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold transition-colors ${
+                        className={`${PRESS_SHRINK_CLASS} inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold transition-colors ${
                           useLightNav
                             ? "text-[#7c3aed] hover:text-[#6d28d9]"
                             : "text-violet-400 hover:text-violet-300"
@@ -751,7 +755,7 @@ export function Navigation() {
                     <Link
                       href="/invata"
                       aria-label="Înapoi la Invata"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                      className={MOBILE_BACK_BUTTON_CLASS}
                     >
                       <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                     </Link>
@@ -765,7 +769,7 @@ export function Navigation() {
                     <Link
                       href="/exerseaza"
                       aria-label="Înapoi la Exersează"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                      className={MOBILE_BACK_BUTTON_CLASS}
                     >
                       <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                     </Link>
@@ -779,7 +783,7 @@ export function Navigation() {
                     <Link
                       href={mobileProblemCatalogHref}
                       aria-label="Înapoi la catalog"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                      className={MOBILE_BACK_BUTTON_CLASS}
                     >
                       <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                     </Link>
@@ -800,7 +804,7 @@ export function Navigation() {
                             e.preventDefault()
                             router.push(user ? getPregatireBackTarget() : "/")
                           }}
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                          className={`${MOBILE_BACK_BUTTON_CLASS} shrink-0`}
                         >
                           <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                         </Link>
@@ -810,7 +814,7 @@ export function Navigation() {
                         <Link
                           href="/invata/cursuri"
                           aria-label="Înapoi la cursuri"
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100"
+                          className={`${MOBILE_BACK_BUTTON_CLASS} shrink-0`}
                         >
                           <ArrowLeft className="h-7 w-7" strokeWidth={2.25} />
                         </Link>
@@ -849,7 +853,7 @@ export function Navigation() {
                       ) : (
                         <Link
                           href="/register"
-                          className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9]"
+                          className={`${PRESS_SHRINK_CLASS} inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9]`}
                         >
                           <span className="whitespace-nowrap">Începe gratuit</span>
                           <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
@@ -861,7 +865,7 @@ export function Navigation() {
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      <Link href={isParent ? "/dashboard/parent" : isTeacher ? "/dashboard" : "/"} className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage || isParentHomeActive) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                      <Link href={isParent ? "/dashboard/parent" : isTeacher ? "/dashboard" : "/"} className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${(isHomepage || isDashboardPage || isParentHomeActive) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                         <Home className="h-5 w-5" />
                       </Link>
                       {isTeacher ? (
@@ -869,21 +873,21 @@ export function Navigation() {
                           <Link
                             href="/classrooms"
                             aria-label="Clasele mele"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <Users className="h-5 w-5" />
                           </Link>
                           <Link
                             href="/profesor/teme"
                             aria-label="Teme"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProfesorTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isProfesorTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <NotebookPen className="h-5 w-5" />
                           </Link>
                           <Link
                             href="/profesor/resurse"
                             aria-label="Resurse de predare"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isProfesorResurseActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isProfesorResurseActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <Library className="h-5 w-5" />
                           </Link>
@@ -893,37 +897,37 @@ export function Navigation() {
                           <Link
                             href="/dashboard/parent/teme"
                             aria-label="Teme"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isParentTemeActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <NotebookPen className="h-5 w-5" />
                           </Link>
                           <Link
                             href="/dashboard/parent/catalog"
                             aria-label="Catalog"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentCatalogActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isParentCatalogActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <BookOpen className="h-5 w-5" />
                           </Link>
                           <Link
                             href="/pricing"
                             aria-label="Abonamentul elevului"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isParentAbonamentActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isParentAbonamentActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <KeyRound className="h-5 w-5" />
                           </Link>
                         </>
                       ) : (
                         <>
-                          <Link href="/invata" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                          <Link href="/invata" className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${pathname?.startsWith('/invata') ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                             <BookOpen className="h-5 w-5" />
                           </Link>
-                          <Link href="/exerseaza" className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isExerseazaActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
+                          <Link href="/exerseaza" className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isExerseazaActive ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}>
                             <Calculator className="h-5 w-5" />
                           </Link>
                           <Link
                             href="/pregatire"
                             aria-label="Pregătiri"
-                            className={`relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} ${navHoverBg} ${isPregatireRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isPregatireRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
                             <CalendarDays className="h-5 w-5" />
                           </Link>

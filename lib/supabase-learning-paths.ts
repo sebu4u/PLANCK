@@ -233,7 +233,7 @@ export async function getLearningPathChapterDashboardSnapshot(
   if (!foundIncomplete && hasStarted) {
     const lastLesson = lessons[lessons.length - 1] ?? firstLesson
     const lastItems = await getLearningPathLessonItems(lastLesson.id)
-    currentLessonIndex = Math.max(lessons.length - 2, 0)
+    currentLessonIndex = Math.max(lessons.length - 1, 0)
     currentLevel =
       lastItems.length > 0
         ? Math.ceil(lastItems.length / LEARNING_PATH_ITEMS_PER_LEVEL)
@@ -244,7 +244,7 @@ export async function getLearningPathChapterDashboardSnapshot(
     currentLessonProgress = { completed: lastItems.length, total: lastItems.length }
   }
 
-  const previewLessons = lessons.slice(currentLessonIndex, currentLessonIndex + 2)
+  const previewLessons = lessons.slice(currentLessonIndex, currentLessonIndex + 1)
 
   return {
     currentLevel,

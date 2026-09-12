@@ -5,6 +5,9 @@ interface LessonItemProgressBarProps {
   completed: number
   total: number
   className?: string
+  /** Floor for the filled width, even when completed is 0. */
+  minPercent?: number
+  accentColor?: string | null
 }
 
 interface LessonHubSquareCardProgressBarProps extends LessonItemProgressBarProps {
@@ -21,8 +24,17 @@ export function getLessonItemProgressPercent(completed: number, total: number): 
       : 0
 }
 
-export function LessonItemProgressBar({ completed, total, className }: LessonItemProgressBarProps) {
-  const percent = getLessonItemProgressPercent(completed, total)
+export function LessonItemProgressBar({
+  completed,
+  total,
+  className,
+  minPercent = 0,
+  accentColor,
+}: LessonItemProgressBarProps) {
+  const percent = Math.max(getLessonItemProgressPercent(completed, total), minPercent)
+  const fillColor = accentColor
+    ? resolveLearningPathChapterAccentColor(accentColor)
+    : undefined
 
   return (
     <div
@@ -34,8 +46,11 @@ export function LessonItemProgressBar({ completed, total, className }: LessonIte
       className={cn("h-2 w-full overflow-hidden rounded-full bg-[#ececec]", className)}
     >
       <div
-        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-[width] duration-300"
-        style={{ width: `${percent}%` }}
+        className={cn(
+          "h-full rounded-full transition-[width] duration-300",
+          !fillColor && "bg-gradient-to-r from-emerald-400 to-emerald-500",
+        )}
+        style={{ width: `${percent}%`, backgroundColor: fillColor }}
         aria-hidden="true"
       />
     </div>

@@ -11,7 +11,8 @@ export type StartPremiumCheckoutInput = {
   childId?: string
   successPath?: string
   cancelPath?: string
-  campaign?: "earlybird"
+  campaign?: "earlybird" | "back2school"
+  onboardingTrial?: boolean
 }
 
 export type StartPremiumCheckoutResult =
@@ -25,14 +26,19 @@ export async function startPremiumCheckout(
   const offer: TikTokCheckoutOffer = {
     interval: input.interval,
     value: premiumCheckoutValue(input.interval, input.campaign),
-    contentName: input.campaign === "earlybird" ? "Planck Premium anual earlybird" : "Planck Premium",
+    contentName:
+      input.campaign === "earlybird"
+        ? "Planck Premium anual earlybird"
+        : input.campaign === "back2school"
+          ? "Planck Premium lunar Back2School"
+          : "Planck Premium",
     campaign: input.campaign,
   }
   tiktokPixel.trackCheckoutStart(offer)
   metaPixel.trackCheckoutStart(offer)
   trackFunnelEvent("checkout_started", {
     interval: input.interval,
-    campaign: input.campaign,
+    campaign: input.onboardingTrial ? "onboarding_trial" : input.campaign,
   })
 
   const response = await fetch("/api/stripe/checkout", {
@@ -50,6 +56,7 @@ export async function startPremiumCheckout(
       ...(input.successPath ? { successPath: input.successPath } : {}),
       ...(input.cancelPath ? { cancelPath: input.cancelPath } : {}),
       ...(input.campaign ? { campaign: input.campaign } : {}),
+      ...(input.onboardingTrial ? { onboardingTrial: true } : {}),
     }),
   })
 
@@ -69,7 +76,7 @@ export async function startPremiumCheckout(
     metaPixel.trackCheckoutSuccess(`applied_${input.interval}`)
     trackFunnelEvent("subscription_purchased", {
       interval: input.interval,
-      campaign: input.campaign,
+      campaign: input.onboardingTrial ? "onboarding_trial" : input.campaign,
       applied: true,
       $insert_id: `purchase:applied_${input.interval}`,
     })

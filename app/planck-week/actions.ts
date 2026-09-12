@@ -1,5 +1,6 @@
 "use server"
 
+import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { upsertSubscriber } from "@/lib/mailerlite/client"
@@ -11,6 +12,7 @@ import {
   planckWeekConfirmarePath,
 } from "@/lib/planck-week"
 import { claimPlanckWeekForUser } from "@/lib/planck-week-claim"
+import { planckWeekConversionContext } from "@/lib/planck-week-conversion-events"
 import { isWorkshopSubject, WORKSHOP_SUBJECTS, type WorkshopSubject } from "@/lib/pregatire/types"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
@@ -179,10 +181,16 @@ export async function submitPlanckWeekLead(
   if (sessionUser) {
     let nextPath = getPlanckWeekPregatirePath(selectedSubjects[0] ?? null)
     try {
+      const headerStore = await headers()
+      const cookieStore = await cookies()
       const claimed = await claimPlanckWeekForUser({
         userId: sessionUser.id,
         email,
         sendSummaryEmail: false,
+        conversion: planckWeekConversionContext({
+          getHeader: (name) => headerStore.get(name),
+          getCookie: (name) => cookieStore.get(name)?.value,
+        }),
       })
       nextPath = claimed.redirectPath ?? nextPath
     } catch (err) {

@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { CheckCircle2, ChevronLeft, Clock, Loader2, X } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
@@ -33,14 +34,59 @@ function workshopFull(workshop: WorkshopPublic): boolean {
   return workshop.seats_remaining === 0
 }
 
+/** iOS ignores overflow:hidden on body; pin the document instead. */
+function lockIosBodyScroll() {
+  const scrollY = window.scrollY
+  const body = document.body
+  const html = document.documentElement
+  const prev = {
+    bodyOverflow: body.style.overflow,
+    bodyPosition: body.style.position,
+    bodyTop: body.style.top,
+    bodyLeft: body.style.left,
+    bodyRight: body.style.right,
+    bodyWidth: body.style.width,
+    htmlOverflow: html.style.overflow,
+    htmlOverscroll: html.style.overscrollBehavior,
+  }
+
+  body.style.overflow = "hidden"
+  body.style.position = "fixed"
+  body.style.top = `-${scrollY}px`
+  body.style.left = "0"
+  body.style.right = "0"
+  body.style.width = "100%"
+  html.style.overflow = "hidden"
+  html.style.overscrollBehavior = "none"
+
+  return () => {
+    body.style.overflow = prev.bodyOverflow
+    body.style.position = prev.bodyPosition
+    body.style.top = prev.bodyTop
+    body.style.left = prev.bodyLeft
+    body.style.right = prev.bodyRight
+    body.style.width = prev.bodyWidth
+    html.style.overflow = prev.htmlOverflow
+    html.style.overscrollBehavior = prev.htmlOverscroll
+    window.scrollTo(0, scrollY)
+  }
+}
+
 export function PlanckWeekOnboarding({
   open,
   onOpenChange,
   initialSubject,
+  lockSubject = false,
+  accountTitle,
+  accountSubtitle,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialSubject?: WorkshopSubject | null
+  /** Skip the subject picker — the landing already chose the materie. */
+  lockSubject?: boolean
+  accountTitle?: string
+  accountSubtitle?: string
 }) {
   const router = useRouter()
   const { user, profile } = useAuth()
@@ -52,27 +98,65 @@ export function PlanckWeekOnboarding({
   const [claiming, setClaiming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [redirectPath, setRedirectPath] = useState(getPlanckWeekPregatirePath(initialSubject ?? null))
+  const [mounted, setMounted] = useState(false)
+  const [viewportBox, setViewportBox] = useState({ top: 0, height: 0 })
+  const autoClaimKeyRef = useRef<string | null>(null)
 
-  const reset = useCallback((subject?: WorkshopSubject | null) => {
-    setStep("subject")
-    setSelected(subject ?? null)
-    setOauthLoading(null)
-    setClaiming(false)
-    setError(null)
-    setRedirectPath(getPlanckWeekPregatirePath(subject ?? null))
+  const reset = useCallback(
+    (subject?: WorkshopSubject | null, skipPicker?: boolean, alreadyLoggedIn?: boolean) => {
+      setSelected(subject ?? null)
+      setOauthLoading(null)
+      setClaiming(false)
+      setError(null)
+      setRedirectPath(getPlanckWeekPregatirePath(subject ?? null))
+      if (skipPicker && subject) {
+        setStep(alreadyLoggedIn ? "subject" : "account")
+      } else {
+        setStep("subject")
+      }
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!open) {
+      autoClaimKeyRef.current = null
+      return
+    }
+    reset(initialSubject ?? null, lockSubject, Boolean(user))
+    // user is read on open; do not reset when signup sets user mid-flow
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialSubject, lockSubject, reset])
+
+  useEffect(() => {
+    setMounted(true)
   }, [])
 
   useEffect(() => {
     if (!open) return
-    reset(initialSubject ?? null)
-  }, [open, initialSubject, reset])
+    return lockIosBodyScroll()
+  }, [open])
 
   useEffect(() => {
     if (!open) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = "hidden"
+
+    const update = () => {
+      const vv = window.visualViewport
+      if (vv) {
+        setViewportBox({ top: vv.offsetTop, height: vv.height })
+        return
+      }
+      setViewportBox({ top: 0, height: window.innerHeight })
+    }
+
+    update()
+    window.visualViewport?.addEventListener("resize", update)
+    window.visualViewport?.addEventListener("scroll", update)
+    window.addEventListener("resize", update)
     return () => {
-      document.body.style.overflow = previous
+      window.visualViewport?.removeEventListener("resize", update)
+      window.visualViewport?.removeEventListener("scroll", update)
+      window.removeEventListener("resize", update)
     }
   }, [open])
 
@@ -142,13 +226,14 @@ export function PlanckWeekOnboarding({
       error?: string
       redirectPath?: string | null
       unlockedCount?: number
+      conversionEventId?: string | null
     } | null
     if (!response.ok) {
       throw new Error(payload?.error ?? "Nu am putut rezerva locul.")
     }
 
-    if (payload?.unlockedCount && payload.unlockedCount > 0) {
-      trackPlanckWeekLeadPixels()
+    if (payload?.conversionEventId) {
+      trackPlanckWeekLeadPixels(payload.conversionEventId)
       trackFunnelEvent("planck_week_claimed", {
         subjects: selected,
         unlocked: payload.unlockedCount,
@@ -188,6 +273,15 @@ export function PlanckWeekOnboarding({
     setStep("account")
   }, [claimReservation, selected, selectedWorkshop, user])
 
+  useEffect(() => {
+    if (!open || !lockSubject || !user) return
+    if (step === "account") return
+    const key = user.id
+    if (autoClaimKeyRef.current === key) return
+    autoClaimKeyRef.current = key
+    void goAfterSubject()
+  }, [open, lockSubject, user, step, goAfterSubject])
+
   const handleEmailSignup = useCallback(
     async (email: string, password: string) => {
       setOauthLoading("email")
@@ -222,34 +316,51 @@ export function PlanckWeekOnboarding({
     [claimReservation],
   )
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  if (step === "account") {
-    return (
-      <div className="fixed inset-0 z-[500] h-dvh w-full overflow-hidden bg-[#ffffff] sm:h-auto sm:min-h-screen sm:overflow-visible">
+  const overlayStyle: CSSProperties = {
+    top: viewportBox.top,
+    height: viewportBox.height > 0 ? viewportBox.height : "100dvh",
+  }
+
+  const overlay = step === "account" ? (
+      <div
+        data-mobile-scroll-lock=""
+        role="dialog"
+        aria-modal="true"
+        aria-label="Creează contul"
+        className="fixed inset-x-0 z-[500] overflow-y-auto overflow-x-hidden overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]"
+        style={overlayStyle}
+      >
         <OnboardingKeyframes />
-        <div className="mx-auto flex h-full w-full max-w-[1100px] flex-col sm:h-auto sm:min-h-screen">
-          <header className="w-full px-4 pb-1 pt-4 sm:px-8 sm:pt-7">
+        <div className="mx-auto flex min-h-full w-full max-w-[1100px] flex-col">
+          <header className="w-full px-4 pb-1 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8 sm:pt-7">
             <div className="relative mx-auto flex w-full max-w-[520px] items-center justify-center">
               <button
                 type="button"
                 onClick={() => {
                   setError(null)
+                  if (lockSubject) {
+                    onOpenChange(false)
+                    return
+                  }
                   setStep("subject")
                 }}
-                className="absolute left-0 inline-flex h-7 w-7 items-center justify-center rounded-full text-[#16181d] transition-colors hover:bg-[#f0f1f5] active:bg-[#f0f1f5]"
+                className="absolute left-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-[#16181d] transition-colors hover:bg-[#f0f1f5] active:bg-[#f0f1f5]"
                 aria-label="Înapoi"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
             </div>
           </header>
-          <main className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overflow-x-hidden px-4 py-4 sm:overflow-visible sm:px-6 sm:py-8">
-            <div className="flex w-full flex-col justify-center sm:block">
+          <main className="flex flex-1 flex-col justify-start px-4 py-4 sm:justify-center sm:px-6 sm:py-8">
+            <div className="flex w-full flex-col sm:block">
               <OnboardingAccountStep
                 oauthLoading={oauthLoading}
                 onEmailSignup={handleEmailSignup}
                 variant="email-only"
+                title={accountTitle}
+                subtitle={accountSubtitle}
               />
               {error ? (
                 <p className="mx-auto mt-4 max-w-[480px] text-center text-sm text-red-600" role="alert">
@@ -260,13 +371,17 @@ export function PlanckWeekOnboarding({
           </main>
         </div>
       </div>
-    )
-  }
-
-  return (
-    <div className="fixed inset-0 z-[500] overflow-y-auto bg-[#F8F7FF]">
+    ) : (
+    <div
+      data-mobile-scroll-lock=""
+      role="dialog"
+      aria-modal="true"
+      aria-label="Rezervă locul la Planck Week"
+      className="fixed inset-x-0 z-[500] overflow-y-auto overscroll-y-contain bg-[#F8F7FF] [-webkit-overflow-scrolling:touch]"
+      style={overlayStyle}
+    >
       <OnboardingKeyframes />
-      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <div className="flex items-center justify-between py-2">
           <span className="w-11" />
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#7C5CFC]">Planck Week</p>
@@ -280,7 +395,26 @@ export function PlanckWeekOnboarding({
           </button>
         </div>
 
-        {step === "subject" ? (
+        {step === "subject" && lockSubject ? (
+          <div className="flex flex-1 flex-col items-center justify-center px-2 pb-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-[#7C5CFC]" />
+            <p className="mt-4 text-sm font-semibold text-gray-800">Rezervăm locul…</p>
+            {error ? (
+              <>
+                <p className="mt-3 text-sm text-red-600" role="alert">
+                  {error}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void goAfterSubject()}
+                  className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[#7C5CFC] px-5 text-sm font-bold text-white"
+                >
+                  Încearcă din nou
+                </button>
+              </>
+            ) : null}
+          </div>
+        ) : step === "subject" ? (
           <div className="flex flex-1 flex-col pb-4">
             <h2 className="mt-4 text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
               Alege materia
@@ -418,4 +552,6 @@ export function PlanckWeekOnboarding({
       </div>
     </div>
   )
+
+  return createPortal(overlay, document.body)
 }

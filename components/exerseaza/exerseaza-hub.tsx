@@ -33,6 +33,7 @@ import {
   normalizePracticeSubject,
   type PracticeSubjectId,
 } from "@/lib/practice-subject"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { PRACTICE_SUBJECT_CHANGE_EVENT } from "@/hooks/use-practice-subject-switcher"
 import type { UserAssignmentListItem } from "@/lib/classrooms/types"
 import { fetchFlashcardDeck } from "@/lib/learning-path-flashcard-client"
@@ -162,7 +163,12 @@ function MobileCard({
   const accent = MOBILE_CARD_ACCENTS[card.id]
 
   const inner = (
-    <article className="flex items-center gap-3 rounded-2xl border-2 border-[#e5e5e5] bg-white px-3.5 py-3.5 transition-transform active:scale-[0.99]">
+    <article
+      className={cn(
+        PRESS_SHRINK_CLASS,
+        "flex items-center gap-3 rounded-2xl border-2 border-[#e5e5e5] bg-white px-3.5 py-3.5",
+      )}
+    >
       <span
         className={cn(
           "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",

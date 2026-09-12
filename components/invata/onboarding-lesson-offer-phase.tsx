@@ -1,87 +1,65 @@
 "use client"
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
-import { Loader2 } from "lucide-react"
+import { Calendar, Loader2, Megaphone, Unlock, X } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import {
+  PremiumComparisonContent,
+  premiumWordGradientClass,
+} from "@/components/invata/premium-comparison-content"
 import { useToast } from "@/hooks/use-toast"
 import { playButtonClickSound } from "@/lib/platform-sounds"
 import { startPremiumCheckout } from "@/lib/stripe-checkout-client"
 import { supabase } from "@/lib/supabaseClient"
-import {
-  getPremiumPeriodLabel,
-  getPremiumPriceRon,
-} from "@/components/pricing/premium-pricing"
 
 interface OnboardingLessonOfferPhaseProps {
   onDecline: () => void | Promise<void>
 }
 
-const OFFER_WINDOW_MS = 10 * 60 * 1000
-const WELCOME_DISCOUNT_PERCENT = 20
 const BILLING_INTERVAL = "week" as const
 
-function getWelcomeOfferStorageKey(userId: string) {
-  return `planck_onboarding_welcome_offer_start_${userId}`
+const PASTEL_BACKGROUND =
+  "radial-gradient(ellipse 80% 55% at 0% 0%, #ead7ff 0%, transparent 58%), radial-gradient(ellipse 80% 55% at 100% 0%, #ffe4c2 0%, transparent 58%), linear-gradient(180deg, #f6efff 0%, #ffffff 52%)"
+
+const CTA_CLASS =
+  "dashboard-start-glow inline-flex min-w-[240px] items-center justify-center rounded-full bg-[#2d2d2d] px-8 py-3.5 text-base font-semibold text-white shadow-[0_4px_0_#1a1a1a] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#1a1a1a] active:translate-y-1 active:shadow-[0_1px_0_#1a1a1a] disabled:cursor-not-allowed disabled:opacity-70"
+
+function formatChargeDate(from = new Date()) {
+  const chargeOn = new Date(from)
+  chargeOn.setDate(chargeOn.getDate() + 7)
+  return chargeOn.toLocaleDateString("ro-RO", { day: "numeric", month: "short" })
 }
 
-function formatCountdown(remainingMs: number): string {
-  const totalSec = Math.max(0, Math.floor(remainingMs / 1000))
-  const m = Math.floor(totalSec / 60)
-  const s = totalSec % 60
-  return [m, s].map((n) => String(n).padStart(2, "0")).join(":")
-}
-
-/** Visual “was” price so the real Stripe amount looks 20% off. */
-function getStruckPriceRon(saleRon: number): number {
-  return Math.round(saleRon / (1 - WELCOME_DISCOUNT_PERCENT / 100))
-}
+type OfferStep = "compare" | "how"
 
 export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferPhaseProps) {
   const router = useRouter()
   const { user } = useAuth()
   const { toast } = useToast()
-  const [now, setNow] = useState(0)
+  const [step, setStep] = useState<OfferStep>("compare")
   const [checkoutLoading, setCheckoutLoading] = useState(false)
-  const startRef = useRef<number | null>(null)
+  const chargeDateLabel = useMemo(() => formatChargeDate(), [])
 
-  useLayoutEffect(() => {
-    const startedAt = Date.now()
-    let start = startedAt
+  const handleDecline = useCallback(() => {
+    playButtonClickSound()
+    void onDecline()
+  }, [onDecline])
 
-    if (user?.id) {
-      try {
-        const key = getWelcomeOfferStorageKey(user.id)
-        const existing = localStorage.getItem(key)
-        const parsed = Number(existing)
-        if (existing && Number.isFinite(parsed)) {
-          start = parsed
-        } else {
-          localStorage.setItem(key, String(startedAt))
-        }
-      } catch {
-        // keep in-memory start
-      }
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") handleDecline()
     }
+    window.addEventListener("keydown", handleKeyDown)
 
-    startRef.current = start
-    setNow(startedAt)
-
-    const id = window.setInterval(() => {
-      if (!document.hidden) setNow(Date.now())
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [user?.id])
-
-  const remainingLabel = useMemo(() => {
-    if (now === 0 || startRef.current == null) return "10:00"
-    return formatCountdown(startRef.current + OFFER_WINDOW_MS - now)
-  }, [now])
-
-  const saleRon = getPremiumPriceRon(BILLING_INTERVAL)
-  const struckRon = getStruckPriceRon(saleRon)
-  const periodLabel = getPremiumPeriodLabel(BILLING_INTERVAL)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [handleDecline])
 
   const handleCheckout = async () => {
     if (checkoutLoading) return
@@ -98,6 +76,7 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
       const result = await startPremiumCheckout({
         accessToken,
         interval: BILLING_INTERVAL,
+        onboardingTrial: true,
       })
 
       if (!result.ok) {
@@ -127,81 +106,155 @@ export function OnboardingLessonOfferPhase({ onDecline }: OnboardingLessonOfferP
     }
   }
 
-  const handleDecline = useCallback(() => {
-    playButtonClickSound()
-    void onDecline()
-  }, [onDecline])
+  return (
+    <div
+      className="fixed inset-0 z-[502] flex flex-col"
+      style={{ background: PASTEL_BACKGROUND }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={
+        step === "compare"
+          ? "Începe-ți planul de învățare cu Premium"
+          : "Cum funcționează perioada ta Premium gratuită"
+      }
+    >
+      <button
+        type="button"
+        onClick={handleDecline}
+        aria-label="Închide"
+        className="absolute right-4 top-4 z-[504] inline-flex h-10 w-10 items-center justify-center rounded-full text-[#6b6b6b] transition-colors hover:bg-white/40 hover:text-[#111111] sm:right-6 sm:top-6"
+      >
+        <X className="h-5 w-5" />
+      </button>
+
+      {step === "compare" ? (
+        <div className="flex flex-1 items-center justify-center overflow-y-auto px-4 py-16 sm:px-6">
+          <PremiumComparisonContent
+            title={
+              <>
+                Începe-ți planul de învățare
+                <br />
+                cu <span className={premiumWordGradientClass}>Premium</span>
+              </>
+            }
+            ctaLabel="Începe săptămâna gratuită"
+            onCtaClick={() => {
+              playButtonClickSound()
+              setStep("how")
+            }}
+          />
+        </div>
+      ) : (
+        <TrialHowItWorksStep
+          chargeDateLabel={chargeDateLabel}
+          checkoutLoading={checkoutLoading}
+          onStart={() => {
+            playButtonClickSound()
+            void handleCheckout()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function TrialHowItWorksStep({
+  chargeDateLabel,
+  checkoutLoading,
+  onStart,
+}: {
+  chargeDateLabel: string
+  checkoutLoading: boolean
+  onStart: () => void
+}) {
+  const steps = [
+    {
+      key: "today",
+      title: "Astăzi",
+      body: "Ai acces la toate cursurile interactive, tutoratul personalizat și nu numai",
+      icon: Unlock,
+      active: true,
+    },
+    {
+      key: "five",
+      title: "În 5 zile",
+      body: "Primești un email de reminder că perioada gratuită se apropie de final",
+      icon: Megaphone,
+      active: false,
+    },
+    {
+      key: "seven",
+      title: "În 7 zile",
+      body: `Contul tău va fi taxat; poți anula oricând înainte de ${chargeDateLabel}`,
+      icon: Calendar,
+      active: false,
+    },
+  ] as const
 
   return (
-    <div className="fixed inset-0 z-[502] flex flex-col bg-[linear-gradient(180deg,#ffd6e8_0%,#fff5f8_42%,#ffffff_100%)]">
-      <div className="flex flex-1 items-center justify-center overflow-y-auto px-6 py-8 pb-36">
-        <motion.div
-          className="w-full max-w-sm text-center"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <span className="inline-flex items-center rounded-full bg-[#be185d] px-4 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-white shadow-[0_6px_18px_rgba(190,24,93,0.35)] sm:text-sm">
-            Reducere de bun venit −{WELCOME_DISCOUNT_PERCENT}%
-          </span>
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 items-center justify-center overflow-y-auto px-4 pb-4 pt-16 sm:px-8">
+        <div className="w-full max-w-3xl text-center">
+          <h2 className="text-3xl font-bold leading-tight text-[#111111] sm:text-4xl md:text-[2.75rem]">
+            Cum funcționează perioada ta{" "}
+            <span className={premiumWordGradientClass}>Premium</span> gratuită
+          </h2>
 
-          <p className="mt-8 text-[11px] font-bold uppercase tracking-[0.22em] text-[#be185d]/80">
-            Oferta expiră în 10 minute
-          </p>
-          <p
-            className="mt-1 font-mono text-7xl font-black tabular-nums leading-none tracking-tight text-[#be185d] sm:text-8xl"
-            aria-live="polite"
-            aria-label={`Timp rămas ${remainingLabel}`}
-          >
-            {remainingLabel}
-          </p>
-
-          <div className="mt-10">
-            <p className="text-base font-medium text-[#9ca3af] line-through">
-              {struckRon.toLocaleString("ro-RO")} RON{periodLabel}
-            </p>
-            <div className="mt-1 flex items-baseline justify-center gap-1.5">
-              <span className="text-5xl font-black tracking-tight text-[#111111] tabular-nums">
-                {saleRon.toLocaleString("ro-RO")}
-              </span>
-              <span className="text-lg font-semibold text-[#6b7280]">RON{periodLabel}</span>
+          <div className="relative mx-auto mt-12 max-w-2xl sm:mt-16">
+            <div
+              className="pointer-events-none absolute left-[16.666%] right-[6%] top-[22px] h-[4px] overflow-hidden rounded-full bg-gradient-to-r from-[#ead9ff] via-[#ead9ff] to-transparent sm:top-[26px] sm:h-[5px]"
+              aria-hidden
+            >
+              <div className="h-full w-[28%] rounded-full bg-[linear-gradient(90deg,#c084fc_0%,#e879f9_42%,#fb923c_100%)] sm:h-[6px]" />
             </div>
-            <p className="mt-2 text-sm font-semibold text-[#be185d]">
-              −{WELCOME_DISCOUNT_PERCENT}% la abonamentul săptămânal
-            </p>
+
+            <ol className="relative grid grid-cols-3 gap-2 sm:gap-6">
+              {steps.map((item) => {
+                const Icon = item.icon
+                return (
+                  <li key={item.key} className="flex flex-col items-center text-center">
+                    <span
+                      className={
+                        item.active
+                          ? "relative z-[1] inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#c084fc] text-white shadow-[0_8px_18px_rgba(168,85,247,0.32)] sm:h-14 sm:w-14"
+                          : "relative z-[1] inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f3e8ff] text-[#7c3aed] sm:h-14 sm:w-14"
+                      }
+                    >
+                      <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={2.25} />
+                    </span>
+                    <p className="mt-4 text-sm font-semibold text-[#7c3aed] sm:mt-5 sm:text-base">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 max-w-[220px] text-[13px] leading-snug text-[#6b7280] sm:text-sm">
+                      {item.body}
+                    </p>
+                  </li>
+                )
+              })}
+            </ol>
           </div>
-        </motion.div>
+        </div>
       </div>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[503] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
-        <div className="pointer-events-auto mx-auto flex w-full max-w-sm flex-col items-center">
-          <button
-            type="button"
-            onClick={() => {
-              playButtonClickSound()
-              void handleCheckout()
-            }}
-            disabled={checkoutLoading}
-            className="inline-flex w-full items-center justify-center rounded-full bg-[#2d2d2d] px-5 py-3.5 text-base font-bold text-white shadow-[0_4px_0_#1a1a1a] transition-[transform,box-shadow,filter] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1a1a1a] hover:brightness-110 active:translate-y-0.5 active:shadow-[0_2px_0_#1a1a1a] disabled:cursor-not-allowed disabled:opacity-70"
-          >
+      <div className="flex justify-center px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4">
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={checkoutLoading}
+          className={CTA_CLASS}
+          style={{ "--start-glow-tint": "rgba(255, 255, 255, 0.38)" } as CSSProperties}
+        >
+          <span className="relative z-[1] inline-flex items-center justify-center">
             {checkoutLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Se deschide...
               </>
             ) : (
-              "Ia reducerea de bun venit"
+              "Începe săptămâna gratuită"
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleDecline}
-            className="mt-3 text-xs font-medium text-black/45 transition hover:text-black/70"
-          >
-            Refuz oferta
-          </button>
-        </div>
+          </span>
+        </button>
       </div>
     </div>
   )

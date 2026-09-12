@@ -1,9 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { isAdmin } from "@/lib/admin-check"
-import {
-  FREE_PLAN_LEARNING_PATH_ITEM_LIMIT,
-  FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT,
-} from "@/lib/learning-path-free-plan"
+import { FREE_PLAN_LEARNING_PATH_ITEM_LIMIT } from "@/lib/learning-path-free-plan"
 import { getCachedOnboardingCustomLessonIds } from "@/lib/learning-path-hub-cache"
 import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
 import { createClient } from "@/lib/supabase/server"
@@ -28,41 +25,23 @@ interface ChapterLike {
   slug: string | null
   generated_by_user_id?: string | null
   is_personalized?: boolean | null
-  order_index?: number | null
 }
 
 /**
- * Un traseu oficial (nu personalizat) e considerat "free preview" doar dacă se
- * numără printre primele `FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT` trasee după
- * order_index — aceleași trasee care apar deblocate (nu grayed out) pe /invata.
+ * Traseele oficiale (nu personalizate) sunt toate încercabile pe planul free,
+ * cu cota globală de `FREE_PLAN_LEARNING_PATH_ITEM_LIMIT` itemi.
  */
-async function isFreePlanUnlockedChapter(
-  supabase: SupabaseClient,
-  chapter: ChapterLike | null | undefined,
-): Promise<boolean> {
-  if (!chapter || chapter.is_personalized === true) return false
-  if (chapter.order_index === null || chapter.order_index === undefined) return false
-
-  const { count, error } = await supabase
-    .from("learning_path_chapters")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", true)
-    .not("is_personalized", "is", true)
-    .lt("order_index", chapter.order_index)
-
-  if (error) return false
-
-  return (count ?? 0) < FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT
+function isOfficialFreePreviewChapter(chapter: ChapterLike | null | undefined): boolean {
+  return Boolean(chapter) && chapter?.is_personalized !== true
 }
 
 /**
  * Determina nivelul de acces al userului curent pentru un capitol learning-path.
  *
  * - `full`: admini, dev (`profiles.is_dev`), planuri platite (plus/premium), useri cu `plus_months_remaining > 0`.
- * - `free-preview`: utilizatori fără cont sau cu plan free, doar pentru primele
- *   `FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT` trasee oficiale (după order_index); pot
- *   parcurge secvențial până la limita globală de itemi.
- * - `locked`: orice alt scenariu (afiseaza preview-ul placeholder).
+ * - `free-preview`: utilizatori fără cont sau cu plan free, pe orice traseu oficial;
+ *   pot parcurge secvențial până la limita globală de itemi.
+ * - `locked`: trasee personalizate ale altor useri (sau fără capitol) — afișează preview-ul placeholder.
  */
 export async function getLearningPathAccess(chapter?: ChapterLike | null): Promise<LearningPathAccess> {
   const supabase = await createClient()
@@ -94,7 +73,7 @@ export async function getLearningPathAccessForUser(
   }
 
   if (!user) {
-    if (await isFreePlanUnlockedChapter(supabase, chapter)) {
+    if (isOfficialFreePreviewChapter(chapter)) {
       return {
         mode: "free-preview",
         itemsSolved: 0,
@@ -177,8 +156,7 @@ export async function getLearningPathAccessForUser(
     }
   }
 
-  const isFreeChapter = await isFreePlanUnlockedChapter(supabase, chapter)
-  if (!isFreeChapter) {
+  if (!isOfficialFreePreviewChapter(chapter)) {
     return {
       mode: "locked",
       itemsSolved: 0,

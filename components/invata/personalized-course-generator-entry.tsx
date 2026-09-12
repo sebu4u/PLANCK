@@ -3,6 +3,7 @@
 import { useCallback, useState, type ComponentType } from "react"
 import { Loader2, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import type { PersonalizedCourseGeneratorProps } from "@/components/invata/personalized-course-generator"
 
 const INITIAL_PLACEHOLDER = "Ce vrei să înveți?"
@@ -33,6 +34,7 @@ function LightweightSearchPill({
         aria-expanded={false}
         aria-haspopup="dialog"
         className={cn(
+          PRESS_SHRINK_CLASS,
           "flex h-full w-full items-center gap-2.5 rounded-full bg-white px-4 text-left transition-colors hover:border-[#bdbdbd] disabled:cursor-wait disabled:opacity-80",
           PILL_BORDER_CLASS,
         )}

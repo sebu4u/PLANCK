@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 
 const NAVBAR_INFO_TOOLTIP_DELAY_MS = 1000
@@ -85,7 +86,10 @@ export function NavbarInfoTooltip({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex touch-manipulation cursor-pointer items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+            className={cn(
+              PRESS_SHRINK_CLASS,
+              "inline-flex touch-manipulation cursor-pointer items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60",
+            )}
             aria-label={ariaLabel}
           >
             {children}
@@ -109,7 +113,10 @@ export function NavbarInfoTooltip({
         <TooltipTrigger asChild>
           <button
             type="button"
-            className="inline-flex cursor-default items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+            className={cn(
+              PRESS_SHRINK_CLASS,
+              "inline-flex cursor-default items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60",
+            )}
             aria-label={ariaLabel}
           >
             {children}

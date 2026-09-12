@@ -46,6 +46,7 @@ export function LandingTeachersSection() {
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
+            overscrollBehaviorX: "contain",
           }}
         >
           {LANDING_TEACHERS.map((teacher) => (

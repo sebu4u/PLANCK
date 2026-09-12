@@ -11,9 +11,13 @@ export const STUDENT_STEP_NAMES: Record<string, string> = {
   "3": "grade",
   "4": "self_grade",
   "5": "target_grade",
+  "6": "daily_time",
+  "7": "testimonials",
+  "8": "simulation",
   "9": "account",
   name: "name",
   lesson_choice: "lesson_choice",
+  offer: "premium_trial_offer",
 }
 
 export function guardianStepName(

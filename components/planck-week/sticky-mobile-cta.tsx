@@ -1,11 +1,27 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import { PlanckWeekCtaButton } from "@/components/planck-week/cta-button"
+import { useCookieManager } from "@/lib/cookie-management"
 
-export function PlanckWeekStickyMobileCta({ onReserve }: { onReserve: () => void }) {
+export function PlanckWeekStickyMobileCta({
+  onReserve,
+  hidden = false,
+  label,
+}: {
+  onReserve: () => void
+  hidden?: boolean
+  label?: string
+}) {
+  const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
+  const { hasConsent } = useCookieManager()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const onScroll = () => {
@@ -16,9 +32,11 @@ export function PlanckWeekStickyMobileCta({ onReserve }: { onReserve: () => void
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
-      {visible && (
+      {visible && hasConsent && !hidden && (
         <motion.div
           className="fixed inset-x-0 bottom-0 z-50 border-t border-[#EBE8FF] bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:hidden"
           initial={{ y: 80, opacity: 0 }}
@@ -26,9 +44,10 @@ export function PlanckWeekStickyMobileCta({ onReserve }: { onReserve: () => void
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: "spring", stiffness: 380, damping: 32 }}
         >
-          <PlanckWeekCtaButton onClick={onReserve} size="full" />
+          <PlanckWeekCtaButton onClick={onReserve} size="full" label={label} />
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

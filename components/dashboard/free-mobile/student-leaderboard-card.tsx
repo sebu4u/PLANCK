@@ -9,6 +9,8 @@ import {
 import { getRankIconPath } from "@/lib/rank-icon"
 import { DashboardDetailOverlay } from "@/components/dashboard/free-mobile/dashboard-detail-overlay"
 import { LeaderboardRow } from "@/components/dashboard/leaderboard-row"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
+import { cn } from "@/lib/utils"
 
 interface StudentLeaderboardCardProps {
   studentName: string
@@ -40,7 +42,10 @@ export function StudentLeaderboardCard({ studentName, elo, rank }: StudentLeader
       <button
         type="button"
         onClick={() => setDetailOpen(true)}
-        className="flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-transform active:scale-[0.99]"
+        className={cn(
+          PRESS_SHRINK_CLASS,
+          "flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)]",
+        )}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>

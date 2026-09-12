@@ -10,10 +10,12 @@ export function PlanckWeekCtaButton({
   onClick,
   className,
   size = "default",
+  label = PLANCK_WEEK_CTA,
 }: {
   onClick: () => void
   className?: string
   size?: "default" | "full"
+  label?: string
 }) {
   return (
     <button
@@ -27,7 +29,7 @@ export function PlanckWeekCtaButton({
         className,
       )}
     >
-      {PLANCK_WEEK_CTA}
+      {label}
     </button>
   )
 }

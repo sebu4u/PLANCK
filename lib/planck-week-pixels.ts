@@ -1,7 +1,8 @@
 "use client"
 
+import { metaEventId } from "@/lib/meta-constants"
 import { META_CURRENCY, metaPixel } from "@/lib/meta-pixel"
-import { TIKTOK_CURRENCY } from "@/lib/tiktok-constants"
+import { TIKTOK_CURRENCY, tiktokEventId } from "@/lib/tiktok-constants"
 import { tiktokPixel } from "@/lib/tiktok-pixel"
 
 const EMAIL_KEY = "planck_week_lead_email"
@@ -18,7 +19,9 @@ export function rememberPlanckWeekLeadEmail(email: string): void {
   }
 }
 
-export function trackPlanckWeekLeadPixels(): void {
+export function trackPlanckWeekLeadPixels(conversionEventId?: string | null): void {
+  if (!conversionEventId) return
+
   let email: string | null = null
   try {
     email = sessionStorage.getItem(EMAIL_KEY)
@@ -32,8 +35,8 @@ export function trackPlanckWeekLeadPixels(): void {
     metaPixel.identify({ email })
   }
 
-  const onceKey = email || "planck_week_lead"
-  metaPixel.trackLead(CONTENT_ID, CONTENT_NAME)
+  const onceKey = conversionEventId
+  metaPixel.trackLead(CONTENT_ID, CONTENT_NAME, metaEventId("Lead", onceKey))
   metaPixel.trackCompleteRegistration(
     {
       content_ids: [CONTENT_ID],
@@ -44,7 +47,7 @@ export function trackPlanckWeekLeadPixels(): void {
     },
     onceKey,
   )
-  tiktokPixel.trackSubmitForm(CONTENT_ID, CONTENT_NAME)
+  tiktokPixel.trackSubmitForm(CONTENT_ID, CONTENT_NAME, tiktokEventId("SubmitForm", onceKey))
   tiktokPixel.trackCompleteRegistration(
     {
       contents: [

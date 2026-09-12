@@ -2,11 +2,11 @@
 
 import { CookieManager } from '@/lib/cookie-management'
 import { EARLYBIRD_YEARLY_RON } from '@/lib/landing-earlybird'
+import { META_CURRENCY, META_PIXEL_ID, metaEventId } from '@/lib/meta-constants'
 import { getCampaignPriceRon } from '@/lib/pricing-campaign'
 import type { PremiumBillingInterval } from '@/components/pricing/premium-pricing'
 
-export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || '1082544554271149'
-export const META_CURRENCY = 'RON'
+export { META_CURRENCY, META_PIXEL_ID } from '@/lib/meta-constants'
 
 const PENDING_CHECKOUT_KEY = 'meta_pending_checkout'
 const PURCHASE_PREFIX = 'meta_purchase_'
@@ -39,7 +39,7 @@ export type MetaCheckoutOffer = {
   interval: PremiumBillingInterval
   value: number
   contentName: string
-  campaign?: 'earlybird'
+  campaign?: 'earlybird' | 'back2school'
 }
 
 function normalizeEmail(email: string): string | null {
@@ -60,8 +60,9 @@ function normalizePhone(phone: string): string | null {
   return e164
 }
 
-function premiumName(interval: PremiumBillingInterval, campaign?: 'earlybird'): string {
+function premiumName(interval: PremiumBillingInterval, campaign?: 'earlybird' | 'back2school'): string {
   if (campaign === 'earlybird' && interval === 'year') return 'Planck Premium anual earlybird'
+  if (campaign === 'back2school' && interval === 'month') return 'Planck Premium lunar Back2School'
   if (interval === 'week') return 'Planck Premium săptămânal'
   if (interval === 'year') return 'Planck Premium anual'
   return 'Planck Premium lunar'
@@ -69,14 +70,20 @@ function premiumName(interval: PremiumBillingInterval, campaign?: 'earlybird'): 
 
 function premiumCommerceParams(
   interval: PremiumBillingInterval,
-  options?: { value?: number; campaign?: 'earlybird' },
+  options?: { value?: number; campaign?: 'earlybird' | 'back2school' },
 ): MetaCommerceParams {
   const value = options?.value ?? (
     options?.campaign === 'earlybird' && interval === 'year'
       ? EARLYBIRD_YEARLY_RON
       : getCampaignPriceRon(interval)
   )
-  const contentId = options?.campaign === 'earlybird' ? `premium_${interval}_earlybird` : `premium_${interval}`
+  const campaignSuffix =
+    options?.campaign === 'earlybird'
+      ? '_earlybird'
+      : options?.campaign === 'back2school'
+        ? '_back2school'
+        : ''
+  const contentId = `premium_${interval}${campaignSuffix}`
   return {
     content_ids: [contentId],
     content_type: 'product',
@@ -220,31 +227,40 @@ class MetaPixel {
     window.fbq?.('track', 'PageView')
   }
 
-  track(event: string, params?: Record<string, unknown>): void {
+  track(event: string, params?: Record<string, unknown>, eventID?: string): void {
     if (!this.canSend()) return
+    const options = eventID ? { eventID } : undefined
+    if (params && options) {
+      window.fbq?.('track', event, params, options)
+      return
+    }
     if (params) {
       window.fbq?.('track', event, params)
+      return
+    }
+    if (options) {
+      window.fbq?.('track', event, {}, options)
       return
     }
     window.fbq?.('track', event)
   }
 
-  private trackCommerce(event: string, params: MetaCommerceParams): void {
+  private trackCommerce(event: string, params: MetaCommerceParams, eventID?: string): void {
     this.track(event, {
       content_ids: params.content_ids,
       content_type: params.content_type,
       content_name: params.content_name,
       value: params.value,
       currency: params.currency,
-    })
+    }, eventID)
   }
 
   trackViewContent(params: MetaCommerceParams): void {
     this.trackCommerce('ViewContent', params)
   }
 
-  trackLead(contentId: string, contentName: string): void {
-    this.trackCommerce('Lead', namedContent(contentId, contentName))
+  trackLead(contentId: string, contentName: string, eventID?: string): void {
+    this.trackCommerce('Lead', namedContent(contentId, contentName), eventID)
   }
 
   trackContact(contentId: string, contentName: string): void {
@@ -253,7 +269,11 @@ class MetaPixel {
 
   trackCompleteRegistration(params: MetaCommerceParams, onceKey?: string): void {
     if (onceKey && !markOnce(`${REGISTRATION_PREFIX}${onceKey}`)) return
-    this.trackCommerce('CompleteRegistration', params)
+    this.trackCommerce(
+      'CompleteRegistration',
+      params,
+      onceKey ? metaEventId('CompleteRegistration', onceKey) : undefined,
+    )
   }
 
   trackCheckoutStart(offer: MetaCheckoutOffer): void {

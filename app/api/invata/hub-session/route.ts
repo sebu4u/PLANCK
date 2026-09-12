@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { logger } from "@/lib/logger"
 import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
-import {
-  getFreePlanLockedChapterIds,
-  resolveLearningPathHubChapterSplit,
-} from "@/lib/learning-path-free-plan"
+import { resolveLearningPathHubChapterSplit } from "@/lib/learning-path-free-plan"
 import {
   getLearningPathHubLessonsByChapterIds,
   getLearningPathLessonItemCountsByLessonIds,
@@ -15,7 +12,7 @@ import {
   getCachedPublicLearningPathHubCatalog,
   getCachedPublicLearningPathLessonItemCounts,
 } from "@/lib/learning-path-hub-cache"
-import { sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-ssr"
+import { getInvataPreferredSubjectForUser, sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-ssr"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
@@ -42,9 +39,10 @@ export async function GET(_req: NextRequest) {
       return noStoreJson({ error: "Necesită autentificare." }, { status: 401 })
     }
 
-    const [personalizedChapters, access] = await Promise.all([
+    const [personalizedChapters, access, preferredSubject] = await Promise.all([
       getUserPersonalizedLearningPathHubChapters(user.id, supabase),
       getLearningPathAccessForUser(supabase, user, null),
+      getInvataPreferredSubjectForUser(supabase, user),
     ])
 
     const personalizedLessonsByChapter = personalizedChapters.length
@@ -55,22 +53,23 @@ export async function GET(_req: NextRequest) {
       : {}
 
     const publicChapterIdSet = new Set(publicCatalog.chapters.map((chapter) => chapter.id))
-    const chapters = sortLearningPathChaptersForHub([
-      ...personalizedChapters,
-      ...publicCatalog.chapters,
-    ])
+    const chapters = sortLearningPathChaptersForHub(
+      [...personalizedChapters, ...publicCatalog.chapters],
+      preferredSubject,
+    )
     const lessonsByChapter = {
       ...publicCatalog.lessonsByChapter,
       ...personalizedLessonsByChapter,
     }
 
     const hasFullAccess = access.mode === "full"
-    const lockedChapterIds = hasFullAccess ? [] : getFreePlanLockedChapterIds(chapters)
+    const lockedChapterIds: string[] = []
 
     const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(chapters, {
       isAdmin: access.isAdmin,
       isDev: access.isDev,
       hasFullAccess,
+      preferredSubject,
     })
 
     const visiblePublicLessonIds = visibleChapters

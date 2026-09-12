@@ -52,7 +52,7 @@ const SUBJECT_ALIASES: Record<InvataSubjectId, readonly string[]> = {
   info: ["info", "informatica"],
 }
 
-function matchSubjectAlias(value: string): InvataSubjectId | null {
+function matchSubjectAlias(value: unknown): InvataSubjectId | null {
   const normalized = normalizeSubjectText(value)
   if (!normalized) return null
   for (const subject of INVATA_SUBJECTS) {
@@ -120,4 +120,34 @@ export function chapterMatchesInvataSubjectFilter(
 ): boolean {
   if (filter === "all") return true
   return getInvataSubjectForChapter(chapter) === filter
+}
+
+/** Maps `profiles.preferred_materie` (onboarding ids like `matematica`) onto hub subject ids. */
+export function onboardingMaterieToInvataSubject(value: unknown): InvataSubjectId | null {
+  return matchSubjectAlias(value)
+}
+
+type HubChapterSubjectSortFields = Parameters<typeof getInvataSubjectForChapter>[0] & {
+  order_index: number
+}
+
+function preferredInvataSubjectRank(
+  chapter: Parameters<typeof getInvataSubjectForChapter>[0],
+  preferredSubject: InvataSubjectId | null,
+): number {
+  if (!preferredSubject) return 0
+  return getInvataSubjectForChapter(chapter) === preferredSubject ? 0 : 1
+}
+
+/** Official hub chapters: preferred onboarding subject first, then `order_index`. */
+export function compareOfficialHubChaptersByPreferredSubject<T extends HubChapterSubjectSortFields>(
+  a: T,
+  b: T,
+  preferredSubject: InvataSubjectId | null,
+): number {
+  const rank =
+    preferredInvataSubjectRank(a, preferredSubject) -
+    preferredInvataSubjectRank(b, preferredSubject)
+  if (rank !== 0) return rank
+  return a.order_index - b.order_index
 }

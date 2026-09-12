@@ -1,11 +1,13 @@
 import Link from "next/link"
-import type { CSSProperties } from "react"
-import { Fragment } from "react"
-import { Check, X } from "lucide-react"
+import type { CSSProperties, ReactNode } from "react"
+import { Loader2, Check, X } from "lucide-react"
 
 interface PremiumComparisonContentProps {
   ctaHref?: string
   ctaLabel?: string
+  title?: ReactNode
+  onCtaClick?: () => void
+  ctaLoading?: boolean
 }
 
 interface BenefitRow {
@@ -23,8 +25,11 @@ const BENEFITS: BenefitRow[] = [
 ]
 
 /** Gradient text ca la outline-ul Go Premium din navbar (titlul principal). */
-const premiumWordGradientClass =
+export const premiumWordGradientClass =
   "bg-gradient-to-r from-[#9a7bff] via-[#d77bff] to-[#ffb56b] bg-clip-text text-transparent"
+
+const ctaClassName =
+  "dashboard-start-glow mt-8 inline-flex w-full max-w-xs items-center justify-center rounded-full bg-[#383838] px-4 py-3 text-base font-semibold text-white shadow-[0_4px_0_#282828] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#282828] active:translate-y-1 active:shadow-[0_1px_0_#282828] disabled:cursor-not-allowed disabled:opacity-70 sm:mt-10"
 
 /** Bifa din cardul alb interior: cerc piersică, bifă închisă — ca în mockup. */
 function PremiumInnerCheckIcon() {
@@ -54,12 +59,19 @@ function CrossIcon() {
 export function PremiumComparisonContent({
   ctaHref = "/pricing",
   ctaLabel = "Începe acum",
+  title,
+  onCtaClick,
+  ctaLoading = false,
 }: PremiumComparisonContentProps) {
   return (
     <div className="flex w-full min-w-0 max-w-2xl flex-col items-center text-center">
       <h2 className="text-3xl font-bold leading-tight text-[#111111] sm:text-4xl md:text-5xl">
-        Avansează la{" "}
-        <span className={premiumWordGradientClass}>Premium</span>
+        {title ?? (
+          <>
+            Avansează la{" "}
+            <span className={premiumWordGradientClass}>Premium</span>
+          </>
+        )}
       </h2>
 
       <div className="mt-6 w-full min-w-0 sm:mt-10">
@@ -67,8 +79,21 @@ export function PremiumComparisonContent({
           <div className="col-start-1 row-start-1 flex min-w-0 items-end pb-2 pt-0.5 text-left text-sm font-semibold text-[#111111] sm:pb-3 sm:pt-1 sm:text-base">
             Beneficii
           </div>
-          <div className="col-start-2 row-start-1 flex items-end justify-center pb-2 pt-0.5 text-center text-sm font-semibold text-[#6f6f6f] sm:pb-3 sm:pt-1 sm:text-base">
-            Free
+
+          {/* Coloana Free: fundal gri rotunjit pe toată înălțimea, ca în mockup. */}
+          <div className="relative col-start-2 grid grid-rows-subgrid overflow-hidden rounded-[16px] bg-[#ececf1] [grid-row:1/-1] sm:rounded-[22px]">
+            <div className="row-start-1 flex items-end justify-center px-3 pb-2 pt-0.5 text-center text-sm font-semibold text-[#6f6f6f] sm:px-5 sm:pb-3 sm:pt-1 sm:text-base">
+              Free
+            </div>
+            {BENEFITS.map((row, index) => (
+              <div
+                key={`free-${row.label}`}
+                style={{ gridRowStart: index + 2 }}
+                className="flex items-center justify-center px-3 sm:px-5"
+              >
+                {row.free ? <CheckIcon /> : <CrossIcon />}
+              </div>
+            ))}
           </div>
 
           {/* Coloana Premium: cadru gradient; ml-1 pe mobil = aer între Free și Premium; sm:-ml aliniază cu Free */}
@@ -113,31 +138,45 @@ export function PremiumComparisonContent({
           </div>
 
           {BENEFITS.map((row, index) => (
-            <Fragment key={row.label}>
-              <div
-                style={{ gridRowStart: index + 2 }}
-                className={`col-start-1 flex min-w-0 items-center break-words py-2 text-left text-base leading-snug text-[#1f1f1f] sm:py-3 sm:text-[15px] ${index > 0 ? "border-t border-[#ececec]/90" : ""}`}
-              >
-                {row.label}
-              </div>
-              <div
-                style={{ gridRowStart: index + 2 }}
-                className={`col-start-2 flex items-center justify-center py-2 sm:py-3 ${index > 0 ? "border-t border-[#ececec]/90" : ""}`}
-              >
-                {row.free ? <CheckIcon /> : <CrossIcon />}
-              </div>
-            </Fragment>
+            <div
+              key={row.label}
+              style={{ gridRowStart: index + 2 }}
+              className={`col-start-1 flex min-w-0 items-center break-words py-2 text-left text-base leading-snug text-[#1f1f1f] sm:py-3 sm:text-[15px] ${index > 0 ? "border-t border-[#ececec]/90" : ""}`}
+            >
+              {row.label}
+            </div>
           ))}
         </div>
       </div>
 
-      <Link
-        href={ctaHref}
-        className="dashboard-start-glow mt-8 inline-flex w-full max-w-xs items-center justify-center rounded-full bg-[#383838] px-4 py-3 text-base font-semibold text-white shadow-[0_4px_0_#282828] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#282828] active:translate-y-1 active:shadow-[0_1px_0_#282828] sm:mt-10"
-        style={{ "--start-glow-tint": "rgba(255, 255, 255, 0.38)" } as CSSProperties}
-      >
-        <span className="relative z-[1] inline-flex items-center justify-center">{ctaLabel}</span>
-      </Link>
+      {onCtaClick ? (
+        <button
+          type="button"
+          onClick={onCtaClick}
+          disabled={ctaLoading}
+          className={ctaClassName}
+          style={{ "--start-glow-tint": "rgba(255, 255, 255, 0.38)" } as CSSProperties}
+        >
+          <span className="relative z-[1] inline-flex items-center justify-center">
+            {ctaLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Se deschide...
+              </>
+            ) : (
+              ctaLabel
+            )}
+          </span>
+        </button>
+      ) : (
+        <Link
+          href={ctaHref}
+          className={ctaClassName}
+          style={{ "--start-glow-tint": "rgba(255, 255, 255, 0.38)" } as CSSProperties}
+        >
+          <span className="relative z-[1] inline-flex items-center justify-center">{ctaLabel}</span>
+        </Link>
+      )}
     </div>
   )
 }

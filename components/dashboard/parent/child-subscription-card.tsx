@@ -7,10 +7,12 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabaseClient"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import {
+  PREMIUM_MONTHLY_RON,
   getPremiumPeriodLabel,
   type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
 import { getCampaignPriceRon, getPricingCampaign } from "@/lib/pricing-campaign"
+import { isBackToSchoolActive } from "@/lib/back-to-school-discount"
 import type { ChildProgressSnapshot } from "@/lib/parent/server"
 import { cn } from "@/lib/utils"
 
@@ -167,7 +169,10 @@ export function ChildSubscriptionCard({
       {billing.can_purchase ? (
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {INTERVALS.map((option) => (
+            {(isBackToSchoolActive()
+              ? INTERVALS.filter((option) => option.id === "month")
+              : INTERVALS
+            ).map((option) => (
               <button
                 key={option.id}
                 type="button"
@@ -185,6 +190,11 @@ export function ChildSubscriptionCard({
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-[#374151]">
+              {campaign === "back2school" ? (
+                <span className="mr-1.5 text-sm text-[#9ca3af] line-through tabular-nums">
+                  {PREMIUM_MONTHLY_RON} RON
+                </span>
+              ) : null}
               <span className="text-xl font-bold text-[#111827]">
                 {priceRon.toLocaleString("ro-RO")} RON
               </span>{" "}
@@ -194,12 +204,20 @@ export function ChildSubscriptionCard({
                   Earlybird
                 </span>
               ) : null}
+              {campaign === "back2school" ? (
+                <span className="ml-2 rounded-full bg-[#EBE8FF] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#5B47D6]">
+                  Back2School
+                </span>
+              ) : null}
               {campaign === "launch20" ? (
                 <span className="ml-2 rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#166534]">
                   −20%
                 </span>
               ) : null}
-              {", "}doar pentru {child.name}
+              {campaign === "back2school"
+                ? `, prima lună, apoi ${PREMIUM_MONTHLY_RON} RON/lună, doar pentru `
+                : ", doar pentru "}
+              {child.name}
             </p>
             <Button
               type="button"

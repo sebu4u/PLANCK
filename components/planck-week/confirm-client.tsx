@@ -68,14 +68,14 @@ export function PlanckWeekConfirmClient() {
       error?: string
       redirectPath?: string | null
       unlockedCount?: number
+      conversionEventId?: string | null
     } | null
     if (!response.ok) {
       throw new Error(payload?.error ?? "Nu am putut rezerva locul pe program.")
     }
 
-    // Fire conversion pixels ONLY after successful claim
-    if (payload?.unlockedCount && payload.unlockedCount > 0) {
-      trackPlanckWeekLeadPixels()
+    if (payload?.conversionEventId) {
+      trackPlanckWeekLeadPixels(payload.conversionEventId)
       trackFunnelEvent("planck_week_claimed", {
         subjects: subjects.join(","),
         unlocked: payload.unlockedCount,

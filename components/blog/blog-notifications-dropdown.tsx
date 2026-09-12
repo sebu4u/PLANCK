@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLearningPathChapterTheme } from "@/lib/learning-path-chapter-theme"
 import { createClient } from "@/lib/supabase/client"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 
 type BlogNotificationPost = {
@@ -294,6 +295,7 @@ export function BlogNotificationsDropdown({
       type="button"
       aria-label="Notificări"
       className={cn(
+        PRESS_SHRINK_CLASS,
         "relative inline-flex h-9 w-9 touch-manipulation items-center justify-center rounded-md outline-none transition-[color,opacity] focus-visible:ring-2 focus-visible:ring-violet-500/60",
         useLightNav
           ? "text-gray-700 active:opacity-80 md:hover:text-gray-900"

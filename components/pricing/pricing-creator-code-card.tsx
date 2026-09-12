@@ -21,12 +21,14 @@ type PricingCreatorCodeCardProps = {
   appliedPromo: AppliedPromo | null
   onApply: (promo: AppliedPromo) => void
   onClear: () => void
+  className?: string
 }
 
 export function PricingCreatorCodeCard({
   appliedPromo,
   onApply,
   onClear,
+  className,
 }: PricingCreatorCodeCardProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [code, setCode] = useState("")
@@ -138,7 +140,7 @@ export function PricingCreatorCodeCard({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50/60">
+    <div className={cn("rounded-2xl border border-gray-200 bg-gray-50/60", className)}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}

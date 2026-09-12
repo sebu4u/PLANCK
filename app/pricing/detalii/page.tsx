@@ -10,6 +10,10 @@ import {
 } from "@/components/pricing/premium-pricing"
 import { EARLYBIRD_YEARLY_RON, isEarlybirdActive } from "@/lib/landing-earlybird"
 import { isLaunch20Active, LAUNCH_20_PERCENT } from "@/lib/launch-20-discount"
+import {
+  BACK_TO_SCHOOL_MONTHLY_RON,
+  isBackToSchoolActive,
+} from "@/lib/back-to-school-discount"
 import { getCampaignPriceRon } from "@/lib/pricing-campaign"
 
 export const metadata: Metadata = {
@@ -126,9 +130,11 @@ export default function PricingDetailsPage() {
           <div className="rounded-2xl border border-gray-900 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900">Premium</h2>
             <p className="mt-1 text-sm text-gray-500">
-              {isLaunch20Active()
-                ? `${getCampaignPriceRon("week")} RON/săpt · ${getCampaignPriceRon("month")} RON/lună (−${LAUNCH_20_PERCENT}%) · `
-                : `${PREMIUM_WEEKLY_RON} RON/săpt · ${PREMIUM_MONTHLY_RON} RON/lună · `}
+              {isBackToSchoolActive()
+                ? `Prima lună ${BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi ${PREMIUM_MONTHLY_RON} RON/lună · `
+                : isLaunch20Active()
+                  ? `${getCampaignPriceRon("week")} RON/săpt · ${getCampaignPriceRon("month")} RON/lună (−${LAUNCH_20_PERCENT}%) · `
+                  : `${PREMIUM_WEEKLY_RON} RON/săpt · ${PREMIUM_MONTHLY_RON} RON/lună · `}
               {isEarlybirdActive()
                 ? `${EARLYBIRD_YEARLY_RON.toLocaleString("ro-RO")} RON/an earlybird`
                 : `${PREMIUM_YEARLY_RON.toLocaleString("ro-RO")} RON/an (−${PREMIUM_YEARLY_SAVE_PERCENT}%)`}

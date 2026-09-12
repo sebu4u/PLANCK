@@ -192,22 +192,32 @@ export function HomepageHeroTestimonials() {
 }
 
 /** A single auto-scrolling row for campaign landings. */
-export function LandingHeroTestimonialsRow() {
+export function LandingHeroTestimonialsRow({
+  compact = false,
+  className,
+}: {
+  compact?: boolean
+  className?: string
+} = {}) {
   const [row1] = LANDING_HERO_REVIEW_ROWS
 
   return (
     <section
-      className="relative overflow-hidden bg-white py-6 sm:py-8"
+      className={cn(
+        "relative overflow-hidden bg-white",
+        compact ? "py-4 sm:py-6" : "py-6 sm:py-8",
+        className,
+      )}
       aria-label="Recenzii elevi Planck"
     >
       <div className="relative mx-auto w-full max-w-[1116px]">
-        <MarqueeRow reviews={row1} direction="right" duration="36s" />
+        <MarqueeRow reviews={row1} direction="right" duration="36s" compact={compact} />
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-white to-transparent sm:w-16 lg:w-24"
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-white to-transparent sm:w-16 lg:w-24"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-white to-transparent sm:w-16 lg:w-24"
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent sm:w-16 lg:w-24"
           aria-hidden
         />
       </div>

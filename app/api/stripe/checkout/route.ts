@@ -30,10 +30,13 @@ import { ensureShopStripeCoupon } from "@/lib/shop/coupons"
 import { getShopCouponByIdForUser } from "@/lib/shop/server"
 import type { ShopCouponView } from "@/lib/shop/types"
 import { logger } from "@/lib/logger"
+import { ensureBackToSchoolStripeCoupon } from "@/lib/back-to-school-discount-coupon"
+import { isBackToSchoolActive } from "@/lib/back-to-school-discount"
 import { ensureEarlybirdStripeCoupon } from "@/lib/landing-earlybird-coupon"
 import { isEarlybirdActive } from "@/lib/landing-earlybird"
 import { ensureLaunch20StripeCoupon } from "@/lib/launch-20-discount-coupon"
 import { isLaunch20Active } from "@/lib/launch-20-discount"
+import { isOnboardingTrialOfferActive } from "@/lib/onboarding-trial-offer"
 import {
   DEFAULT_CHECKOUT_CANCEL_PATH,
   DEFAULT_CHECKOUT_SUCCESS_PATH,
@@ -55,6 +58,7 @@ type CheckoutBody = {
   successPath?: string
   cancelPath?: string
   campaign?: string
+  onboardingTrial?: boolean
 }
 
 const FORBIDDEN_CARD_FIELDS = new Set([
@@ -149,7 +153,16 @@ export async function POST(req: NextRequest) {
     }
 
     const childId = typeof body?.childId === "string" ? body.childId.trim() : ""
+    const wantsOnboardingTrial = body?.onboardingTrial === true && !childId
     const user = userData.user
+
+    if (wantsOnboardingTrial && !isOnboardingTrialOfferActive(user.created_at)) {
+      return NextResponse.json(
+        { error: "Oferta de 7 zile gratuite a expirat." },
+        { status: 400 },
+      )
+    }
+
     const supabaseAdmin = getSupabaseAdmin()
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -159,11 +172,14 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle()
 
-    const wheelPrize = childId ? null : await getUnusedPrizeForUser(user.id)
+    const wheelPrize =
+      childId || wantsOnboardingTrial
+        ? null
+        : await getUnusedPrizeForUser(user.id)
     const requestedShopCouponId =
       typeof body?.shopCouponId === "string" ? body.shopCouponId.trim() : ""
     let shopCoupon: ShopCouponView | null = null
-    if (!childId && !wheelPrize && requestedShopCouponId) {
+    if (!childId && !wantsOnboardingTrial && !wheelPrize && requestedShopCouponId) {
       shopCoupon = await getShopCouponByIdForUser(user.id, requestedShopCouponId)
       if (!shopCoupon) {
         return NextResponse.json(
@@ -172,7 +188,9 @@ export async function POST(req: NextRequest) {
         )
       }
     }
-    const interval = shopCoupon?.interval ?? resolveIntervalForPrize(parsedInterval, wheelPrize)
+    const interval = wantsOnboardingTrial
+      ? "week"
+      : shopCoupon?.interval ?? resolveIntervalForPrize(parsedInterval, wheelPrize)
 
     const userType = normalizeUserType(profile?.user_type)
 
@@ -205,7 +223,12 @@ export async function POST(req: NextRequest) {
     let validPromotionCodeId: string | null = null
     const requestedPromotionCodeId =
       typeof body?.promotionCodeId === "string" ? body.promotionCodeId.trim() : ""
-    if (!childId && requestedPromotionCodeId.startsWith("wheel:") && !wheelPrize) {
+    if (
+      !wantsOnboardingTrial &&
+      !childId &&
+      requestedPromotionCodeId.startsWith("wheel:") &&
+      !wheelPrize
+    ) {
       return NextResponse.json(
         { error: "Cuponul de la roată a expirat sau a fost folosit." },
         { status: 400 },
@@ -216,7 +239,7 @@ export async function POST(req: NextRequest) {
       requestedPromotionCodeId.startsWith("shop:") ||
       Boolean(wheelPrize) ||
       Boolean(shopCoupon)
-    if (requestedPromotionCodeId && !hasPersonalDiscount) {
+    if (requestedPromotionCodeId && !hasPersonalDiscount && !wantsOnboardingTrial) {
       try {
         const promotionCode = await stripe.promotionCodes.retrieve(requestedPromotionCodeId, {
           expand: ["promotion.coupon"],
@@ -243,17 +266,29 @@ export async function POST(req: NextRequest) {
       ? await ensureShopStripeCoupon(shopCoupon, stripe)
       : null
 
-    const canApplyCampaignCoupon = !wheelPrize && !shopCoupon && !validPromotionCodeId
+    const canApplyCampaignCoupon =
+      !wantsOnboardingTrial && !wheelPrize && !shopCoupon && !validPromotionCodeId
     const wantsEarlybird = interval === "year" && isEarlybirdActive()
+    const wantsBackToSchool = interval === "month" && isBackToSchoolActive()
     const wantsLaunch20 =
       (interval === "week" || interval === "month") && isLaunch20Active()
     const campaignCouponId = canApplyCampaignCoupon
       ? wantsEarlybird
         ? await ensureEarlybirdStripeCoupon(stripe)
-        : wantsLaunch20 && (interval === "week" || interval === "month")
-          ? await ensureLaunch20StripeCoupon(interval, stripe)
-          : null
+        : wantsBackToSchool
+          ? await ensureBackToSchoolStripeCoupon(stripe)
+          : wantsLaunch20 && (interval === "week" || interval === "month")
+            ? await ensureLaunch20StripeCoupon(interval, stripe)
+            : null
       : null
+
+    if (wantsBackToSchool && !campaignCouponId && canApplyCampaignCoupon) {
+      logger.error("[stripe/checkout] Back2School coupon missing; refusing full-price checkout.")
+      return NextResponse.json(
+        { error: "Nu am putut aplica oferta Back2School. Încearcă din nou." },
+        { status: 500 }
+      )
+    }
 
     if (wantsLaunch20 && !campaignCouponId && canApplyCampaignCoupon) {
       logger.error("[stripe/checkout] Launch 20% coupon missing; refusing full-price checkout.")
@@ -267,6 +302,19 @@ export async function POST(req: NextRequest) {
     const existingStatus = profile?.stripe_subscription_status ?? null
     const existingSubscriptionId = profile?.stripe_subscription_id ?? null
     const isParentForChild = Boolean(childId)
+
+    if (
+      wantsOnboardingTrial &&
+      !isParentForChild &&
+      existingCustomerId &&
+      existingSubscriptionId &&
+      hasPortalManagedSubscription(existingStatus)
+    ) {
+      return NextResponse.json(
+        { error: "Ai deja un abonament activ. Trial-ul de 7 zile nu se mai aplică." },
+        { status: 409 }
+      )
+    }
 
     if (
       shopCoupon &&
@@ -404,18 +452,22 @@ export async function POST(req: NextRequest) {
           }
         : prizeMetadata),
       ...(campaignCouponId && wantsEarlybird ? { campaign: "earlybird" } : {}),
+      ...(campaignCouponId && wantsBackToSchool ? { campaign: "back2school" } : {}),
       ...(campaignCouponId && wantsLaunch20 ? { campaign: "launch_20" } : {}),
+      ...(wantsOnboardingTrial ? { campaign: "onboarding_trial" } : {}),
     }
 
-    const discountConfig = prizeDiscounts.couponId
-      ? { discounts: [{ coupon: prizeDiscounts.couponId }] }
-      : shopCouponStripeId
-        ? { discounts: [{ coupon: shopCouponStripeId }] }
-      : validPromotionCodeId
-        ? { discounts: [{ promotion_code: validPromotionCodeId }] }
-        : campaignCouponId
-          ? { discounts: [{ coupon: campaignCouponId }] }
-        : { allow_promotion_codes: true }
+    const discountConfig = wantsOnboardingTrial
+      ? {}
+      : prizeDiscounts.couponId
+        ? { discounts: [{ coupon: prizeDiscounts.couponId }] }
+        : shopCouponStripeId
+          ? { discounts: [{ coupon: shopCouponStripeId }] }
+        : validPromotionCodeId
+          ? { discounts: [{ promotion_code: validPromotionCodeId }] }
+          : campaignCouponId
+            ? { discounts: [{ coupon: campaignCouponId }] }
+          : { allow_promotion_codes: true }
 
     // We only create hosted Checkout sessions here; sensitive card input stays on Stripe.
     const session = await stripe.checkout.sessions.create({
@@ -429,9 +481,11 @@ export async function POST(req: NextRequest) {
       metadata: sharedMetadata,
       subscription_data: {
         metadata: sharedMetadata,
-        ...(prizeDiscounts.trialPeriodDays
-          ? { trial_period_days: prizeDiscounts.trialPeriodDays }
-          : {}),
+        ...(wantsOnboardingTrial
+          ? { trial_period_days: 7 }
+          : prizeDiscounts.trialPeriodDays
+            ? { trial_period_days: prizeDiscounts.trialPeriodDays }
+            : {}),
       },
     })
 

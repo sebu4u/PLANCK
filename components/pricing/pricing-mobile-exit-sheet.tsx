@@ -11,6 +11,10 @@ import {
 } from "@/components/pricing/premium-pricing"
 import { isEarlybirdActive } from "@/lib/landing-earlybird"
 import { isLaunch20Active } from "@/lib/launch-20-discount"
+import {
+  BACK_TO_SCHOOL_MONTHLY_RON,
+  isBackToSchoolActive,
+} from "@/lib/back-to-school-discount"
 import { getCampaignPriceRon } from "@/lib/pricing-campaign"
 
 type BillingInterval = "year" | "month"
@@ -20,6 +24,22 @@ function planOptions() {
   const monthlyRon = getCampaignPriceRon("month")
   const earlybird = isEarlybirdActive()
   const launch20 = isLaunch20Active()
+  const back2school = isBackToSchoolActive()
+
+  const monthly = {
+    interval: "month" as const,
+    label: "Lunar",
+    paidLabel: back2school
+      ? `Prima lună ${BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi ${PREMIUM_MONTHLY_RON} RON`
+      : launch20
+        ? `${monthlyRon} RON/lună cu −20% (în loc de ${PREMIUM_MONTHLY_RON})`
+        : `Plătit ${monthlyRon} RON lunar`,
+    totalRon: monthlyRon,
+    dailyRon: premiumDailyPrice(monthlyRon, 30),
+    badge: back2school ? "Back2School" : launch20 ? "−20%" : undefined,
+  }
+
+  if (back2school) return [monthly]
 
   return [
     {
@@ -32,16 +52,7 @@ function planOptions() {
       dailyRon: premiumDailyPrice(yearlyRon, 365),
       badge: earlybird ? "Earlybird" : `Economisești ${PREMIUM_YEARLY_SAVE_PERCENT}%`,
     },
-    {
-      interval: "month" as const,
-      label: "Lunar",
-      paidLabel: launch20
-        ? `${monthlyRon} RON/lună cu −20% (în loc de ${PREMIUM_MONTHLY_RON})`
-        : `Plătit ${monthlyRon} RON lunar`,
-      totalRon: monthlyRon,
-      dailyRon: premiumDailyPrice(monthlyRon, 30),
-      badge: launch20 ? "−20%" : undefined,
-    },
+    monthly,
   ]
 }
 
@@ -73,7 +84,7 @@ export function PricingMobileExitSheet({
   onDismiss,
 }: PricingMobileExitSheetProps) {
   const [selectedInterval, setSelectedInterval] = useState<BillingInterval>(
-    isEarlybirdActive() ? "year" : "month",
+    isBackToSchoolActive() ? "month" : isEarlybirdActive() ? "year" : "month",
   )
 
   return (
@@ -109,7 +120,9 @@ export function PricingMobileExitSheet({
             Încă nu ești decis?
           </h2>
           <p className="mt-1 text-center text-sm text-gray-500">
-            Un singur abonament Premium — alege perioada
+            {isBackToSchoolActive()
+              ? `Prima lună ${BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi ${PREMIUM_MONTHLY_RON} RON/lună`
+              : "Un singur abonament Premium — alege perioada"}
           </p>
 
           <div className="mt-5 flex flex-col gap-3">
@@ -178,14 +191,16 @@ export function PricingMobileExitSheet({
                   : undefined
               }
             >
-              {isCheckoutLoading ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Se deschide...
-                </span>
-              ) : (
-                "Devino Premium"
-              )}
+                {isCheckoutLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Se deschide...
+                  </span>
+                ) : isBackToSchoolActive() ? (
+                  "Ia oferta Back2School"
+                ) : (
+                  "Devino Premium"
+                )}
             </button>
           </div>
         </div>

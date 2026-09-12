@@ -12,6 +12,7 @@ import {
   type WorkshopPublic,
 } from "@/lib/pregatire/types"
 import { WorkshopBacBadge } from "@/components/pregatire/workshop-bac-badge"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 
 export function WorkshopCard({
@@ -32,6 +33,7 @@ export function WorkshopCard({
   const content = (
     <article
       className={cn(
+        PRESS_SHRINK_CLASS,
         "group relative w-full overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white p-4 text-left shadow-sm transition",
         "hover:border-[#d1d5db] hover:shadow-md",
         workshop.unlocked && "border-emerald-200 bg-emerald-50/40 ring-1 ring-emerald-200",

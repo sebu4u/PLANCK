@@ -8,16 +8,17 @@ import {
   getCachedPublicLearningPathHubCatalog,
   getCachedPublicLearningPathLessonItemCounts,
 } from "@/lib/learning-path-hub-cache"
-import { loadSsrPersonalizedLearningPathHub, sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-ssr"
+import {
+  getInvataPreferredSubjectForUser,
+  loadSsrPersonalizedLearningPathHub,
+  sortLearningPathChaptersForHub,
+} from "@/lib/learning-path-hub-ssr"
 import { createClient } from "@/lib/supabase/server"
 import { InvataChapterImageLoadProvider } from "@/components/invata/invata-chapter-image-load-context"
 import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context"
 import { InvataPremiumUpgradeBanner } from "@/components/invata/invata-premium-upgrade-banner"
 import { InvataHubPageClient } from "@/components/invata/invata-hub-page-client"
-import {
-  getFreePlanLockedChapterIds,
-  resolveLearningPathHubChapterSplit,
-} from "@/lib/learning-path-free-plan"
+import { resolveLearningPathHubChapterSplit } from "@/lib/learning-path-free-plan"
 import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
@@ -32,15 +33,18 @@ export default async function InvataPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const publicCatalog = await getCachedPublicLearningPathHubCatalog()
   // Personalized chapters for the signed-in user are loaded in the same SSR pass so
   // they render together with the premade chapters, instead of popping in later.
-  const personalizedHub = await loadSsrPersonalizedLearningPathHub(supabase, user)
-
-  const allChapters = sortLearningPathChaptersForHub([
-    ...personalizedHub.chapters,
-    ...publicCatalog.chapters,
+  const [publicCatalog, personalizedHub, preferredSubject] = await Promise.all([
+    getCachedPublicLearningPathHubCatalog(),
+    loadSsrPersonalizedLearningPathHub(supabase, user),
+    getInvataPreferredSubjectForUser(supabase, user),
   ])
+
+  const allChapters = sortLearningPathChaptersForHub(
+    [...personalizedHub.chapters, ...publicCatalog.chapters],
+    preferredSubject,
+  )
   const allLessonsByChapter = {
     ...publicCatalog.lessonsByChapter,
     ...personalizedHub.lessonsByChapter,
@@ -49,12 +53,13 @@ export default async function InvataPage() {
   const access = await getLearningPathAccessForUser(supabase, user, null)
   const hasFullAccess = access.mode === "full"
 
-  const lockedChapterIds = hasFullAccess ? [] : getFreePlanLockedChapterIds(allChapters)
+  const lockedChapterIds: string[] = []
 
   const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(allChapters, {
     isAdmin: access.isAdmin,
     isDev: access.isDev,
     hasFullAccess,
+    preferredSubject,
   })
 
   const visiblePublicLessonIds = visibleChapters

@@ -23,6 +23,7 @@ import { ProductGuideProvider } from "@/components/product-guide/product-guide-p
 import { PlanckPassSeasonIntroProvider } from "@/components/planckpass/planckpass-season-intro-gate"
 
 import { DashboardStartGlowClickSound } from "@/components/dashboard-start-glow-click-sound"
+import { MobilePressShrink } from "@/components/mobile-press-shrink"
 import { GlobalLoadingOverlay } from "@/components/global-loading-overlay"
 import { IrisTransitionProvider } from "@/components/landing/iris-transition"
 import { baseMetadata } from "@/lib/metadata"
@@ -71,6 +72,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
   themeColor: "#1a1b3a",
 }
 
@@ -117,6 +119,7 @@ export default function RootLayout({
           <MobileViewportFix />
           <ScrollToTop />
           <DashboardStartGlowClickSound />
+          <MobilePressShrink />
           <TopLoader />
           <AuthProvider>
             <ProductGuideProvider>

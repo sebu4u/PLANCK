@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import type { LucideIcon } from "lucide-react"
 import { LogOut, MessageSquare, Settings, Sparkles, User } from "lucide-react"
+import { PRESS_SHRINK_CLASS, PRESS_SHRINK_STRONG_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 import {
   MOBILE_BOTTOM_NAV_HEIGHT,
@@ -111,6 +112,7 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                 {PROFILE_MENU_ITEMS.map((item) => {
                   const Icon = item.icon
                   const itemClass = cn(
+                    PRESS_SHRINK_CLASS,
                     "flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[13px] font-medium transition-colors last:border-b-0",
                     isDark ? "border-b border-white/10" : "border-b border-[#f0f1f3]",
                     item.danger
@@ -171,7 +173,7 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
             const active = isActive(pathname)
             const isProfileTab = href === "/profil"
             const tabClass = cn(
-              "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors",
+              "relative flex min-w-0 flex-1 flex-col items-center justify-center px-1 transition-colors",
               isDark
                 ? active || (isProfileTab && menuOpen)
                   ? "text-white"
@@ -180,17 +182,24 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                   ? "text-blue-600"
                   : "text-gray-500",
             )
+            const tabClusterClass = cn(
+              PRESS_SHRINK_CLASS,
+              PRESS_SHRINK_STRONG_CLASS,
+              "flex flex-col items-center justify-center gap-0.5",
+            )
 
             if (isProfileTab) {
               if (!user) {
                 return (
                   <Link key={href} href="/register" className={tabClass}>
-                    <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
-                      {Icon ? <Icon className="h-5 w-5 shrink-0" aria-hidden /> : null}
+                    <span className={tabClusterClass}>
+                      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                        {Icon ? <Icon className="h-5 w-5 shrink-0" aria-hidden /> : null}
+                      </span>
+                      {hideLabel ? null : (
+                        <span className="truncate text-[10px] font-medium leading-tight">{label}</span>
+                      )}
                     </span>
-                    {hideLabel ? null : (
-                      <span className="truncate text-[10px] font-medium leading-tight">{label}</span>
-                    )}
                   </Link>
                 )
               }
@@ -219,7 +228,8 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                   onClick={() => setMenuOpen((open) => !open)}
                   className={tabClass}
                 >
-                  <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                  <span className={tabClusterClass}>
+                    <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                     <CosmeticsAvatarFrame
                       size={20}
                       borderPresetId={cosmetics.borderPresetId}
@@ -260,6 +270,7 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                   {hideLabel ? null : (
                     <span className="truncate text-[10px] font-medium leading-tight">{label}</span>
                   )}
+                  </span>
                 </button>
               )
             }
@@ -273,6 +284,7 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                   ? { [PRODUCT_GUIDE_ANCHOR_ATTR]: "pregatiri-nav" }
                   : {})}
               >
+                <span className={tabClusterClass}>
                 <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                   {imageSrc ? (
                     <Image
@@ -307,6 +319,7 @@ export function MobileBottomNav({ variant = "light" }: MobileBottomNavProps) {
                 {hideLabel ? null : (
                   <span className="truncate text-[10px] font-medium leading-tight">{label}</span>
                 )}
+                </span>
               </Link>
             )
           })}

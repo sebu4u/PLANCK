@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  compareOfficialHubChaptersByPreferredSubject,
+  type InvataSubjectId,
+} from "@/lib/invata-config"
 import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
 
 /** Capitole accesibile în preview gratuit (plan free + vizitator neautentificat). */
@@ -22,12 +26,6 @@ export const FREE_PLAN_PERSONALIZED_LEARNING_PATH_LIMIT = 1
 export const FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT = 7
 /** Numărul de trasee oficiale afișate pe /invata pentru Plus/Premium; restul apar în arhivă. */
 export const PAID_PLAN_VISIBLE_LEARNING_PATH_COUNT = 12
-/**
- * Numărul de trasee oficiale (primele, după order_index) care rămân complet
- * deblocate pentru planul free; restul sunt vizibile pe /invata (grayed out,
- * pot fi răsfoite) dar nu pot fi începute.
- */
-export const FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT = 6
 
 /** Aliasuri pentru slug-ul principal de cinematică (redirect / onboarding). */
 export const FREE_PREVIEW_CHAPTER_SLUG_ALIASES = ["cinematica-punctului-material"] as const
@@ -43,17 +41,32 @@ export function isFreePreviewLearningPathChapterSlug(slug: string | null): boole
 export interface FreePlanHubChapterSplitInput {
   is_personalized?: boolean | null
   order_index: number
+  slug?: string | null
+  title?: string | null
+  materie?: string | null
+  problem_category?: string | null
 }
 
-/** Primele N trasee oficiale (order_index) + cursurile personalizate; restul în arhivă. */
+function sortOfficialHubChaptersForDisplay<T extends FreePlanHubChapterSplitInput>(
+  chapters: T[],
+  preferredSubject: InvataSubjectId | null,
+): T[] {
+  return [...chapters].sort((a, b) =>
+    compareOfficialHubChaptersByPreferredSubject(a, b, preferredSubject),
+  )
+}
+
+/** Primele N trasee oficiale (materia de onboarding, apoi order_index) + cursurile personalizate; restul în arhivă. */
 export function splitLearningPathChaptersForHub<T extends FreePlanHubChapterSplitInput>(
   chapters: T[],
   visibleStandardCount: number,
+  preferredSubject: InvataSubjectId | null = null,
 ): { visibleChapters: T[]; archivedChapters: T[] } {
   const personalized = chapters.filter((chapter) => chapter.is_personalized === true)
-  const standard = chapters
-    .filter((chapter) => chapter.is_personalized !== true)
-    .sort((a, b) => a.order_index - b.order_index)
+  const standard = sortOfficialHubChaptersForDisplay(
+    chapters.filter((chapter) => chapter.is_personalized !== true),
+    preferredSubject,
+  )
 
   const visibleStandard = standard.slice(0, visibleStandardCount)
   const archivedStandard = standard.slice(visibleStandardCount)
@@ -67,45 +80,38 @@ export function splitLearningPathChaptersForHub<T extends FreePlanHubChapterSpli
 /** Plan free: primele 7 trasee oficiale + cursurile personalizate; restul în arhivă. */
 export function splitLearningPathChaptersForFreePlanHub<T extends FreePlanHubChapterSplitInput>(
   chapters: T[],
+  preferredSubject: InvataSubjectId | null = null,
 ): { visibleChapters: T[]; archivedChapters: T[] } {
-  return splitLearningPathChaptersForHub(chapters, FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT)
+  return splitLearningPathChaptersForHub(
+    chapters,
+    FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT,
+    preferredSubject,
+  )
 }
 
 /**
  * Free și Plus/Premium văd exact aceleași trasee pe /invata (doar cele mai vechi/în
- * exces intră în arhivă, indiferent de plan) — diferența dintre planuri se face prin
- * grayed-out + blocarea începerii traseelor, nu prin ascunderea lor din listă.
+ * exces, după materia de onboarding, intră în arhivă). Planul free poate începe orice
+ * traseu oficial; diferența e cota globală de itemi, nu blocarea traseelor.
  */
 export function resolveLearningPathHubChapterSplit<T extends FreePlanHubChapterSplitInput>(
   chapters: T[],
-  options: { isAdmin: boolean; isDev: boolean; hasFullAccess: boolean },
+  options: {
+    isAdmin: boolean
+    isDev: boolean
+    hasFullAccess: boolean
+    preferredSubject?: InvataSubjectId | null
+  },
 ): { visibleChapters: T[]; archivedChapters: T[] } {
   if (options.isAdmin || options.isDev) {
     return { visibleChapters: chapters, archivedChapters: [] }
   }
 
-  return splitLearningPathChaptersForHub(chapters, PAID_PLAN_VISIBLE_LEARNING_PATH_COUNT)
-}
-
-export interface FreePlanLockedChapterInput {
-  id: string
-  is_personalized?: boolean | null
-  order_index: number
-}
-
-/**
- * Id-urile traseelor oficiale blocate pentru planul free: toate în afara primelor
- * `FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT` (după order_index). Traseele personalizate
- * nu sunt afectate de această regulă (accesul lor se decide separat, per owner).
- */
-export function getFreePlanLockedChapterIds<T extends FreePlanLockedChapterInput>(
-  chapters: T[],
-): string[] {
-  const standard = chapters
-    .filter((chapter) => chapter.is_personalized !== true)
-    .sort((a, b) => a.order_index - b.order_index)
-
-  return standard.slice(FREE_PLAN_UNLOCKED_LEARNING_PATH_COUNT).map((chapter) => chapter.id)
+  return splitLearningPathChaptersForHub(
+    chapters,
+    PAID_PLAN_VISIBLE_LEARNING_PATH_COUNT,
+    options.preferredSubject ?? null,
+  )
 }
 
 /**

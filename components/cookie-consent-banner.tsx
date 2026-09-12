@@ -39,7 +39,7 @@ export function CookieConsentBanner() {
   if (!mounted || cookieManager.hasConsent || pathname === "/1leu") return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 md:bottom-4 md:left-auto md:right-4 md:w-auto">
+    <div className="fixed bottom-0 left-0 right-0 z-[60] md:bottom-4 md:left-auto md:right-4 md:w-auto">
       <div className="w-full rounded-t-2xl border border-gray-200 border-b-0 bg-white px-3 pt-3 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] shadow-xl md:max-w-sm md:rounded-2xl md:border-b md:px-5 md:py-4 md:pb-4">
         <div className="space-y-2 md:space-y-3">
           <div>

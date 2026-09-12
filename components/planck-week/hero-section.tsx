@@ -1,15 +1,21 @@
 "use client"
 
+import Link from "next/link"
 import { FadeInUp } from "@/components/scroll-animations"
 import { HomePageNavbar } from "@/components/homepage-navbar"
 import { Landing1LeuHeroConfetti } from "@/components/landing-1leu/hero-confetti"
 import { PlanckWeekCtaButton } from "@/components/planck-week/cta-button"
 import {
   PLANCK_WEEK_DATES,
-  PLANCK_WEEK_HERO_SUBJECTS,
   PLANCK_WEEK_HERO_TAGLINE,
   PLANCK_WEEK_MICROCOPY,
 } from "@/lib/planck-week"
+import {
+  getPlanckWeekSubjectLandingPath,
+  PLANCK_WEEK_LANDING_SLUGS,
+  PLANCK_WEEK_SUBJECT_LANDINGS,
+} from "@/lib/planck-week-subject-landings"
+import { WORKSHOP_SUBJECT_LABELS } from "@/lib/pregatire/types"
 
 export function PlanckWeekHeroSection({ onReserve }: { onReserve: () => void }) {
   return (
@@ -38,11 +44,19 @@ export function PlanckWeekHeroSection({ onReserve }: { onReserve: () => void }) 
 
         <FadeInUp delay={0.14}>
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-gray-500 sm:text-lg sm:leading-8">
-            {PLANCK_WEEK_HERO_SUBJECTS}
-          </p>
-          <p className="mx-auto mt-2 max-w-xl text-base leading-relaxed text-gray-500 sm:text-lg sm:leading-8">
             {PLANCK_WEEK_HERO_TAGLINE}
           </p>
+          <div className="mx-auto mt-4 flex max-w-xl flex-wrap items-center justify-center gap-2">
+            {PLANCK_WEEK_LANDING_SLUGS.map((slug) => (
+              <Link
+                key={slug}
+                href={getPlanckWeekSubjectLandingPath(slug)}
+                className="rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold text-gray-800 ring-1 ring-[#EBE8FF] transition hover:ring-[#7C5CFC]"
+              >
+                {WORKSHOP_SUBJECT_LABELS[PLANCK_WEEK_SUBJECT_LANDINGS[slug].subject]}
+              </Link>
+            ))}
+          </div>
         </FadeInUp>
 
         <FadeInUp delay={0.2} className="mt-8">

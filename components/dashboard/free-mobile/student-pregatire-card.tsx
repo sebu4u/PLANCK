@@ -10,6 +10,8 @@ import {
 } from "@/lib/pregatire/dates"
 import { WORKSHOP_SUBJECT_COLORS, type WorkshopPublic } from "@/lib/pregatire/types"
 import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
+import { cn } from "@/lib/utils"
 
 const LIVE_LOOKBACK_MS = 4 * 60 * 60 * 1000
 
@@ -97,7 +99,10 @@ export function StudentPregatireCard(_props: StudentPregatireCardProps) {
       href="/pregatire"
       onClick={() => setPregatireBackTarget("/dashboard")}
       aria-label="Deschide calendarul de pregătiri"
-      className="flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-opacity active:opacity-90"
+      className={cn(
+        PRESS_SHRINK_CLASS,
+        "flex w-full flex-col rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.02)]",
+      )}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">

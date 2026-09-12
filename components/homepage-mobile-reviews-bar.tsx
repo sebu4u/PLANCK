@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import { Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { HOMEPAGE_MOBILE_REVIEWS, type HomepageMobileReview } from "@/lib/homepage-mobile-reviews"
@@ -93,13 +94,20 @@ export function HomepageMobileReviewsBar({
   placement?: "top" | "bottom"
   visible?: boolean
 } = {}) {
+  const [mounted, setMounted] = useState(false)
   const marqueeItems = useMemo(
     () => [...HOMEPAGE_MOBILE_REVIEWS, ...HOMEPAGE_MOBILE_REVIEWS],
     []
   )
   const isTop = placement === "top"
 
-  return (
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
     <div
       className={cn(
         "fixed inset-x-0 z-[45] bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 md:hidden",
@@ -129,6 +137,7 @@ export function HomepageMobileReviewsBar({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

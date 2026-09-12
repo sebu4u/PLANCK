@@ -11,7 +11,6 @@ import { HomePageScrollNavbar } from "@/components/homepage-scroll-navbar"
 import { HomePagePlatformVideoSection } from "@/components/homepage-platform-video-section"
 import { HomePageSubjectsSection } from "@/components/homepage-subjects-section"
 import { HomePageLearningPathPreviewSection } from "@/components/homepage-learning-path-preview-section"
-import { LandingWorkshopsCalendarSection } from "@/components/landing/workshops-calendar-section"
 import { HomePageMaiEficientSection } from "@/components/homepage-mai-eficient-section"
 
 import { HomepageMobileReviewsBar } from "@/components/homepage-mobile-reviews-bar"
@@ -168,8 +167,6 @@ export function HomePageContent() {
       <HomePageSubjectsSection />
 
       <HomePageLearningPathPreviewSection />
-
-      <LandingWorkshopsCalendarSection />
 
       <HomePageMaiEficientSection />
 

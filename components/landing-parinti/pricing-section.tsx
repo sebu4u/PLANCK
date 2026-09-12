@@ -11,6 +11,7 @@ import {
   EARLYBIRD_SAVE_PERCENT,
   EARLYBIRD_YEARLY_RON,
   FULL_YEARLY_RON,
+  LANDING_DEADLINE,
   useCountdown,
   type CountdownState,
 } from "@/lib/landing-campaign"
@@ -18,6 +19,13 @@ import {
   PREMIUM_MONTHLY_RON,
   PREMIUM_WEEKLY_RON,
 } from "@/components/pricing/premium-pricing"
+import {
+  BACK_TO_SCHOOL_DEADLINE,
+  BACK_TO_SCHOOL_DEADLINE_LABEL,
+  BACK_TO_SCHOOL_MONTHLY_RON,
+  BACK_TO_SCHOOL_SAVE_PERCENT,
+  isBackToSchoolActive,
+} from "@/lib/back-to-school-discount"
 import {
   LAUNCH_20_DEADLINE_LABEL,
   LAUNCH_20_PERCENT,
@@ -45,14 +53,17 @@ function priceFor(interval: Interval) {
     }
   }
   if (interval === "month") {
+    const back2school = isBackToSchoolActive()
     const launch20 = isLaunch20Active()
     return {
       display: getCampaignPriceRon("month"),
-      struck: launch20 ? PREMIUM_MONTHLY_RON : null,
+      struck: back2school || launch20 ? PREMIUM_MONTHLY_RON : null,
       unit: "RON/lună",
-      note: launch20
-        ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
-        : "Facturare lunară",
+      note: back2school
+        ? `Prima lună ${BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi ${PREMIUM_MONTHLY_RON} RON/lună`
+        : launch20
+          ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
+          : "Facturare lunară",
     }
   }
   const launch20 = isLaunch20Active()
@@ -67,9 +78,10 @@ function priceFor(interval: Interval) {
 }
 
 export function ParentPricingSection({ countdown }: { countdown?: CountdownState }) {
-  const local = useCountdown()
-  const { days, hours, minutes, seconds } = countdown ?? local
-  const [interval, setBillingInterval] = useState<Interval>("year")
+  const back2school = isBackToSchoolActive()
+  const local = useCountdown(back2school ? BACK_TO_SCHOOL_DEADLINE : LANDING_DEADLINE)
+  const { days, hours, minutes, seconds } = countdown && !back2school ? countdown : local
+  const [interval, setBillingInterval] = useState<Interval>(back2school ? "month" : "year")
   const price = priceFor(interval)
   const isYear = interval === "year"
 
@@ -77,21 +89,43 @@ export function ParentPricingSection({ countdown }: { countdown?: CountdownState
     <section id="pricing" className="bg-white py-12 sm:py-16">
       <div className="mx-auto max-w-xl px-4 sm:px-6">
         <FadeInUp className="mb-6 text-center">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#7C5CFC]">
-            Ofertă earlybird
-          </p>
-          <h2 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
-            1 an de Premium pentru copil, doar{" "}
-            <span className="bg-gradient-to-r from-[#9a7bff] to-[#ffb56b] bg-clip-text text-transparent">
-              {EARLYBIRD_YEARLY_RON} RON
-            </span>
-          </h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Prețul de campanie pentru tot anul — nu {FULL_YEARLY_RON} RON. Față de{" "}
-            {PARENT_TUTORING_MONTHLY_MIN_RON}–{PARENT_TUTORING_MONTHLY_MAX_RON} RON/lună la
-            meditații private, pe o singură materie. Valabil până pe{" "}
-            <strong className="text-gray-700">{EARLYBIRD_DEADLINE_LABEL}</strong>.
-          </p>
+          {back2school ? (
+            <>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#7C5CFC]">
+                Ofertă Back2School
+              </p>
+              <h2 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+                Prima lună de Premium pentru copil, doar{" "}
+                <span className="bg-gradient-to-r from-[#9a7bff] to-[#ffb56b] bg-clip-text text-transparent">
+                  {BACK_TO_SCHOOL_MONTHLY_RON} RON
+                </span>
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                În loc de {PREMIUM_MONTHLY_RON} RON/lună. Prima lună e{" "}
+                {BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi {PREMIUM_MONTHLY_RON} RON/lună. Valabil
+                până pe{" "}
+                <strong className="text-gray-700">{BACK_TO_SCHOOL_DEADLINE_LABEL}</strong>.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#7C5CFC]">
+                Ofertă earlybird
+              </p>
+              <h2 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+                1 an de Premium pentru copil, doar{" "}
+                <span className="bg-gradient-to-r from-[#9a7bff] to-[#ffb56b] bg-clip-text text-transparent">
+                  {EARLYBIRD_YEARLY_RON} RON
+                </span>
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                Prețul de campanie pentru tot anul — nu {FULL_YEARLY_RON} RON. Față de{" "}
+                {PARENT_TUTORING_MONTHLY_MIN_RON}–{PARENT_TUTORING_MONTHLY_MAX_RON} RON/lună la
+                meditații private, pe o singură materie. Valabil până pe{" "}
+                <strong className="text-gray-700">{EARLYBIRD_DEADLINE_LABEL}</strong>.
+              </p>
+            </>
+          )}
         </FadeInUp>
 
         <FadeInUp delay={0.08} className="mb-5 flex justify-center">
@@ -117,8 +151,9 @@ export function ParentPricingSection({ countdown }: { countdown?: CountdownState
             <div className="rounded-[20px] bg-white p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-2.5 py-0.5 text-[11px] font-bold text-white">
-                  ✦ Premium anual
+                  {back2school ? "✦ Premium lunar" : "✦ Premium anual"}
                 </div>
+                {back2school ? null : (
                 <div className="inline-flex rounded-full bg-gray-100 p-0.5">
                   {(
                     [
@@ -142,6 +177,7 @@ export function ParentPricingSection({ countdown }: { countdown?: CountdownState
                     </button>
                   ))}
                 </div>
+                )}
               </div>
 
               <div className="mt-4">
@@ -160,7 +196,9 @@ export function ParentPricingSection({ countdown }: { countdown?: CountdownState
                     >
                       {isYear
                         ? `−${EARLYBIRD_SAVE_PERCENT}% earlybird`
-                        : `−${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`}
+                        : back2school
+                          ? `−${BACK_TO_SCHOOL_SAVE_PERCENT}% prima lună`
+                          : `−${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`}
                     </span>
                   </div>
                 )}
@@ -197,7 +235,9 @@ export function ParentPricingSection({ countdown }: { countdown?: CountdownState
                 placement="parinti_pricing"
                 className="mt-5 flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] text-sm font-bold text-white shadow-[0_3px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110"
               >
-                {PARENT_CTA_LABEL_ENROLL} · {EARLYBIRD_YEARLY_RON} RON/an
+                {back2school
+                  ? `${PARENT_CTA_LABEL_ENROLL} · ${BACK_TO_SCHOOL_MONTHLY_RON} RON prima lună`
+                  : `${PARENT_CTA_LABEL_ENROLL} · ${EARLYBIRD_YEARLY_RON} RON/an`}
               </FunnelCtaLink>
             </div>
           </div>

@@ -8,8 +8,11 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
+import { OnboardingLessonOfferPhase } from "@/components/invata/onboarding-lesson-offer-phase"
 import { OnboardingAccountStep } from "@/components/onboarding/onboarding-account-step"
 import { OnboardingGradeSliderStep } from "@/components/onboarding/onboarding-grade-slider-step"
+import { OnboardingSimulationCard } from "@/components/onboarding/OnboardingSimulationCard"
+import { StudentTestimonialsStep } from "@/components/onboarding/student-testimonials-step"
 import { LoadingVideoOverlay } from "@/components/loading-video-overlay"
 import { signUpWithEmailPassword } from "@/lib/onboarding-email-signup"
 import { finalizeStudentOnboarding } from "@/lib/student-onboarding-complete"
@@ -57,8 +60,9 @@ import {
 type SubjectOption = OnboardingSubjectId
 type GradeOption = "9" | "10" | "11" | "12"
 type DailyTimeOption = "15" | "30" | "60"
-type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | "name" | "lesson_choice"
+type RegisterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | "name" | "lesson_choice" | "offer"
 type OnboardingDestination = "dashboard" | "lesson"
+type PremiumOfferResume = "name" | "dashboard"
 
 type CampaignSignup = "1leu"
 
@@ -73,13 +77,14 @@ type OnboardingState = {
   awaitingPostAuth: boolean
   guestDemo: GuestDemoStatus | null
   campaignSignup: CampaignSignup | null
+  offerResume: PremiumOfferResume | null
+  offerSeen: boolean
 }
 
-const PROGRESS_STEPS = 5
+const PROGRESS_STEPS = 8
 const ACCOUNT_STEP = 9
 const LEGACY_SPLASH_STEP = 10
 const DEFAULT_SELF_GRADE = 7
-const SKIPPED_ONBOARDING_STEPS = new Set<number>([6, 7, 8])
 
 const REGISTER_ONBOARDING_STORAGE_KEY = "planck_register_onboarding"
 const ONBOARDING_AFTER_OAUTH_KEY = "planck_onboarding_after_oauth"
@@ -95,6 +100,8 @@ const defaultOnboardingState: OnboardingState = {
   awaitingPostAuth: false,
   guestDemo: null,
   campaignSignup: null,
+  offerResume: null,
+  offerSeen: false,
 }
 
 const ONE_LEU_ALLOWED_STEPS = new Set<RegisterStep>([ACCOUNT_STEP, "name", 2, "lesson_choice"])
@@ -126,6 +133,12 @@ const gradeHeadlines: Record<GradeOption, string> = {
   "12": "Clasa a XII-a, focus pe examen.",
 }
 
+const timeHeadlines: Record<DailyTimeOption, string> = {
+  "15": "Puțin și zilnic bate maratonul.",
+  "30": "30 de minute schimbă ritmul.",
+  "60": "Ritm intens, progres accelerat.",
+}
+
 const mainCtaClassName =
   "inline-flex min-w-[200px] items-center justify-center rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold text-[#f5f4f2] shadow-[0_4px_0_#050505] transition-[transform,box-shadow] hover:translate-y-1 hover:shadow-[0_1px_0_#050505] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#050505]"
 
@@ -138,10 +151,10 @@ const isNumericStep = (step: RegisterStep): step is 1 | 2 | 3 | 4 | 5 | 6 | 7 | 
 const sanitizeStep = (value: unknown): RegisterStep => {
   if (value === "name") return "name"
   if (value === "lesson_choice") return "lesson_choice"
+  if (value === "offer") return "offer"
   if (value === 0 || value === "coming_soon") return 1
   if (typeof value === "number") {
     if (value === LEGACY_SPLASH_STEP) return "name"
-    if (SKIPPED_ONBOARDING_STEPS.has(value)) return ACCOUNT_STEP
     if (value >= 1 && value <= 9) return value as RegisterStep
   }
   return 1
@@ -166,6 +179,9 @@ const sanitizeGuestDemo = (value: unknown): GuestDemoStatus | null =>
 
 const sanitizeCampaignSignup = (value: unknown): CampaignSignup | null =>
   value === "1leu" ? "1leu" : null
+
+const sanitizeOfferResume = (value: unknown): PremiumOfferResume | null =>
+  value === "name" || value === "dashboard" ? value : null
 
 const sanitizeDisplayName = (value: unknown): string => {
   if (typeof value !== "string") return ""
@@ -364,6 +380,8 @@ function RegisterPageContent() {
           awaitingPostAuth: Boolean(decoded.awaitingPostAuth),
           guestDemo: sanitizeGuestDemo(decoded.guestDemo) ?? getGuestDemoStatus(),
           campaignSignup: sanitizeCampaignSignup(decoded.campaignSignup),
+          offerResume: sanitizeOfferResume(decoded.offerResume),
+          offerSeen: Boolean(decoded.offerSeen),
         }
       } catch {
         parsedState = { ...defaultOnboardingState }
@@ -405,9 +423,16 @@ function RegisterPageContent() {
     } else if (
       user &&
       (parsedState.awaitingPostAuth || localStorage.getItem(ONBOARDING_AFTER_OAUTH_KEY) === "1") &&
-      parsedState.step !== "name"
+      parsedState.step !== "name" &&
+      parsedState.step !== "offer"
     ) {
-      parsedState.step = "name"
+      const showGuestOffer =
+        parsedState.guestDemo === "completed" &&
+        parsedState.campaignSignup !== "1leu" &&
+        !parsedState.offerSeen
+      parsedState.step = showGuestOffer ? "offer" : "name"
+      parsedState.offerResume = showGuestOffer ? "name" : parsedState.offerResume
+      parsedState.offerSeen = showGuestOffer || parsedState.offerSeen
       parsedState.awaitingPostAuth = false
     } else if (
       !user &&
@@ -423,6 +448,7 @@ function RegisterPageContent() {
     const wasInAccountCreationFlow =
       parsedState.step === ACCOUNT_STEP ||
       parsedState.step === "name" ||
+      parsedState.step === "offer" ||
       parsedState.awaitingPostAuth
     if (
       !user &&
@@ -513,21 +539,32 @@ function RegisterPageContent() {
       onboardingState.awaitingPostAuth ||
       oauthFromRegister ||
       onboardingState.step === "name" ||
-      onboardingState.step === "lesson_choice"
+      onboardingState.step === "lesson_choice" ||
+      onboardingState.step === "offer"
     const isAuthenticatedOnboardingStep =
       onboardingState.step === 2 ||
       onboardingState.step === 3 ||
       onboardingState.step === 4 ||
       onboardingState.step === 5 ||
+      onboardingState.step === 6 ||
+      onboardingState.step === 7 ||
+      onboardingState.step === 8 ||
       onboardingState.step === ACCOUNT_STEP ||
       onboardingState.step === "name" ||
-      onboardingState.step === "lesson_choice"
+      onboardingState.step === "lesson_choice" ||
+      onboardingState.step === "offer"
 
     const canLeaveNameOn1Leu =
       onboardingState.campaignSignup === "1leu" &&
       (onboardingState.step === 2 || onboardingState.step === "lesson_choice")
 
     if (oauthFromRegister && onboardingState.step === "name") {
+      clearOAuthFlag()
+      if (onboardingState.awaitingPostAuth) {
+        setOnboardingState((prev) => ({ ...prev, awaitingPostAuth: false }))
+        return
+      }
+    } else if (oauthFromRegister && onboardingState.step === "offer") {
       clearOAuthFlag()
       if (onboardingState.awaitingPostAuth) {
         setOnboardingState((prev) => ({ ...prev, awaitingPostAuth: false }))
@@ -541,9 +578,15 @@ function RegisterPageContent() {
       }
     } else if (oauthFromRegister && onboardingState.step !== "name") {
       clearOAuthFlag()
+      const showGuestOffer =
+        onboardingState.guestDemo === "completed" &&
+        onboardingState.campaignSignup !== "1leu" &&
+        !onboardingState.offerSeen
       setOnboardingState((prev) => ({
         ...prev,
-        step: "name",
+        step: showGuestOffer ? "offer" : "name",
+        offerResume: showGuestOffer ? "name" : prev.offerResume,
+        offerSeen: showGuestOffer || prev.offerSeen,
         awaitingPostAuth: false,
       }))
       return
@@ -625,28 +668,32 @@ function RegisterPageContent() {
     (!is1LeuSignup &&
       isNumericStep(onboardingState.step) &&
       onboardingState.step >= 2 &&
-      (onboardingState.step <= 5 || onboardingState.step === ACCOUNT_STEP))
+      (onboardingState.step <= 8 || onboardingState.step === ACCOUNT_STEP))
   const showBottomCta =
-    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 5
+    isNumericStep(onboardingState.step) && onboardingState.step >= 1 && onboardingState.step <= 8
+  const isTestimonialsStep = onboardingState.step === 7
   const isOAuthOnboardingFlow =
     Boolean(user && needsOnboarding) &&
     !onboardingState.awaitingPostAuth &&
+    onboardingState.step !== 7 &&
+    onboardingState.step !== 8 &&
     onboardingState.step !== ACCOUNT_STEP
 
   const progressPercent =
     onboardingState.step === ACCOUNT_STEP
       ? 100
-      : isNumericStep(onboardingState.step) && onboardingState.step <= 5
+      : isNumericStep(onboardingState.step) && onboardingState.step <= 8
         ? ((onboardingState.step - 1) / PROGRESS_STEPS) * 100
         : 0
 
-  const continueLabel = "Continua"
+  const continueLabel = onboardingState.step === 8 ? "Salveaza-ti progresul" : "Continua"
 
   const isContinueDisabled =
     (onboardingState.step === 2 && !onboardingState.subject) ||
     (onboardingState.step === 3 && !onboardingState.grade) ||
     (onboardingState.step === 4 && onboardingState.selfGrade == null) ||
-    (onboardingState.step === 5 && onboardingState.targetGrade == null)
+    (onboardingState.step === 5 && onboardingState.targetGrade == null) ||
+    (onboardingState.step === 6 && !onboardingState.dailyTime)
 
   const setStep = (step: RegisterStep) =>
     setOnboardingState((prev) => ({
@@ -670,7 +717,7 @@ function RegisterPageContent() {
     if (!isNumericStep(onboardingState.step)) return
     if (onboardingState.step <= 1) return
     if (onboardingState.step === ACCOUNT_STEP) {
-      setStep(5)
+      setStep(8)
       return
     }
     setStep((onboardingState.step - 1) as RegisterStep)
@@ -749,10 +796,27 @@ function RegisterPageContent() {
           })
           return
         }
+        setStep(6)
+        break
+      case 6:
+        if (!onboardingState.dailyTime) {
+          toast({
+            title: "Alege timpul zilnic",
+            description: "Doar un interval scurt ne ajută să-ți calibrăm ritmul.",
+            variant: "destructive",
+          })
+          return
+        }
         if (isOAuthOnboardingFlow) {
           setStep("name")
           break
         }
+        setStep(7)
+        break
+      case 7:
+        setStep(8)
+        break
+      case 8:
         setStep(ACCOUNT_STEP)
         break
       default:
@@ -794,6 +858,14 @@ function RegisterPageContent() {
         prev.selfGrade != null
           ? clampTargetGrade(prev.selfGrade, targetGrade)
           : clampTargetGrade(DEFAULT_SELF_GRADE, targetGrade),
+    }))
+  }
+
+  const handleDailyTimeSelect = (dailyTime: DailyTimeOption) => {
+    playOnboardingSelectSound()
+    setOnboardingState((prev) => ({
+      ...prev,
+      dailyTime,
     }))
   }
 
@@ -927,6 +999,22 @@ function RegisterPageContent() {
         description: "Introdu un nume de cel puțin 2 caractere.",
         variant: "destructive",
       })
+      return
+    }
+
+    if (
+      destination === "dashboard" &&
+      onboardingState.campaignSignup !== "1leu" &&
+      onboardingState.step !== "offer" &&
+      !onboardingState.offerSeen
+    ) {
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: "offer",
+        offerResume: "dashboard",
+        offerSeen: true,
+        awaitingPostAuth: false,
+      }))
       return
     }
 
@@ -1067,6 +1155,19 @@ function RegisterPageContent() {
     trackRegistration()
     consumePostOnboardingRedirect()
     router.push(onboardingState.campaignSignup === "1leu" ? "/castiga" : "/dashboard")
+  }
+
+  const handlePremiumOfferDecline = () => {
+    if (onboardingState.offerResume === "name") {
+      setOnboardingState((prev) => ({
+        ...prev,
+        step: "name",
+        offerResume: null,
+        awaitingPostAuth: false,
+      }))
+      return
+    }
+    void completeStudentOnboarding("dashboard")
   }
 
   useEffect(() => {
@@ -1245,8 +1346,87 @@ function RegisterPageContent() {
       }
 
       case 6:
+        return (
+          <div className="mx-auto w-full max-w-[520px]">
+            <StepHeadingWithIcon
+              popFromLeft={!!onboardingState.dailyTime}
+              subtitle="Nu îți cerem mult. Chiar și 15 minute pe zi fac diferența."
+            >
+              {onboardingState.dailyTime ? timeHeadlines[onboardingState.dailyTime] : "Cât timp ai zilnic?"}
+            </StepHeadingWithIcon>
+            <div className="space-y-3">
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.dailyTime === "15"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
+                onClick={() => handleDailyTimeSelect("15")}
+              >
+                15 min
+              </button>
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.dailyTime === "30"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "360ms" }}
+                onClick={() => handleDailyTimeSelect("30")}
+              >
+                30 min
+              </button>
+              <button
+                type="button"
+                className={`${choiceButtonClassName} opacity-0 ${
+                  onboardingState.dailyTime === "60"
+                    ? "border-[#8043f0] bg-[#f4eeff] text-[#5f2fc3]"
+                    : "border-[#ececef] bg-[#f8f8fb] text-[#101216] hover:bg-[#f2f2f6]"
+                }`}
+                style={{ animation: STEP_BUTTON_ANIM, animationDelay: "440ms" }}
+                onClick={() => handleDailyTimeSelect("60")}
+              >
+                1h+
+              </button>
+            </div>
+          </div>
+        )
+
       case 7:
-      case 8:
+        return <StudentTestimonialsStep />
+
+      case 8: {
+        const selectedGrade = onboardingState.grade ?? "9"
+        const simulationSubject =
+          onboardingState.subject === "matematica" ||
+          onboardingState.subject === "fizica" ||
+          onboardingState.subject === "informatica" ||
+          onboardingState.subject === "biologie"
+            ? onboardingState.subject
+            : "fizica"
+
+        return (
+          <div className="mx-auto w-full max-w-[600px]">
+            <StepHeadingWithIcon
+              className="mb-4 sm:mb-8"
+              subtitle="Experimentează interactiv o parte din ce te așteaptă."
+            >
+              Un preview pentru tine
+            </StepHeadingWithIcon>
+
+            <div
+              className="opacity-0"
+              style={{ animation: STEP_BUTTON_ANIM, animationDelay: "280ms" }}
+            >
+              <OnboardingSimulationCard subject={simulationSubject} grade={selectedGrade} />
+            </div>
+          </div>
+        )
+      }
+
       case 9: {
         const selfGrade = onboardingState.selfGrade ?? DEFAULT_SELF_GRADE
         const targetGrade = onboardingState.targetGrade ?? defaultTargetGrade(selfGrade)
@@ -1255,6 +1435,7 @@ function RegisterPageContent() {
           <OnboardingAccountStep
             selfGrade={selfGrade}
             targetGrade={targetGrade}
+            dailyTime={onboardingState.dailyTime}
             oauthLoading={oauthLoading}
             onGoogleStart={is1LeuSignup ? undefined : handleGoogleOAuthStart}
             onGoogleResult={is1LeuSignup ? undefined : handleGoogleOAuthResult}
@@ -1406,6 +1587,10 @@ function RegisterPageContent() {
     return <LoadingVideoOverlay zIndex={500} />
   }
 
+  if (onboardingState.step === "offer") {
+    return <OnboardingLessonOfferPhase onDecline={handlePremiumOfferDecline} />
+  }
+
   return (
     <div className="h-dvh w-full overflow-hidden bg-[#ffffff] sm:min-h-screen sm:h-auto sm:overflow-visible">
       <style jsx global>{`
@@ -1530,12 +1715,20 @@ function RegisterPageContent() {
 
         <main
           className={`flex min-h-0 flex-1 justify-center px-4 sm:px-6 ${
-            showBottomCta
-              ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-3 sm:items-center sm:overflow-visible sm:pb-28 sm:pt-8"
-              : "items-center overflow-y-auto overflow-x-hidden py-4 sm:overflow-visible sm:py-8"
+            isTestimonialsStep
+              ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-0 sm:items-center sm:overflow-visible sm:py-8"
+              : showBottomCta
+                ? "items-center overflow-y-auto overflow-x-hidden pb-28 pt-3 sm:items-center sm:overflow-visible sm:pb-28 sm:pt-8"
+                : "items-center overflow-y-auto overflow-x-hidden py-4 sm:overflow-visible sm:py-8"
           }`}
         >
-          <div className="flex w-full flex-col justify-center sm:block">
+          <div
+            className={
+              isTestimonialsStep
+                ? "flex w-full flex-1 flex-col justify-center lg:min-h-0 lg:flex-none lg:justify-start"
+                : "flex w-full flex-col justify-center sm:block"
+            }
+          >
             {renderStepContent()}
           </div>
         </main>

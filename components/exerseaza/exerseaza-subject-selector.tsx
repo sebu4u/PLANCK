@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 import {
   EXERSEAZA_SUBJECTS,
@@ -43,7 +44,8 @@ export function ExerseazaSubjectSelector({
         >
           <span
             className={cn(
-              "inline-flex items-center rounded-xl border border-[#0b0c0f]/10 bg-white shadow-[0_4px_16px_-10px_rgba(11,12,15,0.2)] transition-colors hover:border-[#0b0c0f]/16 active:scale-[0.99]",
+              PRESS_SHRINK_CLASS,
+              "inline-flex items-center rounded-xl border border-[#0b0c0f]/10 bg-white shadow-[0_4px_16px_-10px_rgba(11,12,15,0.2)] transition-colors hover:border-[#0b0c0f]/16",
               isNavbarLg
                 ? "gap-2 rounded-lg px-2.5 py-1.5"
                 : isNavbar

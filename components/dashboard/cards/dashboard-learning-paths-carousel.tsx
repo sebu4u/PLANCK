@@ -3,6 +3,7 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Loader2, Play } from "lucide-react"
+import { LessonItemProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import {
@@ -25,6 +26,7 @@ interface DashboardLearningPathsCarouselProps {
   startHrefByChapter?: Record<string, string>
   levelByChapter?: Record<string, number>
   hasStartedByChapter?: Record<string, boolean>
+  lessonProgressByChapter?: Record<string, { completed: number; total: number }>
 }
 
 function getChapterTheme(chapter: Pick<LearningPathChapter, "accent_color">): LearningPathChapterTheme {
@@ -164,7 +166,7 @@ function StartContinueButton({
       type="button"
       aria-busy={isLoading}
       className={cn(
-        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_0_var(--lp-accent-dark)] transition-[transform,box-shadow,opacity] hover:translate-y-0.5 hover:shadow-[0_2px_0_var(--lp-accent-dark)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--lp-accent-dark)]",
+        "dashboard-start-glow mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_0_var(--lp-accent-dark)] transition-[transform,box-shadow,opacity] hover:translate-y-0.5 hover:shadow-[0_2px_0_var(--lp-accent-dark)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--lp-accent-dark)] md:min-h-12 md:py-4",
         isLoading && "pointer-events-none opacity-70",
         className
       )}
@@ -204,6 +206,7 @@ export function DashboardLearningPathsCarousel({
   startHrefByChapter = {},
   levelByChapter = {},
   hasStartedByChapter = {},
+  lessonProgressByChapter = {},
 }: DashboardLearningPathsCarouselProps) {
   const router = useRouter()
   const [activeIndex, setActiveIndex] = useState(0)
@@ -549,7 +552,7 @@ export function DashboardLearningPathsCarousel({
       <div
         ref={containerRef}
         className="relative hidden w-full select-none overflow-visible md:block"
-        style={{ height: 540 }}
+        style={{ height: 500 }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -560,6 +563,12 @@ export function DashboardLearningPathsCarousel({
           const chapterHref = getChapterHref(chapter, chapterLessons, startHrefByChapter)
           const currentLevel = levelByChapter[chapter.id] ?? 1
           const hasStarted = hasStartedByChapter[chapter.id] ?? false
+          const lessonProgress = lessonProgressByChapter[chapter.id] ?? {
+            completed: 0,
+            total: 0,
+          }
+          const currentLesson = chapterLessons[0] ? [chapterLessons[0]] : []
+          const isContinueLoading = continueLoadingHref === chapterHref
 
           const offset = (index - activeIndex + count) % count
           const normalizedOffset = offset > Math.floor(count / 2) ? offset - count : offset
@@ -611,31 +620,72 @@ export function DashboardLearningPathsCarousel({
 
               <div className="mt-4 flex justify-center">
                 {chapter.icon_url && absOffset <= 1 ? (
-                  <img
-                    src={chapter.icon_url}
-                    alt={chapter.title}
-                    className="h-40 w-40 object-contain"
-                    loading="lazy"
-                    draggable={false}
-                  />
+                  <button
+                    type="button"
+                    aria-label={hasStarted ? "Continuă" : "Start"}
+                    aria-busy={isContinueLoading}
+                    disabled={isContinueLoading}
+                    className={cn(
+                      "cursor-pointer rounded-xl transition-opacity hover:opacity-90",
+                      isContinueLoading && "pointer-events-none cursor-wait opacity-70",
+                    )}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (isContinueLoading) return
+                      handleContinueClick(chapterHref)
+                    }}
+                  >
+                    <img
+                      src={chapter.icon_url}
+                      alt={chapter.title}
+                      className="h-40 w-40 object-contain"
+                      loading="lazy"
+                      draggable={false}
+                    />
+                  </button>
                 ) : chapter.icon_url ? (
                   <div aria-hidden className="h-40 w-40" />
                 ) : (
-                  <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-[#f3f3f3] text-[#737373]">
+                  <button
+                    type="button"
+                    aria-label={hasStarted ? "Continuă" : "Start"}
+                    aria-busy={isContinueLoading}
+                    disabled={isContinueLoading}
+                    className={cn(
+                      "flex h-40 w-40 cursor-pointer items-center justify-center rounded-xl bg-[#f3f3f3] text-[#737373] transition-opacity hover:opacity-90",
+                      isContinueLoading && "pointer-events-none cursor-wait opacity-70",
+                    )}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (isContinueLoading) return
+                      handleContinueClick(chapterHref)
+                    }}
+                  >
                     <BookOpen className="h-14 w-14" />
-                  </div>
+                  </button>
                 )}
               </div>
 
               <div className="mt-4">
-                <LessonPreviewRows lessons={chapterLessons} />
+                <LessonItemProgressBar
+                  completed={lessonProgress.completed}
+                  total={lessonProgress.total}
+                  minPercent={6}
+                  accentColor={colors.accent}
+                  className="mx-auto w-[58%]"
+                />
+                <div className="mt-2.5">
+                  <LessonPreviewRows lessons={currentLesson} />
+                </div>
               </div>
 
               <StartContinueButton
                 href={chapterHref}
                 hasStarted={hasStarted}
                 colors={colors}
-                isLoading={continueLoadingHref === chapterHref}
+                isLoading={isContinueLoading}
                 onContinue={handleContinueClick}
               />
             </article>

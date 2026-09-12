@@ -7,6 +7,7 @@ import type { EmailOtpType } from "@supabase/supabase-js"
 import { Loader2, Rocket } from "lucide-react"
 import { sanitizeInternalPath } from "@/lib/auth-next"
 import { PLANCK_WEEK_PREGATIRE_PATH } from "@/lib/planck-week"
+import { rememberPlanckWeekLeadEmail, trackPlanckWeekLeadPixels } from "@/lib/planck-week-pixels"
 import { supabase } from "@/lib/supabaseClient"
 
 const OTP_TYPES = new Set<EmailOtpType>([
@@ -69,6 +70,7 @@ export function PlanckWeekAuthConfirmClient() {
 
         const { data: sessionData } = await supabase.auth.getSession()
         const token = sessionData.session?.access_token
+        const email = sessionData.session?.user?.email
         let redirectTo = next
         if (token) {
           try {
@@ -77,7 +79,14 @@ export function PlanckWeekAuthConfirmClient() {
               headers: { Authorization: `Bearer ${token}` },
             })
             if (response.ok) {
-              const payload = (await response.json()) as { redirectPath?: string | null }
+              const payload = (await response.json()) as {
+                redirectPath?: string | null
+                conversionEventId?: string | null
+              }
+              if (email) rememberPlanckWeekLeadEmail(email)
+              if (payload.conversionEventId) {
+                trackPlanckWeekLeadPixels(payload.conversionEventId)
+              }
               if (!nextParam && payload.redirectPath?.startsWith("/")) {
                 redirectTo = sanitizeInternalPath(payload.redirectPath, next)
               }

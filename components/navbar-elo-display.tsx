@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react"
 import dynamic from "next/dynamic"
 import { Trophy } from "lucide-react"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 
 const TrophyRoadOverlay = dynamic(
@@ -51,6 +52,7 @@ export function NavbarEloDisplay({
         aria-haspopup="dialog"
         aria-expanded={open}
         className={cn(
+          PRESS_SHRINK_CLASS,
           "inline-flex items-center gap-1 text-xs font-medium transition-opacity",
           secondaryText,
           className,

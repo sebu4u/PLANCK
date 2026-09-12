@@ -9,13 +9,16 @@ import { OnboardingEmailSignupForm } from "@/components/onboarding/onboarding-em
 import { LiveStats } from "@/components/live-stats"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import type { OAuthPopupResult } from "@/lib/oauth-popup"
-import { buildPlanSummaryCopy } from "@/lib/student-onboarding-plan"
+import {
+  buildPlanSummaryCopy,
+  type StudentDailyTimeOption,
+} from "@/lib/student-onboarding-plan"
 
 const oauthButtonClassName =
   "flex h-[52px] w-full items-center justify-center gap-3 rounded-full border border-[#dadce0] bg-white px-6 text-[15px] font-bold leading-none text-black shadow-[0_5px_0_#dadce0] transition-[transform,box-shadow,background-color] hover:translate-y-[1px] hover:bg-[#f8f9fa] hover:shadow-[0_4px_0_#dadce0] active:translate-y-[5px] active:bg-[#f1f3f4] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-[0_5px_0_#dadce0]"
 
 const emailInputClassName =
-  "h-12 rounded-full border-[#dadce0] px-4 text-[15px] text-[#0f1115] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
+  "h-12 rounded-full border-[#dadce0] px-4 text-base text-[#0f1115] placeholder:text-[#9aa0ad] focus-visible:ring-[#8043f0]"
 
 const emailSubmitClassName =
   "inline-flex h-[52px] w-full items-center justify-center rounded-full bg-[#2a2a2a] px-6 text-[15px] font-bold leading-none text-[#f5f4f2] shadow-[0_5px_0_#050505] transition-[transform,box-shadow] hover:translate-y-[1px] hover:shadow-[0_4px_0_#050505] active:translate-y-[5px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-[0_5px_0_#050505]"
@@ -23,6 +26,7 @@ const emailSubmitClassName =
 type OnboardingAccountStepProps = {
   selfGrade?: number
   targetGrade?: number
+  dailyTime?: StudentDailyTimeOption | null
   oauthLoading: "google" | "email" | null
   onGoogleStart?: () => void
   onGoogleResult?: (result: OAuthPopupResult) => void
@@ -39,6 +43,7 @@ type OnboardingAccountStepProps = {
 export function OnboardingAccountStep({
   selfGrade,
   targetGrade,
+  dailyTime,
   oauthLoading,
   onGoogleStart,
   onGoogleResult,
@@ -59,6 +64,7 @@ export function OnboardingAccountStep({
       : buildPlanSummaryCopy({
           selfGrade: selfGrade ?? 7,
           targetGrade: targetGrade ?? 9,
+          dailyTime,
         })
   const copy = {
     title: title ?? defaultCopy.title,

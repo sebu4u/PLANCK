@@ -11,6 +11,11 @@ import {
   workshopSubjectToOnboardingSubject,
 } from "@/lib/planck-week"
 import {
+  planckWeekConversionEventId,
+  sendPlanckWeekConversionEvents,
+  type PlanckWeekConversionContext,
+} from "@/lib/planck-week-conversion-events"
+import {
   sendPlanckWeekClaimSummaryEmail,
   type PlanckWeekClaimedSession,
 } from "@/lib/planck-week-email"
@@ -24,6 +29,7 @@ export type PlanckWeekClaimResult = {
   unlockedCount: number
   skippedFull: number
   redirectPath: string | null
+  conversionEventId: string | null
 }
 
 type LeadRow = {
@@ -195,6 +201,7 @@ export async function claimPlanckWeekForUser(input: {
   sendSummaryEmail?: boolean
   subjects?: WorkshopSubject[]
   name?: string | null
+  conversion?: PlanckWeekConversionContext | null
 }): Promise<PlanckWeekClaimResult> {
   const email = input.email.trim().toLowerCase()
   const supabase = getServiceRoleSupabase()
@@ -275,6 +282,7 @@ export async function claimPlanckWeekForUser(input: {
       unlockedCount: 0,
       skippedFull: 0,
       redirectPath,
+      conversionEventId: null,
     }
   }
 
@@ -315,6 +323,17 @@ export async function claimPlanckWeekForUser(input: {
     }
   }
 
+  let conversionEventId: string | null = null
+  if (!alreadyClaimed && unlocked.length > 0) {
+    conversionEventId = planckWeekConversionEventId(input.userId)
+    await sendPlanckWeekConversionEvents({
+      userId: input.userId,
+      email,
+      unique: conversionEventId,
+      context: input.conversion,
+    })
+  }
+
   return {
     ok: true,
     claimed: true,
@@ -322,5 +341,6 @@ export async function claimPlanckWeekForUser(input: {
     unlockedCount: unlocked.length,
     skippedFull,
     redirectPath,
+    conversionEventId,
   }
 }

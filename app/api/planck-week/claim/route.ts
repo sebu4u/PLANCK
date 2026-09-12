@@ -3,6 +3,7 @@ import { getAccessTokenFromRequest } from "@/lib/admin-check"
 import { isJwtExpired } from "@/lib/auth-validate"
 import { isPlanckWeekGradeOption } from "@/lib/planck-week"
 import { claimPlanckWeekForUser } from "@/lib/planck-week-claim"
+import { planckWeekConversionContext } from "@/lib/planck-week-conversion-events"
 import { logger } from "@/lib/logger"
 import { isWorkshopSubject } from "@/lib/pregatire/types"
 import { createServerClientWithToken } from "@/lib/supabaseServer"
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
       sendSummaryEmail: false,
       subjects: subjects?.filter(isWorkshopSubject),
       name,
+      conversion: planckWeekConversionContext({
+        getHeader: (name) => req.headers.get(name),
+        getCookie: (name) => req.cookies.get(name)?.value,
+      }),
     })
 
     return NextResponse.json({
@@ -49,6 +54,7 @@ export async function POST(req: NextRequest) {
       claimed: result.claimed,
       unlockedCount: result.unlockedCount,
       redirectPath: result.redirectPath,
+      conversionEventId: result.conversionEventId,
     })
   } catch (err) {
     logger.error("[planck-week/claim] error:", err)

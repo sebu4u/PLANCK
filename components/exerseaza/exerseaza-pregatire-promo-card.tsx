@@ -2,13 +2,15 @@ import Image from "next/image"
 import Link from "next/link"
 import { CalendarDays } from "lucide-react"
 import { setPregatireBackTarget } from "@/lib/pregatire/back-target"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
+import { cn } from "@/lib/utils"
 
 export function ExerseazaPregatirePromoCard() {
   return (
     <Link
       href="/pregatire"
       onClick={() => setPregatireBackTarget("/exerseaza")}
-      className="group relative block overflow-visible pt-2 transition-transform active:scale-[0.99]"
+      className={cn(PRESS_SHRINK_CLASS, "group relative block overflow-visible pt-2")}
     >
       {/*
         Red layers tuck under the pink card so rotation never opens a seam

@@ -8,6 +8,7 @@ import { estimateGradeFromElo } from "@/lib/parent/grade-estimate"
 import { getFreePlanItemsRemainingForUser } from "@/lib/learning-path-free-plan"
 import type { LearningPathChapter } from "@/lib/supabase-learning-paths"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
+import { cn } from "@/lib/utils"
 import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { StudentGradeGoalCard } from "@/components/dashboard/free-mobile/student-grade-goal-card"
 import { StudentCurrentPathCard } from "@/components/dashboard/free-mobile/student-current-path-card"
@@ -69,7 +70,12 @@ export function FreeMobileDashboard({
   const studentName = profile?.nickname || profile?.name || "Tu"
 
   return (
-    <div className="mobile-bottom-nav-pad flex flex-col gap-4 px-4 pt-3">
+    <div
+      className={cn(
+        isFree ? "mobile-bottom-nav-upgrade-banner-pad" : "mobile-bottom-nav-pad",
+        "flex flex-col gap-4 px-4 pt-3",
+      )}
+    >
       <div className="mb-2">
         <InvataPersonalizedCourseEntry />
       </div>

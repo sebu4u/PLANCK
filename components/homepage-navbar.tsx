@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Rocket } from "lucide-react"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 
 type HomePageNavbarProps = {
@@ -27,7 +28,7 @@ export function HomePageNavbar({ variant = "dark", className, barClassName }: Ho
 
           <Link
             href="/login"
-            className={`inline-flex h-11 items-center rounded-full border-[3px] border-gray-400 px-6 text-base font-semibold transition-colors ${
+            className={`${PRESS_SHRINK_CLASS} inline-flex h-11 items-center rounded-full border-[3px] border-gray-400 px-6 text-base font-semibold transition-colors ${
               isLight
                 ? "bg-white text-[#2f236f] hover:border-gray-500 hover:bg-gray-50"
                 : "bg-white text-[#2f236f] hover:border-gray-300 hover:bg-[#f8f5ff]"

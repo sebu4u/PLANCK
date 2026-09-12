@@ -70,12 +70,16 @@ export function estimatePlanMonths(
 export function buildPlanSummaryCopy(params: {
   targetGrade: number
   selfGrade: number
+  dailyTime?: StudentDailyTimeOption | null
 }): { title: string; subtitle: string } {
   const target = formatGrade(params.targetGrade)
   const zone = formatGradeZone(params.selfGrade)
+  const dailyTime = params.dailyTime ?? "30"
+  const months = estimatePlanMonths(params.selfGrade, params.targetGrade, dailyTime)
+  const dailyLabel = formatDailyTimeLabel(dailyTime)
 
   return {
     title: `Planul tău pentru ${target} e gata`,
-    subtitle: `Pornești din zona ${zone}. Înregistrează-te pentru a-ți salva planul.`,
+    subtitle: `Pornești din zona ${zone} și ai ~${months} luni — ritmul tău de ${dailyLabel} e suficient. Înregistrează-te pentru a-ți salva planul.`,
   }
 }

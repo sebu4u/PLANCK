@@ -12,6 +12,7 @@ import {
   EARLYBIRD_YEARLY_RON,
   EARLYBIRD_YEARLY_SEATS_TOTAL,
   FULL_YEARLY_RON,
+  LANDING_DEADLINE,
   LANDING_PREMIUM_BULLETS,
   earlybirdSeatsFomoCopy,
   remainingEarlybirdSeats,
@@ -22,6 +23,13 @@ import {
   PREMIUM_MONTHLY_RON,
   PREMIUM_WEEKLY_RON,
 } from "@/components/pricing/premium-pricing"
+import {
+  BACK_TO_SCHOOL_DEADLINE,
+  BACK_TO_SCHOOL_DEADLINE_LABEL,
+  BACK_TO_SCHOOL_MONTHLY_RON,
+  BACK_TO_SCHOOL_SAVE_PERCENT,
+  isBackToSchoolActive,
+} from "@/lib/back-to-school-discount"
 import {
   LAUNCH_20_DEADLINE_LABEL,
   LAUNCH_20_PERCENT,
@@ -43,14 +51,17 @@ function priceFor(interval: Interval) {
     }
   }
   if (interval === "month") {
+    const back2school = isBackToSchoolActive()
     const launch20 = isLaunch20Active()
     return {
       display: getCampaignPriceRon("month"),
-      struck: launch20 ? PREMIUM_MONTHLY_RON : null,
+      struck: back2school || launch20 ? PREMIUM_MONTHLY_RON : null,
       unit: "RON/lună",
-      note: launch20
-        ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
-        : "Facturare lunară",
+      note: back2school
+        ? `Prima lună ${BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi ${PREMIUM_MONTHLY_RON} RON/lună`
+        : launch20
+          ? `Cupon −${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`
+          : "Facturare lunară",
     }
   }
   const launch20 = isLaunch20Active()
@@ -65,9 +76,10 @@ function priceFor(interval: Interval) {
 }
 
 export function LandingPricingSection({ countdown }: { countdown?: CountdownState }) {
-  const local = useCountdown()
-  const { days, hours, minutes, seconds } = countdown ?? local
-  const [interval, setBillingInterval] = useState<Interval>("year")
+  const back2school = isBackToSchoolActive()
+  const local = useCountdown(back2school ? BACK_TO_SCHOOL_DEADLINE : LANDING_DEADLINE)
+  const { days, hours, minutes, seconds } = countdown && !back2school ? countdown : local
+  const [interval, setBillingInterval] = useState<Interval>(back2school ? "month" : "year")
   const [earlybirdSeats, setEarlybirdSeats] = useState(remainingEarlybirdSeats)
   const price = priceFor(interval)
   const isYear = interval === "year"
@@ -81,40 +93,63 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
     <section id="pricing" className="bg-white py-12 sm:py-16">
       <div className="mx-auto max-w-xl px-4 sm:px-6">
         <FadeInUp className="mb-6 text-center">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#7C5CFC]">
-            Ofertă earlybird
-          </p>
-          <h2 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
-            1 an de Premium, doar{" "}
-            <span className="bg-gradient-to-r from-[#9a7bff] to-[#ffb56b] bg-clip-text text-transparent">
-              {EARLYBIRD_YEARLY_RON} RON
-            </span>
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-gray-500">
-            Prima meditație e gratuită. Apoi abonamentul începe de la{" "}
-            <strong className="text-gray-700">{weeklyFrom} RON/săptămână</strong>. Până pe{" "}
-            <strong className="text-gray-700">{EARLYBIRD_DEADLINE_LABEL}</strong> poți beneficia de{" "}
-            <strong className="text-gray-700">{EARLYBIRD_SAVE_PERCENT}% reducere</strong> la
-            abonamentul Premium.
-          </p>
-          {earlybirdSeats > 0 ? (
-            <div className="mx-auto mt-4 max-w-sm rounded-xl border border-orange-200 bg-[#FFF7ED] px-3.5 py-2.5 text-left">
-              <p className="text-sm font-bold text-orange-800">
-                {earlybirdSeatsFomoCopy(earlybirdSeats)}
+          {back2school ? (
+            <>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#7C5CFC]">
+                Ofertă Back2School
               </p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-orange-100">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
-                  style={{
-                    width: `${Math.max(
-                      8,
-                      (earlybirdSeats / EARLYBIRD_YEARLY_SEATS_TOTAL) * 100,
-                    )}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ) : null}
+              <h2 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+                Prima lună de Premium, doar{" "}
+                <span className="bg-gradient-to-r from-[#9a7bff] to-[#ffb56b] bg-clip-text text-transparent">
+                  {BACK_TO_SCHOOL_MONTHLY_RON} RON
+                </span>
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                În loc de{" "}
+                <strong className="text-gray-700">{PREMIUM_MONTHLY_RON} RON/lună</strong>. Prima
+                lună e {BACK_TO_SCHOOL_MONTHLY_RON} RON, apoi {PREMIUM_MONTHLY_RON} RON/lună.
+                Ofertă până pe{" "}
+                <strong className="text-gray-700">{BACK_TO_SCHOOL_DEADLINE_LABEL}</strong>.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#7C5CFC]">
+                Ofertă earlybird
+              </p>
+              <h2 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+                1 an de Premium, doar{" "}
+                <span className="bg-gradient-to-r from-[#9a7bff] to-[#ffb56b] bg-clip-text text-transparent">
+                  {EARLYBIRD_YEARLY_RON} RON
+                </span>
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                Prima meditație e gratuită. Apoi abonamentul începe de la{" "}
+                <strong className="text-gray-700">{weeklyFrom} RON/săptămână</strong>. Până pe{" "}
+                <strong className="text-gray-700">{EARLYBIRD_DEADLINE_LABEL}</strong> poți beneficia de{" "}
+                <strong className="text-gray-700">{EARLYBIRD_SAVE_PERCENT}% reducere</strong> la
+                abonamentul Premium.
+              </p>
+              {earlybirdSeats > 0 ? (
+                <div className="mx-auto mt-4 max-w-sm rounded-xl border border-orange-200 bg-[#FFF7ED] px-3.5 py-2.5 text-left">
+                  <p className="text-sm font-bold text-orange-800">
+                    {earlybirdSeatsFomoCopy(earlybirdSeats)}
+                  </p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-orange-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
+                      style={{
+                        width: `${Math.max(
+                          8,
+                          (earlybirdSeats / EARLYBIRD_YEARLY_SEATS_TOTAL) * 100,
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </FadeInUp>
 
         <FadeInUp delay={0.08} className="mb-5 flex justify-center">
@@ -140,8 +175,9 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
             <div className="rounded-[20px] bg-white p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] px-2.5 py-0.5 text-[11px] font-bold text-white">
-                  ✦ Premium anual
+                  {back2school ? "✦ Premium lunar" : "✦ Premium anual"}
                 </div>
+                {back2school ? null : (
                 <div className="inline-flex rounded-full bg-gray-100 p-0.5">
                   {(
                     [
@@ -184,6 +220,7 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
                     </button>
                   ))}
                 </div>
+                )}
               </div>
 
               <div className="mt-4">
@@ -202,7 +239,9 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
                     >
                       {isYear
                         ? `−${EARLYBIRD_SAVE_PERCENT}% earlybird`
-                        : `−${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`}
+                        : back2school
+                          ? `−${BACK_TO_SCHOOL_SAVE_PERCENT}% prima lună`
+                          : `−${LAUNCH_20_PERCENT}% până pe ${LAUNCH_20_DEADLINE_LABEL}`}
                     </span>
                   </div>
                 )}
@@ -234,11 +273,13 @@ export function LandingPricingSection({ countdown }: { countdown?: CountdownStat
 
               <FunnelCtaLink
                 href="/pricing"
-                ctaId="landing_pricing_earlybird"
+                ctaId={back2school ? "landing_pricing_back2school" : "landing_pricing_earlybird"}
                 placement="landing_pricing"
                 className="mt-5 flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#7C5CFC] to-[#c77bff] text-sm font-bold text-white shadow-[0_3px_0_#5B47D6] transition-[filter] duration-200 hover:brightness-110"
               >
-                Ia earlybird-ul de {EARLYBIRD_YEARLY_RON} RON/an
+                {back2school
+                  ? `Ia oferta Back2School — ${BACK_TO_SCHOOL_MONTHLY_RON} RON`
+                  : `Ia earlybird-ul de ${EARLYBIRD_YEARLY_RON} RON/an`}
               </FunnelCtaLink>
             </div>
           </div>

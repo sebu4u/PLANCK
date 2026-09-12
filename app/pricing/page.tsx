@@ -12,6 +12,7 @@ import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { canPurchaseSubscriptions } from "@/lib/access-config"
 import type { ChildBillingSnapshot } from "@/lib/parent/billing-types"
+import { BackToSchoolPricingView } from "@/components/pricing/back-to-school-pricing-view"
 import { PricingMobileExitSheet } from "@/components/pricing/pricing-mobile-exit-sheet"
 import { PricingGradeGrowthChart } from "@/components/pricing/pricing-grade-growth-chart"
 import {
@@ -29,6 +30,10 @@ import {
   PREMIUM_YEARLY_SAVE_PERCENT,
   type PremiumBillingInterval,
 } from "@/components/pricing/premium-pricing"
+import {
+  BACK_TO_SCHOOL_FAQ,
+  isBackToSchoolActive,
+} from "@/lib/back-to-school-discount"
 import {
   EARLYBIRD_DEADLINE_LABEL,
   EARLYBIRD_SAVE_PERCENT,
@@ -119,6 +124,9 @@ function AnimatedPrice({ value }: { value: number }) {
 
 function PricingFaq() {
   const [openItemId, setOpenItemId] = useState<string | null>(null)
+  const faqItems = isBackToSchoolActive()
+    ? [BACK_TO_SCHOOL_FAQ, ...PREMIUM_PRICING_FAQ]
+    : PREMIUM_PRICING_FAQ
 
   return (
     <section className="mx-auto w-full max-w-2xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24">
@@ -131,7 +139,7 @@ function PricingFaq() {
         </h2>
       </div>
       <div className="mt-8 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white px-5 shadow-sm sm:px-6">
-        {PREMIUM_PRICING_FAQ.map((item) => {
+        {faqItems.map((item) => {
           const isOpen = openItemId === item.id
           return (
             <div key={item.id} className="py-5">
@@ -614,7 +622,9 @@ function PricingPageContent() {
   const searchParams = useSearchParams()
   const { user, subscriptionPlan, refreshProfile, isParent } = useAuth()
   const { toast } = useToast()
-  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>("week")
+  const [billingInterval, setBillingInterval] = useState<PremiumBillingInterval>(
+    isBackToSchoolActive() ? "month" : "week",
+  )
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [syncingSessionId, setSyncingSessionId] = useState<string | null>(null)
@@ -853,7 +863,11 @@ function PricingPageContent() {
         promotionCodeId: appliedPromo?.promotionCodeId,
         shopCouponId: appliedPromo?.shopCouponId,
         campaign:
-          !appliedPromo && interval === "year" && isEarlybirdActive() ? "earlybird" : undefined,
+          !appliedPromo && interval === "year" && isEarlybirdActive()
+            ? "earlybird"
+            : !appliedPromo && interval === "month" && isBackToSchoolActive()
+              ? "back2school"
+              : undefined,
         ...(isParent && selectedChild ? { childId: selectedChild.child_id } : {}),
       })
 
@@ -946,6 +960,9 @@ function PricingPageContent() {
     if (!appliedPromo && billingInterval === "year" && isEarlybirdActive()) {
       return "Ia earlybird-ul"
     }
+    if (!appliedPromo && isBackToSchoolActive()) {
+      return "Abonează-te acum"
+    }
     if (isParent && selectedChild) return `Cumpără Premium pentru ${selectedChild.name}`
     return "Devino Premium"
   })()
@@ -1024,7 +1041,45 @@ function PricingPageContent() {
   }
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden bg-white text-gray-900">
+    <div
+      className="relative min-h-[100dvh] overflow-x-hidden bg-white text-gray-900"
+    >
+      {isBackToSchoolActive() ? (
+        <>
+          <BackToSchoolPricingView
+            billingInterval={billingInterval}
+            setBillingInterval={setBillingInterval}
+            isCurrentPremium={isCurrentPremium}
+            hasPaidSubscription={Boolean(user && hasPaidSubscription)}
+            portalLoading={portalLoading}
+            openBillingPortal={openBillingPortal}
+            isCtaDisabled={isCtaDisabled}
+            isActionLoading={isActionLoading}
+            ctaLabel={ctaLabel}
+            handlePrimaryCta={handlePrimaryCta}
+            appliedPromo={appliedPromo}
+            onApplyPromo={(promo) => {
+              setAppliedPromo(promo)
+              if (promo.lockedInterval) setBillingInterval(promo.lockedInterval)
+            }}
+            onClearPromo={() => setAppliedPromo(null)}
+            headerSlot={
+              isParent ? (
+                <ParentChildPicker
+                  childrenList={parentChildren}
+                  selectedChildId={selectedChild?.child_id ?? null}
+                  onSelect={setSelectedChildId}
+                />
+              ) : null
+            }
+            onClose={handleCloseButtonClick}
+          />
+          <div className="border-t border-gray-100 bg-white">
+            <PricingFaq />
+          </div>
+        </>
+      ) : (
+        <>
       <div
         className="fixed inset-0 -z-10 bg-[linear-gradient(to_right,#8f91f1,#cd83db,#f4d4c8)] lg:bg-none lg:bg-white"
         aria-hidden
@@ -1095,6 +1150,8 @@ function PricingPageContent() {
       <div className="border-t border-gray-100 bg-[#f6f5f4]">
         <PricingFaq />
       </div>
+        </>
+      )}
 
       <PricingMobileExitSheet
         isOpen={mobileExitSheetOpen}

@@ -3,6 +3,7 @@
 import { type CSSProperties, type MouseEvent, useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, CheckCircle2, Circle, Loader2, PlayCircle } from "lucide-react"
+import { PRESS_SHRINK_CLASS } from "@/lib/press-shrink"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient"
 import { getLearningPathChapterTheme } from "@/lib/learning-path-chapter-theme"
@@ -115,7 +116,10 @@ export function StudentCurrentPathCard({
             handleCardClick()
           }
         }}
-        className="w-full cursor-pointer rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)] transition-transform active:scale-[0.99]"
+        className={cn(
+          PRESS_SHRINK_CLASS,
+          "w-full cursor-pointer rounded-3xl border-2 border-[#e5e5e5] bg-white p-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.02)]",
+        )}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">

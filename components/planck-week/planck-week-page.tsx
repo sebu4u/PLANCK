@@ -10,7 +10,7 @@ import { PlanckWeekFaqSection } from "@/components/planck-week/faq-section"
 import { PlanckWeekTeacherVideosSection } from "@/components/planck-week/teacher-videos-section"
 import { PlanckWeekFinalCtaSection } from "@/components/planck-week/final-cta-section"
 import { PlanckWeekStickyMobileCta } from "@/components/planck-week/sticky-mobile-cta"
-import { PlanckWeekOnboarding } from "@/components/planck-week/onboarding"
+import { PlanckWeekLeadForm } from "@/components/planck-week/lead-form"
 import { PlanckWeekCtaButton } from "@/components/planck-week/cta-button"
 import { PlanckWeekSignupDeadlineBanner } from "@/components/planck-week/signup-deadline-banner"
 import {
@@ -32,7 +32,7 @@ export function PlanckWeekPage() {
     trackFunnelEvent("cta_clicked", {
       cta_id: "planck_week_reserve",
       placement,
-      destination: "onboarding",
+      destination: "lead_form",
     })
     setReserveSubject(subject ?? null)
     setOpen(true)
@@ -53,7 +53,7 @@ export function PlanckWeekPage() {
   }, [])
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-white pb-16 sm:pb-0">
+    <div className="relative min-h-screen bg-white pb-16 sm:pb-0">
       <PlanckWeekSignupDeadlineBanner />
       <PlanckWeekHeroSection onReserve={() => openReserve("planck_week_hero")} />
       <LandingWorkshopsCalendarSection
@@ -71,15 +71,18 @@ export function PlanckWeekPage() {
       <PlanckWeekFaqSection />
       <PlanckWeekFinalCtaSection onReserve={() => openReserve("planck_week_final")} />
       <Footer theme="light" backgroundColor="bg-[#F8F7FF]" borderColor="border-gray-200" />
-      <HomepageMobileReviewsBar placement="top" visible={pastHero} />
-      <PlanckWeekStickyMobileCta onReserve={() => openReserve("planck_week_sticky")} />
-      <PlanckWeekOnboarding
+      <HomepageMobileReviewsBar placement="top" visible={pastHero && !open} />
+      <PlanckWeekStickyMobileCta
+        hidden={open}
+        onReserve={() => openReserve("planck_week_sticky")}
+      />
+      <PlanckWeekLeadForm
         open={open}
+        initialSubject={reserveSubject}
         onOpenChange={(next) => {
           setOpen(next)
           if (!next) setReserveSubject(null)
         }}
-        initialSubject={reserveSubject}
       />
     </div>
   )

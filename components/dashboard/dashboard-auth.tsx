@@ -40,13 +40,13 @@ import { PlanckPassDesktopShell } from "@/components/dashboard/free-mobile/planc
 import { PlanckPassMobileShell } from "@/components/dashboard/free-mobile/planckpass-sheet"
 import { DashboardRankCard } from "@/components/dashboard/cards/dashboard-rank-card"
 import { WelcomeBackOverlay } from "@/components/dashboard/welcome-back-overlay"
-import { PlanckWeekDashboardPromo } from "@/components/dashboard/planck-week-dashboard-promo"
 import { DashboardPremiumUpgradeCard } from "@/components/dashboard/dashboard-premium-upgrade-card"
 import { PrizeWheelDashboardOverlay } from "@/components/prize-wheel/prize-wheel-dashboard-overlay"
 import { DashboardUnusedPrizeNudge } from "@/components/prize-wheel/dashboard-unused-prize-nudge"
 import { DashboardOpenWheelNudge } from "@/components/prize-wheel/dashboard-open-wheel-nudge"
 import { PremiumUpgradeBanner } from "@/components/premium-upgrade-banner"
 import { FreePlanComparisonOverlay } from "@/components/invata/free-plan-comparison-overlay"
+import { MOBILE_BOTTOM_NAV_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 import { useSocialProofTrigger } from "@/hooks/engagement/use-social-proof-trigger"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { useProductGuideBlocking } from "@/components/product-guide/product-guide-blocking"
@@ -61,10 +61,6 @@ import {
   getPrizeWheelOpenDismissedStorageKey,
   PRIZE_WHEEL_CAMPAIGN_START_AT,
 } from "@/lib/prize-wheel/campaign"
-import {
-  getPlanckWeekDashboardPromoSessionKey,
-  isPlanckWeekDashboardPromoActive,
-} from "@/lib/planck-week"
 
 export function DashboardAuth() {
   const router = useRouter()
@@ -82,8 +78,6 @@ export function DashboardAuth() {
   const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false)
   const [showPrizeWheel, setShowPrizeWheel] = useState(false)
   const [showOpenWheelNudge, setShowOpenWheelNudge] = useState(false)
-  const [prizeWheelDecisionReady, setPrizeWheelDecisionReady] = useState(false)
-  const [showPlanckWeekPromo, setShowPlanckWeekPromo] = useState(false)
   const [dashboardData, setDashboardData] = useState<{
     stats: UserStats
     recommendedLessons: RecommendedLesson[]
@@ -115,7 +109,6 @@ export function DashboardAuth() {
       !loading &&
       !showWelcomeBack &&
       !showPrizeWheel &&
-      !showPlanckWeekPromo &&
       !holdDashboardOverlays,
     solvedTotal: dashboardData?.stats.problems_solved_total,
   })
@@ -124,19 +117,16 @@ export function DashboardAuth() {
     setProductGuideBlocked("welcome-back", showWelcomeBack)
     setProductGuideBlocked("premium-upgrade", premiumUpgradeOpen)
     setProductGuideBlocked("prize-wheel", showPrizeWheel)
-    setProductGuideBlocked("planck-week-promo", showPlanckWeekPromo)
     return () => {
       setProductGuideBlocked("welcome-back", false)
       setProductGuideBlocked("premium-upgrade", false)
       setProductGuideBlocked("prize-wheel", false)
-      setProductGuideBlocked("planck-week-promo", false)
     }
   }, [
     setProductGuideBlocked,
     showWelcomeBack,
     premiumUpgradeOpen,
     showPrizeWheel,
-    showPlanckWeekPromo,
   ])
 
   const refreshDashboardLearningPaths = useCallback(
@@ -490,7 +480,6 @@ export function DashboardAuth() {
     if (authLoading || loading || !dashboardData || !user || holdDashboardOverlays) return
 
     if (!isStudent) {
-      setPrizeWheelDecisionReady(true)
       return
     }
 
@@ -542,7 +531,6 @@ export function DashboardAuth() {
       }
       const payload = await loadPrizeWheel()
       if (cancelled) return
-      setPrizeWheelDecisionReady(true)
       if (payload && applyOpenState(payload)) return
       const delay = getPrizeWheelLiveRefreshDelay(payload?.campaign ?? null)
       if (delay == null) return
@@ -566,61 +554,6 @@ export function DashboardAuth() {
       document.removeEventListener("visibilitychange", onVisibility)
     }
   }, [authLoading, loading, dashboardData, user?.id, isStudent, holdDashboardOverlays])
-
-  useEffect(() => {
-    if (authLoading || loading || !dashboardData || !user) return
-    if (holdDashboardOverlays || showWelcomeBack || showPrizeWheel || premiumUpgradeOpen) {
-      setShowPlanckWeekPromo(false)
-      return
-    }
-    if (!prizeWheelDecisionReady) return
-    if (!isPlanckWeekDashboardPromoActive()) {
-      setShowPlanckWeekPromo(false)
-      return
-    }
-
-    try {
-      if (sessionStorage.getItem(getPlanckWeekDashboardPromoSessionKey(user.id)) === "1") {
-        setShowPlanckWeekPromo(false)
-        return
-      }
-    } catch {
-      // ignore
-    }
-
-    setShowPlanckWeekPromo(true)
-
-    const persistTimer = window.setTimeout(() => {
-      try {
-        sessionStorage.setItem(getPlanckWeekDashboardPromoSessionKey(user.id), "1")
-      } catch {
-        // ignore
-      }
-    }, 400)
-
-    return () => window.clearTimeout(persistTimer)
-  }, [
-    authLoading,
-    loading,
-    dashboardData,
-    user?.id,
-    holdDashboardOverlays,
-    showWelcomeBack,
-    showPrizeWheel,
-    prizeWheelDecisionReady,
-    premiumUpgradeOpen,
-  ])
-
-  const dismissPlanckWeekPromo = () => {
-    if (user) {
-      try {
-        sessionStorage.setItem(getPlanckWeekDashboardPromoSessionKey(user.id), "1")
-      } catch {
-        // ignore
-      }
-    }
-    setShowPlanckWeekPromo(false)
-  }
 
   const persistWelcomeBackDismissState = () => {
     if (!user) return
@@ -757,9 +690,7 @@ export function DashboardAuth() {
           <PlanckPassDesktopShell className="hidden md:flex flex-1 min-h-0 w-full">
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-none dashboard-scrollbar bg-white">
               {!isPaid ? (
-                <PremiumUpgradeBanner
-                  className="burger:flex"
-                />
+                <PremiumUpgradeBanner className="flex burger:flex" />
               ) : null}
               <main className="block h-auto overflow-visible p-8 lg:p-10 animate-fade-in-up">
                 <div className="mx-auto flex h-auto min-h-0 w-full max-w-[1000px] flex-col">
@@ -791,6 +722,7 @@ export function DashboardAuth() {
                         startHrefByChapter={dashboardData.dashboardStartHrefByChapter}
                         levelByChapter={dashboardData.dashboardLevelByChapter}
                         hasStartedByChapter={dashboardData.dashboardHasStartedByChapter}
+                        lessonProgressByChapter={dashboardData.dashboardLessonProgressByChapter}
                       />
                     </div>
 
@@ -846,8 +778,10 @@ export function DashboardAuth() {
         />
       ) : null}
 
-      {showPlanckWeekPromo && !showWelcomeBack && !showPrizeWheel && !holdDashboardOverlays ? (
-        <PlanckWeekDashboardPromo onClose={dismissPlanckWeekPromo} />
+      {!isPaid ? (
+        <div className={`fixed inset-x-0 z-[299] md:hidden ${MOBILE_BOTTOM_NAV_OFFSET_CLASS}`}>
+          <PremiumUpgradeBanner compact />
+        </div>
       ) : null}
 
     </DashboardSidebarProvider>

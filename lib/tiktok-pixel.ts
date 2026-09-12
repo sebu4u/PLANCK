@@ -44,7 +44,7 @@ export type TikTokCheckoutOffer = {
   interval: PremiumBillingInterval
   value: number
   contentName: string
-  campaign?: 'earlybird'
+  campaign?: 'earlybird' | 'back2school'
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -73,8 +73,9 @@ function normalizePhone(phone: string): string | null {
   return e164
 }
 
-function premiumName(interval: PremiumBillingInterval, campaign?: 'earlybird'): string {
+function premiumName(interval: PremiumBillingInterval, campaign?: 'earlybird' | 'back2school'): string {
   if (campaign === 'earlybird' && interval === 'year') return 'Planck Premium anual earlybird'
+  if (campaign === 'back2school' && interval === 'month') return 'Planck Premium lunar Back2School'
   if (interval === 'week') return 'Planck Premium săptămânal'
   if (interval === 'year') return 'Planck Premium anual'
   return 'Planck Premium lunar'
@@ -100,7 +101,7 @@ function namedContent(
 
 export function premiumCheckoutValue(
   interval: PremiumBillingInterval,
-  campaign?: 'earlybird',
+  campaign?: 'earlybird' | 'back2school',
 ): number {
   if (campaign === 'earlybird' && interval === 'year') return EARLYBIRD_YEARLY_RON
   return getCampaignPriceRon(interval)
@@ -108,13 +109,19 @@ export function premiumCheckoutValue(
 
 export function premiumCommerceParams(
   interval: PremiumBillingInterval,
-  options?: { value?: number; campaign?: 'earlybird' },
+  options?: { value?: number; campaign?: 'earlybird' | 'back2school' },
 ): TikTokCommerceParams {
   const value = options?.value ?? premiumCheckoutValue(interval, options?.campaign)
+  const campaignSuffix =
+    options?.campaign === 'earlybird'
+      ? '_earlybird'
+      : options?.campaign === 'back2school'
+        ? '_back2school'
+        : ''
   return {
     contents: [
       {
-        content_id: options?.campaign === 'earlybird' ? `premium_${interval}_earlybird` : `premium_${interval}`,
+        content_id: `premium_${interval}${campaignSuffix}`,
         content_type: 'product',
         content_name: premiumName(interval, options?.campaign),
       },
@@ -392,8 +399,8 @@ class TikTokPixel {
     this.track('StartTrial', params, eventId)
   }
 
-  trackSubmitForm(contentId: string, contentName: string): void {
-    this.track('SubmitForm', namedContent(contentId, contentName))
+  trackSubmitForm(contentId: string, contentName: string, eventId?: string): void {
+    this.track('SubmitForm', namedContent(contentId, contentName), eventId)
   }
 
   trackSubscribe(params: TikTokCommerceParams, eventId?: string): void {

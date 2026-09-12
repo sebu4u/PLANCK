@@ -22,8 +22,8 @@ export function PlanckWeekTeacherVideosSection() {
         </FadeInUp>
 
         <div
-          className="-mx-4 flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-2 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:px-0 sm:pb-0 lg:grid-cols-4"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none", overscrollBehaviorX: "contain" }}
         >
           {PLANCK_WEEK_TEACHER_VIDEOS.map((video, index) => {
             const videoId = extractYouTubeVideoId(video.youtubeUrl)
