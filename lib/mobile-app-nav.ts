@@ -149,12 +149,18 @@ export function isParentCatalogRoute(pathname: string | null | undefined): boole
   return pathname === "/dashboard/parent/catalog" || pathname.startsWith("/dashboard/parent/catalog/")
 }
 
+export function isParentMessagesRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === "/dashboard/parent/mesaje" || pathname.startsWith("/dashboard/parent/mesaje/")
+}
+
 export function isParentRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   return (
     isParentDashboardRoute(pathname) ||
     isParentTemeRoute(pathname) ||
-    isParentCatalogRoute(pathname)
+    isParentCatalogRoute(pathname) ||
+    isParentMessagesRoute(pathname)
   )
 }
 
@@ -424,7 +430,7 @@ export const MOBILE_BOTTOM_NAV_PARENT_ITEMS: MobileBottomNavItem[] = [
     href: "/dashboard/parent/teme",
     label: "Teme",
     icon: NotebookPen,
-    isActive: (pathname) => isParentTemeRoute(pathname),
+    isActive: (pathname) => isParentTemeRoute(pathname) || isParentMessagesRoute(pathname),
   },
   {
     href: "/dashboard/parent/catalog",

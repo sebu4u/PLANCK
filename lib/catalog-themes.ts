@@ -49,14 +49,14 @@ export const THEMES: Record<ThemeId, Theme> = {
     description: 'Prima temă personalizată',
     images: {
       physics: {
-        desktop: '/themes/theme-1/physics-desktop.jpg',
-        mobile: '/themes/theme-1/physics-mobile.jpg',
-        detail: '/themes/theme-1/physics-problema.jpg',
+        desktop: '/themes/theme-1/physics-desktop.webp',
+        mobile: '/themes/theme-1/physics-mobile.webp',
+        detail: '/themes/theme-1/physics-problema.webp',
       },
       info: {
-        desktop: '/themes/theme-1/info-desktop.jpg',
-        mobile: '/themes/theme-1/info-mobile.jpg',
-        detail: '/themes/theme-1/info-problema.jpg',
+        desktop: '/themes/theme-1/info-desktop.webp',
+        mobile: '/themes/theme-1/info-mobile.webp',
+        detail: '/themes/theme-1/info-problema.webp',
       },
     },
   },
@@ -66,14 +66,14 @@ export const THEMES: Record<ThemeId, Theme> = {
     description: 'A doua temă personalizată',
     images: {
       physics: {
-        desktop: '/themes/theme-2/physics-desktop.jpg',
-        mobile: '/themes/theme-2/physics-mobile.jpg',
-        detail: '/themes/theme-2/physics-problema.jpg',
+        desktop: '/themes/theme-2/physics-desktop.webp',
+        mobile: '/themes/theme-2/physics-mobile.webp',
+        detail: '/themes/theme-2/physics-problema.webp',
       },
       info: {
-        desktop: '/themes/theme-2/info-desktop.jpg',
-        mobile: '/themes/theme-2/info-mobile.jpg',
-        detail: '/themes/theme-2/info-problema.jpg',
+        desktop: '/themes/theme-2/info-desktop.webp',
+        mobile: '/themes/theme-2/info-mobile.webp',
+        detail: '/themes/theme-2/info-problema.webp',
       },
     },
   },
@@ -83,14 +83,14 @@ export const THEMES: Record<ThemeId, Theme> = {
     description: 'A treia temă personalizată',
     images: {
       physics: {
-        desktop: '/themes/theme-3/physics-desktop.jpg',
-        mobile: '/themes/theme-3/physics-mobile.jpg',
-        detail: '/themes/theme-3/physics-problema.jpg',
+        desktop: '/themes/theme-3/physics-desktop.webp',
+        mobile: '/themes/theme-3/physics-mobile.webp',
+        detail: '/themes/theme-3/physics-problema.webp',
       },
       info: {
-        desktop: '/themes/theme-3/info-desktop.jpg',
-        mobile: '/themes/theme-3/info-mobile.jpg',
-        detail: '/themes/theme-3/info-problema.jpg',
+        desktop: '/themes/theme-3/info-desktop.webp',
+        mobile: '/themes/theme-3/info-mobile.webp',
+        detail: '/themes/theme-3/info-problema.webp',
       },
     },
   },
@@ -100,14 +100,14 @@ export const THEMES: Record<ThemeId, Theme> = {
     description: 'A patra temă personalizată',
     images: {
       physics: {
-        desktop: '/themes/theme-4/physics-desktop.jpg',
-        mobile: '/themes/theme-4/physics-mobile.jpg',
-        detail: '/themes/theme-4/physics-problema.jpg',
+        desktop: '/themes/theme-4/physics-desktop.webp',
+        mobile: '/themes/theme-4/physics-mobile.webp',
+        detail: '/themes/theme-4/physics-problema.webp',
       },
       info: {
-        desktop: '/themes/theme-4/info-desktop.jpg',
-        mobile: '/themes/theme-4/info-mobile.jpg',
-        detail: '/themes/theme-4/info-problema.jpg',
+        desktop: '/themes/theme-4/info-desktop.webp',
+        mobile: '/themes/theme-4/info-mobile.webp',
+        detail: '/themes/theme-4/info-problema.webp',
       },
     },
   },

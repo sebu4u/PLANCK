@@ -9,6 +9,7 @@ export const IMAGE_PRESETS = {
   teacher: { maxPx: 128, quality: 80, fit: "inside" as const },
   cosmetic: { maxPx: 256, quality: 80, fit: "inside" as const },
   avatar: { maxPx: 256, quality: 80, fit: "cover" as const },
+  catalog: { maxPx: 1920, quality: 78, fit: "inside" as const },
 } as const
 
 export type ImagePreset = keyof typeof IMAGE_PRESETS

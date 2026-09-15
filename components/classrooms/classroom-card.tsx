@@ -27,6 +27,9 @@ export function ClassroomCard({ classroom }: ClassroomCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-black/20" />
         <div className="relative z-10">
           <h3 className="line-clamp-2 text-2xl font-semibold tracking-tight">{classroom.name}</h3>
+          {classroom.archived_at ? (
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">Arhivată</p>
+          ) : null}
           <p className="mt-1 text-sm font-medium text-white/90">Creată de {classroom.teacher_name}</p>
         </div>
       </Link>

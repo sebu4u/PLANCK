@@ -70,7 +70,7 @@ export const LANDING_TEACHERS: LandingTeacher[] = [
     cardDescription:
       "A construit cursurile de matematică și rezolvările video. Peste 2 ani de predare și 100+ elevi pregătiți pentru Bacalaureat.",
     subjects: ["mate"],
-    imageSrc: "/images/team/Pavel.png",
+    imageSrc: "/images/team/Pavel.webp",
   },
   {
     id: "victor-paun",
@@ -81,7 +81,7 @@ export const LANDING_TEACHERS: LandingTeacher[] = [
     cardDescription:
       "Clasa a 11-a, locul 1 la Olimpiada Națională de Chimie din primul an de liceu. Pregătește elevii pentru examen, nu doar pentru teorie.",
     subjects: ["chimie"],
-    imageSrc: "/images/team/Victor.jpeg",
+    imageSrc: "/images/team/Victor.webp",
   },
   {
     id: "goicea-matei",
@@ -102,7 +102,7 @@ export const LANDING_TEACHERS: LandingTeacher[] = [
     cardDescription:
       "Premiul I la Naționala de Chimie (clasa a 9-a) și calificare internațională la Științele Pământului. Explică calm, până lucrurile complicate par simple.",
     subjects: ["chimie"],
-    imageSrc: "/images/team/Denisa.jpeg",
+    imageSrc: "/images/team/Denisa.webp",
   },
   {
     id: "alex-dragu",
@@ -113,7 +113,7 @@ export const LANDING_TEACHERS: LandingTeacher[] = [
     cardDescription:
       "Bronz la olimpiadele de mate și informatică. Vicecampion mondial FTC 2024 (Alliance Captain) și campion la Maryland și Michiana.",
     subjects: ["mate"],
-    imageSrc: "/images/team/Dragu.png",
+    imageSrc: "/images/team/Dragu.webp",
   },
   {
     id: "stefan-rares",

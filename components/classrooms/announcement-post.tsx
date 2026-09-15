@@ -4,14 +4,20 @@ import { CalendarDays, FileText } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { AuthorAvatar } from "@/components/classrooms/author-avatar"
 import { DeadlineTimer } from "@/components/classrooms/deadline-timer"
+import {
+  deleteAnnouncementAction,
+  togglePinAnnouncementAction,
+  updateAnnouncementAction,
+} from "@/app/classrooms/teacher-actions"
 import type { ClassroomAnnouncement } from "@/lib/classrooms/types"
 
 interface AnnouncementPostProps {
   announcement: ClassroomAnnouncement
   deadline?: string | null
+  isTeacher?: boolean
 }
 
-export function AnnouncementPost({ announcement, deadline = null }: AnnouncementPostProps) {
+export function AnnouncementPost({ announcement, deadline = null, isTeacher = false }: AnnouncementPostProps) {
   const createdAt = new Date(announcement.created_at).toLocaleString("ro-RO", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -32,12 +38,12 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
             </div>
           </div>
           <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4338ca]">
-            Anunț
+            {announcement.pinned_at ? "Anunț fixat" : "Anunț"}
           </span>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-[#374151]">
-        {announcement.content ? <p className="whitespace-pre-wrap">{announcement.content}</p> : null}
+        {announcement.content && !isTeacher ? <p className="whitespace-pre-wrap">{announcement.content}</p> : null}
 
         {announcement.type === "image" && announcement.signed_file_url ? (
           <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
@@ -79,6 +85,41 @@ export function AnnouncementPost({ announcement, deadline = null }: Announcement
           </span>
           <DeadlineTimer deadline={deadline} />
         </div>
+        {isTeacher ? (
+          <div className="space-y-3">
+            <form action={updateAnnouncementAction} className="space-y-2">
+              <input type="hidden" name="classroom_id" value={announcement.classroom_id} />
+              <input type="hidden" name="announcement_id" value={announcement.id} />
+              <textarea
+                name="content"
+                defaultValue={announcement.content ?? ""}
+                rows={3}
+                className="w-full rounded-md border border-[#d1d5db] px-3 py-2 text-sm"
+                placeholder="Textul anunțului"
+              />
+              <button type="submit" className="text-xs font-medium text-[#1557b0]">
+                Salvează anunțul
+              </button>
+            </form>
+            <div className="flex flex-wrap gap-2">
+              <form action={togglePinAnnouncementAction}>
+                <input type="hidden" name="classroom_id" value={announcement.classroom_id} />
+                <input type="hidden" name="announcement_id" value={announcement.id} />
+                <input type="hidden" name="pinned" value={announcement.pinned_at ? "0" : "1"} />
+                <button type="submit" className="text-xs font-medium text-[#1557b0]">
+                  {announcement.pinned_at ? "Anulează fixarea" : "Fixează"}
+                </button>
+              </form>
+              <form action={deleteAnnouncementAction}>
+                <input type="hidden" name="classroom_id" value={announcement.classroom_id} />
+                <input type="hidden" name="announcement_id" value={announcement.id} />
+                <button type="submit" className="text-xs font-medium text-rose-600">
+                  Șterge
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

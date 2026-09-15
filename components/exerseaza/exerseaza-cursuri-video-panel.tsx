@@ -1,7 +1,7 @@
 import Image from "next/image"
 import { Video } from "lucide-react"
 
-const EMPTY_CURSURI_IMAGE_SRC = `/images/icons/${encodeURIComponent("Untitled design (48).png")}`
+const EMPTY_CURSURI_IMAGE_SRC = `/images/icons/${encodeURIComponent("Untitled design (48).webp")}`
 
 export function ExerseazaCursuriVideoPanel() {
   return (

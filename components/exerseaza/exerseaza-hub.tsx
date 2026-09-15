@@ -17,7 +17,7 @@ import { MOBILE_BOTTOM_NAV_PADDING_CLASS } from "@/lib/mobile-app-nav"
 import { PracticeSubjectSwitcher } from "@/components/exerseaza/practice-subject-switcher"
 import { ExerseazaPregatirePromoCard } from "@/components/exerseaza/exerseaza-pregatire-promo-card"
 import { ExerseazaMonthCalendar } from "@/components/exerseaza/exerseaza-month-calendar"
-import { ExerseazaWeekCalendar } from "@/components/exerseaza/exerseaza-week-calendar"
+import { ExerseazaRecommendedProblems } from "@/components/exerseaza/exerseaza-recommended-problems"
 import { ExerseazaTemePanel } from "@/components/exerseaza/exerseaza-teme-panel"
 import { ExerseazaCursuriVideoPanel } from "@/components/exerseaza/exerseaza-cursuri-video-panel"
 import {
@@ -457,8 +457,7 @@ export function ExerseazaHub({
                   />
                 ) : null}
               </div>
-              <ExerseazaPregatirePromoCard />
-              <ExerseazaWeekCalendar />
+              <ExerseazaRecommendedProblems subject={subject} />
               <div className="flex flex-col gap-3 pt-1">
                 {cards.map((card) => (
                   <MobileCard

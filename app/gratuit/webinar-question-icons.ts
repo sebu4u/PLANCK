@@ -3,13 +3,13 @@
  * Files live under `public/images/icons/`.
  */
 const ICON_FILENAMES = [
-  "Untitled design (42).png",
-  "Untitled design (43).png",
-  "Untitled design (44).png",
-  "Untitled design (45).png",
-  "Untitled design (46).png",
-  "Untitled design (47).png",
-  "Untitled design (48).png",
+  "Untitled design (42).webp",
+  "Untitled design (43).webp",
+  "Untitled design (44).webp",
+  "Untitled design (45).webp",
+  "Untitled design (46).webp",
+  "Untitled design (47).webp",
+  "Untitled design (48).webp",
 ] as const
 
 export const WEBINAR_QUESTION_ICON_SRC: readonly string[] = ICON_FILENAMES.map(

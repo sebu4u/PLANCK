@@ -3,13 +3,36 @@ import { submitAssignmentAnswerAction, syncCatalogSolvedProblemAction } from "@/
 import { LatexRichText } from "@/components/classrooms/latex-rich-text"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import type { AssignmentProblem, AssignmentSubmission } from "@/lib/classrooms/types"
+import type { AssignmentKind, AssignmentProblem, AssignmentSubmission } from "@/lib/classrooms/types"
+import { TestAttemptGuard } from "@/components/classrooms/test-attempt-guard"
 
 interface StudentAssignmentProblemsProps {
   classroomId: string
   assignmentId: string
   problems: AssignmentProblem[]
   submissions: AssignmentSubmission[]
+  canSubmit?: boolean
+  hideResults?: boolean
+  shuffleOptions?: boolean
+  allowCatalogSync?: boolean
+  kind?: AssignmentKind
+  timeLimitMinutes?: number | null
+  startedAt?: string | null
+  windowEnd?: string | null
+}
+
+function seededShuffle<T>(items: T[], seed: string): T[] {
+  const copy = [...items]
+  let h = 0
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    h = (h * 1664525 + 1013904223) >>> 0
+    const j = h % (i + 1)
+    const tmp = copy[i]
+    copy[i] = copy[j]
+    copy[j] = tmp
+  }
+  return copy
 }
 
 function TeacherOnlyPhotosControl({ attachmentCount }: { attachmentCount: number }) {
@@ -46,17 +69,42 @@ export function StudentAssignmentProblems({
   assignmentId,
   problems,
   submissions,
+  canSubmit = true,
+  hideResults = false,
+  shuffleOptions = false,
+  allowCatalogSync = true,
+  kind = "homework",
+  timeLimitMinutes = null,
+  startedAt = null,
+  windowEnd = null,
 }: StudentAssignmentProblemsProps) {
   const submissionByProblem = new Map(submissions.map((submission) => [submission.problem_id, submission]))
 
   return (
     <div className="space-y-4">
+      {kind === "test" ? (
+        <TestAttemptGuard
+          assignmentId={assignmentId}
+          timeLimitMinutes={timeLimitMinutes}
+          startedAt={startedAt}
+          windowEnd={windowEnd}
+        />
+      ) : null}
+      {!canSubmit ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Nu mai poți trimite răspunsuri la această lucrare.
+        </p>
+      ) : null}
       {problems.map((problem, problemIndex) => {
         const existing = submissionByProblem.get(problem.id)
         const existingAnswer = existing?.answer ?? ""
         const teacherAttachmentCount = existing?.teacher_attachment_count ?? 0
         const isGrila = problem.answer_type === "grila"
         const isValue = problem.answer_type === "value"
+        const indexedOptions = (problem.grila_options ?? []).map((option, index) => ({ option, index }))
+        const displayOptions = shuffleOptions
+          ? seededShuffle(indexedOptions, `${assignmentId}:${problem.id}`)
+          : indexedOptions
         const valueAnswers = (() => {
           try {
             return JSON.parse(existingAnswer) as number[]
@@ -90,17 +138,18 @@ export function StudentAssignmentProblems({
                   />
 
                   <div className="space-y-2">
-                    {(problem.grila_options ?? []).map((option, optionIndex) => (
+                    {displayOptions.map(({ option, index }) => (
                       <label
-                        key={`${problem.id}-${optionIndex}`}
+                        key={`${problem.id}-${index}`}
                         className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#e5e7eb] px-3 py-2 hover:bg-[#fafafa]"
                       >
                         <input
                           type="radio"
                           name="answer"
-                          value={String(optionIndex)}
-                          defaultChecked={existingAnswer === String(optionIndex)}
+                          value={String(index)}
+                          defaultChecked={existingAnswer === String(index)}
                           required
+                          disabled={!canSubmit}
                           className="mt-1"
                         />
                         <span className="text-sm text-[#111827]">
@@ -113,8 +162,8 @@ export function StudentAssignmentProblems({
                   <TeacherOnlyPhotosControl attachmentCount={teacherAttachmentCount} />
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button type="submit">{existing ? "Actualizează răspunsul" : "Trimite răspunsul"}</Button>
-                    {existing ? (
+                    <Button type="submit" disabled={!canSubmit}>{existing ? "Actualizează răspunsul" : "Trimite răspunsul"}</Button>
+                    {existing && !hideResults ? (
                       <span
                         className={`text-sm font-medium ${
                           existing.is_correct ? "text-emerald-600" : "text-rose-600"
@@ -122,6 +171,8 @@ export function StudentAssignmentProblems({
                       >
                         {existing.is_correct ? "Răspuns corect" : "Răspuns greșit"}
                       </span>
+                    ) : existing && hideResults ? (
+                      <span className="text-sm text-[#6b7280]">Răspuns salvat</span>
                     ) : null}
                   </div>
                 </form>
@@ -154,6 +205,7 @@ export function StudentAssignmentProblems({
                             type="number"
                             step="any"
                             required
+                            disabled={!canSubmit}
                             defaultValue={typeof valueAnswers[subpointIndex] === "number" ? valueAnswers[subpointIndex] : ""}
                             className="h-10 w-40 rounded-md border border-[#d1d5db] px-3"
                           />
@@ -166,8 +218,8 @@ export function StudentAssignmentProblems({
                   <TeacherOnlyPhotosControl attachmentCount={teacherAttachmentCount} />
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button type="submit">{existing ? "Actualizează răspunsul" : "Trimite răspunsul"}</Button>
-                    {existing ? (
+                    <Button type="submit" disabled={!canSubmit}>{existing ? "Actualizează răspunsul" : "Trimite răspunsul"}</Button>
+                    {existing && !hideResults ? (
                       <span
                         className={`text-sm font-medium ${
                           existing.is_correct ? "text-emerald-600" : "text-rose-600"
@@ -175,12 +227,14 @@ export function StudentAssignmentProblems({
                       >
                         {existing.is_correct ? "Răspuns corect" : "Răspuns greșit"}
                       </span>
+                    ) : existing && hideResults ? (
+                      <span className="text-sm text-[#6b7280]">Răspuns salvat</span>
                     ) : null}
                   </div>
                 </form>
               ) : null}
 
-              {!isGrila && !isValue ? (
+              {!isGrila && !isValue && allowCatalogSync ? (
                 <div className="space-y-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] p-4">
                   <p className="text-sm text-[#4b5563]">
                     Această problemă se rezolvă în catalogul principal. Deschide-o acolo, rezolv-o, apoi

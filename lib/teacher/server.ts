@@ -152,6 +152,9 @@ export interface TeacherAssignmentOverviewItem {
   deadline: string | null
   created_at: string
   problem_count: number
+  status: "draft" | "published" | "closed"
+  kind: "homework" | "test"
+  submitted_count?: number
 }
 
 export async function getTeacherAssignmentsOverview(
@@ -169,7 +172,7 @@ export async function getTeacherAssignmentsOverview(
 
   const { data: assignmentRows } = await admin
     .from("assignments")
-    .select("id, classroom_id, title, description, deadline, created_at")
+    .select("id, classroom_id, title, description, deadline, created_at, status, kind")
     .in("classroom_id", classroomIds)
     .order("created_at", { ascending: false })
 
@@ -205,6 +208,8 @@ export async function getTeacherAssignmentsOverview(
       deadline: asNullableString(row.deadline),
       created_at: asString(row.created_at),
       problem_count: countsByAssignment.get(id) ?? 0,
+      status: asString(row.status) === "draft" || asString(row.status) === "closed" ? asString(row.status) as "draft" | "closed" : "published",
+      kind: asString(row.kind) === "test" ? "test" : "homework",
     }
   })
 }
@@ -219,6 +224,8 @@ export interface TeacherPendingHomeworkReview {
   problem_title: string
   submitted_at: string
   photo_count: number
+  photo_urls: string[]
+  teacher_comment: string | null
 }
 
 export interface TeacherPendingHomeworkReviewsResult {
@@ -266,7 +273,7 @@ export async function getTeacherPendingHomeworkReviews(
 
   const { data: submissionRows } = await admin
     .from("submissions")
-    .select("id, assignment_id, problem_id, student_id, submitted_at")
+    .select("id, assignment_id, problem_id, student_id, submitted_at, teacher_comment")
     .in("assignment_id", assignmentIds)
     .is("reviewed_at", null)
 
@@ -278,15 +285,21 @@ export async function getTeacherPendingHomeworkReviews(
   const submissionIds = submissions.map((row) => asString(row.id)).filter(Boolean)
   const { data: attachmentRows } = await admin
     .from("submission_teacher_attachments")
-    .select("submission_id")
+    .select("submission_id, storage_path")
     .in("submission_id", submissionIds)
 
   const photoCountBySubmission = new Map<string, number>()
+  const photoPathsBySubmission = new Map<string, string[]>()
   for (const row of attachmentRows ?? []) {
     if (!isObject(row)) continue
     const submissionId = asString(row.submission_id)
+    const storagePath = asString(row.storage_path)
     if (!submissionId) continue
     photoCountBySubmission.set(submissionId, (photoCountBySubmission.get(submissionId) ?? 0) + 1)
+    if (!storagePath) continue
+    const paths = photoPathsBySubmission.get(submissionId) ?? []
+    paths.push(storagePath)
+    photoPathsBySubmission.set(submissionId, paths)
   }
 
   const pendingSubmissions = submissions.filter((row) => {
@@ -339,20 +352,106 @@ export async function getTeacherPendingHomeworkReviews(
         problem_title: titleByProblem.get(asString(row.problem_id)) ?? "Problemă",
         submitted_at: asString(row.submitted_at),
         photo_count: photoCountBySubmission.get(submissionId) ?? 0,
+        photo_urls: [] as string[],
+        teacher_comment: asNullableString(row.teacher_comment),
       }
     })
     .filter((item): item is TeacherPendingHomeworkReview => item !== null)
     .sort((left, right) => right.submitted_at.localeCompare(left.submitted_at))
 
+  const sliced = items.slice(0, PENDING_HOMEWORK_LIST_LIMIT)
+  const bucket = admin.storage.from("assignment-teacher-attachments")
+  for (const item of sliced) {
+    const paths = photoPathsBySubmission.get(item.submission_id) ?? []
+    const signedUrls: string[] = []
+    for (const path of paths.slice(0, 6)) {
+      const { data: signed } = await bucket.createSignedUrl(path, 60 * 60)
+      if (signed?.signedUrl) signedUrls.push(signed.signedUrl)
+    }
+    item.photo_urls = signedUrls
+  }
+
   return {
-    items: items.slice(0, PENDING_HOMEWORK_LIST_LIMIT),
+    items: sliced,
     total_count: items.length,
   }
+}
+
+export interface TeacherPendingTestReview {
+  assignment_id: string
+  classroom_id: string
+  classroom_name: string
+  title: string
+  status: "draft" | "published" | "closed"
+  submitted_count: number
+  student_count: number
+  unreviewed_count: number
+  created_at: string
+}
+
+export async function getTeacherPendingTests(userId: string): Promise<TeacherPendingTestReview[]> {
+  const classrooms = (await getClassroomsForUser(userId)).filter((classroom) => classroom.role === "teacher")
+  if (classrooms.length === 0) return []
+
+  const admin = createAdminClient()
+  const classroomIds = classrooms.map((classroom) => classroom.id)
+  const classroomNameById = new Map(classrooms.map((classroom) => [classroom.id, classroom.name]))
+  const studentCountByClassroom = new Map(classrooms.map((classroom) => [classroom.id, classroom.student_count]))
+
+  const { data: testRows } = await admin
+    .from("assignments")
+    .select("id, classroom_id, title, status, created_at")
+    .in("classroom_id", classroomIds)
+    .eq("kind", "test")
+    .neq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  const tests = (testRows ?? []).filter(isObject)
+  if (tests.length === 0) return []
+
+  const assignmentIds = tests.map((row) => asString(row.id)).filter(Boolean)
+  const { data: submissionRows } = await admin
+    .from("submissions")
+    .select("assignment_id, student_id, reviewed_at")
+    .in("assignment_id", assignmentIds)
+
+  const submittedByAssignment = new Map<string, Set<string>>()
+  const unreviewedByAssignment = new Map<string, number>()
+  for (const row of submissionRows ?? []) {
+    if (!isObject(row)) continue
+    const assignmentId = asString(row.assignment_id)
+    const studentId = asString(row.student_id)
+    if (!assignmentId || !studentId) continue
+    const submitted = submittedByAssignment.get(assignmentId) ?? new Set<string>()
+    submitted.add(studentId)
+    submittedByAssignment.set(assignmentId, submitted)
+    if (!asNullableString(row.reviewed_at)) {
+      unreviewedByAssignment.set(assignmentId, (unreviewedByAssignment.get(assignmentId) ?? 0) + 1)
+    }
+  }
+
+  return tests.map((row) => {
+    const id = asString(row.id)
+    const classroomId = asString(row.classroom_id)
+    return {
+      assignment_id: id,
+      classroom_id: classroomId,
+      classroom_name: classroomNameById.get(classroomId) ?? "Clasă",
+      title: asString(row.title, "Test"),
+      status: asString(row.status) === "closed" ? "closed" : "published",
+      submitted_count: submittedByAssignment.get(id)?.size ?? 0,
+      student_count: studentCountByClassroom.get(classroomId) ?? 0,
+      unreviewed_count: unreviewedByAssignment.get(id) ?? 0,
+      created_at: asString(row.created_at),
+    }
+  })
 }
 
 export async function markSubmissionReviewed(
   teacherId: string,
   submissionId: string,
+  comment?: string,
 ): Promise<void> {
   const admin = createAdminClient()
 
@@ -384,16 +483,36 @@ export async function markSubmissionReviewed(
     .eq("id", classroomId)
     .maybeSingle()
 
-  if (!isObject(classroomRow) || asString(classroomRow.teacher_id) !== teacherId) {
-    throw new Error("FORBIDDEN")
+  const isOwner = isObject(classroomRow) && asString(classroomRow.teacher_id) === teacherId
+  if (!isOwner) {
+    const { data: membership } = await admin
+      .from("classroom_members")
+      .select("id")
+      .eq("classroom_id", classroomId)
+      .eq("user_id", teacherId)
+      .eq("role", "teacher")
+      .maybeSingle()
+    if (!membership) {
+      throw new Error("FORBIDDEN")
+    }
+  }
+
+  const payload: {
+    reviewed_at: string
+    reviewed_by: string
+    teacher_comment?: string
+  } = {
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: teacherId,
+  }
+  const trimmedComment = comment?.trim()
+  if (trimmedComment) {
+    payload.teacher_comment = trimmedComment
   }
 
   const { error } = await admin
     .from("submissions")
-    .update({
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: teacherId,
-    })
+    .update(payload)
     .eq("id", submissionId)
 
   if (error) {
@@ -431,8 +550,19 @@ export async function getTeacherStudentProfilesForClassroom(
     .eq("id", classroomId)
     .maybeSingle()
 
-  if (!isObject(classroomRow) || asString(classroomRow.teacher_id) !== teacherId) {
+  const isOwner = isObject(classroomRow) && asString(classroomRow.teacher_id) === teacherId
+  if (!isObject(classroomRow)) {
     return []
+  }
+  if (!isOwner) {
+    const { data: membership } = await admin
+      .from("classroom_members")
+      .select("id")
+      .eq("classroom_id", classroomId)
+      .eq("user_id", teacherId)
+      .eq("role", "teacher")
+      .maybeSingle()
+    if (!membership) return []
   }
 
   const classroomName = asString(classroomRow.name, "Clasă")

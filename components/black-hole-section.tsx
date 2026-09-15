@@ -14,7 +14,7 @@ export function BlackHoleSection() {
             <div
                 className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none"
                 style={{
-                    backgroundImage: 'url(/images/black-hole-bg.png)',
+                    backgroundImage: 'url(/images/black-hole-bg.webp)',
                     backgroundSize: 'cover',
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'center 60%', // Adjust vertical position to keep the black hole somewhat lower

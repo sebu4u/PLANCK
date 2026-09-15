@@ -3,7 +3,12 @@ import "server-only"
 import { logger } from "@/lib/logger"
 import { getServiceRoleSupabase } from "@/lib/supabaseServiceRole"
 
-type ClassroomNotificationType = "classroom_assignment" | "classroom_announcement"
+type ClassroomNotificationType =
+  | "classroom_assignment"
+  | "classroom_announcement"
+  | "classroom_assignment_reminder"
+  | "classroom_assignment_closed"
+  | "classroom_parent_message"
 
 export async function notifyClassroomStudents(input: {
   classroomId: string

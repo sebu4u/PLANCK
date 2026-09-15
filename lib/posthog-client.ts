@@ -19,15 +19,13 @@ export function initPosthog(): void {
   if (initialized || !canUsePosthog() || !POSTHOG_KEY) return
 
   posthog.init(POSTHOG_KEY, {
-    api_host: "/ingest",
+    api_host: "https://eu.i.posthog.com",
     ui_host: POSTHOG_UI_HOST,
     person_profiles: "identified_only",
     capture_pageview: false,
     capture_pageleave: true,
     persistence: "localStorage+cookie",
-    session_recording: {
-      maskAllInputs: true,
-    },
+    disable_session_recording: true,
   })
   initialized = true
 }

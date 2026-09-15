@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { TeacherDashboard } from "@/components/dashboard/teacher-dashboard"
 import { normalizeUserType } from "@/lib/user-types"
-import { getTeacherDashboardOverview, getTeacherPendingHomeworkReviews } from "@/lib/teacher/server"
+import { getTeacherDashboardOverview, getTeacherPendingHomeworkReviews, getTeacherPendingTests } from "@/lib/teacher/server"
 
 export default async function TeacherDashboardPage() {
   const supabase = await createClient()
@@ -26,12 +26,14 @@ export default async function TeacherDashboardPage() {
 
   const overview = await getTeacherDashboardOverview(user.id)
   const pendingHomework = await getTeacherPendingHomeworkReviews(user.id)
+  const pendingTests = await getTeacherPendingTests(user.id)
 
   return (
     <TeacherDashboard
       initialOverview={overview}
       initialPendingHomework={pendingHomework.items}
       initialPendingHomeworkTotal={pendingHomework.total_count}
+      initialPendingTests={pendingTests}
     />
   )
 }

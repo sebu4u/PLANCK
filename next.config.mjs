@@ -26,6 +26,12 @@ const nextConfig = {
     root: __dirname,
   },
   outputFileTracingRoot: __dirname,
+  outputFileTracingExcludes: {
+    '*': [
+      './public/themes/**/*',
+      './public/videos/**/*',
+    ],
+  },
   experimental: {
     // Keep the on-disk Turbopack cache off. A stale `.next/dev` after Cursor is
     // killed is the usual reason localhost comes back stuck compiling.
@@ -48,18 +54,6 @@ const nextConfig = {
   },
   transpilePackages: ['function-plot', 'mathlive'],
   skipTrailingSlashRedirect: true,
-  async rewrites() {
-    return [
-      {
-        source: '/ingest/static/:path*',
-        destination: 'https://eu-assets.i.posthog.com/static/:path*',
-      },
-      {
-        source: '/ingest/:path*',
-        destination: 'https://eu.i.posthog.com/:path*',
-      },
-    ]
-  },
   async redirects() {
     return [
       {

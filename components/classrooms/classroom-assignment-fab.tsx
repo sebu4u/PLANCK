@@ -7,6 +7,7 @@ import {
   useClassroomAssignmentDraft,
   type AssignmentDraftValues,
 } from "@/components/classrooms/classroom-assignment-draft-context"
+import { AssignmentDraftFields } from "@/components/classrooms/assignment-draft-fields"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +22,13 @@ const emptyDraft: AssignmentDraftValues = {
   title: "",
   description: "",
   deadline: "",
+  kind: "homework",
+  status: "published",
+  latePolicy: "accept",
+  windowStart: "",
+  windowEnd: "",
+  timeLimitMinutes: "",
+  shuffleOptions: false,
 }
 
 export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabProps) {
@@ -29,6 +37,13 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [deadline, setDeadline] = useState("")
+  const [kind, setKind] = useState<AssignmentDraftValues["kind"]>("homework")
+  const [status, setStatus] = useState<AssignmentDraftValues["status"]>("published")
+  const [latePolicy, setLatePolicy] = useState<AssignmentDraftValues["latePolicy"]>("accept")
+  const [windowStart, setWindowStart] = useState("")
+  const [windowEnd, setWindowEnd] = useState("")
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState("")
+  const [shuffleOptions, setShuffleOptions] = useState(false)
 
   const isPicking = isPickingForClassroom(classroomId)
 
@@ -42,6 +57,13 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
     setTitle(currentDraft.title)
     setDescription(currentDraft.description)
     setDeadline(currentDraft.deadline)
+    setKind(currentDraft.kind)
+    setStatus(currentDraft.status)
+    setLatePolicy(currentDraft.latePolicy)
+    setWindowStart(currentDraft.windowStart)
+    setWindowEnd(currentDraft.windowEnd)
+    setTimeLimitMinutes(currentDraft.timeLimitMinutes)
+    setShuffleOptions(currentDraft.shuffleOptions)
   }, [currentDraft, open])
 
   const canContinue = title.trim().length > 0
@@ -54,6 +76,13 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
         title: title.trim(),
         description: description.trim(),
         deadline,
+        kind,
+        status,
+        latePolicy,
+        windowStart,
+        windowEnd,
+        timeLimitMinutes,
+        shuffleOptions,
       },
     })
     setOpen(false)
@@ -143,6 +172,23 @@ export function ClassroomAssignmentFab({ classroomId }: ClassroomAssignmentFabPr
                   type="datetime-local"
                 />
               </div>
+
+              <AssignmentDraftFields
+                kind={kind}
+                status={status}
+                latePolicy={latePolicy}
+                windowStart={windowStart}
+                windowEnd={windowEnd}
+                timeLimitMinutes={timeLimitMinutes}
+                shuffleOptions={shuffleOptions}
+                onKind={setKind}
+                onStatus={setStatus}
+                onLatePolicy={setLatePolicy}
+                onWindowStart={setWindowStart}
+                onWindowEnd={setWindowEnd}
+                onTimeLimit={setTimeLimitMinutes}
+                onShuffle={setShuffleOptions}
+              />
 
               <div className="border-t border-[#e8eaed] pt-4">
                 <button

@@ -16,6 +16,13 @@ export interface AssignmentDraftValues {
   title: string
   description: string
   deadline: string
+  kind: "homework" | "test"
+  status: "draft" | "published"
+  latePolicy: "accept" | "mark_late" | "block"
+  windowStart: string
+  windowEnd: string
+  timeLimitMinutes: string
+  shuffleOptions: boolean
 }
 
 interface StartPickingInput {
@@ -43,6 +50,13 @@ const emptyDraft: AssignmentDraftValues = {
   title: "",
   description: "",
   deadline: "",
+  kind: "homework",
+  status: "published",
+  latePolicy: "accept",
+  windowStart: "",
+  windowEnd: "",
+  timeLimitMinutes: "",
+  shuffleOptions: false,
 }
 
 const STORAGE_KEY = "planck-classroom-assignment-draft"
@@ -50,7 +64,18 @@ const STORAGE_KEY = "planck-classroom-assignment-draft"
 const ClassroomAssignmentDraftContext = createContext<ClassroomAssignmentDraftContextValue | null>(null)
 
 function sameDraft(left: AssignmentDraftValues, right: AssignmentDraftValues) {
-  return left.title === right.title && left.description === right.description && left.deadline === right.deadline
+  return (
+    left.title === right.title &&
+    left.description === right.description &&
+    left.deadline === right.deadline &&
+    left.kind === right.kind &&
+    left.status === right.status &&
+    left.latePolicy === right.latePolicy &&
+    left.windowStart === right.windowStart &&
+    left.windowEnd === right.windowEnd &&
+    left.timeLimitMinutes === right.timeLimitMinutes &&
+    left.shuffleOptions === right.shuffleOptions
+  )
 }
 
 export function ClassroomAssignmentDraftProvider({ children }: { children: ReactNode }) {
@@ -92,6 +117,16 @@ export function ClassroomAssignmentDraftProvider({ children }: { children: React
         title: parsed.draft?.title ?? "",
         description: parsed.draft?.description ?? "",
         deadline: parsed.draft?.deadline ?? "",
+        kind: parsed.draft?.kind === "test" ? "test" : "homework",
+        status: parsed.draft?.status === "draft" ? "draft" : "published",
+        latePolicy:
+          parsed.draft?.latePolicy === "mark_late" || parsed.draft?.latePolicy === "block"
+            ? parsed.draft.latePolicy
+            : "accept",
+        windowStart: parsed.draft?.windowStart ?? "",
+        windowEnd: parsed.draft?.windowEnd ?? "",
+        timeLimitMinutes: parsed.draft?.timeLimitMinutes ?? "",
+        shuffleOptions: Boolean(parsed.draft?.shuffleOptions),
       })
       setSelectedProblemIds(Array.isArray(parsed.selectedProblemIds) ? parsed.selectedProblemIds.filter(Boolean) : [])
     } catch {

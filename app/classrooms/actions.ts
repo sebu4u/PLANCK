@@ -8,8 +8,17 @@ import {
   notifyClassroomStudents,
 } from "@/lib/classrooms/in-app-notifications"
 import { classroomCoverPublicPath, listClassroomCoverFilenames } from "@/lib/classrooms/cover-images"
+import {
+  currentSchoolYear,
+  isAssignmentKind,
+  isAssignmentStatus,
+  isClassroomGradeLevel,
+  isClassroomSubject,
+  isLatePolicy,
+} from "@/lib/classrooms/constants"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
+import { normalizeUserType } from "@/lib/user-types"
 
 const JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -182,6 +191,16 @@ async function assertTeacherAccess(
   userId: string,
   classroomId: string
 ) {
+  const { data: membership } = await supabase
+    .from("classroom_members")
+    .select("id")
+    .eq("classroom_id", classroomId)
+    .eq("user_id", userId)
+    .eq("role", "teacher")
+    .maybeSingle()
+
+  if (membership) return
+
   const { data: classroom } = await supabase
     .from("classrooms")
     .select("id")
@@ -194,10 +213,27 @@ async function assertTeacherAccess(
   }
 }
 
+async function requireProfesorOrRedirect(userId: string, fallback = "/classrooms") {
+  const supabase = createAdminClient()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("user_type")
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (normalizeUserType(profile?.user_type) !== "profesor") {
+    redirect(`${fallback}?error=teacher_account_required`)
+  }
+}
+
 export async function createClassroomAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserOrRedirect()
+  await requireProfesorOrRedirect(user.id, "/classrooms/new")
   const classroomName = getStringValue(formData, "name")
   const coverFilename = getStringValue(formData, "cover_image")
+  const subjectRaw = getStringValue(formData, "subject")
+  const gradeRaw = getStringValue(formData, "grade_level")
+  const sectionRaw = getStringValue(formData, "section").toUpperCase()
+  const schoolYear = getStringValue(formData, "school_year") || currentSchoolYear()
 
   if (!classroomName) {
     redirect("/classrooms/new?error=name_required")
@@ -211,6 +247,9 @@ export async function createClassroomAction(formData: FormData) {
     redirect("/classrooms/new?error=cover_required")
   }
   const coverImagePath = classroomCoverPublicPath(coverFilename)
+  const subject = isClassroomSubject(subjectRaw) ? subjectRaw : null
+  const gradeLevel = isClassroomGradeLevel(gradeRaw) ? gradeRaw : null
+  const section = /^[A-Z]$/.test(sectionRaw) ? sectionRaw : null
 
   let createdClassroomId: string | null = null
 
@@ -223,6 +262,10 @@ export async function createClassroomAction(formData: FormData) {
         teacher_id: user.id,
         join_code: joinCode,
         cover_image: coverImagePath,
+        subject,
+        grade_level: gradeLevel,
+        section,
+        school_year: schoolYear,
       })
       .select("id")
       .single()
@@ -270,44 +313,32 @@ export async function createClassroomAction(formData: FormData) {
 }
 
 export async function joinClassroomAction(formData: FormData) {
-  const { supabase, user } = await getAuthenticatedUserOrRedirect()
+  const authClient = await createClient()
+  const {
+    data: { user },
+  } = await authClient.auth.getUser()
+  if (!user) redirect("/")
+
   const joinCode = getStringValue(formData, "join_code").toUpperCase()
+  const redirectError = (code: string) => redirect(`/classrooms/join?error=${code}`)
 
   if (!joinCode || joinCode.length !== 6) {
-    redirect("/classrooms/join?error=invalid_code")
+    redirectError("invalid_code")
   }
 
-  const { data: classroom } = await supabase
-    .from("classrooms")
-    .select("id, teacher_id")
-    .eq("join_code", joinCode)
-    .maybeSingle()
+  const { data: classroomId, error } = await authClient.rpc("join_classroom", { p_join_code: joinCode })
 
-  if (!classroom) {
-    redirect("/classrooms/join?error=classroom_not_found")
-  }
-
-  const role = classroom.teacher_id === user.id ? "teacher" : "student"
-  const { error } = await supabase
-    .from("classroom_members")
-    .insert({
-      classroom_id: classroom.id,
-      user_id: user.id,
-      role,
-    })
-
-  if (error && error.code !== "23505") {
-    console.error("joinClassroomAction insert error:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-    })
-    redirect("/classrooms/join?error=join_failed")
+  if (error || !classroomId) {
+    const message = error?.message ?? ""
+    if (message.includes("classroom_not_found")) redirectError("classroom_not_found")
+    if (message.includes("classroom_archived")) redirectError("classroom_archived")
+    if (message.includes("join_locked")) redirectError("join_locked")
+    console.error("joinClassroomAction rpc error:", error)
+    redirectError("join_failed")
   }
 
   revalidatePath("/classrooms")
-  redirect(`/classrooms/${classroom.id}`)
+  redirect(`/classrooms/${classroomId}`)
 }
 
 export async function createAnnouncementAction(formData: FormData) {
@@ -404,6 +435,18 @@ export async function createAssignmentAction(formData: FormData) {
   const title = getStringValue(formData, "title")
   const description = getStringValue(formData, "description")
   const deadline = getStringValue(formData, "deadline")
+  const kindRaw = getStringValue(formData, "kind")
+  const statusRaw = getStringValue(formData, "status")
+  const latePolicyRaw = getStringValue(formData, "late_policy")
+  const windowStart = getStringValue(formData, "window_start")
+  const windowEnd = getStringValue(formData, "window_end")
+  const timeLimitRaw = getStringValue(formData, "time_limit_minutes")
+  const shuffleOptions = getStringValue(formData, "shuffle_options") === "on" || getStringValue(formData, "shuffle_options") === "true"
+  const allowCatalogSync = getStringValue(formData, "allow_catalog_sync") !== "false"
+  const kind = isAssignmentKind(kindRaw) ? kindRaw : "homework"
+  const status = isAssignmentStatus(statusRaw) ? statusRaw : "published"
+  const latePolicy = isLatePolicy(latePolicyRaw) ? latePolicyRaw : "accept"
+  const timeLimitMinutes = timeLimitRaw ? Number(timeLimitRaw) : NaN
   const selectedProblemIds = formData
     .getAll("problem_ids")
     .map((value) => (typeof value === "string" ? value : ""))
@@ -426,6 +469,14 @@ export async function createAssignmentAction(formData: FormData) {
       title,
       description,
       deadline: deadline || null,
+      status,
+      kind,
+      late_policy: latePolicy,
+      window_start: windowStart || null,
+      window_end: windowEnd || null,
+      time_limit_minutes: Number.isFinite(timeLimitMinutes) && timeLimitMinutes > 0 ? timeLimitMinutes : null,
+      shuffle_options: kind === "test" ? shuffleOptions : false,
+      allow_catalog_sync: kind === "test" ? false : allowCatalogSync,
     })
     .select("id")
     .single()
@@ -454,23 +505,25 @@ export async function createAssignmentAction(formData: FormData) {
     )
   }
 
-  const { data: classroom } = await supabase
-    .from("classrooms")
-    .select("name")
-    .eq("id", classroomId)
-    .maybeSingle()
-  const classroomName = classroom?.name?.trim() || "clasă"
-  try {
-    await notifyClassroomStudents({
-      classroomId,
-      type: "classroom_assignment",
-      title: "Temă nouă",
-      body: `${title} · ${classroomName}`,
-      href: `/classrooms/${classroomId}/assignments/${assignment.id}`,
-      assignmentId: assignment.id,
-    })
-  } catch (notifyError) {
-    console.error("createAssignmentAction notify error:", notifyError)
+  if (status === "published") {
+    const { data: classroom } = await supabase
+      .from("classrooms")
+      .select("name")
+      .eq("id", classroomId)
+      .maybeSingle()
+    const classroomName = classroom?.name?.trim() || "clasă"
+    try {
+      await notifyClassroomStudents({
+        classroomId,
+        type: "classroom_assignment",
+        title: kind === "test" ? "Test nou" : "Temă nouă",
+        body: `${title} · ${classroomName}`,
+        href: `/classrooms/${classroomId}/assignments/${assignment.id}`,
+        assignmentId: assignment.id,
+      })
+    } catch (notifyError) {
+      console.error("createAssignmentAction notify error:", notifyError)
+    }
   }
 
   revalidatePath(`/classrooms/${classroomId}`)
@@ -506,13 +559,46 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
 
   const { data: assignment } = await supabase
     .from("assignments")
-    .select("id")
+    .select("id, status, kind, late_policy, deadline, window_start, window_end, time_limit_minutes, allow_catalog_sync")
     .eq("id", assignmentId)
     .eq("classroom_id", classroomId)
     .maybeSingle()
 
   if (!assignment) {
     redirect(`${redirectTo}?error=assignment_not_found`)
+  }
+
+  if (assignment.status === "closed" || assignment.status === "draft") {
+    redirect(`${redirectTo}?error=assignment_closed`)
+  }
+
+  const now = Date.now()
+  if (assignment.window_start && new Date(assignment.window_start).getTime() > now) {
+    redirect(`${redirectTo}?error=assignment_not_open`)
+  }
+  if (assignment.window_end && new Date(assignment.window_end).getTime() < now) {
+    redirect(`${redirectTo}?error=assignment_closed`)
+  }
+
+  if (assignment.time_limit_minutes && assignment.kind === "test") {
+    const { data: startRow } = await supabase
+      .from("assignment_starts")
+      .select("started_at")
+      .eq("assignment_id", assignmentId)
+      .eq("student_id", user.id)
+      .maybeSingle()
+    if (startRow?.started_at) {
+      const elapsed = now - new Date(startRow.started_at).getTime()
+      if (elapsed > assignment.time_limit_minutes * 60 * 1000) {
+        redirect(`${redirectTo}?error=time_expired`)
+      }
+    }
+  }
+
+  const deadlineMs = assignment.deadline ? new Date(assignment.deadline).getTime() : null
+  const isLate = deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs < now
+  if (isLate && assignment.late_policy === "block") {
+    redirect(`${redirectTo}?error=assignment_closed`)
   }
 
   const teacherPhotos = collectTeacherSubmissionPhotos(formData)
@@ -576,6 +662,14 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
     isCorrect = false
   }
 
+  const { data: existingSubmission } = await supabase
+    .from("submissions")
+    .select("id, answer, is_correct, submitted_at, attempt_count")
+    .eq("assignment_id", assignmentId)
+    .eq("problem_id", problemId)
+    .eq("student_id", user.id)
+    .maybeSingle()
+
   const { data: submissionRow, error } = await supabase
     .from("submissions")
     .upsert(
@@ -586,6 +680,8 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
         answer: normalizedAnswer,
         is_correct: isCorrect,
         submitted_at: new Date().toISOString(),
+        is_late: isLate,
+        attempt_count: (existingSubmission?.attempt_count ?? 0) + 1,
       },
       {
         onConflict: "assignment_id,problem_id,student_id",
@@ -597,6 +693,16 @@ export async function submitAssignmentAnswerAction(formData: FormData) {
   if (error || !submissionRow?.id) {
     console.error("submitAssignmentAnswerAction upsert error:", error)
     redirect(`${redirectTo}?error=submission_failed`)
+  }
+
+  if (existingSubmission?.id && existingSubmission.answer) {
+    await supabase.from("submission_attempts").insert({
+      submission_id: existingSubmission.id,
+      answer: existingSubmission.answer,
+      is_correct: Boolean(existingSubmission.is_correct),
+      submitted_at: existingSubmission.submitted_at,
+      attempt_number: existingSubmission.attempt_count ?? 1,
+    })
   }
 
   if (teacherPhotos.length > 0) {
@@ -642,6 +748,26 @@ export async function syncCatalogSolvedProblemAction(formData: FormData) {
     redirect(`${redirectTo}?error=students_only`)
   }
 
+  const { data: assignment } = await supabase
+    .from("assignments")
+    .select("id, status, kind, allow_catalog_sync, late_policy, deadline")
+    .eq("id", assignmentId)
+    .eq("classroom_id", classroomId)
+    .maybeSingle()
+
+  if (!assignment || assignment.status !== "published") {
+    redirect(`${redirectTo}?error=assignment_closed`)
+  }
+  if (assignment.kind === "test" || assignment.allow_catalog_sync === false) {
+    redirect(`${redirectTo}?error=catalog_sync_disabled`)
+  }
+
+  const deadlineMs = assignment.deadline ? new Date(assignment.deadline).getTime() : null
+  const isLate = deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs < Date.now()
+  if (isLate && assignment.late_policy === "block") {
+    redirect(`${redirectTo}?error=assignment_closed`)
+  }
+
   const { data: solvedProblem } = await supabase
     .from("solved_problems")
     .select("problem_id")
@@ -669,6 +795,7 @@ export async function syncCatalogSolvedProblemAction(formData: FormData) {
         answer: "catalog_solved",
         is_correct: true,
         submitted_at: new Date().toISOString(),
+        is_late: isLate,
       },
       {
         onConflict: "assignment_id,problem_id,student_id",
@@ -742,7 +869,14 @@ export async function leaveClassroomAction(formData: FormData) {
   }
 
   if (membership.role === "teacher") {
-    redirect("/classrooms?error=teacher_cannot_leave")
+    const { data: classroom } = await supabase
+      .from("classrooms")
+      .select("teacher_id")
+      .eq("id", classroomId)
+      .maybeSingle()
+    if (classroom?.teacher_id === user.id) {
+      redirect("/classrooms?error=teacher_cannot_leave")
+    }
   }
 
   await supabase.from("classroom_members").delete().eq("id", membership.id)

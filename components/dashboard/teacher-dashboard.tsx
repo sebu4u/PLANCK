@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type {
   TeacherClassroomOverview,
   TeacherPendingHomeworkReview,
+  TeacherPendingTestReview,
 } from "@/lib/teacher/server"
 
 function EloDistribution({ students }: { students: TeacherClassroomOverview["students"] }) {
@@ -131,12 +132,14 @@ interface TeacherDashboardProps {
   initialOverview: TeacherClassroomOverview[]
   initialPendingHomework: TeacherPendingHomeworkReview[]
   initialPendingHomeworkTotal: number
+  initialPendingTests: TeacherPendingTestReview[]
 }
 
 export function TeacherDashboard({
   initialOverview,
   initialPendingHomework,
   initialPendingHomeworkTotal,
+  initialPendingTests,
 }: TeacherDashboardProps) {
   const router = useRouter()
   const { user, loading: authLoading, profile, isTeacher } = useAuth()
@@ -191,7 +194,10 @@ export function TeacherDashboard({
                   </h1>
                   <p className="mt-1 text-sm text-[#6b7280]">
                     Gestionează clasele și urmărește progresul elevilor.
-                    {profile?.teaching_materie ? ` · ${profile.teaching_materie}` : ""}
+                    {profile?.teaching_materie ? ` · ${profile.teaching_materie}` : ""}{" "}
+                    <Link href="/profesor/scoala" className="font-medium text-[#1a73e8] hover:underline">
+                      Școala mea
+                    </Link>
                   </p>
                 </div>
                 <Button asChild>
@@ -217,20 +223,21 @@ export function TeacherDashboard({
                 </Card>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr]">
-                    <TeacherCourseCard />
-                    <ClassActivityDonutCard overview={overview} />
-                  </div>
-
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <HomeworkReviewCard
                       initialItems={initialPendingHomework}
                       initialTotalCount={initialPendingHomeworkTotal}
                     />
-                    <TestsReviewCard />
+                    <TestsReviewCard tests={initialPendingTests} />
+                  </div>
+
+                  <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr]">
+                    <TeacherCourseCard />
+                    <ClassActivityDonutCard overview={overview} />
                   </div>
 
                   <div className="space-y-4">
+                    <h2 className="text-base font-semibold text-[#111827]">Progres platformă</h2>
                     {overview.map((item) => (
                       <ClassroomOverviewCard key={item.classroom.id} overview={item} />
                     ))}

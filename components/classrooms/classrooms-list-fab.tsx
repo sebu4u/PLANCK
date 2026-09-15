@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { MOBILE_BOTTOM_NAV_FAB_OFFSET_CLASS } from "@/lib/mobile-app-nav"
 
-export function ClassroomsListFab() {
+export function ClassroomsListFab({ canCreateClassroom = false }: { canCreateClassroom?: boolean }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -32,11 +32,13 @@ export function ClassroomsListFab() {
           )}
           role="menu"
         >
-          <Button asChild className="h-10 w-full justify-start font-medium" variant="ghost">
-            <Link href="/classrooms/new" onClick={() => setOpen(false)}>
-              Creează o clasă
-            </Link>
-          </Button>
+          {canCreateClassroom ? (
+            <Button asChild className="h-10 w-full justify-start font-medium" variant="ghost">
+              <Link href="/classrooms/new" onClick={() => setOpen(false)}>
+                Creează o clasă
+              </Link>
+            </Button>
+          ) : null}
           <Button asChild className="h-10 w-full justify-start font-medium" variant="ghost">
             <Link href="/classrooms/join" onClick={() => setOpen(false)}>
               Intră într-o clasă

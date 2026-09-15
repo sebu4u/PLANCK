@@ -1,13 +1,28 @@
+import { resolveClassroomCoverSrc } from "@/lib/classrooms/cover-images"
+import {
+  ASSIGNMENT_ROW_COLUMNS,
+  CLASSROOM_ROW_COLUMNS,
+  asClassroomRole,
+  asNullableString,
+  asString,
+  isObject,
+  mapClassroomCore,
+} from "@/lib/classrooms/mappers"
 import { slugify } from "@/lib/slug"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabaseAdmin"
 import type {
+  AssignmentKind,
+  AssignmentLatePolicy,
   AssignmentProblem,
+  AssignmentStatus,
   AssignmentSubmission,
   ClassroomAnnouncement,
   ClassroomAssignmentListItem,
   ClassroomDetails,
+  ClassroomInvite,
   ClassroomMemberOverview,
+  ClassroomSession,
   ClassroomSummary,
   TeacherAssignmentAttachmentGroup,
   UserAssignmentListItem,
@@ -26,25 +41,49 @@ export interface AssignmentDetails {
   description: string
   deadline: string | null
   created_at: string
+  status: AssignmentStatus
+  kind: AssignmentKind
+  late_policy: AssignmentLatePolicy
+  window_start: string | null
+  window_end: string | null
+  time_limit_minutes: number | null
+  shuffle_options: boolean
+  allow_catalog_sync: boolean
   problems: AssignmentProblem[]
 }
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
-
-function asString(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback
-}
-
-function asNullableString(value: unknown): string | null {
-  return typeof value === "string" ? value : null
-}
-
 function asNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback
+}
+
+function asAssignmentStatus(value: unknown): AssignmentStatus {
+  return value === "draft" || value === "closed" ? value : "published"
+}
+
+function asAssignmentKind(value: unknown): AssignmentKind {
+  return value === "test" ? "test" : "homework"
+}
+
+function asLatePolicy(value: unknown): AssignmentLatePolicy {
+  return value === "mark_late" || value === "block" ? value : "accept"
+}
+
+function mapAssignmentListFields(row: Record<string, unknown>) {
+  return {
+    status: asAssignmentStatus(row.status),
+    kind: asAssignmentKind(row.kind),
+    late_policy: asLatePolicy(row.late_policy),
+    window_start: asNullableString(row.window_start),
+    window_end: asNullableString(row.window_end),
+    time_limit_minutes:
+      typeof row.time_limit_minutes === "number" && Number.isFinite(row.time_limit_minutes)
+        ? row.time_limit_minutes
+        : null,
+    shuffle_options: Boolean(row.shuffle_options),
+    allow_catalog_sync: row.allow_catalog_sync !== false,
+  }
 }
 
 async function getAuthenticatedContext() {
@@ -67,7 +106,7 @@ async function getClassroomMembership(
 ): Promise<ClassroomDetails | null> {
   const { data } = await admin
     .from("classroom_members")
-    .select("role, classrooms!inner(id, name, join_code, teacher_id, created_at, cover_image)")
+    .select(`role, classrooms!inner(${CLASSROOM_ROW_COLUMNS})`)
     .eq("classroom_id", classroomId)
     .eq("user_id", userId)
     .maybeSingle()
@@ -77,13 +116,11 @@ async function getClassroomMembership(
   }
 
   return {
-    id: asString(data.classrooms.id),
-    name: asString(data.classrooms.name, "Classroom"),
-    join_code: asString(data.classrooms.join_code),
-    teacher_id: asString(data.classrooms.teacher_id),
-    created_at: asString(data.classrooms.created_at),
-    role: asString(data.role) === "teacher" ? "teacher" : "student",
-    cover_image: asNullableString(data.classrooms.cover_image),
+    ...mapClassroomCore(
+      data.classrooms,
+      resolveClassroomCoverSrc(asNullableString(data.classrooms.cover_image)),
+    ),
+    role: asClassroomRole(data.role),
   }
 }
 
@@ -109,12 +146,15 @@ export async function requireAuthenticatedUser() {
   return { supabase, user }
 }
 
-export async function getClassroomsForUser(userId: string): Promise<ClassroomSummary[]> {
+export async function getClassroomsForUser(
+  userId: string,
+  options?: { includeArchived?: boolean },
+): Promise<ClassroomSummary[]> {
   const { admin } = await getAuthenticatedContext()
 
   const { data: membershipRows } = await admin
     .from("classroom_members")
-    .select("role, joined_at, classrooms!inner(id, name, join_code, teacher_id, created_at, cover_image)")
+    .select(`role, joined_at, classrooms!inner(${CLASSROOM_ROW_COLUMNS})`)
     .eq("user_id", userId)
     .order("joined_at", { ascending: false })
 
@@ -127,8 +167,9 @@ export async function getClassroomsForUser(userId: string): Promise<ClassroomSum
   if (classroomIds.length > 0) {
     const { data: countRows } = await admin
       .from("classroom_members")
-      .select("classroom_id")
+      .select("classroom_id, role")
       .in("classroom_id", classroomIds)
+      .eq("role", "student")
 
     for (const row of countRows ?? []) {
       if (!isObject(row)) continue
@@ -160,9 +201,11 @@ export async function getClassroomsForUser(userId: string): Promise<ClassroomSum
       if (!isObject(profile)) continue
       const teacherId = asString(profile.user_id)
       if (!teacherId) continue
-      teacherNameById.set(teacherId, asString(profile.nickname) || asString(profile.name) || "Teacher")
+      teacherNameById.set(teacherId, asString(profile.nickname) || asString(profile.name) || "Profesor")
     }
   }
+
+  const includeArchived = options?.includeArchived === true
 
   return memberships
     .map((row) => {
@@ -172,17 +215,20 @@ export async function getClassroomsForUser(userId: string): Promise<ClassroomSum
       const classroomId = asString(classroomRaw.id)
       if (!classroomId) return null
 
+      const archivedAt = asNullableString(classroomRaw.archived_at)
+      if (!includeArchived && archivedAt) return null
+
+      const core = mapClassroomCore(
+        classroomRaw,
+        resolveClassroomCoverSrc(asNullableString(classroomRaw.cover_image)),
+      )
+
       return {
-        id: classroomId,
-        name: asString(classroomRaw.name, "Untitled Classroom"),
-        join_code: asString(classroomRaw.join_code),
-        teacher_id: asString(classroomRaw.teacher_id),
-        teacher_name: teacherNameById.get(asString(classroomRaw.teacher_id)) ?? "Teacher",
-        created_at: asString(classroomRaw.created_at),
-        role: asString(row.role) === "teacher" ? "teacher" : "student",
+        ...core,
+        teacher_name: teacherNameById.get(asString(classroomRaw.teacher_id)) ?? "Profesor",
+        role: asClassroomRole(row.role),
         joined_at: asString(row.joined_at),
         student_count: studentCountByClassroom.get(classroomId) ?? 0,
-        cover_image: asNullableString(classroomRaw.cover_image),
       } satisfies ClassroomSummary
     })
     .filter((row): row is ClassroomSummary => row !== null)
@@ -205,7 +251,7 @@ export async function getClassroomAnnouncements(classroomId: string): Promise<Cl
 
   const { data: rows } = await admin
     .from("announcements")
-    .select("id, classroom_id, author_id, type, content, file_url, lesson_slug, created_at")
+    .select("id, classroom_id, author_id, type, content, file_url, lesson_slug, created_at, pinned_at")
     .eq("classroom_id", classroomId)
     .order("created_at", { ascending: false })
 
@@ -231,7 +277,7 @@ export async function getClassroomAnnouncements(classroomId: string): Promise<Cl
       if (!authorId) continue
       authorNameById.set(
         authorId,
-        asString(profile.nickname) || asString(profile.name) || "Teacher"
+        asString(profile.nickname) || asString(profile.name) || "Profesor"
       )
     }
   }
@@ -258,10 +304,17 @@ export async function getClassroomAnnouncements(classroomId: string): Promise<Cl
       file_url: filePath,
       lesson_slug: asNullableString(row.lesson_slug),
       created_at: asString(row.created_at),
-      author_name: authorNameById.get(authorId) ?? "Teacher",
+      pinned_at: asNullableString(row.pinned_at),
+      author_name: authorNameById.get(authorId) ?? "Profesor",
       signed_file_url: signedFileUrl,
     })
   }
+
+  result.sort((left, right) => {
+    if (left.pinned_at && !right.pinned_at) return -1
+    if (!left.pinned_at && right.pinned_at) return 1
+    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+  })
 
   return result
 }
@@ -295,7 +348,7 @@ export async function getClassroomAssignments(classroomId: string): Promise<Clas
   const membership = await getClassroomMembership(admin, classroomId, user.id)
   if (!membership) return []
 
-  let teacherName = "Teacher"
+  let teacherName = "Profesor"
   if (membership.teacher_id) {
     const { data: teacherProfile } = await admin
       .from("profiles")
@@ -308,16 +361,27 @@ export async function getClassroomAssignments(classroomId: string): Promise<Clas
     }
   }
 
-  const { data: assignmentRows } = await admin
+  let assignmentQuery = admin
     .from("assignments")
-    .select("id, classroom_id, title, description, deadline, created_at")
+    .select(ASSIGNMENT_ROW_COLUMNS)
     .eq("classroom_id", classroomId)
     .order("created_at", { ascending: false })
+
+  if (membership.role !== "teacher") {
+    assignmentQuery = assignmentQuery.neq("status", "draft")
+  }
+
+  const { data: assignmentRows } = await assignmentQuery
 
   const assignments = (assignmentRows ?? []).filter(isObject)
   const assignmentIds = assignments.map((row) => asString(row.id)).filter(Boolean)
 
   const countsByAssignment = new Map<string, number>()
+  const submittedCountByAssignment = new Map<string, number>()
+  const partialCountByAssignment = new Map<string, number>()
+  const unreviewedPhotoByAssignment = new Map<string, number>()
+  let studentCount = 0
+
   if (assignmentIds.length > 0) {
     const { data: problemRows } = await admin
       .from("assignment_problems")
@@ -330,18 +394,85 @@ export async function getClassroomAssignments(classroomId: string): Promise<Clas
       if (!assignmentId) continue
       countsByAssignment.set(assignmentId, (countsByAssignment.get(assignmentId) ?? 0) + 1)
     }
+
+    if (membership.role === "teacher") {
+      const [{ data: memberRows }, { data: submissionRows }] = await Promise.all([
+        admin.from("classroom_members").select("user_id").eq("classroom_id", classroomId).eq("role", "student"),
+        admin
+          .from("submissions")
+          .select("id, assignment_id, student_id, reviewed_at")
+          .in("assignment_id", assignmentIds),
+      ])
+      studentCount = (memberRows ?? []).length
+
+      const submittedStudents = new Map<string, Set<string>>()
+      const problemCountByStudent = new Map<string, number>()
+      const unreviewedIds: string[] = []
+      for (const row of submissionRows ?? []) {
+        if (!isObject(row)) continue
+        const assignmentId = asString(row.assignment_id)
+        const studentId = asString(row.student_id)
+        const submissionId = asString(row.id)
+        if (!assignmentId || !studentId) continue
+        const submitted = submittedStudents.get(assignmentId) ?? new Set<string>()
+        submitted.add(studentId)
+        submittedStudents.set(assignmentId, submitted)
+        const pairKey = `${assignmentId}::${studentId}`
+        problemCountByStudent.set(pairKey, (problemCountByStudent.get(pairKey) ?? 0) + 1)
+        if (!asNullableString(row.reviewed_at) && submissionId) {
+          unreviewedIds.push(submissionId)
+        }
+      }
+
+      for (const [assignmentId, students] of submittedStudents) {
+        const totalProblems = countsByAssignment.get(assignmentId) ?? 0
+        let partial = 0
+        for (const studentId of students) {
+          const submittedProblems = problemCountByStudent.get(`${assignmentId}::${studentId}`) ?? 0
+          if (totalProblems > 0 && submittedProblems < totalProblems) partial += 1
+        }
+        submittedCountByAssignment.set(assignmentId, students.size)
+        partialCountByAssignment.set(assignmentId, partial)
+      }
+
+      if (unreviewedIds.length > 0) {
+        const { data: photoRows } = await admin
+          .from("submission_teacher_attachments")
+          .select("submission_id")
+          .in("submission_id", unreviewedIds)
+        const assignmentBySubmission = new Map(
+          (submissionRows ?? [])
+            .filter(isObject)
+            .map((row) => [asString(row.id), asString(row.assignment_id)] as const),
+        )
+        for (const raw of photoRows ?? []) {
+          if (!isObject(raw)) continue
+          const assignmentId = assignmentBySubmission.get(asString(raw.submission_id))
+          if (!assignmentId) continue
+          unreviewedPhotoByAssignment.set(assignmentId, (unreviewedPhotoByAssignment.get(assignmentId) ?? 0) + 1)
+        }
+      }
+    }
   }
 
-  return assignments.map((row) => ({
-    id: asString(row.id),
-    classroom_id: asString(row.classroom_id),
-    title: asString(row.title, "Untitled Assignment"),
-    description: asString(row.description),
-    deadline: asNullableString(row.deadline),
-    created_at: asString(row.created_at),
-    problem_count: countsByAssignment.get(asString(row.id)) ?? 0,
-    author_name: teacherName,
-  }))
+  return assignments.map((row) => {
+    const id = asString(row.id)
+    return {
+      id,
+      classroom_id: asString(row.classroom_id),
+      title: asString(row.title, "Temă"),
+      description: asString(row.description),
+      deadline: asNullableString(row.deadline),
+      created_at: asString(row.created_at),
+      problem_count: countsByAssignment.get(id) ?? 0,
+      author_name: teacherName,
+      ...mapAssignmentListFields(row),
+      submitted_count: submittedCountByAssignment.get(id) ?? 0,
+      student_count: studentCount,
+      partial_count: partialCountByAssignment.get(id) ?? 0,
+      unreviewed_photo_count: unreviewedPhotoByAssignment.get(id) ?? 0,
+    }
+  })
 }
 
 /** All assignments across classrooms the user belongs to (single flat list). */
@@ -398,8 +529,9 @@ export async function getAssignmentsForUser(userId: string): Promise<UserAssignm
 
   const { data: assignmentRows } = await admin
     .from("assignments")
-    .select("id, classroom_id, title, description, deadline, created_at")
+    .select(ASSIGNMENT_ROW_COLUMNS)
     .in("classroom_id", classroomIds)
+    .neq("status", "draft")
     .order("created_at", { ascending: false })
 
   const assignments = (assignmentRows ?? []).filter(isObject)
@@ -433,6 +565,7 @@ export async function getAssignmentsForUser(userId: string): Promise<UserAssignm
       created_at: asString(row.created_at),
       problem_count: countsByAssignment.get(asString(row.id)) ?? 0,
       author_name: teacherNameById.get(meta?.teacher_id ?? "") ?? "Profesor",
+      ...mapAssignmentListFields(row),
     }
   })
 
@@ -552,23 +685,28 @@ export async function getClassroomMembers(classroomId: string): Promise<Classroo
   const emailByUserId =
     membership.role === "teacher" ? await getEmailMapForUserIds(admin, userIds) : new Map<string, string>()
 
-  return members.map((row) => {
-    const userIdValue = asString(row.user_id)
-    const profile = profileByUserId.get(userIdValue)
-    const role: "teacher" | "student" = asString(row.role) === "teacher" ? "teacher" : "student"
-    const stats = statsByUserId.get(userIdValue)
-    return {
-      member_id: asString(row.id),
-      user_id: userIdValue,
-      role,
-      joined_at: asString(row.joined_at),
-      name: profile?.nickname || profile?.name || (role === "teacher" ? "Profesor" : "Elev"),
-      email: membership.role === "teacher" ? (emailByUserId.get(userIdValue) ?? "") : "",
-      user_icon: profile?.user_icon ?? null,
-      elo: stats?.elo ?? 500,
-      rank: stats?.rank ?? "Bronze III",
-    }
-  })
+  return members
+    .map((row) => {
+      const userIdValue = asString(row.user_id)
+      const profile = profileByUserId.get(userIdValue)
+      const role: "teacher" | "student" = asString(row.role) === "teacher" ? "teacher" : "student"
+      const stats = statsByUserId.get(userIdValue)
+      return {
+        member_id: asString(row.id),
+        user_id: userIdValue,
+        role,
+        joined_at: asString(row.joined_at),
+        name: profile?.nickname || profile?.name || (role === "teacher" ? "Profesor" : "Elev"),
+        email: membership.role === "teacher" ? (emailByUserId.get(userIdValue) ?? "") : "",
+        user_icon: profile?.user_icon ?? null,
+        elo: stats?.elo ?? 500,
+        rank: stats?.rank ?? "Bronze III",
+      }
+    })
+    .sort((left, right) => {
+      if (left.role !== right.role) return left.role === "teacher" ? -1 : 1
+      return left.name.localeCompare(right.name, "ro", { sensitivity: "base" })
+    })
 }
 
 export async function getClassroomLeaderboard(classroomId: string) {
@@ -636,12 +774,16 @@ export async function getAssignmentDetails(
 
   const { data: assignment } = await admin
     .from("assignments")
-    .select("id, classroom_id, title, description, deadline, created_at")
+    .select(ASSIGNMENT_ROW_COLUMNS)
     .eq("id", assignmentId)
     .eq("classroom_id", classroomId)
     .maybeSingle()
 
   if (!isObject(assignment)) {
+    return null
+  }
+
+  if (membership.role !== "teacher" && asAssignmentStatus(assignment.status) === "draft") {
     return null
   }
 
@@ -693,6 +835,7 @@ export async function getAssignmentDetails(
     description: asString(assignment.description),
     deadline: asNullableString(assignment.deadline),
     created_at: asString(assignment.created_at),
+    ...mapAssignmentListFields(assignment),
     problems,
   }
 }
@@ -709,7 +852,7 @@ export async function getAssignmentSubmissions(
 
   let submissionsQuery = admin
     .from("submissions")
-    .select("id, assignment_id, problem_id, student_id, answer, is_correct, submitted_at")
+    .select("id, assignment_id, problem_id, student_id, answer, is_correct, submitted_at, teacher_comment, teacher_grade, is_late, attempt_count, reviewed_at")
     .eq("assignment_id", assignmentId)
 
   if (membership.role === "student") {
@@ -726,6 +869,12 @@ export async function getAssignmentSubmissions(
     answer: asString(row.answer),
     is_correct: Boolean(row.is_correct),
     submitted_at: asString(row.submitted_at),
+    teacher_comment: asNullableString(row.teacher_comment),
+    teacher_grade:
+      typeof row.teacher_grade === "number" && Number.isFinite(row.teacher_grade) ? row.teacher_grade : null,
+    is_late: Boolean(row.is_late),
+    attempt_count: asNumber(row.attempt_count, 1),
+    reviewed_at: asNullableString(row.reviewed_at),
   }))
 
   if (membership.role !== "student" || rows.length === 0) {

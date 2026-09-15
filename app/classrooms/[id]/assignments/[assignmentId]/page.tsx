@@ -1,12 +1,17 @@
 import { redirect } from "next/navigation"
+import { AssignmentTeacherToolbar } from "@/components/classrooms/assignment-teacher-toolbar"
 import { StudentAssignmentProblems } from "@/components/classrooms/student-assignment-problems"
 import { StudentAnalyticsTable } from "@/components/classrooms/student-analytics-table"
 import { TeacherAssignmentAttachmentsSection } from "@/components/classrooms/teacher-assignment-attachments"
+import { TeacherFeedbackList } from "@/components/classrooms/teacher-feedback-list"
+import { ASSIGNMENT_KIND_LABELS, ASSIGNMENT_STATUS_LABELS } from "@/lib/classrooms/constants"
+import { getAssignmentStart } from "@/lib/classrooms/extra-server"
 import {
   getAssignmentDetails,
   getAssignmentSubmissions,
   getClassroomDetailsForUser,
   getClassroomMembers,
+  getClassroomsForUser,
   getTeacherAssignmentAttachmentGroups,
   requireAuthenticatedUser,
 } from "@/lib/classrooms/server"
@@ -20,6 +25,10 @@ const errorMessages: Record<string, string> = {
   teacher_photos_too_large: "Fiecare imagine trebuie să aibă cel mult 5 MB.",
   teacher_photos_bad_type: "Sunt acceptate doar imagini JPG, PNG, WebP sau GIF.",
   teacher_photos_upload_failed: "Răspunsul a fost salvat, dar pozele nu s-au încărcat. Încearcă din nou.",
+  assignment_closed: "Tema sau testul este închis. Nu mai poți trimite răspunsuri.",
+  assignment_not_open: "Fereastra de lucru încă nu a început.",
+  time_expired: "Timpul alocat s-a terminat.",
+  catalog_sync_disabled: "Sincronizarea din catalog nu este permisă la acest test.",
 }
 
 export default async function AssignmentDetailPage({
@@ -27,7 +36,7 @@ export default async function AssignmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string; assignmentId: string }>
-  searchParams: Promise<{ error?: string; saved?: string }>
+  searchParams: Promise<{ error?: string; saved?: string; reminded?: string }>
 }) {
   const { user } = await requireAuthenticatedUser()
   if (!user) {
@@ -45,10 +54,12 @@ export default async function AssignmentDetailPage({
     redirect(`/classrooms/${classroomId}/assignments`)
   }
 
-  const [submissions, members, query] = await Promise.all([
+  const [submissions, members, query, classrooms, start] = await Promise.all([
     getAssignmentSubmissions(classroomId, assignmentId),
     classroom.role === "teacher" ? getClassroomMembers(classroomId) : Promise.resolve([]),
     searchParams,
+    classroom.role === "teacher" ? getClassroomsForUser(user.id) : Promise.resolve([]),
+    classroom.role === "student" ? getAssignmentStart(assignmentId, user.id) : Promise.resolve(null),
   ])
 
   const teacherAttachmentGroups =
@@ -56,28 +67,33 @@ export default async function AssignmentDetailPage({
       ? await getTeacherAssignmentAttachmentGroups(classroomId, assignmentId, assignment.problems, members)
       : []
 
-  const errorMessage = query.error ? errorMessages[query.error] : undefined
+  const errorMessage = query.error ? errorMessages[query.error] ?? query.error : undefined
   const showSaved = query.saved === "1"
 
   const totalProblems = assignment.problems.length
+  const students = members.filter((member) => member.role === "student")
+  const submittedStudentIds = new Set(submissions.map((entry) => entry.student_id))
+  const partialCount = students.filter((student) => {
+    const count = submissions.filter((entry) => entry.student_id === student.user_id).length
+    return count > 0 && count < totalProblems
+  }).length
+  const unreviewedPhotoCount = teacherAttachmentGroups.reduce((sum, group) => sum + group.signed_urls.length, 0)
 
   const teacherRows =
     classroom.role === "teacher"
-      ? members
-          .filter((member) => member.role === "student")
-          .map((student) => {
-            const studentSubmissions = submissions.filter((entry) => entry.student_id === student.user_id)
-            const correct = studentSubmissions.filter((entry) => entry.is_correct).length
-            const score = totalProblems > 0 ? Math.round((correct / totalProblems) * 100) : 0
-            return {
-              user_id: student.user_id,
-              name: student.name,
-              email: student.email,
-              correct,
-              total: totalProblems,
-              score,
-            }
-          })
+      ? students.map((student) => {
+          const studentSubmissions = submissions.filter((entry) => entry.student_id === student.user_id)
+          const correct = studentSubmissions.filter((entry) => entry.is_correct).length
+          const score = totalProblems > 0 ? Math.round((correct / totalProblems) * 100) : 0
+          return {
+            user_id: student.user_id,
+            name: student.name,
+            email: student.email,
+            correct,
+            total: totalProblems,
+            score,
+          }
+        })
       : []
 
   const problemStats =
@@ -85,7 +101,7 @@ export default async function AssignmentDetailPage({
       ? assignment.problems.map((problem) => {
           const problemSubmissions = submissions.filter((entry) => entry.problem_id === problem.id)
           const correct = problemSubmissions.filter((entry) => entry.is_correct).length
-          const studentCount = members.filter((member) => member.role === "student").length
+          const studentCount = students.length
           const correctRate = studentCount > 0 ? Math.round((correct / studentCount) * 100) : 0
           return {
             problem_id: problem.id,
@@ -96,16 +112,12 @@ export default async function AssignmentDetailPage({
       : []
 
   const studentSubmissions = submissions.filter((entry) => entry.student_id === user.id)
-
+  const canSubmit = assignment.status === "published"
+  const hideResults = assignment.kind === "test" && assignment.status !== "closed"
   const deadlineText = assignment.deadline
-    ? new Date(assignment.deadline).toLocaleString("ro-RO", {
-        dateStyle: "short",
-        timeStyle: "short",
-      })
+    ? new Date(assignment.deadline).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" })
     : "Fără termen limită"
-
-  const problemCount = assignment.problems.length
-  const problemCountLabel = `${problemCount} ${problemCount === 1 ? "problemă" : "probleme"}`
+  const problemCountLabel = `${assignment.problems.length} ${assignment.problems.length === 1 ? "problemă" : "probleme"}`
 
   return (
     <div className="space-y-4">
@@ -115,7 +127,8 @@ export default async function AssignmentDetailPage({
             {assignment.title}
           </h1>
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#6b7280]">
-            <span className="whitespace-nowrap">Termen limită: {deadlineText}</span>
+            <span>{ASSIGNMENT_KIND_LABELS[assignment.kind]} · {ASSIGNMENT_STATUS_LABELS[assignment.status]}</span>
+            <span className="whitespace-nowrap">Termen: {deadlineText}</span>
             <span className="whitespace-nowrap">{problemCountLabel}</span>
           </div>
         </div>
@@ -127,20 +140,43 @@ export default async function AssignmentDetailPage({
       </header>
 
       {errorMessage ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
       ) : null}
-
       {showSaved ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          Răspunsul a fost salvat.
+          Salvarea a reușit.
+        </div>
+      ) : null}
+      {query.reminded === "1" ? (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          Restanțierii au primit o notificare.
         </div>
       ) : null}
 
       {classroom.role === "teacher" ? (
         <>
+          <AssignmentTeacherToolbar
+            classroomId={classroomId}
+            assignmentId={assignmentId}
+            title={assignment.title}
+            description={assignment.description}
+            deadline={assignment.deadline}
+            status={assignment.status}
+            kind={assignment.kind}
+            latePolicy={assignment.late_policy}
+            submittedCount={submittedStudentIds.size}
+            studentCount={students.length}
+            partialCount={partialCount}
+            unreviewedPhotoCount={unreviewedPhotoCount}
+            classrooms={classrooms}
+          />
           <TeacherAssignmentAttachmentsSection groups={teacherAttachmentGroups} />
+          <TeacherFeedbackList
+            classroomId={classroomId}
+            assignmentId={assignmentId}
+            members={members}
+            submissions={submissions}
+          />
           <StudentAnalyticsTable rows={teacherRows} problemStats={problemStats} />
         </>
       ) : (
@@ -149,6 +185,14 @@ export default async function AssignmentDetailPage({
           assignmentId={assignmentId}
           problems={assignment.problems}
           submissions={studentSubmissions}
+          canSubmit={canSubmit}
+          hideResults={hideResults}
+          shuffleOptions={assignment.shuffle_options}
+          allowCatalogSync={assignment.allow_catalog_sync && assignment.kind !== "test"}
+          kind={assignment.kind}
+          timeLimitMinutes={assignment.time_limit_minutes}
+          startedAt={start?.started_at ?? null}
+          windowEnd={assignment.window_end}
         />
       )}
     </div>

@@ -94,7 +94,12 @@ export default async function ClassroomStreamPage({
       id: assignment.id,
       assignment,
     })),
-  ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+  ].sort((left, right) => {
+    const leftPinned = left.kind === "announcement" && Boolean(left.announcement.pinned_at)
+    const rightPinned = right.kind === "announcement" && Boolean(right.announcement.pinned_at)
+    if (leftPinned !== rightPinned) return leftPinned ? -1 : 1
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  })
 
   const nextDeadlines = assignments
     .filter((assignment) => assignment.deadline && new Date(assignment.deadline).getTime() > now)
@@ -148,7 +153,7 @@ export default async function ClassroomStreamPage({
             ) : (
               feedItems.map((item) =>
                 item.kind === "announcement" ? (
-                  <AnnouncementPost key={`ann-${item.id}`} announcement={item.announcement} deadline={null} />
+                  <AnnouncementPost key={`ann-${item.id}`} announcement={item.announcement} deadline={null} isTeacher={classroom.role === "teacher"} />
                 ) : (
                   <AssignmentStreamPost key={`asg-${item.id}`} classroomId={id} assignment={item.assignment} />
                 ),

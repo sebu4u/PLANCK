@@ -44,11 +44,11 @@ export const WORKSHOP_SUBJECT_COLORS: Record<WorkshopSubject, string> = {
 
 /** Right-side hero art on `/pregatire` — files in `public/images/pregatire/`. */
 export const WORKSHOP_HERO_IMAGE_SRC: Record<WorkshopSubject, string> = {
-  mate: "/images/pregatire/hero-mate.png",
-  fizica: "/images/pregatire/hero-fizica.png",
-  info: "/images/pregatire/hero-info.png",
-  biologie: "/images/pregatire/hero-biologie.png",
-  chimie: "/images/pregatire/hero-chimie.png",
+  mate: "/images/pregatire/hero-mate.webp",
+  fizica: "/images/pregatire/hero-fizica.webp",
+  info: "/images/pregatire/hero-info.webp",
+  biologie: "/images/pregatire/hero-biologie.webp",
+  chimie: "/images/pregatire/hero-chimie.webp",
 }
 
 export const WORKSHOP_ENERGY_SIGNUP = 25

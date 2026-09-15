@@ -3,7 +3,8 @@
 import { useEffect, useState, type CSSProperties } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, X } from "lucide-react"
-import { useClassroomAssignmentDraft } from "@/components/classrooms/classroom-assignment-draft-context"
+import { AssignmentDraftFields } from "@/components/classrooms/assignment-draft-fields"
+import { useClassroomAssignmentDraft, type AssignmentDraftValues } from "@/components/classrooms/classroom-assignment-draft-context"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,6 +35,13 @@ export function TeacherNewAssignmentDialog({
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [deadline, setDeadline] = useState("")
+  const [kind, setKind] = useState<AssignmentDraftValues["kind"]>("homework")
+  const [status, setStatus] = useState<AssignmentDraftValues["status"]>("published")
+  const [latePolicy, setLatePolicy] = useState<AssignmentDraftValues["latePolicy"]>("accept")
+  const [windowStart, setWindowStart] = useState("")
+  const [windowEnd, setWindowEnd] = useState("")
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState("")
+  const [shuffleOptions, setShuffleOptions] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -41,6 +49,13 @@ export function TeacherNewAssignmentDialog({
     setTitle("")
     setDescription("")
     setDeadline("")
+    setKind("homework")
+    setStatus("published")
+    setLatePolicy("accept")
+    setWindowStart("")
+    setWindowEnd("")
+    setTimeLimitMinutes("")
+    setShuffleOptions(false)
   }, [classrooms, open])
 
   const canContinue = title.trim().length > 0 && classroomId.length > 0
@@ -54,6 +69,13 @@ export function TeacherNewAssignmentDialog({
         title: title.trim(),
         description: description.trim(),
         deadline,
+        kind,
+        status,
+        latePolicy,
+        windowStart,
+        windowEnd,
+        timeLimitMinutes,
+        shuffleOptions,
       },
     })
     onOpenChange(false)
@@ -145,6 +167,23 @@ export function TeacherNewAssignmentDialog({
                 type="datetime-local"
               />
             </div>
+
+            <AssignmentDraftFields
+              kind={kind}
+              status={status}
+              latePolicy={latePolicy}
+              windowStart={windowStart}
+              windowEnd={windowEnd}
+              timeLimitMinutes={timeLimitMinutes}
+              shuffleOptions={shuffleOptions}
+              onKind={setKind}
+              onStatus={setStatus}
+              onLatePolicy={setLatePolicy}
+              onWindowStart={setWindowStart}
+              onWindowEnd={setWindowEnd}
+              onTimeLimit={setTimeLimitMinutes}
+              onShuffle={setShuffleOptions}
+            />
 
             <div className="border-t border-[#e8eaed] pt-4">
               <button

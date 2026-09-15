@@ -64,7 +64,7 @@ export function getExerseazaCards(subject: PracticeSubjectId): ExerseazaCardConf
       description: EXERCISES_DESCRIPTION[subject],
       href: EXERCISES_HREF[subject],
       icon: Calculator,
-      imageSrc: EXERSEAZA_CARD_IMAGE("exercitii.png"),
+      imageSrc: EXERSEAZA_CARD_IMAGE("exercitii.webp"),
       imageGradient: "from-violet-500 via-purple-500 to-indigo-600",
     },
     {
@@ -76,7 +76,7 @@ export function getExerseazaCards(subject: PracticeSubjectId): ExerseazaCardConf
         : "Grilele pentru această materie vor fi disponibile în curând.",
       href: grileAvailable ? "/grile" : null,
       icon: ListChecks,
-      imageSrc: EXERSEAZA_CARD_IMAGE("grile.png"),
+      imageSrc: EXERSEAZA_CARD_IMAGE("grile.webp"),
       imageGradient: "from-emerald-500 via-teal-500 to-cyan-600",
       comingSoon: !grileAvailable,
     },
@@ -87,7 +87,7 @@ export function getExerseazaCards(subject: PracticeSubjectId): ExerseazaCardConf
       description: "Teste pe clasă și capitol — cu limită de timp și review cu Insight.",
       href: `/teste?subject=${subject}`,
       icon: ClipboardList,
-      imageSrc: EXERSEAZA_CARD_IMAGE("teste.png"),
+      imageSrc: EXERSEAZA_CARD_IMAGE("teste.webp"),
       imageGradient: "from-amber-400 via-orange-400 to-rose-500",
     },
     {
@@ -97,7 +97,7 @@ export function getExerseazaCards(subject: PracticeSubjectId): ExerseazaCardConf
       description: "Carduri generate din traseele de învățare, pentru fixarea conceptelor.",
       href: "/invata/flashcard-uri",
       icon: Layers,
-      imageSrc: EXERSEAZA_CARD_IMAGE("flashcard.png"),
+      imageSrc: EXERSEAZA_CARD_IMAGE("flashcard.webp"),
       imageGradient: "from-fuchsia-500 via-pink-500 to-rose-500",
     },
   ]

@@ -15,7 +15,7 @@ export function ParentFounderSection() {
         <div className="relative flex items-end justify-center px-4 pt-10 sm:px-6 lg:px-4 lg:pt-12 xl:px-6">
           <FadeInUp className="w-full max-w-[210px] lg:max-w-none">
             <Image
-              src="/images/homepage/fondator.png"
+              src="/images/homepage/fondator.webp"
               alt={founder.name}
               width={720}
               height={1080}

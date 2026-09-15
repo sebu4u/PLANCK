@@ -50,7 +50,10 @@ export function TeacherAssignmentsPage({
             <div className="space-y-2">
               <h1 className="text-3xl font-bold text-[#111827]">Teme</h1>
               <p className="text-sm text-[#6b7280] sm:text-base">
-                Toate temele pe care le-ai dat la clasele tale.
+                Toate temele pe care le-ai dat la clasele tale.{" "}
+                <Link href="/profesor/scoala" className="font-medium text-[#1a73e8] hover:underline">
+                  Școala mea
+                </Link>
               </p>
             </div>
 
@@ -107,6 +110,9 @@ export function TeacherAssignmentsPage({
                         {assignment.classroom_name}
                       </p>
                       <h2 className="truncate text-lg font-semibold text-[#111827]">{assignment.title}</h2>
+                      <p className="text-xs text-[#6b7280]">
+                        {assignment.kind === "test" ? "Test" : "Temă"} · {assignment.status === "draft" ? "ciornă" : assignment.status === "closed" ? "închisă" : "publicată"}
+                      </p>
                       {assignment.description ? (
                         <p className="line-clamp-2 text-sm text-[#6b7280]">{assignment.description}</p>
                       ) : null}

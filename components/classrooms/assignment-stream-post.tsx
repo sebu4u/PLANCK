@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, CalendarDays } from "lucide-react"
 import { AuthorAvatar } from "@/components/classrooms/author-avatar"
 import { DeadlineTimer } from "@/components/classrooms/deadline-timer"
 import type { ClassroomAssignmentListItem } from "@/lib/classrooms/types"
+import { ASSIGNMENT_KIND_LABELS, ASSIGNMENT_STATUS_LABELS } from "@/lib/classrooms/constants"
 import { cn } from "@/lib/utils"
 
 interface AssignmentStreamPostProps {
@@ -46,7 +47,9 @@ export function AssignmentStreamPost({ classroomId, assignment }: AssignmentStre
               <p className="text-[11px] text-[#9ca3af]">{createdAt}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-0.5">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-[#9ca3af]">Temă</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[#9ca3af]">
+                {ASSIGNMENT_KIND_LABELS[assignment.kind]} · {ASSIGNMENT_STATUS_LABELS[assignment.status]}
+              </span>
               {isOverdue ? (
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-rose-700">
                   <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
@@ -64,7 +67,12 @@ export function AssignmentStreamPost({ classroomId, assignment }: AssignmentStre
               {assignment.description}
             </p>
           ) : null}
-          <p className="text-[11px] text-[#9ca3af]">{assignment.problem_count} probleme</p>
+          <p className="text-[11px] text-[#9ca3af]">
+            {assignment.problem_count} probleme
+            {typeof assignment.submitted_count === "number" && typeof assignment.student_count === "number"
+              ? ` · ${assignment.submitted_count}/${assignment.student_count} trimiși`
+              : ""}
+          </p>
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0f2f5] pt-1.5">
             <span

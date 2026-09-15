@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils"
 
 interface ClassroomTabsNavProps {
   classroomId: string
+  isTeacher?: boolean
 }
 
-export function ClassroomTabsNav({ classroomId }: ClassroomTabsNavProps) {
+export function ClassroomTabsNav({ classroomId, isTeacher = false }: ClassroomTabsNavProps) {
   const pathname = usePathname()
   const { isPickingForClassroom } = useClassroomAssignmentDraft()
 
@@ -18,26 +19,33 @@ export function ClassroomTabsNav({ classroomId }: ClassroomTabsNavProps) {
   }
 
   const tabs = [
-    { href: `/classrooms/${classroomId}`, label: "Flux" },
-    { href: `/classrooms/${classroomId}/assignments`, label: "Teme" },
-    { href: `/classrooms/${classroomId}/students`, label: "Persoane" },
+    { href: `/classrooms/${classroomId}`, label: "Flux", match: "exact" as const },
+    { href: `/classrooms/${classroomId}/assignments`, label: "Teme", match: "prefix" as const },
+    { href: `/classrooms/${classroomId}/students`, label: "Persoane", match: "prefix" as const },
+    ...(isTeacher
+      ? [
+          { href: `/classrooms/${classroomId}/ora`, label: "Ora", match: "prefix" as const },
+          { href: `/classrooms/${classroomId}/setari`, label: "Setări", match: "prefix" as const },
+        ]
+      : []),
   ]
 
   return (
-    <div className="flex items-center gap-2 border-b border-[#dadce0]">
+    <div className="flex items-center gap-2 overflow-x-auto border-b border-[#dadce0]">
       {tabs.map((tab) => {
         const active =
-          pathname === tab.href ||
-          (tab.href.includes("/assignments") && pathname?.startsWith(`${tab.href}/`))
+          tab.match === "exact"
+            ? pathname === tab.href
+            : pathname === tab.href || Boolean(pathname?.startsWith(`${tab.href}/`))
         return (
           <Link
             key={tab.href}
             href={tab.href}
             className={cn(
-              "relative -mb-px px-4 py-3 text-sm font-medium transition-colors",
+              "relative -mb-px shrink-0 px-4 py-3 text-sm font-medium transition-colors",
               active
                 ? "border-b-2 border-[#1a73e8] text-[#1a73e8]"
-                : "border-b-2 border-transparent text-[#5f6368] hover:text-[#202124]"
+                : "border-b-2 border-transparent text-[#5f6368] hover:text-[#202124]",
             )}
           >
             {tab.label}

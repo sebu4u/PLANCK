@@ -30,7 +30,7 @@ import { playGrileErrorSound, playGrileSuccessSound } from '@/lib/grile-quiz-aud
 import { GrileSubjectProvider, useGrileSubject } from './grile-subject-context';
 import { getGrileSubjectConfig, type GrileMaterie } from '@/lib/grile-subject-config';
 
-const GRILE_DESKTOP_EMPTY_ICON = `/images/icons/${encodeURIComponent("Untitled design (42).png")}`;
+const GRILE_DESKTOP_EMPTY_ICON = `/images/icons/${encodeURIComponent("Untitled design (42).webp")}`;
 
 type GrileShellFeedbackContextValue = {
     triggerWrongAnswerFeedback: () => void;

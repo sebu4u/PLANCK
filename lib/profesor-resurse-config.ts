@@ -43,12 +43,11 @@ export const PROFESOR_RESURSE_CARDS: ProfesorResurseCardConfig[] = [
   {
     id: "teste",
     title: "Teste",
-    subtitle: "În curând",
-    description: "Simulări și teste complete — disponibile în curând.",
-    href: null,
+    subtitle: "Evaluări la clasă",
+    description: "Creează un test cu timer și fereastră orară, din catalogul de probleme.",
+    href: "/profesor/teme",
     icon: ClipboardList,
     imageGradient: "from-amber-400 via-orange-400 to-rose-500",
-    comingSoon: true,
   },
   {
     id: "cursuri",
@@ -80,7 +79,7 @@ export function getProfesorResurseCardCountLabel(
     case "grile":
       return formatExerseazaCount(counts.grile, "grilă", "grile")
     case "teste":
-      return "În curând"
+      return formatExerseazaCount(counts.grile, "test", "teste")
     case "cursuri":
       return "Catalog complet"
     case "trasee_invata":

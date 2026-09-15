@@ -10,7 +10,7 @@ export function ParentHowItWorksSection() {
         <FadeInRight className="w-full lg:w-[42%] lg:shrink-0">
           <div className="overflow-hidden rounded-none bg-gray-100">
             <Image
-              src="/images/landing-copil.jpeg"
+              src="/images/landing-copil.webp"
               alt="Elev PLANCK la învățat"
               width={900}
               height={720}

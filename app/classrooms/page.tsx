@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button"
 import { ClassroomCard } from "@/components/classrooms/classroom-card"
 import { cn } from "@/lib/utils"
 import { getClassroomsForUser, requireAuthenticatedUser } from "@/lib/classrooms/server"
+import { createAdminClient } from "@/lib/supabaseAdmin"
+import { normalizeUserType } from "@/lib/user-types"
 
-const EMPTY_CLASSROOMS_IMAGE_SRC = `/images/icons/${encodeURIComponent("Untitled design (48).png")}`
+const EMPTY_CLASSROOMS_IMAGE_SRC = `/images/icons/${encodeURIComponent("Untitled design (48).webp")}`
 
 const errorMessages: Record<string, string> = {
   invalid_leave_request: "Nu am putut procesa cererea de ieșire. Încearcă din nou.",
   not_member: "Nu mai ești membru al acelei clase.",
-  teacher_cannot_leave: "Profesorul nu poate părăsi propria clasă.",
+  teacher_cannot_leave: "Titularul nu poate părăsi propria clasă.",
+  teacher_account_required: "Doar un cont de profesor poate crea o clasă.",
 }
 
 export default async function ClassroomsHomePage({
@@ -24,10 +27,18 @@ export default async function ClassroomsHomePage({
     redirect("/")
   }
 
-  const [classrooms, query] = await Promise.all([getClassroomsForUser(user.id), searchParams])
+  const admin = createAdminClient()
+  const [{ data: profile }, classrooms, query] = await Promise.all([
+    admin.from("profiles").select("user_type").eq("user_id", user.id).maybeSingle(),
+    getClassroomsForUser(user.id, { includeArchived: true }),
+    searchParams,
+  ])
+  const canCreateClassroom = normalizeUserType(profile?.user_type) === "profesor"
   const errorMessage = query.error ? errorMessages[query.error] : undefined
-  const leftMessage = query.left === "1" ? "You left the classroom." : undefined
-  const hasNoClassrooms = classrooms.length === 0
+  const leftMessage = query.left === "1" ? "Ai părăsit clasa." : undefined
+  const activeClassrooms = classrooms.filter((classroom) => !classroom.archived_at)
+  const archivedClassrooms = classrooms.filter((classroom) => Boolean(classroom.archived_at))
+  const hasNoClassrooms = activeClassrooms.length === 0 && archivedClassrooms.length === 0
 
   return (
     <div className="space-y-6">
@@ -47,9 +58,11 @@ export default async function ClassroomsHomePage({
           <Button asChild variant="outline">
             <Link href="/classrooms/join">Intră într-o clasă</Link>
           </Button>
-          <Button asChild>
-            <Link href="/classrooms/new">Creează o clasă</Link>
-          </Button>
+          {canCreateClassroom ? (
+            <Button asChild>
+              <Link href="/classrooms/new">Creează o clasă</Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -83,11 +96,21 @@ export default async function ClassroomsHomePage({
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {classrooms.map((classroom) => (
+          {activeClassrooms.map((classroom) => (
             <ClassroomCard key={classroom.id} classroom={classroom} />
           ))}
         </div>
       )}
+      {archivedClassrooms.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-[#6b7280]">Clase arhivate</h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {archivedClassrooms.map((classroom) => (
+              <ClassroomCard key={classroom.id} classroom={classroom} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

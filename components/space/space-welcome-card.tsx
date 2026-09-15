@@ -36,7 +36,7 @@ export function SpaceWelcomeCard({ onClose }: SpaceWelcomeCardProps) {
                 {/* Hero Image Section */}
                 <div className="relative h-48 md:h-64 w-full">
                     <Image
-                        src="/images/space-welcome.png"
+                        src="/images/space-welcome.webp"
                         alt="Welcome to Space"
                         fill
                         className="object-cover"

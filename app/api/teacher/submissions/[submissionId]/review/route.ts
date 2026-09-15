@@ -36,7 +36,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    await markSubmissionReviewed(userData.user.id, submissionId)
+    let comment: string | undefined
+    try {
+      const body = (await request.json()) as { comment?: unknown }
+      if (typeof body.comment === "string") comment = body.comment
+    } catch {
+      comment = undefined
+    }
+
+    await markSubmissionReviewed(userData.user.id, submissionId, comment)
     return NextResponse.json({ ok: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : "UNKNOWN"

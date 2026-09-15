@@ -10,27 +10,28 @@ function SubmitButton() {
   const { pending } = useFormStatus()
   return (
     <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-      {pending ? "Joining..." : "Join classroom"}
+      {pending ? "Se alătură…" : "Intră în clasă"}
     </Button>
   )
 }
 
 interface JoinClassroomFormProps {
   errorMessage?: string
+  defaultCode?: string
 }
 
-export function JoinClassroomForm({ errorMessage }: JoinClassroomFormProps) {
+export function JoinClassroomForm({ errorMessage, defaultCode }: JoinClassroomFormProps) {
   return (
     <Card className="border-[#eceff3]">
       <CardHeader>
-        <CardTitle className="text-xl">Join a classroom</CardTitle>
-        <CardDescription>Enter the code your teacher shared with you.</CardDescription>
+        <CardTitle className="text-xl">Intră într-o clasă</CardTitle>
+        <CardDescription>Introdu codul de 6 caractere primit de la profesor.</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={joinClassroomAction} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="join-code" className="text-sm font-medium text-[#111827]">
-              Join code
+              Cod de clasă
             </label>
             <Input
               id="join-code"
@@ -39,6 +40,7 @@ export function JoinClassroomForm({ errorMessage }: JoinClassroomFormProps) {
               autoComplete="off"
               autoCapitalize="characters"
               maxLength={6}
+              defaultValue={defaultCode}
               required
             />
           </div>

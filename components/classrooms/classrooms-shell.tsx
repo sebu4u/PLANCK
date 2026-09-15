@@ -17,6 +17,7 @@ import type { ClassroomSummary } from "@/lib/classrooms/types"
 interface ClassroomsShellProps {
   children: ReactNode
   classrooms: ClassroomSummary[]
+  canCreateClassroom?: boolean
 }
 
 function formatDeadline(deadline: string) {
@@ -57,12 +58,26 @@ function DraftSubmitForm({
   description,
   deadline,
   selectedProblemIds,
+  kind,
+  status,
+  latePolicy,
+  windowStart,
+  windowEnd,
+  timeLimitMinutes,
+  shuffleOptions,
 }: {
   classroomId: string
   title: string
   description: string
   deadline: string
   selectedProblemIds: string[]
+  kind: string
+  status: string
+  latePolicy: string
+  windowStart: string
+  windowEnd: string
+  timeLimitMinutes: string
+  shuffleOptions: boolean
 }) {
   const disabled = !title.trim() || selectedProblemIds.length === 0
 
@@ -72,6 +87,14 @@ function DraftSubmitForm({
       <input type="hidden" name="title" value={title} />
       <input type="hidden" name="description" value={description} />
       <input type="hidden" name="deadline" value={deadline} />
+      <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="status" value={status} />
+      <input type="hidden" name="late_policy" value={latePolicy} />
+      <input type="hidden" name="window_start" value={windowStart} />
+      <input type="hidden" name="window_end" value={windowEnd} />
+      <input type="hidden" name="time_limit_minutes" value={timeLimitMinutes} />
+      {shuffleOptions ? <input type="hidden" name="shuffle_options" value="true" /> : null}
+      {kind === "test" ? <input type="hidden" name="allow_catalog_sync" value="false" /> : null}
       {selectedProblemIds.map((problemId) => (
         <input key={problemId} type="hidden" name="problem_ids" value={problemId} />
       ))}
@@ -90,7 +113,7 @@ function classroomIdFromPathname(pathname: string | null): string | null {
   return id
 }
 
-export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) {
+export function ClassroomsShell({ children, classrooms, canCreateClassroom = false }: ClassroomsShellProps) {
   const pathname = usePathname()
   const isClassroomsHome = pathname === "/classrooms" || pathname === "/classrooms/"
 
@@ -220,6 +243,13 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
                 description={draft.description}
                 deadline={draft.deadline}
                 selectedProblemIds={selectedProblemIds}
+                kind={draft.kind}
+                status={draft.status}
+                latePolicy={draft.latePolicy}
+                windowStart={draft.windowStart}
+                windowEnd={draft.windowEnd}
+                timeLimitMinutes={draft.timeLimitMinutes}
+                shuffleOptions={draft.shuffleOptions}
               />
             </div>
           </div>
@@ -273,13 +303,20 @@ export function ClassroomsShell({ children, classrooms }: ClassroomsShellProps) 
                 description={draft.description}
                 deadline={draft.deadline}
                 selectedProblemIds={selectedProblemIds}
+                kind={draft.kind}
+                status={draft.status}
+                latePolicy={draft.latePolicy}
+                windowStart={draft.windowStart}
+                windowEnd={draft.windowEnd}
+                timeLimitMinutes={draft.timeLimitMinutes}
+                shuffleOptions={draft.shuffleOptions}
               />
             )}
           </div>
         </div>
       ) : null}
 
-      {isClassroomsHome ? <ClassroomsListFab /> : null}
+      {isClassroomsHome ? <ClassroomsListFab canCreateClassroom={canCreateClassroom} /> : null}
     </div>
   )
 }

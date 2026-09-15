@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { CalendarDays, NotebookPen, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -79,7 +80,10 @@ export function ParentAssignmentsPage({ assignments }: ParentAssignmentsPageProp
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-[#111827]">Teme</h1>
           <p className="text-sm text-[#6b7280] sm:text-base">
-            Toate temele copiilor tăi — finalizate și cele care încă așteaptă.
+            Toate temele copiilor tăi — finalizate și cele care încă așteaptă.{" "}
+            <Link href="/dashboard/parent/mesaje" className="font-medium text-[#1a73e8] hover:underline">
+              Mesaje de la profesori
+            </Link>
           </p>
         </div>
 
