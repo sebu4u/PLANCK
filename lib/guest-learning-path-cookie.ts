@@ -41,3 +41,18 @@ export function getGuestCompletedItemIdsForLesson(
   const ids = map[lessonId]
   return Array.isArray(ids) ? ids.filter((id) => typeof id === "string" && id.trim()) : []
 }
+
+export function readGuestLearningPathProgressFromDocument(): GuestLearningPathProgressMap {
+  if (typeof document === "undefined") return {}
+  const prefix = `${GUEST_LEARNING_PATH_PROGRESS_COOKIE}=`
+  const raw = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+  if (!raw) return {}
+  try {
+    return parseGuestLearningPathProgress(decodeURIComponent(raw.slice(prefix.length)))
+  } catch {
+    return {}
+  }
+}

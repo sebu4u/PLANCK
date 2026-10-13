@@ -2,8 +2,6 @@
 
 import { useLayoutEffect, useState } from "react"
 import { InvataHubMain } from "@/components/invata/invata-hub-main"
-import { InvataMobileHubShell } from "@/components/invata/invata-mobile-hub-shell"
-import { InvataHowToLearnCard } from "@/components/invata/invata-how-to-learn-card"
 import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { InvataAdminLearningPathsLink } from "@/components/invata/invata-admin-learning-paths-link"
 import { InvataSeoIntro } from "@/components/invata/invata-seo-intro"
@@ -24,6 +22,7 @@ import {
   readStoredInvataSubjectFilter,
   writeStoredInvataSubjectFilter,
   type InvataSubjectFilter,
+  type InvataSubjectId,
 } from "@/lib/invata-config"
 import type {
   LearningPathHubChapter,
@@ -36,6 +35,8 @@ interface InvataHubPageClientProps {
   lessonsByChapter: Record<string, LearningPathHubLesson[]>
   lockedChapterIds: string[]
   lessonProgressByLessonId: LessonProgressByLessonId
+  preferredSubject?: InvataSubjectId | null
+  startedLastActivityByChapterId?: Record<string, number>
 }
 
 function HubLearningPaths({
@@ -54,6 +55,8 @@ function HubLearningPaths({
       lockedChapterIds={props.lockedChapterIds}
       completedLessonIds={[]}
       lessonProgressByLessonId={props.lessonProgressByLessonId}
+      preferredSubject={props.preferredSubject}
+      startedLastActivityByChapterId={props.startedLastActivityByChapterId}
       subjectFilter={subjectFilter}
       showChapterIndicator={showChapterIndicator}
     />
@@ -100,7 +103,7 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
   return (
     <>
       <div className="sm:hidden">
-        <InvataMobileHubShell top={<InvataHowToLearnCard />}>
+        <InvataHubMain>
           <div className="px-5 pt-5">
             <InvataHubTabBar
               value={tab}
@@ -119,7 +122,7 @@ export function InvataHubPageClient(props: InvataHubPageClientProps) {
               <InvataHubLectiiPanel compact className="pb-14" />
             )}
           </div>
-        </InvataMobileHubShell>
+        </InvataHubMain>
       </div>
 
       <div className="hidden sm:block">

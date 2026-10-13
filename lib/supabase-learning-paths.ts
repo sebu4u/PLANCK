@@ -57,6 +57,8 @@ export interface LearningPathChapter {
   is_active: boolean
   /** True for chapters kept out of /invata, the dashboard, and subject maps (e.g. onboarding custom lessons). */
   is_hidden?: boolean
+  /** Includes the reserved `arhiva` tag, which sends the path to the /invata archive. */
+  tags?: string[] | null
   generated_by_user_id?: string | null
   is_personalized?: boolean
   original_prompt?: string | null
@@ -81,8 +83,67 @@ export type LearningPathHubChapter = Pick<
   | "is_personalized"
   | "generation_status"
   | "created_at"
+  | "tags"
 > & {
   materie?: string | null
+}
+
+export const LEARNING_PATH_HUB_CHAPTER_COLUMNS =
+  "id, slug, title, nav_title, description, icon_url, accent_color, problem_category, materie, order_index, is_personalized, generation_status, created_at, tags"
+
+const LEARNING_PATH_HUB_CHAPTER_COLUMNS_WITHOUT_TAGS =
+  "id, slug, title, nav_title, description, icon_url, accent_color, problem_category, materie, order_index, is_personalized, generation_status, created_at"
+
+function isMissingTagsColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  const haystack = `${error.code ?? ""} ${error.message ?? ""}`.toLowerCase()
+  return error.code === "PGRST204" || (
+    haystack.includes("tags") &&
+    (haystack.includes("does not exist") || haystack.includes("schema cache"))
+  )
+}
+
+type HubChapterQueryResult = PromiseLike<{
+  data: unknown[] | null
+  error: { code?: string; message?: string } | null
+}>
+
+async function selectLearningPathHubChapters(
+  query: (columns: string) => HubChapterQueryResult,
+): Promise<LearningPathHubChapter[]> {
+  const withTags = await query(LEARNING_PATH_HUB_CHAPTER_COLUMNS)
+  if (!withTags.error) {
+    return (withTags.data || []) as LearningPathHubChapter[]
+  }
+
+  if (isMissingTagsColumnError(withTags.error)) {
+    const withoutTags = await query(LEARNING_PATH_HUB_CHAPTER_COLUMNS_WITHOUT_TAGS)
+    if (!withoutTags.error) {
+      return ((withoutTags.data || []) as LearningPathHubChapter[]).map((chapter) => ({
+        ...chapter,
+        tags: chapter.tags ?? [],
+      }))
+    }
+    console.error("Error fetching learning path hub chapters:", withoutTags.error)
+    return []
+  }
+
+  console.error("Error fetching learning path hub chapters:", withTags.error)
+  return []
+}
+
+export async function getPublicLearningPathHubChapters(
+  client: SupabaseClient,
+): Promise<LearningPathHubChapter[]> {
+  return selectLearningPathHubChapters((columns) =>
+    client
+      .from("learning_path_chapters")
+      .select(columns)
+      .eq("is_active", true)
+      .or("is_personalized.is.null,is_personalized.eq.false")
+      .or("is_hidden.is.null,is_hidden.eq.false")
+      .order("order_index"),
+  )
 }
 
 export interface LearningPathLesson {
@@ -279,22 +340,15 @@ export async function getUserPersonalizedLearningPathHubChapters(
 ): Promise<LearningPathHubChapter[]> {
   if (!userId) return []
 
-  const { data, error } = await client
-    .from("learning_path_chapters")
-    .select(
-      "id, slug, title, nav_title, description, icon_url, accent_color, problem_category, materie, order_index, is_personalized, generation_status, created_at"
-    )
-    .eq("generated_by_user_id", userId)
-    .eq("is_personalized", true)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching personalized learning path hub chapters:", error)
-    return []
-  }
-
-  return (data || []) as LearningPathHubChapter[]
+  return selectLearningPathHubChapters((columns) =>
+    client
+      .from("learning_path_chapters")
+      .select(columns)
+      .eq("generated_by_user_id", userId)
+      .eq("is_personalized", true)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false }),
+  )
 }
 
 /**
@@ -870,6 +924,74 @@ export async function getCompletedLearningPathItemIdsForUser(
   }
 
   return Array.from(completed)
+}
+
+function asEmbeddedRow<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+function bumpChapterActivity(
+  lastActivityByChapterId: Record<string, number>,
+  chapterId: string | null | undefined,
+  completedAt: string | null | undefined,
+) {
+  if (!chapterId || !completedAt) return
+  const timestamp = Date.parse(completedAt)
+  if (!Number.isFinite(timestamp)) return
+  lastActivityByChapterId[chapterId] = Math.max(lastActivityByChapterId[chapterId] ?? 0, timestamp)
+}
+
+/**
+ * Capitolele la care userul a lucrat deja, cu timestamp-ul ultimei activități
+ * (`completed_at` pe item sau lecție). Folosit ca să le punem primele pe /invata.
+ */
+export async function getStartedLearningPathChapterLastActivityById(
+  client: SupabaseClient,
+  userId: string,
+): Promise<Record<string, number>> {
+  if (!userId) return {}
+
+  const lastActivityByChapterId: Record<string, number> = {}
+
+  const [itemProgress, lessonProgress] = await Promise.all([
+    client
+      .from("user_learning_path_item_progress")
+      .select("completed_at, learning_path_lesson_items!inner(learning_path_lessons!inner(chapter_id))")
+      .eq("user_id", userId),
+    client
+      .from("user_learning_path_lesson_progress")
+      .select("completed_at, learning_path_lessons!inner(chapter_id)")
+      .eq("user_id", userId),
+  ])
+
+  if (itemProgress.error) {
+    console.error("Error fetching started learning-path item activity:", itemProgress.error)
+  } else {
+    for (const row of itemProgress.data ?? []) {
+      const item = asEmbeddedRow(
+        row.learning_path_lesson_items as
+          | { learning_path_lessons?: { chapter_id?: string } | { chapter_id?: string }[] }
+          | { learning_path_lessons?: { chapter_id?: string } | { chapter_id?: string }[] }[]
+          | null,
+      )
+      const lesson = asEmbeddedRow(item?.learning_path_lessons)
+      bumpChapterActivity(lastActivityByChapterId, lesson?.chapter_id, row.completed_at as string)
+    }
+  }
+
+  if (lessonProgress.error) {
+    console.error("Error fetching started learning-path lesson activity:", lessonProgress.error)
+  } else {
+    for (const row of lessonProgress.data ?? []) {
+      const lesson = asEmbeddedRow(
+        row.learning_path_lessons as { chapter_id?: string } | { chapter_id?: string }[] | null,
+      )
+      bumpChapterActivity(lastActivityByChapterId, lesson?.chapter_id, row.completed_at as string)
+    }
+  }
+
+  return lastActivityByChapterId
 }
 
 /** Capitolul din ultimul item de learning path completat de user (după completed_at). */

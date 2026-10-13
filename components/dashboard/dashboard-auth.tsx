@@ -679,6 +679,7 @@ export function DashboardAuth() {
                           : null
                       }
                       rank={dashboardData.stats.rank}
+                      problemsSolvedTotal={dashboardData.stats.problems_solved_total}
                     />
                   </PlanckPassMobileShell>
                 </div>

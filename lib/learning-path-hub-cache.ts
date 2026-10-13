@@ -6,6 +6,7 @@ import {
   getLearningPathHubLessonsByChapterIds,
   getLearningPathLessonItemCountsByLessonIds,
   getLearningPathLessonItemAggregates,
+  getPublicLearningPathHubChapters,
   type LearningPathHubChapter,
   type LearningPathHubLesson,
   type LearningPathLessonItemAggregates,
@@ -13,8 +14,6 @@ import {
 import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
 
 const LEARNING_PATH_HUB_CACHE_SECONDS = 5 * 60
-const LEARNING_PATH_HUB_CHAPTER_COLUMNS =
-  "id, slug, title, nav_title, description, icon_url, accent_color, problem_category, materie, order_index, is_personalized, generation_status, created_at"
 
 function createAnonSupabaseClient() {
   return createClient(
@@ -36,20 +35,7 @@ export interface PublicLearningPathHubCatalog {
 
 async function loadPublicLearningPathHubCatalog(): Promise<PublicLearningPathHubCatalog> {
   const supabase = createAnonSupabaseClient()
-  const { data, error } = await supabase
-    .from("learning_path_chapters")
-    .select(LEARNING_PATH_HUB_CHAPTER_COLUMNS)
-    .eq("is_active", true)
-    .or("is_personalized.is.null,is_personalized.eq.false")
-    .or("is_hidden.is.null,is_hidden.eq.false")
-    .order("order_index")
-
-  if (error) {
-    console.error("Error fetching cached public learning path hub chapters:", error)
-    return { chapters: [], lessonsByChapter: {} }
-  }
-
-  const chapters = (data || []) as LearningPathHubChapter[]
+  const chapters = await getPublicLearningPathHubChapters(supabase)
   const lessonsByChapter = await getLearningPathHubLessonsByChapterIds(
     chapters.map((chapter) => chapter.id),
     supabase
@@ -60,7 +46,7 @@ async function loadPublicLearningPathHubCatalog(): Promise<PublicLearningPathHub
 
 export const getCachedPublicLearningPathHubCatalog = unstable_cache(
   loadPublicLearningPathHubCatalog,
-  ["learning-path-hub-public-catalog-v3"],
+  ["learning-path-hub-public-catalog-v5"],
   { revalidate: LEARNING_PATH_HUB_CACHE_SECONDS }
 )
 

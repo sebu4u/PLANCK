@@ -23,6 +23,10 @@ import { isPhysicsCatalogCategory } from "@/lib/physics-catalog-chapters"
 import { generateUniqueChapterSlug, generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
 import { fetchAllTableRows } from "@/lib/supabase-fetch-all"
+import {
+  parseLearningPathTagsInput,
+  setLearningPathArchiveTag,
+} from "@/lib/learning-path-tags"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 type DevSubject = ApiDevSubject
@@ -646,6 +650,13 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      const tagsParsed = parseLearningPathTagsInput(body.tags)
+      if (!tagsParsed.ok) {
+        return NextResponse.json(
+          { error: "tags trebuie să fie o listă sau un text separat prin virgulă." },
+          { status: 400 },
+        )
+      }
       const payload: Record<string, unknown> = {
         title,
         nav_title: toNullableString(body.nav_title),
@@ -656,6 +667,10 @@ export async function POST(req: NextRequest) {
         problem_category,
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
+        tags:
+          body.is_archived !== undefined
+            ? setLearningPathArchiveTag(tagsParsed.tags, toBoolean(body.is_archived, false))
+            : tagsParsed.tags,
       }
       if (!auth.permissions.isAdmin && !isSuperDev(auth.permissions.isDev, auth.permissions.devSubjects)) {
         payload.allowed_dev_user_ids = [auth.userId]
@@ -926,7 +941,7 @@ export async function PUT(req: NextRequest) {
     if (type === "chapter") {
       const { data: existing, error: exErr } = await supabase
         .from("learning_path_chapters")
-        .select("id, problem_category, allowed_dev_user_ids")
+        .select("id, problem_category, allowed_dev_user_ids, tags")
         .eq("id", id)
         .maybeSingle()
       if (exErr || !existing) {
@@ -954,6 +969,21 @@ export async function PUT(req: NextRequest) {
       }
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
+      if (body.tags !== undefined || body.is_archived !== undefined) {
+        const tagsParsed = parseLearningPathTagsInput(
+          body.tags !== undefined ? body.tags : existing.tags,
+        )
+        if (!tagsParsed.ok) {
+          return NextResponse.json(
+            { error: "tags trebuie să fie o listă sau un text separat prin virgulă." },
+            { status: 400 },
+          )
+        }
+        updateData.tags =
+          body.is_archived !== undefined
+            ? setLearningPathArchiveTag(tagsParsed.tags, toBoolean(body.is_archived, false))
+            : tagsParsed.tags
+      }
 
       if (body.problem_category !== undefined) {
         const rawPc = toNullableString(body.problem_category)

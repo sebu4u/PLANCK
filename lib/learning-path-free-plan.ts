@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import {
-  compareOfficialHubChaptersByPreferredSubject,
-  type InvataSubjectId,
-} from "@/lib/invata-config"
 import { ONBOARDING_CUSTOM_LESSON_CHAPTER_SLUG } from "@/lib/onboarding-custom-lesson"
+import { learningPathHasArchiveTag } from "@/lib/learning-path-tags"
 
 /** Capitole accesibile în preview gratuit (plan free + vizitator neautentificat). */
 export const FREE_PREVIEW_LEARNING_PATH_CHAPTER_SLUGS = [
@@ -22,10 +19,6 @@ export const FREE_LEARNING_PATH_CHAPTER_SLUG = "cinematica"
 export const FREE_PLAN_LEARNING_PATH_ITEM_LIMIT = 10
 /** Trasee personalizate generate de un user free (cont obligatoriu). */
 export const FREE_PLAN_PERSONALIZED_LEARNING_PATH_LIMIT = 1
-/** Numărul de trasee afișate complet pe /invata pentru planul free; restul apar în arhivă. */
-export const FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT = 7
-/** Numărul de trasee oficiale afișate pe /invata pentru Plus/Premium; restul apar în arhivă. */
-export const PAID_PLAN_VISIBLE_LEARNING_PATH_COUNT = 12
 
 /** Aliasuri pentru slug-ul principal de cinematică (redirect / onboarding). */
 export const FREE_PREVIEW_CHAPTER_SLUG_ALIASES = ["cinematica-punctului-material"] as const
@@ -45,73 +38,27 @@ export interface FreePlanHubChapterSplitInput {
   title?: string | null
   materie?: string | null
   problem_category?: string | null
-}
-
-function sortOfficialHubChaptersForDisplay<T extends FreePlanHubChapterSplitInput>(
-  chapters: T[],
-  preferredSubject: InvataSubjectId | null,
-): T[] {
-  return [...chapters].sort((a, b) =>
-    compareOfficialHubChaptersByPreferredSubject(a, b, preferredSubject),
-  )
-}
-
-/** Primele N trasee oficiale (materia de onboarding, apoi order_index) + cursurile personalizate; restul în arhivă. */
-export function splitLearningPathChaptersForHub<T extends FreePlanHubChapterSplitInput>(
-  chapters: T[],
-  visibleStandardCount: number,
-  preferredSubject: InvataSubjectId | null = null,
-): { visibleChapters: T[]; archivedChapters: T[] } {
-  const personalized = chapters.filter((chapter) => chapter.is_personalized === true)
-  const standard = sortOfficialHubChaptersForDisplay(
-    chapters.filter((chapter) => chapter.is_personalized !== true),
-    preferredSubject,
-  )
-
-  const visibleStandard = standard.slice(0, visibleStandardCount)
-  const archivedStandard = standard.slice(visibleStandardCount)
-
-  return {
-    visibleChapters: [...personalized, ...visibleStandard],
-    archivedChapters: archivedStandard,
-  }
-}
-
-/** Plan free: primele 7 trasee oficiale + cursurile personalizate; restul în arhivă. */
-export function splitLearningPathChaptersForFreePlanHub<T extends FreePlanHubChapterSplitInput>(
-  chapters: T[],
-  preferredSubject: InvataSubjectId | null = null,
-): { visibleChapters: T[]; archivedChapters: T[] } {
-  return splitLearningPathChaptersForHub(
-    chapters,
-    FREE_PLAN_VISIBLE_LEARNING_PATH_COUNT,
-    preferredSubject,
-  )
+  tags?: string[] | null
 }
 
 /**
- * Free și Plus/Premium văd exact aceleași trasee pe /invata (doar cele mai vechi/în
- * exces, după materia de onboarding, intră în arhivă). Planul free poate începe orice
- * traseu oficial; diferența e cota globală de itemi, nu blocarea traseelor.
+ * Traseele cu tag-ul rezervat `arhiva` apar în arhivă pe /invata; restul rămân în listă.
  */
 export function resolveLearningPathHubChapterSplit<T extends FreePlanHubChapterSplitInput>(
   chapters: T[],
-  options: {
-    isAdmin: boolean
-    isDev: boolean
-    hasFullAccess: boolean
-    preferredSubject?: InvataSubjectId | null
-  },
 ): { visibleChapters: T[]; archivedChapters: T[] } {
-  if (options.isAdmin || options.isDev) {
-    return { visibleChapters: chapters, archivedChapters: [] }
+  const visibleChapters: T[] = []
+  const archivedChapters: T[] = []
+
+  for (const chapter of chapters) {
+    if (learningPathHasArchiveTag(chapter.tags)) {
+      archivedChapters.push(chapter)
+    } else {
+      visibleChapters.push(chapter)
+    }
   }
 
-  return splitLearningPathChaptersForHub(
-    chapters,
-    PAID_PLAN_VISIBLE_LEARNING_PATH_COUNT,
-    options.preferredSubject ?? null,
-  )
+  return { visibleChapters, archivedChapters }
 }
 
 /**

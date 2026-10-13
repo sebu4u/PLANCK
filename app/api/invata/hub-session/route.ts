@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { logger } from "@/lib/logger"
-import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 import { resolveLearningPathHubChapterSplit } from "@/lib/learning-path-free-plan"
 import {
   getLearningPathHubLessonsByChapterIds,
   getLearningPathLessonItemCountsByLessonIds,
+  getStartedLearningPathChapterLastActivityById,
   getUserPersonalizedLearningPathHubChapters,
-  type LearningPathHubChapter,
 } from "@/lib/supabase-learning-paths"
 import {
   getCachedPublicLearningPathHubCatalog,
@@ -39,10 +38,10 @@ export async function GET(_req: NextRequest) {
       return noStoreJson({ error: "Necesită autentificare." }, { status: 401 })
     }
 
-    const [personalizedChapters, access, preferredSubject] = await Promise.all([
+    const [personalizedChapters, preferredSubject, startedLastActivityByChapterId] = await Promise.all([
       getUserPersonalizedLearningPathHubChapters(user.id, supabase),
-      getLearningPathAccessForUser(supabase, user, null),
       getInvataPreferredSubjectForUser(supabase, user),
+      getStartedLearningPathChapterLastActivityById(supabase, user.id),
     ])
 
     const personalizedLessonsByChapter = personalizedChapters.length
@@ -56,21 +55,16 @@ export async function GET(_req: NextRequest) {
     const chapters = sortLearningPathChaptersForHub(
       [...personalizedChapters, ...publicCatalog.chapters],
       preferredSubject,
+      startedLastActivityByChapterId,
     )
     const lessonsByChapter = {
       ...publicCatalog.lessonsByChapter,
       ...personalizedLessonsByChapter,
     }
 
-    const hasFullAccess = access.mode === "full"
     const lockedChapterIds: string[] = []
 
-    const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(chapters, {
-      isAdmin: access.isAdmin,
-      isDev: access.isDev,
-      hasFullAccess,
-      preferredSubject,
-    })
+    const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(chapters)
 
     const visiblePublicLessonIds = visibleChapters
       .filter((chapter) => publicChapterIdSet.has(chapter.id))
@@ -97,6 +91,8 @@ export async function GET(_req: NextRequest) {
       lessonsByChapter,
       lockedChapterIds,
       lessonProgressByLessonId,
+      preferredSubject,
+      startedLastActivityByChapterId,
     })
   } catch (error) {
     logger.error("[invata/hub-session] load failed:", error)

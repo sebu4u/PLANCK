@@ -4,7 +4,7 @@ import { MOBILE_BOTTOM_NAV_PADDING_CLASS, MOBILE_BOTTOM_NAV_UPGRADE_BANNER_PADDI
 import { useSubscriptionPlan } from "@/hooks/use-subscription-plan"
 import { cn } from "@/lib/utils"
 
-/** Desktop / tablet hub main. Mobile uses InvataMobileHubShell instead. */
+/** Hub main for /invata. Offset clears the fixed top bar. */
 export function InvataHubMain({ children }: { children: React.ReactNode }) {
   const { isPaid } = useSubscriptionPlan()
 

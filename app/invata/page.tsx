@@ -3,7 +3,10 @@ import { Navigation } from "@/components/navigation"
 import { generateMetadata } from "@/lib/metadata"
 import { learningPathsHubStructuredData } from "@/lib/structured-data"
 import { StructuredData } from "@/components/structured-data"
-import { getLearningPathLessonItemCountsByLessonIds } from "@/lib/supabase-learning-paths"
+import {
+  getLearningPathLessonItemCountsByLessonIds,
+  getStartedLearningPathChapterLastActivityById,
+} from "@/lib/supabase-learning-paths"
 import {
   getCachedPublicLearningPathHubCatalog,
   getCachedPublicLearningPathLessonItemCounts,
@@ -19,7 +22,6 @@ import { InvataHubNavProvider } from "@/components/invata/invata-hub-nav-context
 import { InvataPremiumUpgradeBanner } from "@/components/invata/invata-premium-upgrade-banner"
 import { InvataHubPageClient } from "@/components/invata/invata-hub-page-client"
 import { resolveLearningPathHubChapterSplit } from "@/lib/learning-path-free-plan"
-import { getLearningPathAccessForUser } from "@/lib/learning-path-access"
 
 export const metadata: Metadata = generateMetadata("learning-paths")
 // The page renders user-specific personalized chapters when authenticated, so it cannot
@@ -35,32 +37,29 @@ export default async function InvataPage() {
 
   // Personalized chapters for the signed-in user are loaded in the same SSR pass so
   // they render together with the premade chapters, instead of popping in later.
-  const [publicCatalog, personalizedHub, preferredSubject] = await Promise.all([
-    getCachedPublicLearningPathHubCatalog(),
-    loadSsrPersonalizedLearningPathHub(supabase, user),
-    getInvataPreferredSubjectForUser(supabase, user),
-  ])
+  const [publicCatalog, personalizedHub, preferredSubject, startedLastActivityByChapterId] =
+    await Promise.all([
+      getCachedPublicLearningPathHubCatalog(),
+      loadSsrPersonalizedLearningPathHub(supabase, user),
+      getInvataPreferredSubjectForUser(supabase, user),
+      user
+        ? getStartedLearningPathChapterLastActivityById(supabase, user.id)
+        : Promise.resolve<Record<string, number>>({}),
+    ])
 
   const allChapters = sortLearningPathChaptersForHub(
     [...personalizedHub.chapters, ...publicCatalog.chapters],
     preferredSubject,
+    startedLastActivityByChapterId,
   )
   const allLessonsByChapter = {
     ...publicCatalog.lessonsByChapter,
     ...personalizedHub.lessonsByChapter,
   }
 
-  const access = await getLearningPathAccessForUser(supabase, user, null)
-  const hasFullAccess = access.mode === "full"
-
   const lockedChapterIds: string[] = []
 
-  const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(allChapters, {
-    isAdmin: access.isAdmin,
-    isDev: access.isDev,
-    hasFullAccess,
-    preferredSubject,
-  })
+  const { visibleChapters, archivedChapters } = resolveLearningPathHubChapterSplit(allChapters)
 
   const visiblePublicLessonIds = visibleChapters
     .filter((chapter) => chapter.is_personalized !== true)
@@ -89,19 +88,17 @@ export default async function InvataPage() {
     <InvataHubNavProvider chapters={visibleChapters}>
       <InvataChapterImageLoadProvider chapterCount={visibleChapters.length}>
         <StructuredData data={learningPathsHubStructuredData} id="learning-paths-hub" />
-        <div className="max-sm:bg-[#DCE6FA]">
-          <Navigation />
-
-          <InvataHubPageClient
-            chapters={visibleChapters}
-            archivedChapters={archivedChapters}
-            lessonsByChapter={allLessonsByChapter}
-            lockedChapterIds={lockedChapterIds}
-            lessonProgressByLessonId={lessonProgressByLessonId}
-          />
-
-          <InvataPremiumUpgradeBanner />
-        </div>
+        <Navigation />
+        <InvataHubPageClient
+          chapters={visibleChapters}
+          archivedChapters={archivedChapters}
+          lessonsByChapter={allLessonsByChapter}
+          lockedChapterIds={lockedChapterIds}
+          lessonProgressByLessonId={lessonProgressByLessonId}
+          preferredSubject={preferredSubject}
+          startedLastActivityByChapterId={startedLastActivityByChapterId}
+        />
+        <InvataPremiumUpgradeBanner />
       </InvataChapterImageLoadProvider>
     </InvataHubNavProvider>
   )

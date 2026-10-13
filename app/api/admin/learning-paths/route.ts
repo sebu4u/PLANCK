@@ -13,6 +13,10 @@ import { generateUniqueLessonSlug } from "@/lib/learning-path-slug"
 import { normalizeLearningPathChapterAccentColor } from "@/lib/learning-path-chapter-theme"
 import { parseAllowedDevUserIdsInput } from "@/lib/dev-chapter-access"
 import { fetchAllTableRows } from "@/lib/supabase-fetch-all"
+import {
+  parseLearningPathTagsInput,
+  setLearningPathArchiveTag,
+} from "@/lib/learning-path-tags"
 
 type AdminEntityType = "chapter" | "lesson" | "item"
 
@@ -482,6 +486,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: devIdsError }, { status: 400 })
       }
 
+      const tagsParsed = parseLearningPathTagsInput(body.tags)
+      if (!tagsParsed.ok) {
+        return NextResponse.json(
+          { error: "tags trebuie să fie o listă sau un text separat prin virgulă." },
+          { status: 400 },
+        )
+      }
+      const tags =
+        body.is_archived !== undefined
+          ? setLearningPathArchiveTag(tagsParsed.tags, toBoolean(body.is_archived, false))
+          : tagsParsed.tags
+
       const payload = {
         title,
         nav_title: toNullableString(body.nav_title),
@@ -493,6 +509,7 @@ export async function POST(req: NextRequest) {
         allowed_dev_user_ids: allowedDevUserIds && allowedDevUserIds.length > 0 ? allowedDevUserIds : null,
         order_index: toInt(body.order_index, 0),
         is_active: toBoolean(body.is_active, true),
+        tags,
       }
 
       const { data, error } = await supabase.from("learning_path_chapters").insert(payload).select().single()
@@ -666,6 +683,30 @@ export async function PUT(req: NextRequest) {
       if (body.order_index !== undefined) updateData.order_index = toInt(body.order_index, 0)
       if (body.is_active !== undefined) updateData.is_active = toBoolean(body.is_active, true)
       if (body.is_hidden !== undefined) updateData.is_hidden = toBoolean(body.is_hidden, false)
+      if (body.tags !== undefined || body.is_archived !== undefined) {
+        const { data: existingChapter, error: existingChapterErr } = await supabase
+          .from("learning_path_chapters")
+          .select("tags")
+          .eq("id", id)
+          .maybeSingle()
+        if (existingChapterErr || !existingChapter) {
+          return NextResponse.json({ error: "Capitolul nu există." }, { status: 404 })
+        }
+
+        const tagsParsed = parseLearningPathTagsInput(
+          body.tags !== undefined ? body.tags : existingChapter.tags,
+        )
+        if (!tagsParsed.ok) {
+          return NextResponse.json(
+            { error: "tags trebuie să fie o listă sau un text separat prin virgulă." },
+            { status: 400 },
+          )
+        }
+        updateData.tags =
+          body.is_archived !== undefined
+            ? setLearningPathArchiveTag(tagsParsed.tags, toBoolean(body.is_archived, false))
+            : tagsParsed.tags
+      }
       updateData.updated_at = new Date().toISOString()
 
       const { data, error } = await supabase

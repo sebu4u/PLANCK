@@ -36,6 +36,11 @@ import { allPhysicsCatalogCategories } from "@/lib/physics-catalog-chapters"
 import { INFORMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-informatica"
 import { MATEMATICA_LEARNING_PATH_MARKER } from "@/lib/learning-path-matematica"
 import { BIOLOGIE_LEARNING_PATH_MARKER } from "@/lib/learning-path-biologie"
+import {
+  formatLearningPathTagsInput,
+  learningPathHasArchiveTag,
+  parseLearningPathTagsInput,
+} from "@/lib/learning-path-tags"
 import type { AnswerKey } from "@/lib/types/quiz-questions"
 import { validateBiologyQuizInput } from "@/lib/quiz-question-utils"
 import type { ApiDevSubject } from "@/lib/dev-subjects"
@@ -648,6 +653,7 @@ export function LearningPathsManager({
   const [newLessonImageUrl, setNewLessonImageUrl] = useState("")
   const [chapterIconDrafts, setChapterIconDrafts] = useState<Record<string, string>>({})
   const [chapterNavTitleDrafts, setChapterNavTitleDrafts] = useState<Record<string, string>>({})
+  const [chapterTagsDrafts, setChapterTagsDrafts] = useState<Record<string, string>>({})
   const [chapterAccentColorDrafts, setChapterAccentColorDrafts] = useState<Record<string, string>>({})
   const [chapterDevEditorDrafts, setChapterDevEditorDrafts] = useState<Record<string, string[]>>({})
   const [devUsers, setDevUsers] = useState<DevUserOption[]>([])
@@ -664,6 +670,8 @@ export function LearningPathsManager({
     problem_category: "",
     order_index: "",
     allowed_dev_user_ids: [] as string[],
+    tags: "",
+    is_archived: false,
   })
 
   const orderedItemIdsRef = useRef<string[]>([])
@@ -1531,6 +1539,8 @@ export function LearningPathsManager({
         problem_category,
         order_index,
         is_active: true,
+        tags: chapterForm.tags,
+        is_archived: chapterForm.is_archived,
       }
       if (isDev && devSubject) {
         payload.subject = devSubject
@@ -1571,6 +1581,8 @@ export function LearningPathsManager({
         problem_category: "",
         order_index: "",
         allowed_dev_user_ids: [],
+        tags: "",
+        is_archived: false,
       })
       await fetchData()
     } catch (err: unknown) {
@@ -1751,6 +1763,103 @@ export function LearningPathsManager({
       await fetchData()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Eroare la salvarea titlului din top bar.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveChapterTags = async (chapterId: string) => {
+    const chapterRow = chapters.find((c) => c.id === chapterId)
+    if (!chapterRow) return
+
+    const parsed = parseLearningPathTagsInput(
+      chapterTagsDrafts[chapterId] ?? formatLearningPathTagsInput(chapterRow.tags),
+    )
+    if (!parsed.ok) {
+      setError("Tag-urile trebuie să fie text separat prin virgulă.")
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error("Sesiune expirată.")
+
+      const payload: Record<string, unknown> = {
+        type: "chapter",
+        id: chapterId,
+        tags: parsed.tags,
+        is_archived: learningPathHasArchiveTag(chapterRow.tags),
+      }
+      if (isDev && devSubject) {
+        payload.subject = devSubject
+      }
+
+      const response = await fetch(apiBase, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut actualiza tag-urile.")
+      }
+
+      setChapterTagsDrafts(({ [chapterId]: _removed, ...rest }) => rest)
+      setSuccessMessage("Tag-urile au fost salvate.")
+      setTimeout(() => setSuccessMessage(null), 3000)
+      await fetchData()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Eroare la salvarea tag-urilor.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggleChapterArchive = async (chapterId: string, archived: boolean) => {
+    const chapterRow = chapters.find((c) => c.id === chapterId)
+    if (!chapterRow) return
+    if (learningPathHasArchiveTag(chapterRow.tags) === archived) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error("Sesiune expirată.")
+
+      const payload: Record<string, unknown> = {
+        type: "chapter",
+        id: chapterId,
+        is_archived: archived,
+      }
+      if (isDev && devSubject) {
+        payload.subject = devSubject
+      }
+
+      const response = await fetch(apiBase, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Nu am putut actualiza arhiva.")
+      }
+
+      setSuccessMessage(archived ? "Traseul a fost mutat în arhivă." : "Traseul a fost scos din arhivă.")
+      setTimeout(() => setSuccessMessage(null), 3000)
+      await fetchData()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Eroare la actualizarea arhivei.")
     } finally {
       setSaving(false)
     }
@@ -3131,6 +3240,24 @@ export function LearningPathsManager({
               placeholder={`order_index (implicit ${nextChapterOrderDefault})`}
               className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
             />
+            <Input
+              value={chapterForm.tags}
+              onChange={(e) => setChapterForm((f) => ({ ...f, tags: e.target.value }))}
+              placeholder="Tag-uri (separate prin virgulă, opțional)"
+              className="h-9 border-white/20 bg-black/40 text-sm text-gray-100"
+            />
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+              <Checkbox
+                checked={chapterForm.is_archived}
+                onCheckedChange={(value) =>
+                  setChapterForm((f) => ({ ...f, is_archived: value === true }))
+                }
+              />
+              Arhivă pe /invata
+            </label>
+            <p className="text-[11px] leading-snug text-gray-500">
+              Tag-ul special <code className="text-gray-400">arhiva</code> mută traseul în secțiunea Arhivă.
+            </p>
             {!isDev && devUsers.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
@@ -3211,6 +3338,14 @@ export function LearningPathsManager({
                           title="Ascuns din /invata, dashboard și hărțile de materie — accesibil doar direct prin URL."
                         >
                           ascuns
+                        </span>
+                      ) : null}
+                      {learningPathHasArchiveTag(chapter.tags) ? (
+                        <span
+                          className="text-[10px] font-semibold uppercase tracking-wide text-sky-300/90"
+                          title="Are tag-ul arhiva — apare în Arhivă pe /invata."
+                        >
+                          arhivă
                         </span>
                       ) : null}
                       {!isDev && (chapter.allowed_dev_user_ids?.length ?? 0) > 0 ? (
@@ -3411,6 +3546,52 @@ export function LearningPathsManager({
                           </div>
                           <p className="text-[11px] leading-snug text-gray-500">
                             Afișat în bara de sus pe mobil la /invata. Dacă e gol, se folosește titlul capitolului.
+                          </p>
+                        </div>
+
+                        <div className="border-t border-white/10 px-3 py-3 pl-9 space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                            Tag-uri
+                          </p>
+                          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                            <Checkbox
+                              checked={learningPathHasArchiveTag(chapter.tags)}
+                              disabled={saving}
+                              onCheckedChange={(value) =>
+                                void handleToggleChapterArchive(chapter.id, value === true)
+                              }
+                            />
+                            Arhivă pe /invata
+                          </label>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              value={
+                                chapterTagsDrafts[chapter.id] ??
+                                formatLearningPathTagsInput(chapter.tags)
+                              }
+                              onChange={(e) =>
+                                setChapterTagsDrafts((prev) => ({ ...prev, [chapter.id]: e.target.value }))
+                              }
+                              placeholder="ex. BAC, clasa 9"
+                              className="h-9 flex-1 border-white/20 bg-black/40 text-sm text-gray-100"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={
+                                saving ||
+                                (chapterTagsDrafts[chapter.id] ??
+                                  formatLearningPathTagsInput(chapter.tags)) ===
+                                  formatLearningPathTagsInput(chapter.tags)
+                              }
+                              onClick={() => void handleSaveChapterTags(chapter.id)}
+                              className="shrink-0 bg-emerald-700 text-white hover:bg-emerald-600"
+                            >
+                              Salvează
+                            </Button>
+                          </div>
+                          <p className="text-[11px] leading-snug text-gray-500">
+                            Tag-ul special <code className="text-gray-400">arhiva</code> este controlat din bifă.
                           </p>
                         </div>
 

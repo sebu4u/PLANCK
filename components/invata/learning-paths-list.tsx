@@ -18,12 +18,15 @@ import type {
   LearningPathHubLesson,
 } from "@/lib/supabase-learning-paths"
 import type { ElasticLessonsScrollerProps } from "@/components/invata/elastic-lessons-scroller"
-import { GUEST_LEARNING_PATH_PROGRESS_COOKIE } from "@/lib/guest-learning-path-cookie"
+import { GUEST_LEARNING_PATH_PROGRESS_COOKIE, readGuestLearningPathProgressFromDocument } from "@/lib/guest-learning-path-cookie"
 import { dispatchInvataHubRefresh, INVATA_HUB_REFRESH_EVENT } from "@/lib/invata/hub-events"
 import {
   chapterMatchesInvataSubjectFilter,
   type InvataSubjectFilter,
+  type InvataSubjectId,
 } from "@/lib/invata-config"
+import { sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-order"
+import { getLearningPathDisplayTags } from "@/lib/learning-path-tags"
 import { LessonHubSquareCardProgressBar } from "@/components/invata/lesson-item-progress-bar"
 import { LearningPathSegmentedProgress } from "@/components/invata/learning-path-segmented-progress"
 import { InvataMobileLessonList } from "@/components/invata/invata-mobile-lesson-card"
@@ -48,6 +51,8 @@ interface LearningPathsListProps {
   lockedChapterIds?: string[]
   completedLessonIds?: string[]
   lessonProgressByLessonId?: LessonProgressByLessonId
+  preferredSubject?: InvataSubjectId | null
+  startedLastActivityByChapterId?: Record<string, number>
   subjectFilter?: InvataSubjectFilter
   /** Desktop hub only — mobile tree is still in the DOM and must not mount a second spy. */
   showChapterIndicator?: boolean
@@ -65,6 +70,8 @@ type HubSessionResponse = {
   lessonsByChapter?: Record<string, LearningPathHubLesson[]>
   lockedChapterIds?: string[]
   lessonProgressByLessonId?: LessonProgressByLessonId
+  preferredSubject?: InvataSubjectId | null
+  startedLastActivityByChapterId?: Record<string, number>
   error?: string
 }
 
@@ -193,6 +200,41 @@ function isHiddenGeneratingChapter(chapter: LearningPathHubChapter): boolean {
   return chapter.generation_status === "creating" || chapter.generation_status === "failed"
 }
 
+function chapterProgressCompletedCount(
+  lessons: LearningPathHubLesson[],
+  completedLessonIds: string[],
+  lessonProgressByLessonId: LessonProgressByLessonId,
+  guestCompletedItemIdsByLessonId: Record<string, string[]>,
+): number {
+  const completedLessonIdSet = new Set(completedLessonIds)
+  let completed = 0
+  for (const lesson of lessons) {
+    if (completedLessonIdSet.has(lesson.id)) completed += 1
+    const progress = lessonProgressByLessonId[lesson.id]
+    if (progress && progress.completed > 0) completed += progress.completed
+    completed += guestCompletedItemIdsByLessonId[lesson.id]?.length ?? 0
+  }
+  return completed
+}
+
+function LearningPathDisplayTags({ tags }: { tags: unknown }) {
+  const displayTags = getLearningPathDisplayTags(tags)
+  if (!displayTags.length) return null
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {displayTags.map((tag) => (
+        <span
+          key={tag}
+          className="rounded-full border border-[#e6e6e6] bg-white px-2.5 py-0.5 text-[11px] font-semibold text-[#6f6f6f]"
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 interface InvataChapterSectionProps {
   chapter: LearningPathHubChapter
   chapterIndex: number
@@ -246,6 +288,7 @@ function InvataChapterSection({
             {chapter.description ? (
               <p className="mt-1 text-sm text-[#707070]">{chapter.description}</p>
             ) : null}
+            <LearningPathDisplayTags tags={chapter.tags} />
             {isLocked ? (
               <span className="mt-3 inline-flex items-center gap-1 rounded-full border border-[#ebdef9] bg-[#f6f0ff] px-3 py-1 text-xs font-semibold text-[#7c3aed]">
                 <Lock className="h-3 w-3" aria-hidden="true" />
@@ -329,6 +372,7 @@ function InvataChapterSection({
             {chapter.description ? (
               <p className="mt-0.5 text-sm text-[#707070]">{chapter.description}</p>
             ) : null}
+            <LearningPathDisplayTags tags={chapter.tags} />
             {chapterLessons.length > 0 ? (
               <LearningPathSegmentedProgress
                 lessons={chapterLessons}
@@ -531,12 +575,11 @@ function InvataArchivedLearningPathsSection({
               {chapters.map((chapter, chapterIndex) => {
                 const chapterLessons = lessonsByChapter[chapter.id] ?? []
                 const progress = getArchivedChapterProgress(chapterLessons, completedLessonIds)
+                const firstLesson = chapterLessons[0]
+                const href = firstLesson ? getLearningPathLessonHref(chapter, firstLesson) : null
 
-                return (
-                  <div
-                    key={chapter.id}
-                    className="relative flex w-[120px] shrink-0 flex-col items-center sm:w-[132px]"
-                  >
+                const card = (
+                  <>
                     <div className="relative">
                       {chapterIndex < chapters.length - 1 ? (
                         <div
@@ -576,6 +619,23 @@ function InvataArchivedLearningPathsSection({
                     <p className="mt-3 line-clamp-3 text-center text-sm font-medium leading-snug text-[#1f1f1f]">
                       {chapter.title}
                     </p>
+                  </>
+                )
+
+                return href ? (
+                  <Link
+                    key={chapter.id}
+                    href={href}
+                    className="relative flex w-[120px] shrink-0 flex-col items-center sm:w-[132px]"
+                  >
+                    {card}
+                  </Link>
+                ) : (
+                  <div
+                    key={chapter.id}
+                    className="relative flex w-[120px] shrink-0 flex-col items-center sm:w-[132px]"
+                  >
+                    {card}
                   </div>
                 )
               })}
@@ -594,6 +654,8 @@ export function LearningPathsList({
   lockedChapterIds = [],
   completedLessonIds = [],
   lessonProgressByLessonId = {},
+  preferredSubject = null,
+  startedLastActivityByChapterId = {},
   subjectFilter = "all",
   showChapterIndicator = false,
 }: LearningPathsListProps) {
@@ -607,6 +669,10 @@ export function LearningPathsList({
   const [hubArchivedChapters, setHubArchivedChapters] = useState(archivedChapters)
   const [hubLessonsByChapter, setHubLessonsByChapter] = useState(lessonsByChapter)
   const [hubLockedChapterIds, setHubLockedChapterIds] = useState(lockedChapterIds)
+  const [hubPreferredSubject, setHubPreferredSubject] = useState(preferredSubject)
+  const [hubStartedLastActivityByChapterId, setHubStartedLastActivityByChapterId] = useState(
+    startedLastActivityByChapterId,
+  )
   const [hubSessionReadyUserId, setHubSessionReadyUserId] = useState<string | null>(null)
   const [hubRefreshToken, setHubRefreshToken] = useState(0)
   const lockedChapterIdSet = useMemo(
@@ -631,6 +697,8 @@ export function LearningPathsList({
     setHubArchivedChapters(archivedChapters)
     setHubLessonsByChapter(lessonsByChapter)
     setHubLockedChapterIds(lockedChapterIds)
+    setHubPreferredSubject(preferredSubject)
+    setHubStartedLastActivityByChapterId(startedLastActivityByChapterId)
     setHubSessionReadyUserId(null)
     setHydratedCompletedLessonIds(completedLessonIds)
     setHydratedLessonProgressByLessonId(lessonProgressByLessonId)
@@ -642,6 +710,8 @@ export function LearningPathsList({
     lessonProgressByLessonId,
     lessonsByChapter,
     lockedChapterIds,
+    preferredSubject,
+    startedLastActivityByChapterId,
     user,
   ])
 
@@ -671,6 +741,10 @@ export function LearningPathsList({
           setHubLessonsByChapter(data.lessonsByChapter)
         }
         if (Array.isArray(data.lockedChapterIds)) setHubLockedChapterIds(data.lockedChapterIds)
+        if (data.preferredSubject !== undefined) setHubPreferredSubject(data.preferredSubject)
+        if (data.startedLastActivityByChapterId && typeof data.startedLastActivityByChapterId === "object") {
+          setHubStartedLastActivityByChapterId(data.startedLastActivityByChapterId)
+        }
         if (data.lessonProgressByLessonId && typeof data.lessonProgressByLessonId === "object") {
           setHydratedLessonProgressByLessonId(data.lessonProgressByLessonId)
         }
@@ -685,18 +759,47 @@ export function LearningPathsList({
     return () => controller.abort()
   }, [authLoading, hubRefreshToken, user?.id])
 
-  const visibleChapters = useMemo(
-    () =>
-      hubChapters.filter(
-        (chapter) =>
-          !deletedChapterIds.has(chapter.id) &&
-          !isHiddenGeneratingChapter(chapter) &&
-          chapterMatchesInvataSubjectFilter(chapter, subjectFilter),
-      ),
-    [hubChapters, deletedChapterIds, subjectFilter],
-  )
-  const visibleArchivedChapters = useMemo(
-    () =>
+  const guestProgressMap = useMemo(() => {
+    if (authLoading || user) return {}
+    return readGuestLearningPathProgressFromDocument()
+  }, [authLoading, hubRefreshToken, user])
+
+  const startedLastActivityForSort = useMemo(() => {
+    const activity = { ...hubStartedLastActivityByChapterId }
+    for (const chapter of [...hubChapters, ...hubArchivedChapters]) {
+      if ((activity[chapter.id] ?? 0) > 0) continue
+      const completed = chapterProgressCompletedCount(
+        hubLessonsByChapter[chapter.id] ?? [],
+        hydratedCompletedLessonIds,
+        hydratedLessonProgressByLessonId,
+        guestProgressMap,
+      )
+      if (completed > 0) activity[chapter.id] = completed
+    }
+    return activity
+  }, [
+    guestProgressMap,
+    hubArchivedChapters,
+    hubChapters,
+    hubLessonsByChapter,
+    hubStartedLastActivityByChapterId,
+    hydratedCompletedLessonIds,
+    hydratedLessonProgressByLessonId,
+  ])
+
+  const subjectForSort = subjectFilter === "all" ? hubPreferredSubject : subjectFilter
+
+  const visibleChapters = useMemo(() => {
+    const filtered = hubChapters.filter(
+      (chapter) =>
+        !deletedChapterIds.has(chapter.id) &&
+        !isHiddenGeneratingChapter(chapter) &&
+        chapterMatchesInvataSubjectFilter(chapter, subjectFilter),
+    )
+    return sortLearningPathChaptersForHub(filtered, subjectForSort, startedLastActivityForSort)
+  }, [deletedChapterIds, hubChapters, startedLastActivityForSort, subjectFilter, subjectForSort])
+  const visibleArchivedChapters = useMemo(() => {
+    const filtered =
       hubArchivedChapters.length === 0
         ? []
         : hubArchivedChapters.filter(
@@ -704,9 +807,9 @@ export function LearningPathsList({
               !deletedChapterIds.has(chapter.id) &&
               !isHiddenGeneratingChapter(chapter) &&
               chapterMatchesInvataSubjectFilter(chapter, subjectFilter),
-          ),
-    [hubArchivedChapters, deletedChapterIds, subjectFilter],
-  )
+          )
+    return sortLearningPathChaptersForHub(filtered, subjectForSort, startedLastActivityForSort)
+  }, [deletedChapterIds, hubArchivedChapters, startedLastActivityForSort, subjectFilter, subjectForSort])
 
   useEffect(() => {
     setInvataHubChapters?.(visibleChapters)
@@ -841,7 +944,7 @@ export function LearningPathsList({
     [deletingChapterId],
   )
 
-  if (!visibleChapters.length) {
+  if (!visibleChapters.length && !visibleArchivedChapters.length) {
     return (
       <section className="rounded-2xl border border-[#e6e6e6] bg-[#f7f7f7] p-8 text-center">
         <h2 className="text-lg font-semibold text-[#1f1f1f]">

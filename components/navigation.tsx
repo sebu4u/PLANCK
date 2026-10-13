@@ -10,7 +10,7 @@ import {
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Home, BookOpen, Calculator, CalendarDays, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus, ShoppingBag } from "lucide-react"
+import { Menu, Home, BookOpen, Calculator, Rocket, Search as SearchIcon, Loader2, ArrowUpRight, ArrowRight, ArrowLeft, Github, Chrome, Trophy, Users, NotebookPen, Library, KeyRound, User, Sparkles, MessageSquare, LogOut, UserPlus, ShoppingBag } from "lucide-react"
 import { BlogNotificationsDropdown } from "@/components/blog/blog-notifications-dropdown"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
@@ -38,7 +38,6 @@ import {
   isFlashcardRoute,
   isGrileRoute as matchGrileRoute,
   isTesteRoute as matchTesteRoute,
-  isInvataHubRoute,
   isMobileAppShellRoute,
   isMobileLessonItemsShellRoute,
   isPracticeProblemDetailRoute,
@@ -84,7 +83,6 @@ export function Navigation() {
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
-  const isInvataHub = isInvataHubRoute(pathname)
 
   // Dashboard, /invata, /grile, /probleme catalog, /matematica|informatica/probleme, /classrooms, /profil, and /castiga share the same white navbar theme.
   const isDashboard =
@@ -452,16 +450,7 @@ export function Navigation() {
   // Don't render anything during initial auth loading - the DashboardRedirect overlay
   // will cover everything anyway. This prevents navbar flash during redirect.
   if (loading) {
-    if (!isInvataHub) {
-      return null
-    }
-
-    return (
-      <div
-        className="relative z-0 h-16 max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:fixed sm:inset-x-0 sm:top-0 sm:z-[300] sm:border-b sm:border-gray-200 sm:bg-[#ffffff]"
-        aria-hidden
-      />
-    )
+    return null
   }
 
   const isHomepage = pathname === '/'
@@ -637,9 +626,7 @@ export function Navigation() {
           ? planckPassExpanded
             ? "shadow-[0_6px_20px_rgba(26,10,74,0.28)] transition-shadow duration-300 burger:shadow-md"
             : "shadow-none transition-shadow duration-300 burger:shadow-md"
-          : isInvataHub
-            ? "max-sm:shadow-none transition-shadow duration-300 burger:shadow-md sm:shadow-md"
-            : isPracticeCatalogHubPage
+          : isPracticeCatalogHubPage
               ? "shadow-none"
               : isCatalogHubPage || isProfileRoute || isCastigaRoute(pathname) || isFlashcardRoute(pathname)
                 ? "shadow-none burger:shadow-md"
@@ -685,39 +672,22 @@ export function Navigation() {
         : "bg-[#ffffff] border-gray-200 burger:bg-[#0d1117] burger:border-gray-800"
     : isPlanckCodeRoute
       ? `${navTheme.background} ${navTheme.border}`
-      : isInvataHub
-        ? "max-sm:border-transparent max-sm:bg-[#DCE6FA] sm:bg-[#ffffff] sm:border-gray-200"
-        : showMobileFocusedShell
+      : showMobileFocusedShell
           ? "bg-[#ffffff] border-transparent"
           : `${navTheme.background} ${navTheme.border}`
   const navBackdropClass = showMobileFocusedShell
     ? ""
-    : isInvataHub
-      ? "max-sm:backdrop-blur-none sm:backdrop-blur-md"
-      : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
+    : `${isHomepage && isScrolled ? "backdrop-blur-md" : !isHomepage ? "backdrop-blur-md" : ""}`
 
   return (
     <>
       <div
-        className={`${
-          isInvataHub ? "max-sm:relative sm:fixed top-0 left-0 right-0" : "fixed top-0 left-0 right-0"
-        } ${
-          // On mobile /invata the header character must paint above this bar (see INVATA_HUB_MOBILE_HEADER_Z).
-          isInvataHub ? "z-0 sm:z-[300]" : "z-[300]"
-        } flex flex-col ${
-          isInvataHub
-            ? "max-sm:animate-none max-sm:transition-none max-sm:bg-[#DCE6FA] sm:animate-slide-down sm:transition-transform sm:duration-300"
-            : "animate-slide-down transition-transform duration-300"
-        } ${
-          !isInvataHub && isHomepage && isNavbarHidden ? "-translate-y-full" : "translate-y-0"
+        className={`fixed top-0 left-0 right-0 z-[300] flex flex-col animate-slide-down transition-transform duration-300 ${
+          isHomepage && isNavbarHidden ? "-translate-y-full" : "translate-y-0"
         } ${navbarElevationClass}`}
       >
         <nav
-          className={`w-full ${navBackdropClass} ${
-            isInvataHub
-              ? "max-sm:transition-none max-sm:bg-[#DCE6FA] sm:transition-all sm:duration-300"
-              : "transition-all duration-300"
-          } ${mobileShellNavSurfaceClass}`}
+          className={`w-full ${navBackdropClass} transition-all duration-300 ${mobileShellNavSurfaceClass}`}
         >
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="relative flex h-16 items-center justify-between gap-4">
@@ -925,11 +895,11 @@ export function Navigation() {
                             <Calculator className="h-5 w-5" />
                           </Link>
                           <Link
-                            href="/pregatire"
-                            aria-label="Pregătiri"
-                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isPregatireRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
+                            href="/classrooms"
+                            aria-label="Clasa mea"
+                            className={`${MOBILE_FALLBACK_NAV_ICON_CLASS} ${navPrimaryText} ${navHoverBg} ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`}`}
                           >
-                            <CalendarDays className="h-5 w-5" />
+                            <Users className="h-5 w-5" />
                           </Link>
                         </>
                       )}
@@ -1097,11 +1067,11 @@ export function Navigation() {
                     </Link>
 
                     <Link
-                      href="/pregatire"
-                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isPregatireRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
+                      href="/classrooms"
+                      className={`relative h-full px-3 py-0 text-sm flex items-center gap-1 transition-all duration-300 rounded-lg whitespace-nowrap after:absolute after:bottom-0 after:left-0 after:right-0 after:block after:h-[2px] after:content-[''] after:rounded-none ${navPrimaryText} font-semibold ${isClassroomsRoute(pathname) ? (useLightNav ? 'after:bg-gray-900' : 'after:bg-white') : `after:bg-transparent ${useLightNav ? 'hover:after:bg-gray-400' : 'hover:after:bg-gray-500'}`} ${useLightNav ? 'hover:text-gray-700' : 'hover:text-gray-300'}`}
                     >
-                      <CalendarDays size={16} />
-                      Pregătiri
+                      <Users size={16} />
+                      Clasa mea
                     </Link>
                   </div>
                 )}

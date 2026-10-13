@@ -9,11 +9,12 @@ import { getFreePlanItemsRemainingForUser } from "@/lib/learning-path-free-plan"
 import type { LearningPathChapter } from "@/lib/supabase-learning-paths"
 import { PROBLEMS_BG_AVATAR_SRC } from "@/lib/planck-catalog-avatar"
 import { cn } from "@/lib/utils"
+import { ExerseazaRecommendedProblems } from "@/components/exerseaza/exerseaza-recommended-problems"
 import { InvataPersonalizedCourseEntry } from "@/components/invata/invata-personalized-course-entry"
 import { StudentGradeGoalCard } from "@/components/dashboard/free-mobile/student-grade-goal-card"
 import { StudentCurrentPathCard } from "@/components/dashboard/free-mobile/student-current-path-card"
-import { StudentPregatireCard } from "@/components/dashboard/free-mobile/student-pregatire-card"
 import { StudentLeaderboardCard } from "@/components/dashboard/free-mobile/student-leaderboard-card"
+import { normalizePracticeSubject } from "@/lib/practice-subject"
 
 interface FreeMobileDashboardProps {
   primaryChapter: LearningPathChapter | null
@@ -23,6 +24,7 @@ interface FreeMobileDashboardProps {
   lessonProgress?: { completed: number; total: number }
   currentLessonTitle?: string | null
   rank: string
+  problemsSolvedTotal: number
 }
 
 export function FreeMobileDashboard({
@@ -33,6 +35,7 @@ export function FreeMobileDashboard({
   lessonProgress,
   currentLessonTitle,
   rank,
+  problemsSolvedTotal,
 }: FreeMobileDashboardProps) {
   const { user, profile, userElo } = useAuth()
   const { isFree } = useSubscriptionPlan()
@@ -68,6 +71,7 @@ export function FreeMobileDashboard({
 
   const elo = userElo ?? 500
   const studentName = profile?.nickname || profile?.name || "Tu"
+  const hasActivity = hasStarted || problemsSolvedTotal > 0
 
   return (
     <div
@@ -76,14 +80,6 @@ export function FreeMobileDashboard({
         "flex flex-col gap-4 px-4 pt-3",
       )}
     >
-      <div className="mb-2">
-        <InvataPersonalizedCourseEntry />
-      </div>
-
-      <StudentGradeGoalCard currentGrade={estimateGradeFromElo(elo)} targetGrade={targetGrade} />
-
-      <StudentPregatireCard preferredMaterie={profile?.preferred_materie} />
-
       {primaryChapter ? (
         <StudentCurrentPathCard
           userId={user?.id ?? ""}
@@ -97,14 +93,24 @@ export function FreeMobileDashboard({
         />
       ) : null}
 
-      <StudentLeaderboardCard studentName={studentName} elo={elo} rank={rank} />
+      <ExerseazaRecommendedProblems subject={normalizePracticeSubject(profile?.preferred_materie)} />
+
+      {hasActivity ? (
+        <>
+          <StudentGradeGoalCard currentGrade={estimateGradeFromElo(elo)} targetGrade={targetGrade} />
+          <StudentLeaderboardCard studentName={studentName} elo={elo} rank={rank} />
+          <InvataPersonalizedCourseEntry />
+        </>
+      ) : null}
 
       <div className="relative mt-6 flex flex-col items-center pt-6 text-center">
         <h3 className="max-w-[280px] text-lg font-bold leading-snug text-[#111111]">
-          Te ajut să îți măresti media!
+          {hasActivity ? "Continuă ca să crești" : "Începe cu traseul"}
         </h3>
         <p className="mt-1.5 max-w-[280px] text-sm text-[#6b7280]">
-          Continuă să explorezi platforma pentru a crește în clasament
+          {hasActivity
+            ? "Fiecare pas îți ridică nota și locul în clasament"
+            : "Rezolvă primul pas din traseu, apoi problemele recomandate"}
         </p>
 
         <img

@@ -3,7 +3,6 @@ import "server-only"
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
 import {
-  compareOfficialHubChaptersByPreferredSubject,
   onboardingMaterieToInvataSubject,
   type InvataSubjectId,
 } from "@/lib/invata-config"
@@ -13,6 +12,8 @@ import {
   type LearningPathHubChapter,
   type LearningPathHubLesson,
 } from "@/lib/supabase-learning-paths"
+
+export { sortLearningPathChaptersForHub } from "@/lib/learning-path-hub-order"
 
 export interface SsrPersonalizedLearningPathHub {
   chapters: LearningPathHubChapter[]
@@ -60,26 +61,4 @@ export async function getInvataPreferredSubjectForUser(
     .maybeSingle()
 
   return onboardingMaterieToInvataSubject(data?.preferred_materie)
-}
-
-/**
- * Hub chapter order: personalized chapters first (newest first by created_at), then
- * official chapters for the user's onboarding subject, then the rest by `order_index`.
- * Shared by the SSR pass and /api/invata/hub-session so both views agree.
- */
-export function sortLearningPathChaptersForHub(
-  chapters: LearningPathHubChapter[],
-  preferredSubject: InvataSubjectId | null = null,
-): LearningPathHubChapter[] {
-  return [...chapters].sort((a, b) => {
-    const aPersonalized = a.is_personalized === true
-    const bPersonalized = b.is_personalized === true
-    if (aPersonalized !== bPersonalized) return aPersonalized ? -1 : 1
-
-    if (aPersonalized && bPersonalized) {
-      return Date.parse(b.created_at) - Date.parse(a.created_at)
-    }
-
-    return compareOfficialHubChaptersByPreferredSubject(a, b, preferredSubject)
-  })
 }
